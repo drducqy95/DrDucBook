@@ -1,0 +1,11 @@
+CVDICT frequency-bounded base lexicon
+
+Source: https://github.com/ph0ngp/CVDICT
+Revision: c379d909e308343a247e51619f7839a2060a271c
+Author/publisher: Phong Phan
+License: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+
+CVDICT is based on CC-CEDICT. The bundled subset is selected by Chinese word
+frequency and keeps a concise Vietnamese sense. Modifications to this subset are
+offered under CC BY-SA 4.0. Project-authored CC0 overrides are stored separately.

@@ -1,0 +1,148 @@
+# QT Clean v2 project-authored core names. License: CC0-1.0
+# source<TAB>target<TAB>type<TAB>provenance
+爱丽丝	Alice	person_name_latin	project
+艾丽丝	Alice	person_name_latin	project
+艾莉丝	Alice	person_name_latin	project
+艾伦	Alan	person_name_latin	project
+亚伦	Aaron	person_name_latin	project
+亚历克斯	Alex	person_name_latin	project
+亚历山大	Alexander	person_name_latin	project
+亚历山德拉	Alexandra	person_name_latin	project
+安德鲁	Andrew	person_name_latin	project
+安德烈	Andrei	person_name_latin	project
+安东尼	Anthony	person_name_latin	project
+阿瑟	Arthur	person_name_latin	project
+奥斯卡	Oscar	person_name_latin	project
+奥利弗	Oliver	person_name_latin	project
+本杰明	Benjamin	person_name_latin	project
+布莱恩	Brian	person_name_latin	project
+布鲁斯	Bruce	person_name_latin	project
+查尔斯	Charles	person_name_latin	project
+克里斯	Chris	person_name_latin	project
+克里斯蒂安	Christian	person_name_latin	project
+克里斯托弗	Christopher	person_name_latin	project
+丹尼尔	Daniel	person_name_latin	project
+大卫	David	person_name_latin	project
+戴维	David	person_name_latin	project
+爱德华	Edward	person_name_latin	project
+伊丽莎白	Elizabeth	person_name_latin	project
+艾米莉	Emily	person_name_latin	project
+艾玛	Emma	person_name_latin	project
+埃里克	Eric	person_name_latin	project
+伊森	Ethan	person_name_latin	project
+弗兰克	Frank	person_name_latin	project
+弗雷德	Fred	person_name_latin	project
+乔治	George	person_name_latin	project
+格蕾丝	Grace	person_name_latin	project
+汉娜	Hannah	person_name_latin	project
+亨利	Henry	person_name_latin	project
+伊莎贝拉	Isabella	person_name_latin	project
+杰克	Jack	person_name_latin	project
+雅各布	Jacob	person_name_latin	project
+詹姆斯	James	person_name_latin	project
+简	Jane	person_name_latin	project
+杰森	Jason	person_name_latin	project
+珍妮	Jenny	person_name_latin	project
+杰西卡	Jessica	person_name_latin	project
+约翰	John	person_name_latin	project
+约瑟夫	Joseph	person_name_latin	project
+朱莉娅	Julia	person_name_latin	project
+凯瑟琳	Catherine	person_name_latin	project
+凯文	Kevin	person_name_latin	project
+劳拉	Laura	person_name_latin	project
+利奥	Leo	person_name_latin	project
+莱昂纳多	Leonardo	person_name_latin	project
+莉莉	Lily	person_name_latin	project
+琳达	Linda	person_name_latin	project
+卢卡斯	Lucas	person_name_latin	project
+露西	Lucy	person_name_latin	project
+玛格丽特	Margaret	person_name_latin	project
+玛丽	Mary	person_name_latin	project
+马修	Matthew	person_name_latin	project
+迈克尔	Michael	person_name_latin	project
+米歇尔	Michelle	person_name_latin	project
+娜塔莉	Natalie	person_name_latin	project
+尼古拉斯	Nicholas	person_name_latin	project
+诺亚	Noah	person_name_latin	project
+奥利维亚	Olivia	person_name_latin	project
+帕特里克	Patrick	person_name_latin	project
+保罗	Paul	person_name_latin	project
+彼得	Peter	person_name_latin	project
+瑞秋	Rachel	person_name_latin	project
+理查德	Richard	person_name_latin	project
+罗伯特	Robert	person_name_latin	project
+瑞安	Ryan	person_name_latin	project
+塞缪尔	Samuel	person_name_latin	project
+莎拉	Sarah	person_name_latin	project
+索菲娅	Sophia	person_name_latin	project
+斯蒂芬	Stephen	person_name_latin	project
+苏珊	Susan	person_name_latin	project
+托马斯	Thomas	person_name_latin	project
+维多利亚	Victoria	person_name_latin	project
+威廉	William	person_name_latin	project
+约翰逊	Johnson	person_name_latin	project
+史密斯	Smith	person_name_latin	project
+布朗	Brown	person_name_latin	project
+威尔逊	Wilson	person_name_latin	project
+泰勒	Taylor	person_name_latin	project
+安德森	Anderson	person_name_latin	project
+托马斯家族	gia tộc Thomas	organization_name	project
+山田太郎	Taro Yamada	person_name_japanese	project
+佐藤太郎	Taro Sato	person_name_japanese	project
+鈴木一郎	Ichiro Suzuki	person_name_japanese	project
+铃木一郎	Ichiro Suzuki	person_name_japanese	project
+高橋健太	Kenta Takahashi	person_name_japanese	project
+高桥健太	Kenta Takahashi	person_name_japanese	project
+田中健二	Kenji Tanaka	person_name_japanese	project
+伊藤誠	Makoto Ito	person_name_japanese	project
+伊藤诚	Makoto Ito	person_name_japanese	project
+渡辺直樹	Naoki Watanabe	person_name_japanese	project
+渡边直树	Naoki Watanabe	person_name_japanese	project
+中村翔	Sho Nakamura	person_name_japanese	project
+小林大輔	Daisuke Kobayashi	person_name_japanese	project
+小林大辅	Daisuke Kobayashi	person_name_japanese	project
+加藤悠斗	Yuto Kato	person_name_japanese	project
+吉田拓海	Takumi Yoshida	person_name_japanese	project
+山本美咲	Misaki Yamamoto	person_name_japanese	project
+佐藤美咲	Misaki Sato	person_name_japanese	project
+鈴木葵	Aoi Suzuki	person_name_japanese	project
+铃木葵	Aoi Suzuki	person_name_japanese	project
+高橋陽菜	Hina Takahashi	person_name_japanese	project
+高桥阳菜	Hina Takahashi	person_name_japanese	project
+田中結衣	Yui Tanaka	person_name_japanese	project
+田中结衣	Yui Tanaka	person_name_japanese	project
+伊藤さくら	Sakura Ito	person_name_japanese	project
+渡辺凛	Rin Watanabe	person_name_japanese	project
+渡边凛	Rin Watanabe	person_name_japanese	project
+中村七海	Nanami Nakamura	person_name_japanese	project
+小林遥	Haruka Kobayashi	person_name_japanese	project
+金敏俊	Kim Min-jun	person_name_korean	project
+李敏俊	Lee Min-jun	person_name_korean	project
+朴敏俊	Park Min-jun	person_name_korean	project
+金智勋	Kim Ji-hoon	person_name_korean	project
+金智勳	Kim Ji-hoon	person_name_korean	project
+李贤宇	Lee Hyun-woo	person_name_korean	project
+李賢宇	Lee Hyun-woo	person_name_korean	project
+朴俊浩	Park Jun-ho	person_name_korean	project
+崔宇镇	Choi Woo-jin	person_name_korean	project
+崔宇鎮	Choi Woo-jin	person_name_korean	project
+郑泰贤	Jung Tae-hyun	person_name_korean	project
+鄭泰賢	Jung Tae-hyun	person_name_korean	project
+姜道允	Kang Do-yoon	person_name_korean	project
+赵成民	Cho Sung-min	person_name_korean	project
+趙成民	Cho Sung-min	person_name_korean	project
+尹正勋	Yoon Jung-hoon	person_name_korean	project
+金智恩	Kim Ji-eun	person_name_korean	project
+朴智恩	Park Ji-eun	person_name_korean	project
+李秀贤	Lee Soo-hyun	person_name_korean	project
+李秀賢	Lee Soo-hyun	person_name_korean	project
+崔恩智	Choi Eun-ji	person_name_korean	project
+郑秀敏	Jung Soo-min	person_name_korean	project
+鄭秀敏	Jung Soo-min	person_name_korean	project
+姜敏书	Kang Min-seo	person_name_korean	project
+姜敏書	Kang Min-seo	person_name_korean	project
+赵智慧	Cho Ji-hye	person_name_korean	project
+趙智慧	Cho Ji-hye	person_name_korean	project
+尹素妍	Yoon So-yeon	person_name_korean	project
+韩瑞妍	Han Seo-yeon	person_name_korean	project
+韓瑞妍	Han Seo-yeon	person_name_korean	project

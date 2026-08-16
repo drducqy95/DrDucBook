@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "project_name": "legado-with-MD3-main",
+    "last_updated": "2026-07-27T15:10:00+07:00",
+    "overall_progress_percent": 100,
+    "current_phase": "P08",
+    "status": "DONE",
+    "database_version": 105,
+    "debug_device": "LDPlayer (127.0.0.1:5555)"
+  },
+  "milestones": [
+    {"id": "P01", "name": "AI Router & Providers", "status": "DONE", "progress": 100},
+    {"id": "P02", "name": "AI Agent & Chat Bubble", "status": "DONE", "progress": 100},
+    {"id": "P03", "name": "LocalAI, ML Kit & Translation", "status": "DONE", "progress": 100},
+    {"id": "P04", "name": "VBook, Source Health & Browser", "status": "DONE", "progress": 100},
+    {"id": "P05", "name": "TTS & Model Management", "status": "DONE", "progress": 100},
+    {"id": "P06", "name": "Media Player & Download", "status": "DONE", "progress": 100},
+    {"id": "P07", "name": "Authoring, Ebook & Drop Cap", "status": "DONE", "progress": 100},
+    {"id": "P08", "name": "Integration, Migration & Release", "status": "DONE", "progress": 100, "validation_note": "Split lint gate passed; monolithic AGP FIR/UAST lint requires a build machine with more than 16 GB RAM"}
+  ]
+}

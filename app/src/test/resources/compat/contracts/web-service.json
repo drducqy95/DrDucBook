@@ -1,0 +1,38 @@
+{
+  "httpPort": 1122,
+  "webSocketPort": 1123,
+  "http": [
+    {"method":"POST","path":"/saveBookSource"},
+    {"method":"POST","path":"/saveBookSources"},
+    {"method":"POST","path":"/deleteBookSources"},
+    {"method":"POST","path":"/saveBook"},
+    {"method":"POST","path":"/deleteBook"},
+    {"method":"POST","path":"/saveBookProgress"},
+    {"method":"POST","path":"/addLocalBook"},
+    {"method":"POST","path":"/saveReadConfig"},
+    {"method":"POST","path":"/saveRssSource"},
+    {"method":"POST","path":"/saveRssSources"},
+    {"method":"POST","path":"/deleteRssSources"},
+    {"method":"POST","path":"/saveReplaceRule"},
+    {"method":"POST","path":"/deleteReplaceRule"},
+    {"method":"POST","path":"/testReplaceRule"},
+    {"method":"GET","path":"/getBookSource"},
+    {"method":"GET","path":"/getBookSources"},
+    {"method":"GET","path":"/getBookshelf"},
+    {"method":"GET","path":"/getChapterList"},
+    {"method":"GET","path":"/refreshToc"},
+    {"method":"GET","path":"/getBookContent"},
+    {"method":"GET","path":"/cover"},
+    {"method":"GET","path":"/image"},
+    {"method":"GET","path":"/getReadConfig"},
+    {"method":"GET","path":"/getRssSource"},
+    {"method":"GET","path":"/getRssSources"},
+    {"method":"GET","path":"/getReplaceRules"},
+    {"method":"GET","path":"/{...}","purpose":"static-assets"}
+  ],
+  "webSocket": [
+    "/bookSourceDebug",
+    "/rssSourceDebug",
+    "/searchBook"
+  ]
+}

@@ -1,0 +1,226 @@
+# QT Clean v2 project-authored VietPhrase extension. License: CC0-1.0
+# source<TAB>target<TAB>type<TAB>category
+不由自主	không tự chủ được	general	narration
+不知不觉	bất giác	general	narration
+若有所思	đăm chiêu suy nghĩ	general	narration
+意味深长	đầy ẩn ý	general	narration
+难以置信	khó tin	general	narration
+不可思议	không thể tưởng tượng nổi	general	narration
+理所当然	đương nhiên	general	narration
+毋庸置疑	không thể nghi ngờ	general	narration
+毫无疑问	không còn nghi ngờ gì	general	narration
+显而易见	rõ ràng	general	narration
+一言不发	không nói một lời	general	narration
+沉默不语	im lặng không nói	general	narration
+欲言又止	muốn nói rồi lại thôi	general	narration
+脱口而出	buột miệng nói ra	general	narration
+异口同声	đồng thanh	general	narration
+自言自语	lẩm bẩm một mình	general	narration
+喃喃自语	lẩm bẩm	general	narration
+冷冷说道	lạnh lùng nói	general	speech
+沉声说道	trầm giọng nói	general	speech
+低声说道	nhỏ giọng nói	general	speech
+轻声说道	khẽ nói	general	speech
+朗声说道	cất giọng nói	general	speech
+厉声喝道	quát lớn	general	speech
+开口说道	lên tiếng nói	general	speech
+缓缓说道	chậm rãi nói	general	speech
+继续说道	nói tiếp	general	speech
+补充说道	nói thêm	general	speech
+反问道	hỏi ngược lại	general	speech
+回答道	trả lời	general	speech
+解释道	giải thích	general	speech
+提醒道	nhắc nhở	general	speech
+警告道	cảnh cáo	general	speech
+命令道	ra lệnh	general	speech
+恳求道	cầu xin	general	speech
+惊呼道	kinh ngạc thốt lên	general	speech
+失声叫道	thất thanh kêu lên	general	speech
+忍不住问	không nhịn được hỏi	general	speech
+忍不住说道	không nhịn được nói	general	speech
+话音刚落	vừa dứt lời	general	speech
+话还没说完	chưa nói hết câu	general	speech
+目瞪口呆	trợn mắt há hốc mồm	general	expression
+大吃一惊	giật mình kinh hãi	general	expression
+脸色一变	sắc mặt biến đổi	general	expression
+脸色苍白	sắc mặt tái nhợt	general	expression
+面无表情	mặt không cảm xúc	general	expression
+神色凝重	vẻ mặt nghiêm trọng	general	expression
+神情复杂	vẻ mặt phức tạp	general	expression
+眉头紧皱	nhíu chặt mày	general	expression
+皱了皱眉	khẽ nhíu mày	general	expression
+微微一笑	khẽ mỉm cười	general	expression
+苦笑一声	cười khổ	general	expression
+冷笑一声	cười lạnh	general	expression
+深吸一口气	hít sâu một hơi	general	action
+长出一口气	thở phào một hơi	general	action
+倒吸一口凉气	hít vào một hơi lạnh	general	action
+握紧拳头	siết chặt nắm tay	general	action
+握紧长剑	siết chặt trường kiếm	general	action
+咬紧牙关	nghiến chặt răng	general	action
+咬了咬牙	cắn răng	general	action
+点了点头	gật đầu	general	action
+摇了摇头	lắc đầu	general	action
+摆了摆手	xua tay	general	action
+挥了挥手	vẫy tay	general	action
+抬起头	ngẩng đầu	general	action
+低下头	cúi đầu	general	action
+转过身	quay người	general	action
+转身离开	quay người rời đi	general	action
+迈步向前	cất bước tiến lên	general	action
+快步走去	nhanh chân đi tới	general	action
+缓步走来	chậm rãi đi tới	general	action
+飞身而起	phi thân bay lên	general	action
+纵身一跃	nhún người nhảy lên	general	action
+猛然回头	đột nhiên quay đầu	general	action
+下意识地	theo bản năng	general	narration
+有意无意	cố ý hay vô tình	general	narration
+从容不迫	bình tĩnh ung dung	general	narration
+小心翼翼	hết sức cẩn thận	general	narration
+迫不及待	không thể chờ thêm	general	narration
+当机立断	quyết đoán ngay lập tức	general	narration
+毫不犹豫	không chút do dự	general	narration
+犹豫片刻	do dự một lát	general	narration
+思索片刻	suy nghĩ một lát	general	narration
+沉吟片刻	trầm ngâm một lát	general	narration
+过了片刻	một lát sau	general	time
+与此同时	cùng lúc đó	general	time
+转眼之间	trong chớp mắt	general	time
+眨眼之间	trong nháy mắt	general	time
+顷刻之间	trong khoảnh khắc	general	time
+一时之间	nhất thời	general	time
+从始至终	từ đầu đến cuối	general	time
+自始至终	từ đầu đến cuối	general	time
+有朝一日	một ngày nào đó	general	time
+来日方长	ngày tháng còn dài	general	time
+事到如今	đến nước này	general	narration
+既然如此	đã vậy	general	conjunction
+话虽如此	dù nói vậy	general	conjunction
+即便如此	dù vậy	general	conjunction
+尽管如此	mặc dù vậy	general	conjunction
+不仅如此	không chỉ vậy	general	conjunction
+除此之外	ngoài ra	general	conjunction
+换句话说	nói cách khác	general	conjunction
+总而言之	tóm lại	general	conjunction
+归根结底	suy cho cùng	general	conjunction
+另一方面	mặt khác	general	conjunction
+果不其然	quả nhiên	general	narration
+不出所料	không ngoài dự liệu	general	narration
+出乎意料	ngoài dự liệu	general	narration
+意料之外	ngoài dự liệu	general	narration
+情理之中	hợp tình hợp lý	general	narration
+大局已定	đại cục đã định	general	narration
+胜负已分	thắng bại đã rõ	general	narration
+生死未卜	chưa rõ sống chết	general	narration
+九死一生	thập tử nhất sinh	general	idiom
+死里逃生	thoát chết trong gang tấc	general	idiom
+化险为夷	hóa nguy thành an	general	idiom
+绝处逢生	tìm được đường sống trong chỗ chết	general	idiom
+势不可挡	không gì cản nổi	general	idiom
+势均力敌	ngang tài ngang sức	general	idiom
+不堪一击	không chịu nổi một đòn	general	idiom
+全力以赴	dốc toàn lực	general	idiom
+竭尽全力	dốc hết sức	general	idiom
+孤注一掷	được ăn cả ngã về không	general	idiom
+同归于尽	đồng quy vu tận	general	idiom
+以命相搏	liều mạng giao đấu	general	idiom
+杀意凛然	sát ý lạnh thấu xương	general	combat
+杀气腾腾	sát khí đằng đằng	general	combat
+战意高昂	chiến ý dâng cao	general	combat
+气势如虹	khí thế như cầu vồng	general	combat
+全神贯注	toàn tâm tập trung	general	combat
+严阵以待	nghiêm trận chờ đợi	general	combat
+蓄势待发	tích thế chờ phát	general	combat
+一触即发	căng thẳng chỉ chực bùng nổ	general	combat
+迎面而来	ập thẳng tới	general	motion
+扑面而来	ập vào mặt	general	motion
+席卷而来	cuốn tới	general	motion
+呼啸而过	rít gào lướt qua	general	motion
+破空而来	xé gió lao tới	general	motion
+冲天而起	vút thẳng lên trời	general	motion
+从天而降	từ trên trời giáng xuống	general	motion
+消失不见	biến mất không thấy	general	motion
+无影无踪	không còn dấu vết	general	motion
+灵力波动	dao động linh lực	general	cultivation
+精神力量	sức mạnh tinh thần	general	cultivation
+精神世界	thế giới tinh thần	general	cultivation
+识海深处	nơi sâu trong thức hải	general	cultivation
+丹田之中	trong đan điền	general	cultivation
+经脉之中	trong kinh mạch	general	cultivation
+天地灵气	linh khí trời đất	general	cultivation
+天地之力	lực lượng trời đất	general	cultivation
+法则之力	lực lượng pháp tắc	general	cultivation
+空间之力	lực lượng không gian	general	cultivation
+时间之力	lực lượng thời gian	general	cultivation
+生命气息	khí tức sinh mệnh	general	cultivation
+神魂力量	lực lượng thần hồn	general	cultivation
+血脉之力	lực lượng huyết mạch	general	cultivation
+修炼资源	tài nguyên tu luyện	general	cultivation
+修炼速度	tốc độ tu luyện	general	cultivation
+修炼天赋	thiên phú tu luyện	general	cultivation
+战斗经验	kinh nghiệm chiến đấu	general	combat
+实战经验	kinh nghiệm thực chiến	general	combat
+生死危机	nguy cơ sinh tử	general	combat
+致命一击	đòn trí mạng	general	combat
+最后一击	đòn cuối cùng	general	combat
+防御屏障	lá chắn phòng ngự	general	combat
+能量屏障	lá chắn năng lượng	general	combat
+空间裂缝	khe nứt không gian	general	cultivation
+空间通道	thông đạo không gian	general	cultivation
+传送阵法	trận pháp truyền tống	skill_name	cultivation
+护山大阵	đại trận hộ sơn	skill_name	cultivation
+聚灵阵法	trận pháp tụ linh	skill_name	cultivation
+炼丹炉	lò luyện đan	item_name	cultivation
+储物戒指	nhẫn trữ vật	item_name	cultivation
+空间戒指	nhẫn không gian	item_name	cultivation
+身份令牌	lệnh bài thân phận	item_name	cultivation
+传讯玉简	ngọc giản truyền tin	item_name	cultivation
+任务奖励	phần thưởng nhiệm vụ	general	system
+任务失败	nhiệm vụ thất bại	general	system
+任务完成	nhiệm vụ hoàn thành	general	system
+支线任务	nhiệm vụ phụ	general	system
+主线任务	nhiệm vụ chính	general	system
+隐藏任务	nhiệm vụ ẩn	general	system
+属性面板	bảng thuộc tính	general	system
+人物面板	bảng nhân vật	general	system
+状态面板	bảng trạng thái	general	system
+技能面板	bảng kỹ năng	general	system
+个人信息	thông tin cá nhân	general	system
+当前等级	cấp độ hiện tại	general	system
+剩余时间	thời gian còn lại	general	system
+冷却时间	thời gian hồi	general	system
+使用次数	số lần sử dụng	general	system
+成功概率	xác suất thành công	general	system
+失败惩罚	hình phạt thất bại	general	system
+系统空间	không gian hệ thống	general	system
+系统提示	thông báo hệ thống	general	system
+系统通知	thông báo hệ thống	general	system
+系统商城	cửa hàng hệ thống	general	system
+兑换积分	điểm đổi thưởng	general	system
+经验值	điểm kinh nghiệm	general	system
+生命值	điểm sinh mệnh	general	system
+精神值	điểm tinh thần	general	system
+好感度	độ thiện cảm	general	system
+忠诚度	độ trung thành	general	system
+完成条件	điều kiện hoàn thành	general	system
+触发条件	điều kiện kích hoạt	general	system
+必要条件	điều kiện cần thiết	general	system
+紧急情况	tình huống khẩn cấp	general	modern
+调查结果	kết quả điều tra	general	modern
+监控录像	đoạn ghi hình giám sát	general	modern
+身份信息	thông tin danh tính	general	modern
+联系方式	thông tin liên hệ	general	modern
+电话号码	số điện thoại	general	modern
+电子邮件	thư điện tử	general	modern
+新闻发布会	họp báo	general	modern
+董事会	hội đồng quản trị	organization_name	modern
+管理层	ban lãnh đạo	organization_name	modern
+研究小组	nhóm nghiên cứu	organization_name	modern
+行动小组	nhóm hành động	organization_name	modern
+特别行动	tác chiến đặc biệt	general	modern
+执行任务	thực hiện nhiệm vụ	general	modern
+调查案件	điều tra vụ án	general	modern
+秘密基地	căn cứ bí mật	place_name	modern
+地下基地	căn cứ ngầm	place_name	modern
+实验基地	căn cứ thí nghiệm	place_name	modern
+研究中心	trung tâm nghiên cứu	organization_name	modern

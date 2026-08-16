@@ -1,0 +1,43 @@
+{
+  "url": "http://127.0.0.1:4173/?qa=4#/webService",
+  "results": [
+    {
+      "name": "desktop",
+      "width": 1365,
+      "height": 900,
+      "metrics": {
+        "hasSettings": true,
+        "panelCount": 3,
+        "headerText": "Đang chờ WebService từ app",
+        "hasUndefinedText": false,
+        "bodyTextLength": 415,
+        "viewportWidth": 1365,
+        "viewportHeight": 900,
+        "scrollWidth": 1365,
+        "clientWidth": 1365,
+        "hasHorizontalOverflow": false
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "metrics": {
+        "hasSettings": true,
+        "panelCount": 3,
+        "headerText": "Đang chờ WebService từ app",
+        "hasUndefinedText": false,
+        "bodyTextLength": 415,
+        "viewportWidth": 390,
+        "viewportHeight": 844,
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "hasHorizontalOverflow": false
+      },
+      "consoleErrors": [],
+      "pageErrors": []
+    }
+  ]
+}

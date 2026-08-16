@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "id": "phase00",
+    "slug": "compatibility",
+    "name": "DrDucBook Compatibility Registry",
+    "author": "DrDucBook",
+    "description": "Synthetic compatibility fixtures",
+    "version": 1,
+    "generatedAt": "2026-07-29T00:00:00Z",
+    "totalItems": 6
+  },
+  "data": [
+    {"name":"Text Fixture","author":"DrDucBook","path":"https://plugins.example.test/text.zip","version":1,"source":"https://text.example.test","type":"novel","locale":"vi"},
+    {"name":"Comic Fixture","author":"DrDucBook","path":"https://plugins.example.test/comic.zip","version":1,"source":"https://comic.example.test","type":"comic","locale":"vi"},
+    {"name":"Audio Fixture","author":"DrDucBook","path":"https://plugins.example.test/audio.zip","version":1,"source":"https://audio.example.test","type":"audiobook","locale":"vi"},
+    {"name":"Video Fixture","author":"DrDucBook","path":"https://plugins.example.test/video.zip","version":1,"source":"https://video.example.test","type":"video","locale":"vi"},
+    {"name":"TTS Fixture","author":"DrDucBook","path":"https://plugins.example.test/tts.zip","version":1,"source":"https://tts-plugin.example.test","type":"tts","locale":"vi"},
+    {"name":"Translator Fixture","author":"DrDucBook","path":"https://plugins.example.test/translator.zip","version":1,"source":"https://translator.example.test","type":"translator","locale":"vi"}
+  ]
+}

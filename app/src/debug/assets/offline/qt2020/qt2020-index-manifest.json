@@ -1,0 +1,58 @@
+{
+  "id": "quick-translator-2020-debug",
+  "sourceRevision": "2025-09-01",
+  "formatVersion": 1,
+  "entryCount": 743425,
+  "maxSourceChars": 15,
+  "bucketCount": 1048576,
+  "loadFactor": 0.708985,
+  "collisions": 902497,
+  "rejectedLines": 65,
+  "index": {
+    "file": "qt2020-terms.qtdict",
+    "bytes": 34132707,
+    "sha256": "8d0ddc59a832d3dcfacb98aeba3c91a0c6fabf8514d9115b6146eaf7ab8d86f1"
+  },
+  "sources": [
+    {
+      "name": "Names2.txt",
+      "lane": "name_additions",
+      "bytes": 41591,
+      "parsedEntries": 1768,
+      "acceptedEntries": 1768,
+      "rejectedLines": 0
+    },
+    {
+      "name": "Names.txt",
+      "lane": "name",
+      "bytes": 28063,
+      "parsedEntries": 928,
+      "acceptedEntries": 920,
+      "rejectedLines": 0
+    },
+    {
+      "name": "VietPhrase2.txt",
+      "lane": "vietphrase_additions",
+      "bytes": 213100,
+      "parsedEntries": 4747,
+      "acceptedEntries": 4708,
+      "rejectedLines": 0
+    },
+    {
+      "name": "VietPhrase.txt",
+      "lane": "vietphrase",
+      "bytes": 28358029,
+      "parsedEntries": 728633,
+      "acceptedEntries": 726930,
+      "rejectedLines": 65
+    },
+    {
+      "name": "Pronouns.txt",
+      "lane": "pronoun",
+      "bytes": 319598,
+      "parsedEntries": 12062,
+      "acceptedEntries": 9099,
+      "rejectedLines": 0
+    }
+  ]
+}

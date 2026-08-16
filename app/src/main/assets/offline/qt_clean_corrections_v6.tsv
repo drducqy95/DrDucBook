@@ -1,0 +1,297 @@
+# QT Clean v6 reviewed narrative corrections. License: CC0-1.0
+# source<TAB>Vietnamese<TAB>type<TAB>provenance
+崔桂英	Thôi Quế Anh	name	project:qt-corrections-v6:laoshiren-name
+李维汉	Lý Duy Hán	name	project:qt-corrections-v6:laoshiren-name
+李追远	Lý Truy Viễn	name	project:qt-corrections-v6:laoshiren-name
+远子	Viễn Tử	name	project:qt-corrections-v6:laoshiren-name
+小远侯	Tiểu Viễn Hầu	name	project:qt-corrections-v6:laoshiren-name
+潘子	Phan Tử	name	project:qt-corrections-v6:laoshiren-name
+雷子	Lôi Tử	name	project:qt-corrections-v6:laoshiren-name
+英子	Anh Tử	name	project:qt-corrections-v6:laoshiren-name
+虎子	Hổ Tử	name	project:qt-corrections-v6:laoshiren-name
+石头	Thạch Đầu	name	project:qt-corrections-v6:laoshiren-name
+小黄莺	Tiểu Hoàng Oanh	name	project:qt-corrections-v6:laoshiren-name
+黄莺	Hoàng Oanh	name	project:qt-corrections-v6:laoshiren-name
+肖黄英	Tiêu Hoàng Anh	name	project:qt-corrections-v6:laoshiren-name
+赵四美	Triệu Tứ Mỹ	name	project:qt-corrections-v6:laoshiren-name
+大胡子	Râu Xồm	name	project:qt-corrections-v6:laoshiren-name
+娟侯	Quyên Hầu	name	project:qt-corrections-v6:laoshiren-name
+奶奶	bà	general	project:qt-corrections-v6:kinship
+爷爷	ông	general	project:qt-corrections-v6:kinship
+爹妈	cha mẹ	general	project:qt-corrections-v6:kinship
+爹娘	cha mẹ	general	project:qt-corrections-v6:kinship
+老娘	mẹ già	general	project:qt-corrections-v6:kinship
+闺女	con gái	general	project:qt-corrections-v6:kinship
+姑爷	con rể	general	project:qt-corrections-v6:kinship
+外孙	cháu ngoại	general	project:qt-corrections-v6:kinship
+亲孙	cháu ruột	general	project:qt-corrections-v6:kinship
+孙子	cháu trai	general	project:qt-corrections-v6:kinship
+孙女	cháu gái	general	project:qt-corrections-v6:kinship
+朕	trẫm	general	project:qt-corrections-v6:ancient-address
+寡人	quả nhân	general	project:qt-corrections-v6:ancient-address
+本王	bổn vương	general	project:qt-corrections-v6:ancient-address
+本宫	bổn cung	general	project:qt-corrections-v6:ancient-address
+哀家	ai gia	general	project:qt-corrections-v6:ancient-address
+臣妾	thần thiếp	general	project:qt-corrections-v6:ancient-address
+微臣	vi thần	general	project:qt-corrections-v6:ancient-address
+臣	thần	general	project:qt-corrections-v6:ancient-address
+奴婢	nô tỳ	general	project:qt-corrections-v6:ancient-address
+奴才	nô tài	general	project:qt-corrections-v6:ancient-address
+下官	hạ quan	general	project:qt-corrections-v6:ancient-address
+草民	thảo dân	general	project:qt-corrections-v6:ancient-address
+小人	tiểu nhân	general	project:qt-corrections-v6:ancient-address
+民女	dân nữ	general	project:qt-corrections-v6:ancient-address
+在下	tại hạ	general	project:qt-corrections-v6:ancient-address
+老夫	lão phu	general	project:qt-corrections-v6:ancient-address
+老身	lão thân	general	project:qt-corrections-v6:ancient-address
+贫道	bần đạo	general	project:qt-corrections-v6:ancient-address
+贫僧	bần tăng	general	project:qt-corrections-v6:ancient-address
+陛下	bệ hạ	general	project:qt-corrections-v6:ancient-title
+皇上	hoàng thượng	general	project:qt-corrections-v6:ancient-title
+殿下	điện hạ	general	project:qt-corrections-v6:ancient-title
+娘娘	nương nương	general	project:qt-corrections-v6:ancient-title
+王爷	vương gia	general	project:qt-corrections-v6:ancient-title
+公主	công chúa	general	project:qt-corrections-v6:ancient-title
+太子	thái tử	general	project:qt-corrections-v6:ancient-title
+公子	công tử	general	project:qt-corrections-v6:ancient-title
+姑娘	cô nương	general	project:qt-corrections-v6:ancient-title
+少爷	thiếu gia	general	project:qt-corrections-v6:ancient-title
+夫君	phu quân	general	project:qt-corrections-v6:ancient-spouse
+相公	tướng công	general	project:qt-corrections-v6:ancient-spouse
+郎君	lang quân	general	project:qt-corrections-v6:ancient-spouse
+娘子	nương tử	general	project:qt-corrections-v6:ancient-spouse
+师父	sư phụ	general	project:qt-corrections-v6:sect-address
+师尊	sư tôn	general	project:qt-corrections-v6:sect-address
+徒儿	đồ nhi	general	project:qt-corrections-v6:sect-address
+弟子	đệ tử	general	project:qt-corrections-v6:sect-address
+师兄	sư huynh	general	project:qt-corrections-v6:sect-address
+师姐	sư tỷ	general	project:qt-corrections-v6:sect-address
+师弟	sư đệ	general	project:qt-corrections-v6:sect-address
+师妹	sư muội	general	project:qt-corrections-v6:sect-address
+掌门	chưởng môn	general	project:qt-corrections-v6:sect-title
+宗主	tông chủ	general	project:qt-corrections-v6:sect-title
+道友	đạo hữu	general	project:qt-corrections-v6:sect-address
+阁下	các hạ	general	project:qt-corrections-v6:formal-address
+大人	đại nhân	general	project:qt-corrections-v6:formal-address
+公爵	công tước	general	project:qt-corrections-v6:western-title
+伯爵	bá tước	general	project:qt-corrections-v6:western-title
+子爵	tử tước	general	project:qt-corrections-v6:western-title
+男爵	nam tước	general	project:qt-corrections-v6:western-title
+骑士	kỵ sĩ	general	project:qt-corrections-v6:western-title
+神父	cha xứ	general	project:qt-corrections-v6:western-title
+牧师	mục sư	general	project:qt-corrections-v6:western-title
+教堂	nhà thờ	general	project:qt-corrections-v6:western-setting
+城堡	lâu đài	general	project:qt-corrections-v6:western-setting
+庄园	trang viên	general	project:qt-corrections-v6:western-setting
+王国	vương quốc	general	project:qt-corrections-v6:western-setting
+魔法	ma pháp	general	project:qt-corrections-v6:western-setting
+巫师	phù thủy	general	project:qt-corrections-v6:western-setting
+女巫	phù thủy	general	project:qt-corrections-v6:western-setting
+吸血鬼	ma cà rồng	general	project:qt-corrections-v6:western-setting
+狼人	người sói	general	project:qt-corrections-v6:western-setting
+郑大筒	Trịnh Đại Đồng	name	project:qt-corrections-v6:laoshiren-ch2
+郑华民	Trịnh Hoa Dân	name	project:qt-corrections-v6:laoshiren-ch2
+刘瞎子	Lưu mù	name	project:qt-corrections-v6:laoshiren-ch2
+刘金霞	Lưu Kim Hà	name	project:qt-corrections-v6:laoshiren-ch2
+李菊香	Lý Cúc Hương	name	project:qt-corrections-v6:laoshiren-ch2
+思源村	thôn Tư Nguyên	location	project:qt-corrections-v6:laoshiren-ch2
+四安镇	trấn Tứ An	location	project:qt-corrections-v6:laoshiren-ch2
+三江叔	chú Tam Giang	general	project:qt-corrections-v6:laoshiren-ch2
+李三江	Lý Tam Giang	name	project:qt-corrections-v6:laoshiren-ch2
+诊所大夫	bác sĩ phòng khám	general	project:qt-corrections-v6:laoshiren-ch2
+赤脚医生	thầy thuốc chân đất	general	project:qt-corrections-v6:laoshiren-ch2
+大针筒	ống tiêm lớn	general	project:qt-corrections-v6:laoshiren-ch2
+三轮车	xe ba bánh	general	project:qt-corrections-v6:laoshiren-ch2
+一辆三轮车	một chiếc xe ba bánh	general	project:qt-corrections-v6:laoshiren-ch2
+一辆三轮车被骑着过来	một chiếc xe ba bánh đang được đạp tới	general	project:qt-corrections-v6:laoshiren-ch2
+一个老太婆	một bà lão	general	project:qt-corrections-v6:laoshiren-ch2
+车上坐着一个老太婆	trên xe có một bà lão ngồi	general	project:qt-corrections-v6:laoshiren-ch2
+老太婆	bà lão	general	project:qt-corrections-v6:laoshiren-ch2
+伢儿	đứa nhỏ	general	project:qt-corrections-v6:laoshiren-ch2
+过得	sống	verb	project:qt-corrections-v6:grammar
+干嘛	làm gì	general	project:qt-corrections-v6:grammar
+怎么了	thì sao	general	project:qt-corrections-v6:grammar
+其它问题	vấn đề khác	general	project:qt-corrections-v6:grammar
+其他问题	vấn đề khác	general	project:qt-corrections-v6:grammar
+单位的文艺汇演	hội diễn văn nghệ của đơn vị	general	project:qt-corrections-v6:grammar
+专业的歌者与舞者	ca sĩ và vũ công chuyên nghiệp	general	project:qt-corrections-v6:grammar
+伸出了手	vươn tay	general	project:qt-corrections-v6:grammar
+死沉死沉	nặng trĩu	general	project:qt-corrections-v6:grammar
+一头发了情的耕牛	một con trâu cày động dục	general	project:qt-corrections-v6:grammar
+将家里田租给他人种	cho người khác thuê ruộng nhà để trồng	general	project:qt-corrections-v6:grammar
+骑着三轮车载着自己去	đạp xe ba bánh chở mình đi	general	project:qt-corrections-v6:grammar
+你照顾伢儿吧	bà chăm sóc đứa nhỏ đi	general	project:qt-corrections-v6:address
+让他再睡一觉	để nó ngủ thêm một giấc	general	project:qt-corrections-v6:address
+你快救救他	mong chị mau cứu nó	general	project:qt-corrections-v6:address
+远子你醒醒	Viễn Tử, cậu tỉnh lại đi	general	project:qt-corrections-v6:address
+小远侯你醒了	Tiểu Viễn Hầu, cậu tỉnh rồi	general	project:qt-corrections-v6:address
+你终于醒了	cuối cùng cậu cũng tỉnh rồi	general	project:qt-corrections-v6:address
+昨日他受小黄莺表演的冲击不比哥哥弟弟们小	hôm qua cậu bị màn biểu diễn của Tiểu Hoàng Oanh tác động không kém các anh em	general	project:qt-corrections-v6:laoshiren-ch2
+昨日他受小黄莺表演的冲击不小	hôm qua cậu bị màn biểu diễn của Tiểu Hoàng Oanh tác động không nhỏ	general	project:qt-corrections-v6:laoshiren-ch2
+他受小黄莺表演的冲击不比哥哥弟弟们小	cậu bị màn biểu diễn của Tiểu Hoàng Oanh tác động không kém các anh em	general	project:qt-corrections-v6:laoshiren-ch2
+受小黄莺表演的冲击不比哥哥弟弟们小	bị màn biểu diễn của Tiểu Hoàng Oanh tác động không kém các anh em	general	project:qt-corrections-v6:laoshiren-ch2
+小黄莺表演的冲击	màn biểu diễn của Tiểu Hoàng Oanh tác động	general	project:qt-corrections-v6:laoshiren-ch2
+船行到家	thuyền về tới nhà	general	project:qt-corrections-v6:laoshiren-ch2
+将竹篙一丢	ném sào tre sang một bên	general	project:qt-corrections-v6:laoshiren-ch2
+顾不得拴船绳	chẳng kịp buộc dây thuyền	general	project:qt-corrections-v6:laoshiren-ch2
+他已很是疲惫	ông ấy đã rất mệt	general	project:qt-corrections-v6:laoshiren-ch2
+郑大筒叫郑华民	Trịnh Đại Đồng tên là Trịnh Hoa Dân	general	project:qt-corrections-v6:laoshiren-ch2
+因他喜欢拿大针筒故意吓唬孩子	vì ông ấy thích cầm ống tiêm lớn cố ý dọa trẻ con	general	project:qt-corrections-v6:laoshiren-ch2
+得了白内障	bị đục thủy tinh thể	general	project:qt-corrections-v6:laoshiren-ch2
+眼睛看不大清楚了	mắt nhìn không rõ lắm	general	project:qt-corrections-v6:laoshiren-ch2
+留下个李菊香带一个同样刚出生的闺女	để lại Lý Cúc Hương với một đứa con gái cũng vừa chào đời	general	project:qt-corrections-v6:laoshiren-ch2
+她痛苦地侧身倒在地上	cô ấy đau đớn nghiêng người ngã xuống đất	general	project:qt-corrections-v6:laoshiren-ch2
+你这是要出去	ông định đi ra ngoài à	general	project:qt-corrections-v6:laoshiren-ch2
+你这是怎么了	cháu làm sao thế này	general	project:qt-corrections-v6:laoshiren-ch2
+孩子他奶，你快来看看孩子	Bà nó, bà mau đến xem đứa trẻ	general	project:qt-corrections-v6:laoshiren-ch2
+孩子他爷已经去请人了	Ông nó đã đi mời người rồi	general	project:qt-corrections-v6:laoshiren-ch2
+远子刚落下去就被他爷抓起来了	Viễn Tử vừa rơi xuống đã được ông nó kéo lên	general	project:qt-corrections-v6:laoshiren-ch2
+远子刚掉下去就被他爷拽起来	Viễn Tử vừa rơi xuống đã được ông nó kéo lên	general	project:qt-corrections-v6:laoshiren-ch2
+可能是其它问题	có thể là vấn đề khác	general	project:qt-corrections-v6:laoshiren-ch2
+可能是其他问题	có thể là vấn đề khác	general	project:qt-corrections-v6:laoshiren-ch2
+这年头，想将日子过得富余些还得靠其它营生	thời buổi này, muốn sống dư dả hơn còn phải dựa vào nghề khác	general	project:qt-corrections-v6:laoshiren-ch2
+这年头，想将日子过得富余些还得靠其他营生	thời buổi này, muốn sống dư dả hơn còn phải dựa vào nghề khác	general	project:qt-corrections-v6:laoshiren-ch2
+没男人怎么了，干嘛要这样作践自己	không có đàn ông thì sao, làm gì phải giày vò bản thân như vậy	general	project:qt-corrections-v6:laoshiren-ch2
+李追远回过头	Lý Truy Viễn quay đầu lại	general	project:qt-corrections-v6:laoshiren-ch2
+回头一瞥	quay đầu liếc nhìn	general	project:qt-corrections-v6:laoshiren-ch2
+一双红色高跟鞋	một đôi giày cao gót màu đỏ	general	project:qt-corrections-v6:laoshiren-ch2
+白皙肿涨的脚踝	cổ chân trắng bệch sưng phù	general	project:qt-corrections-v6:laoshiren-ch2
+黑色的旗袍紧裹着她的身躯	xường xám màu đen bó sát thân thể cô ta	general	project:qt-corrections-v6:laoshiren-ch2
+黑色的旗袍紧裹着她的身躯，水珠顺着她的衣角和发梢不停滴落	xường xám màu đen bó sát thân thể cô ta, nước không ngừng nhỏ xuống theo vạt áo và lọn tóc cô ta	general	project:qt-corrections-v6:laoshiren-ch2
+水珠顺着她的衣角和发梢不停滴落	nước không ngừng nhỏ xuống theo vạt áo và lọn tóc cô ta	general	project:qt-corrections-v6:laoshiren-ch2
+她，很美	cô ta rất đẹp	general	project:qt-corrections-v6:laoshiren-ch2
+奶。	Bà.	general	project:qt-corrections-v6:address
+奶，	Bà ơi,	general	project:qt-corrections-v6:address
+奶！	Bà ơi!	general	project:qt-corrections-v6:address
+雷侯	Lôi Hầu	name	project:qt-corrections-v6:laoshiren-name
+潘侯	Phan Hầu	name	project:qt-corrections-v6:laoshiren-name
+伢儿这是怎么了	đứa nhỏ làm sao thế này	general	project:qt-corrections-v6:laoshiren-ch2
+带伢儿去镇上卫生院再做个检查吧	đưa đứa nhỏ lên trạm y tế trấn kiểm tra lại đi	general	project:qt-corrections-v6:laoshiren-ch2
+带伢儿去镇上卫生院再做个检查吧，可能是其它问题	đưa đứa nhỏ lên trạm y tế trấn kiểm tra lại đi, có thể là vấn đề khác	general	project:qt-corrections-v6:laoshiren-ch2
+带伢儿去镇上卫生院再做个检查吧，可能是其他问题	đưa đứa nhỏ lên trạm y tế trấn kiểm tra lại đi, có thể là vấn đề khác	general	project:qt-corrections-v6:laoshiren-ch2
+孩子不是溺水了，也不呛水，没啥事儿啊	đứa trẻ không bị đuối nước, cũng không sặc nước, không có chuyện gì đâu	general	project:qt-corrections-v6:laoshiren-ch2
+郑大筒收拾好东西，站起身，他没办法了	Trịnh Đại Đồng thu dọn đồ đạc, đứng dậy; ông ấy không có cách nào	general	project:qt-corrections-v6:laoshiren-ch2
+崔桂英又拔出一根烟，递给了他	Thôi Quế Anh lại rút ra một điếu thuốc, đưa cho ông ấy	general	project:qt-corrections-v6:laoshiren-ch2
+到了晚上还不醒的话，明早就往镇上送吧	nếu đến tối vẫn chưa tỉnh thì sáng mai đưa lên trấn đi	general	project:qt-corrections-v6:laoshiren-ch2
+来时路上潘子对他说了些	trên đường tới Phan Tử đã kể cho ông ấy một chút	general	project:qt-corrections-v6:laoshiren-ch2
+此时，他只能嘱咐道	lúc này, ông ấy chỉ có thể dặn	general	project:qt-corrections-v6:laoshiren-ch2
+刘瞎子来了	Lưu mù đến rồi	general	project:qt-corrections-v6:laoshiren-ch2
+妈，你不该这么磨蹭的，该早点来的	Mẹ, mẹ không nên lề mề như vậy, đáng lẽ phải đến sớm hơn	general	project:qt-corrections-v6:laoshiren-ch2
+急着赶趟干嘛	vội vàng làm gì	general	project:qt-corrections-v6:laoshiren-ch2
+反正又收不到他家的钱	dù sao cũng không thu được tiền nhà họ	general	project:qt-corrections-v6:laoshiren-ch2
+等孩子完全好了再说	đợi đứa trẻ khỏi hẳn rồi nói sau	general	project:qt-corrections-v6:laoshiren-ch2
+我们先家去了，别送了	chúng tôi về nhà trước, đừng tiễn	general	project:qt-corrections-v6:laoshiren-ch2
+我们先家去了	chúng tôi về nhà trước	general	project:qt-corrections-v6:laoshiren-ch2
+等汉侯回来	chờ Hán Hầu về	general	project:qt-corrections-v6:laoshiren-ch2
+等汉侯回来，我和他	chờ Hán Hầu về, tôi và ông ấy	general	project:qt-corrections-v6:laoshiren-ch2
+过得咋样	sống thế nào	general	project:qt-corrections-v6:laoshiren-ch2
+追远，你也尿啊	Truy Viễn, cậu cũng đi tiểu đi	general	project:qt-corrections-v6:laoshiren-ch2
+等什么呢	chờ gì nữa	general	project:qt-corrections-v6:laoshiren-ch2
+喊	gọi	general	project:qt-corrections-v6:laoshiren-ch2
+让你受累了	làm phiền ông rồi	general	project:qt-corrections-v6:laoshiren-ch2
+受累了	làm phiền rồi	general	project:qt-corrections-v6:laoshiren-ch2
+好的，爷。	Vâng, ông.	general	project:qt-corrections-v6:laoshiren-ch2
+潘子，你去喊郑大筒！	Phan Tử, con đi gọi Trịnh Đại Đồng!	general	project:qt-corrections-v6:laoshiren-ch2
+雷子，你去喊刘瞎子。	Lôi Tử, con đi gọi Lưu mù.	general	project:qt-corrections-v6:laoshiren-ch2
+细那康子	thằng nhóc kia	general	project:qt-corrections-v6:laoshiren-ch2
+没大没小	không biết lớn nhỏ	general	project:qt-corrections-v6:laoshiren-ch2
+刘奶奶	bà Lưu	general	project:qt-corrections-v6:laoshiren-ch2
+崔桂英呵斥道：“细那康子没大没小的，要叫刘奶奶。”	Thôi Quế Anh quát: “Thằng nhóc kia không biết lớn nhỏ gì cả, phải gọi là bà Lưu.”	general	project:qt-corrections-v6:laoshiren-ch2
+思源村的诊所大夫	bác sĩ phòng khám thôn Tư Nguyên	general	project:qt-corrections-v6:laoshiren-ch2
+你去喊	con đi gọi	general	project:qt-corrections-v6:laoshiren-ch2
+没大没小的	không biết lớn nhỏ gì cả	general	project:qt-corrections-v6:laoshiren-ch2
+要叫	phải gọi là	general	project:qt-corrections-v6:laoshiren-ch2
+车上坐着	trên xe có	general	project:qt-corrections-v6:laoshiren-ch2
+让你受累	làm phiền ông	general	project:qt-corrections-v6:laoshiren-ch2
+受累	làm phiền	general	project:qt-corrections-v6:laoshiren-ch2
+好嘞，好嘞，让你受累了，受累了。	Được rồi, được rồi, làm phiền ông rồi, làm phiền rồi.	general	project:qt-corrections-v6:laoshiren-ch2
+后厨	bếp sau	general	project:qt-corrections-v6:domestic
+帮忙洗碗	phụ rửa bát	general	project:qt-corrections-v6:domestic
+忙得脚不着地	bận tối mặt	general	project:qt-corrections-v6:idiom
+闲工夫	thời gian rảnh	general	project:qt-corrections-v6:idiom
+白事班子	đội tang lễ	general	project:qt-corrections-v6:funeral
+吃席	ăn cỗ	general	project:qt-corrections-v6:funeral
+去吃席	đi ăn cỗ	general	project:qt-corrections-v6:funeral
+办席	làm cỗ	general	project:qt-corrections-v6:funeral
+出船	ra thuyền	general	project:qt-corrections-v6:rural
+捎带	tiện thể	general	project:qt-corrections-v6:action
+拿了不少	lấy theo không ít	general	project:qt-corrections-v6:action
+硬菜	món mặn	general	project:qt-corrections-v6:food
+按人头分的硬菜	món mặn chia theo đầu người	general	project:qt-corrections-v6:food
+红塑料纸	giấy nhựa đỏ	general	project:qt-corrections-v6:object
+铺桌子的红塑料纸	giấy nhựa đỏ trải trên bàn	general	project:qt-corrections-v6:object
+吃食	đồ ăn	general	project:qt-corrections-v6:food
+点点头	gật đầu	general	project:qt-corrections-v6:action
+点头	gật đầu	general	project:qt-corrections-v6:action
+唱歌	hát	general	project:qt-corrections-v6:performance
+跳舞	nhảy múa	general	project:qt-corrections-v6:performance
+表演	biểu diễn	general	project:qt-corrections-v6:performance
+文艺表演	tiết mục văn nghệ	general	project:qt-corrections-v6:performance
+大食堂	nhà ăn lớn	general	project:qt-corrections-v6:food
+咸酱	tương mặn	general	project:qt-corrections-v6:food
+肉丁	thịt thái hạt lựu	general	project:qt-corrections-v6:food
+粥碗	bát cháo	general	project:qt-corrections-v6:food
+起哄	hùa theo	general	project:qt-corrections-v6:action
+不懂事	không hiểu chuyện	general	project:qt-corrections-v6:idiom
+懂点事	biết điều	general	project:qt-corrections-v6:idiom
+一粒米	một hạt gạo	general	project:qt-corrections-v6:food
+低下头	cúi đầu	general	project:qt-corrections-v6:action
+男娃	bé trai	general	project:qt-corrections-v6:family
+女娃	bé gái	general	project:qt-corrections-v6:family
+女娃娃	bé gái	general	project:qt-corrections-v6:family
+细伢儿	trẻ con	general	project:qt-corrections-v6:family
+死那康子	đồ nhãi ranh	general	project:qt-corrections-v6:dialogue
+打胜仗回来的将军	vị tướng thắng trận trở về	general	project:qt-corrections-v6:idiom
+降维打击	đòn áp đảo khác hẳn đẳng cấp	general	project:qt-corrections-v6:idiom
+谢谢奶奶	cảm ơn bà	general	project:qt-corrections-v6:address
+奶，今天怎么不去大胡子爷爷家吃席啊	Bà ơi, hôm nay sao không đến nhà ông Râu Xồm ăn cỗ ạ	general	project:qt-corrections-v6:address
+奶，我也要肉	Bà ơi, cháu cũng muốn ăn thịt	general	project:qt-corrections-v6:address
+奶，我也要	Bà ơi, cháu cũng muốn	general	project:qt-corrections-v6:address
+我也要	cháu cũng muốn	general	project:qt-corrections-v6:address
+你个大人跟细伢儿说的什么浑话	Bà là người lớn mà nói bậy gì với trẻ con thế	general	project:qt-corrections-v6:address
+你们爹妈	cha mẹ các cháu	general	project:qt-corrections-v6:address
+你可知道	bà có biết	general	project:qt-corrections-v6:address
+你这儿	nhà bà	general	project:qt-corrections-v6:address
+给你盛一碗	xới cho bà một bát	general	project:qt-corrections-v6:address
+你这口吃的	miếng ăn của bà	general	project:qt-corrections-v6:address
+你那俩孙儿	hai đứa cháu của bà	general	project:qt-corrections-v6:address
+你没有一孙女啥的，配一个	bà không có cháu gái nào à, ghép một đứa đi	general	project:qt-corrections-v6:address
+你家小远侯	Tiểu Viễn Hầu nhà bà	general	project:qt-corrections-v6:address
+让我家娟侯也能跟着他进京享福去	để Quyên Hầu nhà tôi cũng có thể theo nó vào kinh hưởng phúc	general	project:qt-corrections-v6:address
+我以后就想娶她这样的	sau này cháu muốn cưới người như cô ấy	general	project:qt-corrections-v6:address
+奶这里	chỗ bà	general	project:qt-corrections-v6:address
+爷，	Ông ơi,	general	project:qt-corrections-v6:address
+她男人李维汉	chồng bà là Lý Duy Hán	general	project:qt-corrections-v6:address
+让潘子雷子领着远子、虎子、石头五个孩子	để Phan Tử và Lôi Tử dẫn Viễn Tử, Hổ Tử, Thạch Đầu, năm đứa trẻ	general	project:qt-corrections-v6:address
+他这个大人	người lớn như ông	general	project:qt-corrections-v6:address
+吃相	tướng ăn	general	project:qt-corrections-v6:address
+爷，下午撑船去摘莲蓬呗	Ông ơi, chiều chống thuyền đi hái đài sen nhé	general	project:qt-corrections-v6:address
+系着围裙的崔桂英左手端碗，右手握勺，边呼喊边敲打着粥缸边缘	Thôi Quế Anh đeo tạp dề, tay trái bưng bát, tay phải cầm muôi, vừa gọi vừa gõ mép nồi cháo	general	project:qt-corrections-v6:laoshiren-ch1
+坐在旁边正给水烟袋装烟叶的李维汉一脚踢在女人大腚上，没好气地骂道	Lý Duy Hán đang ngồi bên cạnh nhồi thuốc vào tẩu thuốc lào, đá một cước vào mông to của vợ, bực bội mắng	general	project:qt-corrections-v6:laoshiren-ch1
+脑子进水了你，唤猪崽呢	Đầu óc úng nước à, gọi heo con đấy à	general	project:qt-corrections-v6:laoshiren-ch1
+崔桂英瞪了一眼自家男人，将一叠碗重重放在他面前，啐骂道	Thôi Quế Anh lườm chồng mình một cái, đặt mạnh chồng bát trước mặt ông, xì một tiếng rồi mắng	general	project:qt-corrections-v6:laoshiren-ch1
+猪可没他们闹腾更没他们能吃	heo còn không ồn ào bằng chúng, cũng không ăn khỏe bằng chúng	general	project:qt-corrections-v6:laoshiren-ch1
+呼唤声下，一群孩子从门外跑了进来，其中七个男娃四个女娃，年纪最大的十六，最小的才三岁	Nghe tiếng gọi, một đám trẻ từ ngoài cửa chạy vào, trong đó có bảy bé trai và bốn bé gái, đứa lớn nhất mười sáu tuổi, đứa nhỏ nhất mới ba tuổi	general	project:qt-corrections-v6:laoshiren-ch1
+李维汉两口子育有四子一女	Lý Duy Hán và vợ có bốn con trai một con gái	general	project:qt-corrections-v6:laoshiren-ch1
+子女们长大后就分家过了	các con sau khi lớn lên đã ra ở riêng	general	project:qt-corrections-v6:laoshiren-ch1
+住得近的老大家	nhà con cả ở gần	general	project:qt-corrections-v6:laoshiren-ch1
+一对三岁的双胞胎	cặp song sinh ba tuổi	general	project:qt-corrections-v6:laoshiren-ch1
+可等暑假一到	hễ đến nghỉ hè	general	project:qt-corrections-v6:laoshiren-ch1
+图方便	ham tiện	general	project:qt-corrections-v6:laoshiren-ch1
+爹妈的便宜自己没占到就是吃亏	không chiếm được phần lợi từ cha mẹ thì thấy thiệt	general	project:qt-corrections-v6:laoshiren-ch1
+把自家孩子给送了过来	đưa con nhà mình sang	general	project:qt-corrections-v6:laoshiren-ch1
+你收了老大家的	đã nhận con nhà con cả	general	project:qt-corrections-v6:laoshiren-ch1
+其他家的也就不好意思不收	nhà khác thì cũng ngại không nhận	general	project:qt-corrections-v6:laoshiren-ch1
+办了学堂似的	như mở lớp học	general	project:qt-corrections-v6:laoshiren-ch1
+儿孙满堂	con cháu đầy nhà	general	project:qt-corrections-v6:laoshiren-ch1
+还没来得及品砸出味儿来	còn chưa kịp cảm nhận vị ngọt	general	project:qt-corrections-v6:laoshiren-ch1
+米缸眼瞅着就要掏见底了	vại gạo đã sắp cạn đáy	general	project:qt-corrections-v6:laoshiren-ch1
+正是长身体的时候	đúng tuổi đang lớn	general	project:qt-corrections-v6:laoshiren-ch1
+贼能吃	ăn khỏe khủng khiếp	general	project:qt-corrections-v6:laoshiren-ch1
+肚皮个个都跟无底洞似的	bụng đứa nào cũng như hang không đáy	general	project:qt-corrections-v6:laoshiren-ch1
+主食都得用缸来盛	món chính phải dùng vại để đựng	general	project:qt-corrections-v6:laoshiren-ch1
+灶上还温着一锅	trên bếp còn hâm thêm một nồi	general	project:qt-corrections-v6:laoshiren-ch1
+崔桂英昨儿个在人家后厨帮忙洗碗，忙得脚不着地，可没闲工夫饭后去前头看白事班子表演	Thôi Quế Anh hôm qua phụ rửa bát ở bếp sau nhà người ta, bận tối mặt, không rảnh sau bữa ăn ra phía trước xem đội tang lễ biểu diễn	general	project:qt-corrections-v6:laoshiren-ch1
+她男人李维汉也没去，借口出船了，其实人在家，不去的原因是不好意思；毕竟已经让潘子雷子领着远子、虎子、石头五个孩子去吃席了，他这个大人再去吃相就难看了	Chồng bà là Lý Duy Hán cũng không đi, lấy cớ ra thuyền, thật ra vẫn ở nhà; lý do không đi là vì ngại, dù sao đã để Phan Tử và Lôi Tử dẫn Viễn Tử, Hổ Tử, Thạch Đầu, năm đứa trẻ đi ăn cỗ rồi, người lớn như ông mà đi nữa thì tướng ăn khó coi quá	general	project:qt-corrections-v6:laoshiren-ch1
+五个孩子不仅自己吃，还捎带拿了不少，尤其是那种饭桌上按人头分的硬菜；李追远学着哥哥们那样，在身前铺桌子的红塑料纸上撕扯下一块，拿来包吃食	Năm đứa trẻ không chỉ tự ăn mà còn tiện thể lấy theo không ít, nhất là những món mặn trên bàn được chia theo đầu người; Lý Truy Viễn học theo các anh, xé một miếng giấy nhựa đỏ trải trên bàn trước mặt để gói đồ ăn	general	project:qt-corrections-v6:laoshiren-ch1
+等回到家，再把它们分给没能去吃席的弟弟妹妹们，看着弟弟妹妹吃的时候，他们觉得自己像是个打胜仗回来的将军	Đợi về đến nhà, chúng lại chia đồ ăn cho các em không được đi ăn cỗ; nhìn em trai em gái ăn, chúng thấy mình như những vị tướng thắng trận trở về	general	project:qt-corrections-v6:laoshiren-ch1

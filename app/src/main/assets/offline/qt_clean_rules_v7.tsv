@@ -1,0 +1,18 @@
+# QT Clean v7 narrative grammar and punctuation rules. License: CC0-1.0
+# actionType<TAB>priority<TAB>sourcePattern<TAB>replacement<TAB>category
+QT_TEMPLATE	858	{0:person}的两侧肩膀	hai bên vai của {0}	attributive_person
+QT_TEMPLATE	858	跑到{0:person}身边	chạy đến bên {0}	directional_person
+QT_TEMPLATE	858	抱着{0:person}的腰向后发力	ôm eo {0}, dồn sức kéo về sau	action_person
+QT_TEMPLATE	858	来不及起身就对{0:person}吼了一声	chưa kịp đứng dậy đã hét với {0}	sequence_person
+QT_TEMPLATE	858	抱起{0:person}的头	nâng đầu {0} lên	action_person
+QT_TEMPLATE	856	一个将{0:person}扶着坐起另一个用手拍打他后背	một người đỡ {0} ngồi dậy, người kia vỗ lưng hắn	parallel_person
+QT_TEMPLATE	852	任凭{0}都{1}	dù {0} vẫn {1}	concession
+QT_TEMPLATE	852	一旦{0}就{1}	một khi {0} thì {1}	conditional
+QT_TEMPLATE	850	为了{0}只能{1}	để {0}, chỉ có thể {1}	purpose
+QT_TEMPLATE	850	先{0}再{1}	trước {0}, rồi {1}	sequence
+QT_TEMPLATE	848	一个{0}另一个{1}	một người {0}, người kia {1}	parallel
+QT_TEMPLATE	846	由{0}安排{1}	do {0} sắp xếp {1}	passive_agent
+QT_TEMPLATE	844	当{0}时	khi {0}	time
+REPLACE	-132	,(?=[\p{L}\p{N}])	, 	punctuation_spacing
+REPLACE	-132	(["“‘])\s+	$1	punctuation_spacing
+REPLACE	-131	\s+([,.;:!?，。；：！？])	$1	punctuation_spacing

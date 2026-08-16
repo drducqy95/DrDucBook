@@ -1,0 +1,19 @@
+# Classes that must remain addressable by their historical name in a minified APK.
+# One fully-qualified class per line. Nested classes use JVM `$` notation.
+io.legado.app.api.ReaderProvider
+io.legado.app.api.ReturnData
+io.legado.app.data.entities.Book
+io.legado.app.data.entities.Book$ReadConfig
+io.legado.app.data.entities.BookChapter
+io.legado.app.data.entities.BookSource
+io.legado.app.data.entities.HttpTTS
+io.legado.app.data.entities.RssSource
+io.legado.app.data.entities.rule.BookInfoRule
+io.legado.app.data.entities.rule.ContentRule
+io.legado.app.data.entities.rule.ExploreRule
+io.legado.app.data.entities.rule.SearchRule
+io.legado.app.help.rhino.NativeBaseSource
+io.legado.app.help.vbook.VbookExecutor
+io.legado.app.help.vbook.VbookPluginAdapter
+io.legado.app.help.vbook.VbookPluginImporter
+io.legado.app.help.vbook.VbookPluginInspector

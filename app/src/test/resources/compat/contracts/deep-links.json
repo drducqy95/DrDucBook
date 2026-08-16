@@ -1,0 +1,27 @@
+{
+  "onlineImport": {
+    "action": "android.intent.action.VIEW",
+    "categories": ["android.intent.category.DEFAULT", "android.intent.category.BROWSABLE"],
+    "schemes": ["legado", "yuedu"]
+  },
+  "fileAssociation": {
+    "action": "android.intent.action.VIEW",
+    "schemes": ["app", "content", "file"],
+    "mimeTypes": [
+      "text/plain",
+      "application/json",
+      "application/epub+zip",
+      "application/pdf",
+      "application/mobi",
+      "application/x-mobipocket-ebook",
+      "application/azw",
+      "application/azw3",
+      "application/x-mobi8-ebook",
+      "application/octet-stream"
+    ]
+  },
+  "sharedTextActions": [
+    "android.intent.action.PROCESS_TEXT",
+    "android.intent.action.SEND"
+  ]
+}

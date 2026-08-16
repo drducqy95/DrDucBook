@@ -1,0 +1,244 @@
+# Clean QT web-novel lexicon v4. Project-authored, CC0-1.0.
+# raw_key	translated_value	type	provenance
+# Translation/runtime terms observed in multi-chapter regression corpora.
+掌握	nắm vững	general	project:webnovel-v4:action
+尽在掌握	nắm rõ trong tay	general	project:webnovel-v4:action
+熟练掌握	thành thạo	general	project:webnovel-v4:action
+完全掌握	hoàn toàn nắm vững	general	project:webnovel-v4:action
+牢牢掌握	nắm chắc	general	project:webnovel-v4:action
+赐予	ban cho	general	project:webnovel-v4:divine
+赐下	ban xuống	general	project:webnovel-v4:divine
+神赐	thần ban	general	project:webnovel-v4:divine
+赐福	ban phước	general	project:webnovel-v4:divine
+降下赐福	ban phước xuống	general	project:webnovel-v4:divine
+神赐之力	sức mạnh thần ban	general	project:webnovel-v4:divine
+神明赐福	phước lành của thần linh	general	project:webnovel-v4:divine
+神力灌注	truyền thần lực vào	general	project:webnovel-v4:divine
+灌注	truyền vào	general	project:webnovel-v4:action
+灌注入	truyền vào	general	project:webnovel-v4:action
+灌顶	quán đỉnh	general	project:webnovel-v4:cultivation
+灌顶传功	quán đỉnh truyền công	general	project:webnovel-v4:cultivation
+祂	Ngài	general	project:webnovel-v4:pronoun
+祂们	Các Ngài	general	project:webnovel-v4:pronoun
+全知之父	Đấng Cha Toàn Tri	title	project:webnovel-v4:divine
+启蒙之主	Chúa Tể Khai Minh	title	project:webnovel-v4:divine
+神之眼	Mắt Thần	skill_name	project:webnovel-v4:divine
+神谕	thần dụ	general	project:webnovel-v4:divine
+神迹	thần tích	general	project:webnovel-v4:divine
+神职	thần chức	general	project:webnovel-v4:divine
+权柄	quyền bính	general	project:webnovel-v4:divine
+权能	quyền năng	general	project:webnovel-v4:divine
+信仰之力	sức mạnh tín ngưỡng	general	project:webnovel-v4:divine
+信仰转化	chuyển hóa tín ngưỡng	general	project:webnovel-v4:divine
+有求必应	cầu gì được nấy	general	project:webnovel-v4:idiom
+洞窟	hang động	general	project:webnovel-v4:scene
+地下洞窟	hang động dưới lòng đất	general	project:webnovel-v4:scene
+洞穴	hang động	general	project:webnovel-v4:scene
+地牢	ngục tối	general	project:webnovel-v4:scene
+祭坛	tế đàn	general	project:webnovel-v4:scene
+仪式现场	hiện trường nghi thức	general	project:webnovel-v4:scene
+阴森	âm u	general	project:webnovel-v4:scene
+阴暗潮湿	tối tăm ẩm thấp	general	project:webnovel-v4:scene
+漆黑	đen kịt	general	project:webnovel-v4:scene
+幽绿	xanh lục u ám	general	project:webnovel-v4:scene
+烛火	ánh nến	general	project:webnovel-v4:scene
+虚无缥缈	hư vô mờ mịt	general	project:webnovel-v4:description
+鬼祟	quỷ quái	general	project:webnovel-v4:description
+鬼祟之徒	kẻ mờ ám	general	project:webnovel-v4:person
+畸变	biến dị	general	project:webnovel-v4:mutation
+异变	biến cố bất thường	general	project:webnovel-v4:mutation
+畸变怪	quái vật biến dị	general	project:webnovel-v4:mutation
+畸变体	thể biến dị	general	project:webnovel-v4:mutation
+畸变怪物	quái vật biến dị	general	project:webnovel-v4:mutation
+血肉怪物	quái vật máu thịt	general	project:webnovel-v4:mutation
+肉瘤	khối u thịt	general	project:webnovel-v4:mutation
+血块	cục máu thịt	general	project:webnovel-v4:mutation
+眼球	nhãn cầu	general	project:webnovel-v4:mutation
+口器	miệng hút	general	project:webnovel-v4:mutation
+触手	xúc tu	general	project:webnovel-v4:mutation
+蠕动	ngọ nguậy	general	project:webnovel-v4:action
+腐烂血肉	máu thịt thối rữa	general	project:webnovel-v4:mutation
+失去活性	mất hoạt tính	general	project:webnovel-v4:state
+酸蚀	ăn mòn bởi axit	general	project:webnovel-v4:damage
+冻疮	vết bỏng lạnh	general	project:webnovel-v4:damage
+侵蚀	xâm thực	general	project:webnovel-v4:damage
+爆裂	nổ tung	general	project:webnovel-v4:damage
+接二连三	liên tiếp	general	project:webnovel-v4:idiom
+抽击	quật đánh	general	project:webnovel-v4:combat
+挥动	vung vẩy	general	project:webnovel-v4:combat
+撕碎	xé nát	general	project:webnovel-v4:combat
+压碎	nghiền nát	general	project:webnovel-v4:combat
+咀嚼	nhai	general	project:webnovel-v4:action
+吞食	nuốt chửng	general	project:webnovel-v4:action
+束缚	trói buộc	general	project:webnovel-v4:combat
+垂死挣扎	giãy giụa trước khi chết	general	project:webnovel-v4:combat
+迟缓	chậm chạp	general	project:webnovel-v4:state
+无比迟缓	chậm chạp vô cùng	general	project:webnovel-v4:state
+越来越迟缓	ngày càng chậm chạp	general	project:webnovel-v4:state
+缓缓	chậm rãi	general	project:webnovel-v4:action
+呼哧	hổn hển	general	project:webnovel-v4:sound
+喘着粗气	thở hổn hển	general	project:webnovel-v4:action
+死死地盯着	nhìn chằm chằm	general	project:webnovel-v4:action
+盯着	nhìn chằm chằm	general	project:webnovel-v4:action
+盯上	nhắm vào	general	project:webnovel-v4:action
+注视	chăm chú nhìn	general	project:webnovel-v4:action
+投下注视	dõi mắt nhìn	general	project:webnovel-v4:action
+特征码	mã đặc trưng	general	project:webnovel-v4:magic-tech
+解码	giải mã	general	project:webnovel-v4:magic-tech
+进行解码	tiến hành giải mã	general	project:webnovel-v4:magic-tech
+密钥	khóa mã hóa	general	project:webnovel-v4:magic-tech
+魔法能量	năng lượng phép thuật	general	project:webnovel-v4:magic
+魔力波动	dao động ma lực	general	project:webnovel-v4:magic
+法表	bảng phép	general	project:webnovel-v4:magic
+施法	thi triển phép thuật	general	project:webnovel-v4:magic
+三阶法术	pháp thuật bậc ba	skill_name	project:webnovel-v4:magic
+攻击性魔法	phép thuật tấn công	general	project:webnovel-v4:magic
+临时连接	kết nối tạm thời	general	project:webnovel-v4:magic-tech
+建立连接	thiết lập kết nối	general	project:webnovel-v4:magic-tech
+按键	phím bấm	general	project:webnovel-v4:magic-tech
+许可凭证	chứng nhận cho phép	general	project:webnovel-v4:magic-tech
+使用许可	quyền sử dụng	general	project:webnovel-v4:magic-tech
+不怪	chẳng trách	general	project:webnovel-v4:discourse
+难怪	thảo nào	general	project:webnovel-v4:discourse
+怪声	giọng nói quái dị	general	project:webnovel-v4:sound
+沙哑低沉的怪声	giọng nói khàn đục quái dị	general	project:webnovel-v4:sound
+怪异	quái dị	general	project:webnovel-v4:state
+惊喊	kinh hãi kêu lên	general	project:webnovel-v4:action
+高喊	hét lớn	general	project:webnovel-v4:action
+哭爹喊娘	khóc cha gọi mẹ	general	project:webnovel-v4:idiom
+尖叫	thét lên	general	project:webnovel-v4:action
+清脆的声音	giọng nói trong trẻo	general	project:webnovel-v4:sound
+呼唤	kêu gọi	general	project:webnovel-v4:action
+回应	đáp lại	general	project:webnovel-v4:action
+悄然	lặng lẽ	general	project:webnovel-v4:action
+鼓起勇气	lấy hết can đảm	general	project:webnovel-v4:action
+静心	tĩnh tâm	general	project:webnovel-v4:state
+豁然开朗	bừng tỉnh ngộ	general	project:webnovel-v4:idiom
+理顺	sắp xếp cho thông suốt	general	project:webnovel-v4:action
+头绪	manh mối	general	project:webnovel-v4:discourse
+脉络	mạch lạc	general	project:webnovel-v4:discourse
+一清二楚	rõ như lòng bàn tay	general	project:webnovel-v4:idiom
+无师自通	tự học mà thành	general	project:webnovel-v4:idiom
+本能般	như bản năng	general	project:webnovel-v4:state
+一瞬间	trong nháy mắt	general	project:webnovel-v4:time
+短短数秒	chỉ trong vài giây	general	project:webnovel-v4:time
+数秒	vài giây	general	project:webnovel-v4:time
+几秒钟	vài giây	general	project:webnovel-v4:time
+立马	ngay lập tức	general	project:webnovel-v4:time
+先前	trước đó	general	project:webnovel-v4:time
+眼下	trước mắt	general	project:webnovel-v4:time
+先从	trước tiên bắt đầu từ	general	project:webnovel-v4:discourse
+换言之	nói cách khác	general	project:webnovel-v4:discourse
+某种意义上	theo một nghĩa nào đó	general	project:webnovel-v4:discourse
+毫无疑问	không còn nghi ngờ gì	general	project:webnovel-v4:discourse
+显然	hiển nhiên	general	project:webnovel-v4:discourse
+毕竟	dù sao	general	project:webnovel-v4:discourse
+何况	huống chi	general	project:webnovel-v4:discourse
+即使	cho dù	general	project:webnovel-v4:discourse
+并非	không phải	general	project:webnovel-v4:discourse
+不知名	không rõ tên	general	project:webnovel-v4:state
+神神秘秘	thần thần bí bí	general	project:webnovel-v4:state
+截然不同	hoàn toàn khác biệt	general	project:webnovel-v4:state
+源源不断	liên tục không ngừng	general	project:webnovel-v4:state
+庞然大物	quái vật khổng lồ	general	project:webnovel-v4:description
+狰狞怪异	dữ tợn quái dị	general	project:webnovel-v4:description
+毛骨悚然	rợn tóc gáy	general	project:webnovel-v4:idiom
+黄褐色	màu vàng nâu	general	project:webnovel-v4:color
+倒霉蛋	kẻ xui xẻo	general	project:webnovel-v4:person
+吊车尾	kẻ đội sổ	general	project:webnovel-v4:person
+癫佬	kẻ điên	general	project:webnovel-v4:person
+门外汉	kẻ ngoại đạo	general	project:webnovel-v4:person
+职业者	người có nghề nghiệp	general	project:webnovel-v4:person
+布告板	bảng thông báo	general	project:webnovel-v4:object
+秘密集会	cuộc tụ họp bí mật	general	project:webnovel-v4:event
+生存空间	không gian sinh tồn	general	project:webnovel-v4:scene
+发展路线	lộ trình phát triển	general	project:webnovel-v4:world
+运转规则	quy tắc vận hành	general	project:webnovel-v4:world
+文明诞生	nền văn minh ra đời	general	project:webnovel-v4:world
+世界规则	quy tắc thế giới	general	project:webnovel-v4:world
+捷径	đường tắt	general	project:webnovel-v4:action
+筹集	gom góp	general	project:webnovel-v4:action
+循着	lần theo	general	project:webnovel-v4:action
+撂倒	đánh ngã	general	project:webnovel-v4:combat
+靠着	dựa vào	general	project:webnovel-v4:action
+剩下	còn lại	general	project:webnovel-v4:state
+捡点边角料	nhặt chút lợi vụn vặt	general	project:webnovel-v4:idiom
+净赚	lãi ròng	general	project:webnovel-v4:economy
+负收益	lợi nhuận âm	general	project:webnovel-v4:economy
+收支平衡	cân bằng thu chi	general	project:webnovel-v4:economy
+消耗掉	tiêu hao hết	general	project:webnovel-v4:economy
+搭上	bù thêm vào	general	project:webnovel-v4:economy
+以量取胜	lấy số lượng giành chiến thắng	general	project:webnovel-v4:idiom
+赛道	hướng phát triển	general	project:webnovel-v4:modern
+缺衣少食	thiếu ăn thiếu mặc	general	project:webnovel-v4:idiom
+无代价	không phải trả giá	general	project:webnovel-v4:state
+无条件	vô điều kiện	general	project:webnovel-v4:state
+划分出	phân chia thành	general	project:webnovel-v4:action
+三六九等	ba sáu chín bậc	general	project:webnovel-v4:idiom
+做	làm	general	project:webnovel-v4:function
+帮	giúp	general	project:webnovel-v4:function
+您	ngài	general	project:webnovel-v4:pronoun
+秒	giây	general	project:webnovel-v4:unit
+码	mã	general	project:webnovel-v4:unit
+喊	hét	general	project:webnovel-v4:action
+父	cha	general	project:webnovel-v4:kinship
+# General narrative phrases added after real-output review; these are not book-specific names.
+长长地舒了一口气	thở phào nhẹ nhõm	general	project:webnovel-v4:narrative
+长长地舒了口气	thở phào nhẹ nhõm	general	project:webnovel-v4:narrative
+长长的舒了一口气	thở phào nhẹ nhõm	general	project:webnovel-v4:narrative
+舒了一口气	thở phào	general	project:webnovel-v4:narrative
+舒了口气	thở phào	general	project:webnovel-v4:narrative
+远在	ở tận nơi xa	general	project:webnovel-v4:narrative
+长舒一口气	thở phào một hơi	general	project:webnovel-v4:narrative
+松了一口气	thở phào	general	project:webnovel-v4:narrative
+绞尽脑汁	vắt óc suy nghĩ	general	project:webnovel-v4:idiom
+万一	lỡ như	general	project:webnovel-v4:discourse
+宁死不屈	thà chết không khuất phục	general	project:webnovel-v4:idiom
+显灵	hiển linh	general	project:webnovel-v4:divine
+解决困难	giải quyết khó khăn	general	project:webnovel-v4:action
+各自的优势	ưu thế riêng của mỗi bên	general	project:webnovel-v4:comparison
+发展模式	mô hình phát triển	general	project:webnovel-v4:world
+科技发展	phát triển khoa học kỹ thuật	general	project:webnovel-v4:world
+科学技术	khoa học kỹ thuật	general	project:webnovel-v4:world
+生产力	sức sản xuất	general	project:webnovel-v4:world
+更加优越	ưu việt hơn	general	project:webnovel-v4:comparison
+来到这个世界	đến thế giới này	general	project:webnovel-v4:narrative
+留给我的选项	lựa chọn còn lại cho ta	general	project:webnovel-v4:narrative
+知识传播	truyền bá tri thức	general	project:webnovel-v4:knowledge
+亲自编写	tự tay biên soạn	general	project:webnovel-v4:action
+知识体系	hệ thống tri thức	general	project:webnovel-v4:knowledge
+从零开始	bắt đầu từ con số không	general	project:webnovel-v4:idiom
+一点一点	từng chút một	general	project:webnovel-v4:time
+少得多	ít hơn nhiều	general	project:webnovel-v4:comparison
+保持平衡	duy trì cân bằng	general	project:webnovel-v4:state
+高质量	chất lượng cao	general	project:webnovel-v4:description
+培养信徒	bồi dưỡng tín đồ	general	project:webnovel-v4:divine
+神力有限	thần lực có hạn	general	project:webnovel-v4:divine
+支撑不起	không đủ sức duy trì	general	project:webnovel-v4:state
+大部分	phần lớn	general	project:webnovel-v4:quantity
+特别关爱	quan tâm đặc biệt	general	project:webnovel-v4:emotion
+特殊关照	chăm sóc đặc biệt	general	project:webnovel-v4:emotion
+独一无二	độc nhất vô nhị	general	project:webnovel-v4:idiom
+最终结果	kết quả cuối cùng	general	project:webnovel-v4:narrative
+理论上来说	xét về lý thuyết	general	project:webnovel-v4:discourse
+我的判断是正确的	phán đoán của tôi là đúng	general	project:webnovel-v4:narrative
+脑海中凭空出现的信息	thông tin đột nhiên xuất hiện trong đầu	general	project:webnovel-v4:narrative
+亲手编写	đích thân biên soạn	general	project:webnovel-v4:action
+至于为什么	còn vì sao	general	project:webnovel-v4:discourse
+看起来像是	trông giống như	general	project:webnovel-v4:description
+从某种意义上来说	xét theo một nghĩa nào đó	general	project:webnovel-v4:discourse
+尽可能地	hết sức có thể	general	project:webnovel-v4:degree
+原本我以为	ban đầu tôi cho rằng	general	project:webnovel-v4:narrative
+他们不需要理解	họ không cần hiểu	general	project:webnovel-v4:narrative
+情况恰恰相反	tình hình hoàn toàn ngược lại	general	project:webnovel-v4:comparison
+并没有消失	không hề biến mất	general	project:webnovel-v4:state
+完全透明	hoàn toàn minh bạch	general	project:webnovel-v4:description
+没有关系	không liên quan	general	project:webnovel-v4:relation
+依靠自己的努力	dựa vào nỗ lực của mình	general	project:webnovel-v4:action
+可以证明这一点	có thể chứng minh điều này	general	project:webnovel-v4:reasoning
+正是因为	chính vì	general	project:webnovel-v4:reasoning
+根本不需要	hoàn toàn không cần	general	project:webnovel-v4:degree
+遇到困难的时候	khi gặp khó khăn	general	project:webnovel-v4:time
+意识到了	nhận ra	general	project:webnovel-v4:cognition
+各式各样	đủ loại	general	project:webnovel-v4:quantity
+按照规则	theo quy tắc	general	project:webnovel-v4:method

@@ -1,0 +1,18 @@
+{
+  "sourceUrl": "https://rss.example.test/feed",
+  "sourceName": "Compatibility RSS",
+  "sourceIcon": "https://rss.example.test/icon.png",
+  "sourceGroup": "Phase00",
+  "enabled": true,
+  "enabledCookieJar": true,
+  "loginUrl": "https://rss.example.test/login",
+  "loginCheckJs": "return cookie.getCookie('https://rss.example.test').length > 0;",
+  "ruleArticles": "item",
+  "ruleTitle": "title@text",
+  "rulePubDate": "pubDate@text",
+  "ruleLink": "link@text",
+  "ruleContent": "description@html",
+  "enableJs": true,
+  "loadWithBaseUrl": true,
+  "redirectPolicy": "ASK_CROSS_ORIGIN"
+}

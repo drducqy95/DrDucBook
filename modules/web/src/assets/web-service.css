@@ -1,0 +1,93 @@
+body,
+#app {
+  min-height: 100vh;
+}
+
+.web-service-shell {
+  min-height: 100vh;
+  height: 100%;
+  position: relative;
+  background: #edf3f0;
+  --web-service-background-image: none;
+  --web-service-background-fit: cover;
+  --web-service-background-position: center;
+  --web-service-background-dim: 0.22;
+  --web-service-background-blur: 0px;
+}
+
+.web-service-background-layer,
+.web-service-background-dim {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.web-service-background-layer {
+  background-image: var(--web-service-background-image);
+  background-position: var(--web-service-background-position);
+  background-repeat: no-repeat;
+  background-size: var(--web-service-background-fit);
+  filter: blur(var(--web-service-background-blur));
+  transform: scale(1.04);
+}
+
+.web-service-background-dim {
+  background: rgba(0, 0, 0, var(--web-service-background-dim));
+}
+
+.web-service-shell.has-web-service-background .web-service-background-layer,
+.web-service-shell.has-web-service-background .web-service-background-dim {
+  opacity: 1;
+}
+
+.web-service-content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  height: 100%;
+}
+
+.web-service-shell.has-web-service-background .app-main {
+  background: transparent;
+}
+
+.web-service-shell.has-web-service-background .el-dialog,
+.web-service-shell.has-web-service-background .el-dropdown-menu {
+  background: rgba(250, 252, 251, 0.94);
+  backdrop-filter: blur(16px);
+}
+
+/* The bookshelf/editor use viewport-sized internal scrollers. The chapter reader instead
+   grows with its paragraphs, so it must leave document scrolling enabled. */
+.web-service-shell.is-chapter-reader,
+.web-service-shell.is-chapter-reader .web-service-content {
+  min-height: 100vh;
+  height: auto;
+}
+
+.web-service-shell.is-chapter-reader {
+  overflow: visible;
+}
+
+.web-service-shell.has-web-service-background .index-wrapper .navigation-wrapper,
+.web-service-shell.has-web-service-background .editor,
+.web-service-shell.has-web-service-background .web-service-settings {
+  background: rgba(247, 249, 248, 0.88);
+  backdrop-filter: blur(12px);
+}
+
+.web-service-shell.has-web-service-background .index-wrapper.night .navigation-wrapper,
+.web-service-shell.has-web-service-background .index-wrapper.night .shelf-wrapper {
+  background: rgba(18, 22, 24, 0.82);
+}
+
+.web-service-shell.has-web-service-background .chapter-wrapper {
+  background: transparent !important;
+}
+
+.web-service-shell.has-web-service-background .chapter,
+.web-service-shell.has-web-service-background .read-bar,
+.web-service-shell.has-web-service-background .tool-bar {
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.18);
+}

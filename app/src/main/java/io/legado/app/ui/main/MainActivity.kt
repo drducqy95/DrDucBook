@@ -1,0 +1,613 @@
+package io.legado.app.ui.main
+
+import android.content.Context
+import android.content.Intent
+import android.content.res.Configuration
+import android.os.Bundle
+import android.text.format.DateUtils
+import android.view.InputDevice
+import android.view.KeyEvent
+import android.view.MotionEvent
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.scene.SinglePaneSceneStrategy
+import androidx.navigation3.ui.NavDisplay
+import com.drducbook.app.BuildConfig
+import com.drducbook.app.R
+import io.legado.app.base.BaseComposeActivity
+import io.legado.app.constant.AppConst.appInfo
+import io.legado.app.help.book.BookHelp
+import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.storage.Backup
+import io.legado.app.help.update.AppUpdate
+import io.legado.app.lib.dialogs.alert
+import io.legado.app.service.WebService
+import io.legado.app.ui.ai.bubble.ChatBubbleCoordinator
+import io.legado.app.ui.ai.context.AiScreenContextRegistry
+import io.legado.app.ui.ai.context.AiScreenContextSnapshot
+import io.legado.app.ui.about.CrashLogsDialog
+import io.legado.app.ui.about.UpdateDialog
+import io.legado.app.ui.book.read.ReadBookInputHandler
+import io.legado.app.ui.book.read.page.entities.PageDirection
+import io.legado.app.ui.config.otherConfig.OtherConfig
+import io.legado.app.ui.config.themeConfig.ThemeConfig
+import io.legado.app.ui.welcome.WelcomeActivity
+import io.legado.app.ui.widget.dialog.TextDialog
+import io.legado.app.ui.widget.dialog.VariableDialog
+import io.legado.app.utils.LogUtils
+import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.startActivity
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.koin.androidx.viewmodel.ext.android.viewModel
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+
+/**
+ * 主界面
+ */
+open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
+
+    companion object {
+        private const val KEY_RESTORE_READ_ROUTE = "restoreReadRoute"
+        private const val KEY_RESTORE_READ_BOOK_URL = "restoreReadBookUrl"
+        private const val KEY_RESTORE_READ_ALOUD = "restoreReadAloud"
+        private const val KEY_RESTORE_READ_IN_BOOKSHELF = "restoreReadInBookshelf"
+        private const val KEY_RESTORE_READ_CHAPTER_CHANGED = "restoreReadChapterChanged"
+        private val startupUpdateCheckGate = ProcessStartupUpdateCheckGate()
+
+        @Volatile
+        var hasActiveReadBookRoute: Boolean = false
+
+        fun createLauncherIntent(context: Context): Intent =
+            MainIntent.createLauncherIntent(context)
+
+        fun createHomeIntent(context: Context): Intent = MainIntent.createHomeIntent(context)
+        fun createAiChatIntent(context: Context): Intent = MainIntent.createAiChatIntent(context)
+        fun createIntent(context: Context, configTag: String? = null): Intent =
+            MainIntent.createIntent(context, configTag)
+
+        fun createRssSortIntent(
+            context: Context,
+            sourceUrl: String,
+            sortUrl: String? = null,
+            key: String? = null
+        ): Intent = MainIntent.createRssSortIntent(context, sourceUrl, sortUrl, key)
+
+        fun createRssReadIntent(
+            context: Context,
+            title: String? = null,
+            origin: String,
+            link: String? = null,
+            openUrl: String? = null
+        ): Intent = MainIntent.createRssReadIntent(context, title, origin, link, openUrl)
+
+        fun createBookshelfManageScreenIntent(context: Context, groupId: Long = -1L): Intent =
+            MainIntent.createBookshelfManageScreenIntent(context, groupId)
+
+        fun createCacheIntent(context: Context, groupId: Long = -1L): Intent =
+            MainIntent.createCacheIntent(context, groupId)
+
+        fun createBookCacheManageIntent(context: Context): Intent =
+            MainIntent.createBookCacheManageIntent(context)
+
+        fun createReadBookIntent(
+            context: Context,
+            bookUrl: String? = null,
+            readAloud: Boolean = false,
+            inBookshelf: Boolean = true,
+            chapterChanged: Boolean = false,
+        ): Intent = MainIntent.createReadBookIntent(
+            context = context,
+            bookUrl = bookUrl,
+            readAloud = readAloud,
+            inBookshelf = inBookshelf,
+            chapterChanged = chapterChanged,
+        )
+
+        fun createMediaPlayerIntent(
+            context: Context,
+            bookUrl: String,
+            chapterIndex: Int? = null,
+        ): Intent = MainIntent.createMediaPlayerIntent(
+            context = context,
+            bookUrl = bookUrl,
+            chapterIndex = chapterIndex,
+        )
+
+        fun createSearchIntent(
+            context: Context,
+            key: String? = null,
+            scopeRaw: String? = null
+        ): Intent = MainIntent.createSearchIntent(context, key, scopeRaw)
+
+        fun createBookInfoIntent(
+            context: Context,
+            name: String? = null,
+            author: String? = null,
+            bookUrl: String,
+            origin: String? = null,
+            coverPath: String? = null
+        ): Intent =
+            MainIntent.createBookInfoIntent(context, name, author, bookUrl, origin, coverPath)
+
+        fun createExploreShowIntent(
+            context: Context,
+            exploreName: String? = null,
+            sourceUrl: String,
+            exploreUrl: String? = null,
+        ): Intent = MainIntent.createExploreShowIntent(context, exploreName, sourceUrl, exploreUrl)
+
+        fun createAssetDeliveryIntent(context: Context, rawUri: String): Intent =
+            MainIntent.createAssetDeliveryIntent(context, rawUri)
+    }
+
+    private val viewModel by viewModel<MainViewModel>()
+    private val pendingRoute = MutableStateFlow<NavKey?>(null)
+    private var bookInfoVariableSetter: ((String, String?) -> Unit)? = null
+    private var shouldApplyDefaultToRead = true
+    private var restoredReadBookRoute: MainRouteReadBook? = null
+    private var latestBackStack: List<NavKey> = emptyList()
+    internal var activeReadBookInputHandler: ReadBookInputHandler? = null
+    internal var activeReadBookRoute: MainRouteReadBook? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        shouldApplyDefaultToRead = savedInstanceState == null
+        restoredReadBookRoute = savedInstanceState?.restoreReadBookRoute()
+        super.onCreate(savedInstanceState)
+
+        if (checkStartupRoute()) return
+        val shouldAutoCheckUpdate = startupUpdateCheckGate.consume(
+            OtherConfig.autoCheckUpdateOnStart
+        )
+
+        // 智能自启：如果上次是手动开启状态（web_service_auto 为 true），则自启
+        if (AppConfig.webServiceAutoStart) {
+            WebService.startForeground(this)
+        }
+
+        lifecycleScope.launch {
+            //版本更新
+            upVersion()
+            //设置本地密码
+            notifyAppCrash()
+            //备份同步
+            backupSync()
+            //自动更新书籍
+            val isAutoRefreshedBook = savedInstanceState?.getBoolean("isAutoRefreshedBook") ?: false
+            if (AppConfig.autoRefreshBook && !isAutoRefreshedBook) {
+                viewModel.upAllBookToc()
+            }
+            viewModel.postLoad()
+            if (shouldAutoCheckUpdate) {
+                checkUpdateOnStart()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (!intent.hasExplicitStartRoute()) return
+        pendingRoute.value = MainNavigator.resolveStartRoute(intent)
+    }
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    @Composable
+    override fun Content() {
+        val orientation = resources.configuration.orientation
+        val smallestWidthDp = resources.configuration.smallestScreenWidthDp
+        val tabletInterface = ThemeConfig.tabletInterface
+
+        val useRail = resolveUseNavigationRail(
+            tabletInterface = tabletInterface,
+            orientation = orientation,
+            smallestWidthDp = smallestWidthDp,
+        )
+
+        val startRoutes = remember {
+            val resolved = MainNavigator.resolveStartRoute(intent)
+            val hasExplicitStartRoute = intent?.hasExplicitStartRoute() == true
+            when {
+                !hasExplicitStartRoute && restoredReadBookRoute != null -> {
+                    arrayOf(MainRouteHome, restoredReadBookRoute!!)
+                }
+                shouldApplyDefaultToRead && OtherConfig.defaultToRead && resolved == MainRouteHome -> {
+                    arrayOf(MainRouteHome, MainRouteReadBook())
+                }
+                else -> MainNavigator.initialBackStack(resolved).toTypedArray()
+            }
+        }
+        latestBackStack = startRoutes.toList()
+        val backStack = rememberNavBackStack(*startRoutes)
+
+        SideEffect {
+            shouldApplyDefaultToRead = false
+        }
+
+        LaunchedEffect(backStack) {
+            pendingRoute.filterNotNull().collect { route ->
+                MainNavigator.navigateToRoute(backStack, route)
+                pendingRoute.compareAndSet(route, null)
+            }
+        }
+
+        LaunchedEffect(backStack) {
+            snapshotFlow { backStack.toList() }
+                .collect {
+                    latestBackStack = it
+                    MainNavigator.onBackStackChanged()
+                    it.lastOrNull()?.let { route ->
+                        AiScreenContextRegistry.register(route.toAiScreenContextSnapshot())
+                    }
+                    ChatBubbleCoordinator.refresh()
+                }
+        }
+
+        SharedTransitionLayout {
+            NavDisplay(
+                backStack = backStack,
+                entryDecorators = listOf(
+                    rememberSaveableStateHolderNavEntryDecorator(),
+                    rememberViewModelStoreNavEntryDecorator(),
+                ),
+                sceneStrategies = listOf(SinglePaneSceneStrategy()),
+                transitionSpec = {
+                    (slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing),
+                        initialOffset = { fullWidth -> fullWidth }
+                    ) + fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 360,
+                            easing = LinearOutSlowInEasing
+                        )
+                    )) togetherWith (slideOutOfContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing),
+                        targetOffset = { fullWidth -> fullWidth / 4 }
+                    ) + fadeOut(
+                        animationSpec = tween(
+                            durationMillis = 360,
+                            easing = LinearOutSlowInEasing
+                        )
+                    ))
+                },
+                popTransitionSpec = {
+                    (slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing),
+                        initialOffset = { fullWidth -> -fullWidth / 4 }
+                    ) + fadeIn(
+                        animationSpec = tween(
+                            durationMillis = 360,
+                            easing = LinearOutSlowInEasing
+                        )
+                    )) togetherWith (scaleOut(
+                        targetScale = 0.8f,
+                        animationSpec = tween(durationMillis = 480, easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween(durationMillis = 360)))
+                },
+                predictivePopTransitionSpec = { _ ->
+                    (slideIntoContainer(
+                        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+                        animationSpec = tween(easing = FastOutSlowInEasing),
+                        initialOffset = { fullWidth -> -fullWidth / 4 }
+                    ) + fadeIn(animationSpec = tween(easing = LinearOutSlowInEasing))) togetherWith (scaleOut(
+                        targetScale = 0.8f,
+                        animationSpec = tween(easing = FastOutSlowInEasing)
+                    ) + fadeOut(animationSpec = tween()))
+                },
+                onBack = { MainNavigator.navigateBack(this@MainActivity, backStack) },
+                entryProvider = mainEntryProvider(
+                    backStack = backStack,
+                    useRail = useRail,
+                    sharedTransitionScope = this@SharedTransitionLayout,
+                    onNavigateToRoute = { route ->
+                        MainNavigator.navigateToRoute(
+                            backStack,
+                            route
+                        )
+                    },
+                    onNavigateBack = { MainNavigator.navigateBack(this@MainActivity, backStack) },
+                    onRegisterVariableSetter = { setter -> bookInfoVariableSetter = setter }
+                )
+            )
+            BackHandler(enabled = !AppConfig.isPredictiveBackEnabled) {
+                MainNavigator.navigateBack(this@MainActivity, backStack)
+            }
+        }
+    }
+
+    private fun checkStartupRoute(): Boolean {
+        return when {
+            LocalConfig.isFirstOpenApp -> {
+                startActivity<WelcomeActivity>()
+                finish()
+                true
+            }
+            else -> false
+        }
+    }
+
+    private fun checkUpdateOnStart() {
+        val updater = AppUpdate.gitHubUpdate ?: return
+        updater.check(lifecycleScope)
+            .onSuccess { updateInfo ->
+                showDialogFragment(UpdateDialog(updateInfo))
+            }
+    }
+
+    /**
+     * 版本更新日志
+     */
+    private suspend fun upVersion() = suspendCoroutine<Unit?> { block ->
+        if (LocalConfig.versionCode == appInfo.versionCode) {
+            block.resume(null)
+            return@suspendCoroutine
+        }
+        LocalConfig.versionCode = appInfo.versionCode
+        if (LocalConfig.isFirstOpenApp) {
+            val help = String(assets.open("web/help/md/appHelp.md").readBytes())
+            val dialog = TextDialog(getString(R.string.help), help, TextDialog.Mode.MD)
+            dialog.setOnDismissListener { block.resume(null) }
+            showDialogFragment(dialog)
+            return@suspendCoroutine
+        }
+        if (!BuildConfig.DEBUG) {
+            val releaseNotes = resources.openRawResource(R.raw.release_notes)
+                .bufferedReader(Charsets.UTF_8)
+                .use { it.readText() }
+            val dialog = TextDialog(
+                getString(R.string.about_installed_version_title),
+                releaseNotes,
+                TextDialog.Mode.MD,
+            )
+            dialog.setOnDismissListener { block.resume(null) }
+            showDialogFragment(dialog)
+        } else {
+            block.resume(null)
+        }
+    }
+
+    private fun notifyAppCrash() {
+        if (!LocalConfig.appCrash || BuildConfig.DEBUG) {
+            return
+        }
+        LocalConfig.appCrash = false
+        alert(getString(R.string.draw), getString(R.string.crash_detected_open_logs)) {
+            yesButton {
+                showDialogFragment<CrashLogsDialog>()
+            }
+            noButton()
+        }
+    }
+
+    /**
+     * 备份同步
+     */
+    private fun backupSync() {
+        if (!AppConfig.autoCheckNewBackup) {
+            return
+        }
+        lifecycleScope.launch {
+            val lastBackupFile = try {
+                withContext(IO) { viewModel.getLatestWebDavBackup() }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                return@launch
+            } ?: return@launch
+            if (lastBackupFile.lastModify - LocalConfig.lastBackup > DateUtils.MINUTE_IN_MILLIS) {
+                LocalConfig.lastBackup = lastBackupFile.lastModify
+                alert(R.string.restore, R.string.webdav_after_local_restore_confirm) {
+                    cancelButton()
+                    okButton {
+                        viewModel.restoreWebDav(lastBackupFile.name)
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        publishCurrentAiContext()
+        ChatBubbleCoordinator.refresh()
+    }
+
+    override fun onPause() {
+        AiScreenContextRegistry.clear(MAIN_CONTEXT_OWNER)
+        ChatBubbleCoordinator.refresh()
+        super.onPause()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (AppConfig.autoRefreshBook) {
+            outState.putBoolean("isAutoRefreshedBook", true)
+        }
+        val readRoute = latestBackStack.lastOrNull() as? MainRouteReadBook
+            ?: activeReadBookRoute
+        if (readRoute != null) {
+            outState.putBoolean(KEY_RESTORE_READ_ROUTE, true)
+            outState.putString(KEY_RESTORE_READ_BOOK_URL, readRoute.bookUrl)
+            outState.putBoolean(KEY_RESTORE_READ_ALOUD, readRoute.readAloud)
+            outState.putBoolean(KEY_RESTORE_READ_IN_BOOKSHELF, readRoute.inBookshelf)
+            outState.putBoolean(KEY_RESTORE_READ_CHAPTER_CHANGED, readRoute.chapterChanged)
+        }
+    }
+
+    private fun publishCurrentAiContext() {
+        latestBackStack.lastOrNull()?.let { route ->
+            AiScreenContextRegistry.register(route.toAiScreenContextSnapshot())
+        }
+    }
+
+    private fun Bundle.restoreReadBookRoute(): MainRouteReadBook? {
+        if (!getBoolean(KEY_RESTORE_READ_ROUTE, false)) return null
+        return MainRouteReadBook(
+            bookUrl = getString(KEY_RESTORE_READ_BOOK_URL),
+            readAloud = getBoolean(KEY_RESTORE_READ_ALOUD, false),
+            inBookshelf = getBoolean(KEY_RESTORE_READ_IN_BOOKSHELF, true),
+            chapterChanged = getBoolean(KEY_RESTORE_READ_CHAPTER_CHANGED, false),
+        )
+    }
+
+    private fun Intent.hasExplicitStartRoute(): Boolean {
+        return hasExtra(MainIntent.EXTRA_START_ROUTE)
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        val isDown = event.action == KeyEvent.ACTION_DOWN
+        if (keyCode == KeyEvent.KEYCODE_MENU && isDown) {
+            activeReadBookInputHandler?.toggleMenu()
+            if (activeReadBookInputHandler != null) return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        val controller = activeReadBookInputHandler ?: return super.onGenericMotionEvent(event)
+        if (0 != (event.source and InputDevice.SOURCE_CLASS_POINTER) &&
+            event.action == MotionEvent.ACTION_SCROLL
+        ) {
+            val axisValue = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+            LogUtils.d("onGenericMotionEvent", "axisValue = $axisValue")
+            controller.mouseWheelPage(
+                if (axisValue < 0.0f) PageDirection.NEXT else PageDirection.PREV
+            )
+            return true
+        }
+        if (0 != (event.source and InputDevice.SOURCE_CLASS_JOYSTICK) &&
+            event.action == MotionEvent.ACTION_MOVE
+        ) {
+            val yAxis = event.getAxisValue(MotionEvent.AXIS_Y)
+            if (kotlin.math.abs(yAxis) > 0.5f) {
+                controller.handleKeyPage(
+                    if (yAxis > 0) PageDirection.NEXT else PageDirection.PREV
+                )
+                return true
+            }
+        }
+        return super.onGenericMotionEvent(event)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (activeReadBookInputHandler?.onKeyDown(keyCode, event) == true) return true
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (activeReadBookInputHandler?.onKeyUp(keyCode, event) == true) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Coroutine.async {
+            BookHelp.clearInvalidCache()
+        }
+        if (!BuildConfig.DEBUG) {
+            Backup.autoBack(this)
+        }
+        AiScreenContextRegistry.clear(MAIN_CONTEXT_OWNER)
+    }
+
+    override fun setVariable(key: String, variable: String?) {
+        bookInfoVariableSetter?.invoke(key, variable)
+    }
+
+}
+
+private const val MAIN_CONTEXT_OWNER = "main_activity"
+
+private fun NavKey.toAiScreenContextSnapshot(): AiScreenContextSnapshot {
+    return AiScreenContextSnapshot(
+        ownerId = MAIN_CONTEXT_OWNER,
+        screen = this::class.simpleName ?: "MainRoute",
+        attributes = routeAttributes(),
+        sensitive = when (this) {
+            is MainRouteSettingsAiProviderEdit,
+            is MainRouteSettingsAiModelEdit -> true
+            else -> false
+        },
+    )
+}
+
+private fun NavKey.routeAttributes(): Map<String, String> {
+    return when (this) {
+        is MainRouteReadBook -> mapOf(
+            "bookUrl" to bookUrl.orEmpty(),
+            "readAloud" to readAloud.toString(),
+            "inBookshelf" to inBookshelf.toString(),
+        )
+
+        is MainRouteBookInfo -> mapOf(
+            "bookUrl" to bookUrl,
+            "name" to name.orEmpty(),
+            "author" to author.orEmpty(),
+        )
+
+        is MainRouteMediaPlayer -> mapOf(
+            "bookUrl" to bookUrl,
+            "chapterIndex" to chapterIndex?.toString().orEmpty(),
+        )
+
+        is MainRouteSearch -> mapOf(
+            "key" to key.orEmpty(),
+            "scope" to scopeRaw.orEmpty(),
+        )
+
+        else -> emptyMap()
+    }.filterValues { it.isNotBlank() }
+}
+
+class LauncherW : MainActivity()
+class Launcher1 : MainActivity()
+class Launcher2 : MainActivity()
+class Launcher3 : MainActivity()
+class Launcher4 : MainActivity()
+class Launcher5 : MainActivity()
+class Launcher6 : MainActivity()
+class Launcher0 : MainActivity()
+
+internal fun resolveUseNavigationRail(
+    tabletInterface: String,
+    orientation: Int,
+    smallestWidthDp: Int,
+): Boolean = when (tabletInterface) {
+    "always" -> true
+    "landscape" -> orientation == Configuration.ORIENTATION_LANDSCAPE
+    "off" -> false
+    "auto" -> smallestWidthDp >= 600
+    else -> smallestWidthDp >= 600
+}

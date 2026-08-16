@@ -1,0 +1,80 @@
+{
+  "id": "quick-translator-2025-runtime",
+  "formatVersion": 1,
+  "engineSha256": "302f9f8d52d39ecb39fb1d55a53d224359a83bbf0b196f50e350d66526cc59f4",
+  "entryCount": 840878,
+  "maxSourceChars": 42,
+  "bucketCount": 2097152,
+  "loadFactor": 0.400962,
+  "collisions": 282738,
+  "rejectedLines": 29,
+  "index": {
+    "file": "qt2025-terms.qtdict",
+    "bytes": 41095293,
+    "sha256": "a91c3bcedd84f9dda6a964860d18f1ec28dc0990cc8d50057ca0137d099380b6"
+  },
+  "runtimeFiles": [
+    {
+      "name": "ChinesePhienAmWords.txt",
+      "bytes": 139370,
+      "sha256": "6b00344ed8587a4b885fd6b79d5448680398b0d11b081db7045add0638fb089a"
+    },
+    {
+      "name": "HoNguoi.txt",
+      "bytes": 8105,
+      "sha256": "933cfbf42b0dcf6f9a66432cd9d3983681ec96340743e4be863028a169e31c54"
+    },
+    {
+      "name": "HauTu.txt",
+      "bytes": 7937,
+      "sha256": "2ec3f657c4872df2b2b524e98d3d90416768f6e3a31a5e0ed8ff386191641f24"
+    },
+    {
+      "name": "LuatNhan.txt",
+      "bytes": 10995,
+      "sha256": "2b6439f3dd3508f501dd72e647f31ad5f56e0e436d9e15302414d7fbd1579f58"
+    }
+  ],
+  "sources": [
+    {
+      "name": "Names.txt",
+      "lane": "name",
+      "bytes": 2317163,
+      "sha256": "5bb69e5305da1a7e819b0f32c93285cbe0683c736d593e8819d7df44c5004373",
+      "parsedEntries": 77124,
+      "acceptedEntries": 77106,
+      "replacedEntries": 0,
+      "rejectedLines": 0
+    },
+    {
+      "name": "Names2/123.txt",
+      "lane": "name_additions",
+      "bytes": 5282,
+      "sha256": "e33da6adee503238306072e21d6e21bd2f72197f6d7c02e1bc052f5478d440fa",
+      "parsedEntries": 170,
+      "acceptedEntries": 170,
+      "replacedEntries": 0,
+      "rejectedLines": 0
+    },
+    {
+      "name": "VietPhrase/VietPhrase.txt",
+      "lane": "vietphrase",
+      "bytes": 28640047,
+      "sha256": "e9facae9624dad87f9c200638e578cd35d0dc6cc904e9a20bae55915ff58b308",
+      "parsedEntries": 763719,
+      "acceptedEntries": 763601,
+      "replacedEntries": 0,
+      "rejectedLines": 29
+    },
+    {
+      "name": "Resources/Pronouns.txt",
+      "lane": "pronoun",
+      "bytes": 606,
+      "sha256": "bf612137663453ca163acab4abd7293e8b91c31ff4f9c59677f6470e1210c219",
+      "parsedEntries": 32,
+      "acceptedEntries": 1,
+      "replacedEntries": 0,
+      "rejectedLines": 0
+    }
+  ]
+}

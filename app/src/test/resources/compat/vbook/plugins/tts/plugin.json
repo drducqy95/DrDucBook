@@ -1,0 +1,4 @@
+{
+  "metadata": {"name":"TTS Fixture","author":"DrDucBook","version":1,"source":"https://tts-plugin.example.test","description":"Synthetic TTS plugin","type":"tts"},
+  "script": {"voice":"voice.js","tts":"tts.js"}
+}

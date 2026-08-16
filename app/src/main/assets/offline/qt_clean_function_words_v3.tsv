@@ -1,0 +1,315 @@
+# QT Clean v3 project-authored function words and narrative connectors. License: CC0-1.0
+# These high-frequency grammatical readings override polysemous dictionary/Hán-Việt fallbacks.
+# source<TAB>target<TAB>type<TAB>category
+的	của	general	particle
+了	rồi	general	particle
+着	đang	general	particle
+地	một cách	general	particle
+得	được	general	particle
+过	đã từng	general	particle
+之	của	general	particle
+所	được	general	particle
+者	người	general	particle
+们	các	general	particle
+啊	à	general	particle
+吗	không	general	particle
+呢	thế	general	particle
+吧	đi	general	particle
+呀	nhỉ	general	particle
+嘛	mà	general	particle
+么	gì	general	particle
+是	là	general	grammar
+有	có	general	grammar
+无	không có	general	grammar
+不	không	general	grammar
+没	không	general	grammar
+也	cũng	general	grammar
+都	đều	general	grammar
+只	chỉ	general	grammar
+仅	chỉ	general	grammar
+就	liền	general	grammar
+才	mới	general	grammar
+还	còn	general	grammar
+又	lại	general	grammar
+再	lại	general	grammar
+便	liền	general	grammar
+则	thì	general	grammar
+却	lại	general	grammar
+而	mà	general	grammar
+但	nhưng	general	grammar
+并	và	general	grammar
+且	và	general	grammar
+与	với	general	grammar
+和	và	general	grammar
+或	hoặc	general	grammar
+若	nếu	general	grammar
+为	vì	general	grammar
+以	bằng	general	grammar
+由	do	general	grammar
+从	từ	general	grammar
+到	đến	general	grammar
+向	hướng tới	general	grammar
+对	đối với	general	grammar
+把	đem	general	grammar
+被	bị	general	grammar
+让	khiến	general	grammar
+使	khiến	general	grammar
+令	khiến	general	grammar
+将	sẽ	general	grammar
+给	cho	general	grammar
+于	ở	general	grammar
+在	ở	general	grammar
+中	trong	general	position
+上	trên	general	position
+下	dưới	general	position
+里	trong	general	position
+外	ngoài	general	position
+前	trước	general	position
+后	sau	general	position
+内	bên trong	general	position
+间	giữa	general	position
+旁	bên cạnh	general	position
+边	phía	general	position
+处	nơi	general	position
+这	này	general	demonstrative
+那	đó	general	demonstrative
+此	này	general	demonstrative
+该	này	general	demonstrative
+其	của nó	general	demonstrative
+某	nào đó	general	demonstrative
+本	này	general	demonstrative
+何	gì	general	question
+何处	ở đâu	general	question
+为何	tại sao	general	question
+如何	thế nào	general	question
+怎样	thế nào	general	question
+是否	có hay không	general	question
+能否	có thể hay không	general	question
+能	có thể	general	modal
+会	sẽ	general	modal
+要	muốn	general	modal
+可	có thể	general	modal
+愿	nguyện	general	modal
+应	nên	general	modal
+该	nên	general	modal
+敢	dám	general	modal
+肯	chịu	general	modal
+别	đừng	general	modal
+莫	đừng	general	modal
+勿	đừng	general	modal
+并非	không phải	general	negation
+并不	không hề	general	negation
+不再	không còn	general	negation
+不曾	chưa từng	general	negation
+尚未	chưa	general	negation
+未曾	chưa từng	general	negation
+无法	không thể	general	negation
+无需	không cần	general	negation
+无论	bất kể	general	conjunction
+无论如何	dù thế nào	general	conjunction
+只要	chỉ cần	general	conjunction
+只有	chỉ có	general	conjunction
+除非	trừ khi	general	conjunction
+即使	cho dù	general	conjunction
+即便	cho dù	general	conjunction
+哪怕	cho dù	general	conjunction
+否则	nếu không	general	conjunction
+于是	thế là	general	conjunction
+因此	vì thế	general	conjunction
+因而	do đó	general	conjunction
+既然	đã vậy	general	conjunction
+尽管	mặc dù	general	conjunction
+不但	không những	general	conjunction
+不仅	không chỉ	general	conjunction
+反而	trái lại	general	conjunction
+甚至	thậm chí	general	conjunction
+况且	huống chi	general	conjunction
+至于	còn về	general	conjunction
+总之	tóm lại	general	conjunction
+首先	trước hết	general	sequence
+其次	tiếp theo	general	sequence
+最后	cuối cùng	general	sequence
+随后	sau đó	general	sequence
+之后	sau đó	general	sequence
+之前	trước đó	general	sequence
+期间	trong thời gian	general	time
+当时	khi đó	general	time
+此时	lúc này	general	time
+那时	lúc đó	general	time
+如今	hiện giờ	general	time
+目前	hiện tại	general	time
+片刻	một lát	general	time
+瞬间	trong nháy mắt	general	time
+一瞬间	trong nháy mắt	general	time
+一时间	nhất thời	general	time
+一开始	ban đầu	general	time
+一直	luôn luôn	general	time
+逐渐	dần dần	general	time
+渐渐	dần dần	general	time
+很	rất	general	degree
+太	quá	general	degree
+更	hơn	general	degree
+最	nhất	general	degree
+极	cực kỳ	general	degree
+颇	khá	general	degree
+挺	khá	general	degree
+十分	rất	general	degree
+非常	vô cùng	general	degree
+相当	khá	general	degree
+完全	hoàn toàn	general	degree
+彻底	hoàn toàn	general	degree
+几乎	hầu như	general	degree
+大概	có lẽ	general	degree
+大约	khoảng	general	degree
+至少	ít nhất	general	degree
+仅仅	chỉ	general	degree
+不过	chỉ là	general	degree
+一样	giống nhau	general	comparison
+一般	bình thường	general	comparison
+更加	càng thêm	general	comparison
+越发	càng thêm	general	comparison
+越来越	ngày càng	general	comparison
+一个	một	general	measure
+一种	một loại	general	measure
+一些	một vài	general	measure
+一点	một chút	general	measure
+一下	một chút	general	measure
+一番	một phen	general	measure
+一阵	một trận	general	measure
+一声	một tiếng	general	measure
+一眼	một cái nhìn	general	measure
+一口	một ngụm	general	measure
+一条	một	general	measure
+一名	một người	general	measure
+几名	vài người	general	measure
+所有	tất cả	general	quantity
+全部	toàn bộ	general	quantity
+任何	bất kỳ	general	quantity
+每个	mỗi	general	quantity
+各自	mỗi người	general	quantity
+彼此	lẫn nhau	general	relation
+双方	hai bên	general	relation
+其中	trong đó	general	position
+周围	xung quanh	general	position
+深处	nơi sâu	general	position
+面前	trước mặt	general	position
+眼前	trước mắt	general	position
+身上	trên người	general	position
+手中	trong tay	general	position
+心里	trong lòng	general	position
+当中	ở giữa	general	position
+看来	xem ra	general	narration
+看起来	trông có vẻ	general	narration
+听起来	nghe có vẻ	general	narration
+想来	nghĩ lại	general	narration
+显然	rõ ràng	general	narration
+显得	trở nên	general	narration
+似的	như thể	general	narration
+一般来说	nói chung	general	narration
+没想到	không ngờ	general	narration
+想不到	không ngờ	general	narration
+不知道	không biết	general	narration
+不清楚	không rõ	general	narration
+不明白	không hiểu	general	narration
+意识到	nhận ra	general	cognition
+反应过来	sực hiểu ra	general	cognition
+回过神来	hoàn hồn	general	cognition
+清晰	rõ ràng	general	cognition
+清楚	rõ	general	cognition
+明明	rõ ràng	general	cognition
+记忆	ký ức	general	cognition
+印象	ấn tượng	general	cognition
+打算	dự định	general	cognition
+计划	kế hoạch	general	cognition
+办法	cách	general	cognition
+原因	nguyên nhân	general	cognition
+结果	kết quả	general	cognition
+情况	tình hình	general	narration
+状态	trạng thái	general	narration
+模样	dáng vẻ	general	narration
+样子	dáng vẻ	general	narration
+过程	quá trình	general	narration
+方式	cách thức	general	narration
+程度	mức độ	general	narration
+方面	phương diện	general	narration
+行动	hành động	general	action
+动作	động tác	general	action
+移动	di chuyển	general	action
+靠近	đến gần	general	action
+远离	rời xa	general	action
+握住	nắm lấy	general	action
+抓住	bắt lấy	general	action
+松开	buông ra	general	action
+伸手	giơ tay	general	action
+睁开	mở ra	general	action
+闭上	nhắm lại	general	action
+抬起	nâng lên	general	action
+放下	đặt xuống	general	action
+取出	lấy ra	general	action
+收回	thu lại	general	action
+直接	trực tiếp	general	action
+尝试	thử	general	action
+做到	làm được	general	action
+完成	hoàn thành	general	action
+获得	nhận được	general	action
+达到	đạt tới	general	action
+维持	duy trì	general	action
+改变	thay đổi	general	action
+恢复	hồi phục	general	action
+产生	sinh ra	general	action
+形成	hình thành	general	action
+导致	dẫn đến	general	action
+影响	ảnh hưởng	general	action
+允许	cho phép	general	action
+拒绝	từ chối	general	action
+接受	chấp nhận	general	action
+确定	xác định	general	cognition
+确认	xác nhận	general	cognition
+证明	chứng minh	general	cognition
+解释	giải thích	general	speech
+提醒	nhắc nhở	general	speech
+祈祷	cầu nguyện	general	religion
+祷告	cầu nguyện	general	religion
+信仰	đức tin	general	religion
+信徒	tín đồ	general	religion
+教派	giáo phái	organization_name	religion
+神力	thần lực	general	religion
+神国	thần quốc	place_name	religion
+凡世	phàm thế	place_name	religion
+众生	chúng sinh	general	religion
+万灵	muôn loài	general	religion
+邪神	tà thần	general	religion
+女神	nữ thần	general	religion
+魔法女神	Nữ thần Phép thuật	proper_name	religion
+黑袍	áo bào đen	general	appearance
+白袍	áo bào trắng	general	appearance
+怪物	quái vật	general	fantasy
+畸变	biến dị	general	fantasy
+变异	biến dị	general	fantasy
+血肉	máu thịt	general	body
+肉体	thân thể	general	body
+骨骼	xương cốt	general	body
+皮肤	da	general	body
+大脑	não bộ	general	body
+神经系统	hệ thần kinh	general	body
+行动能力	khả năng vận động	general	body
+严重受损	bị tổn thương nghiêm trọng	general	body
+植物人	người thực vật	general	body
+卡车	xe tải	general	modern
+医院	bệnh viện	place_name	modern
+病床	giường bệnh	general	modern
+小男孩	cậu bé	general	person
+上辈子	kiếp trước	general	time
+另一个世界	một thế giới khác	place_name	fantasy
+穿越	chuyển sinh	general	fantasy
+传说	truyền thuyết	general	fantasy
+白茫茫	trắng xóa	general	description
+广袤	rộng lớn	general	description
+幽远	xa xăm	general	description
+模糊	mơ hồ	general	description
+巨大	khổng lồ	general	description
+稳定	ổn định	general	description
+奇怪	kỳ lạ	general	description
+怪异	quái dị	general	description
+真实	chân thật	general	description
+伟大	vĩ đại	general	description

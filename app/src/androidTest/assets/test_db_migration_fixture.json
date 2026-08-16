@@ -1,0 +1,38 @@
+{
+  "sourceVersion": 98,
+  "targetVersion": 110,
+  "counts": {
+    "books": 5,
+    "chapters": 50,
+    "book_sources": 3,
+    "cookies": 1,
+    "ai_provider_profiles": 1,
+    "ai_model_profiles": 1,
+    "ai_route_profiles": 1,
+    "ai_credentials": 1,
+    "ai_memory": 2,
+    "ai_memory_fts": 2
+  },
+  "preserved": {
+    "bookName": "Text fixture",
+    "sourceName": "Online fixture",
+    "cookie": "session=fixture",
+    "providerId": "provider-fixture",
+    "legacyApiKey": "legacy-secret",
+    "credentialSecretRef": "secret://fixture"
+  },
+  "newTables": [
+    "ai_agent_runs",
+    "ai_agent_trace",
+    "ai_agent_proposals",
+    "ai_memory_fts",
+    "ai_skills",
+    "ai_skill_versions",
+    "ai_agent_audits",
+    "ai_custom_tools",
+    "ai_custom_tool_versions",
+    "book_source_health",
+    "media_download_tasks",
+    "media_download_items"
+  ]
+}

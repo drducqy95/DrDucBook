@@ -1,0 +1,4 @@
+{
+  "metadata": {"name":"Video Fixture","author":"DrDucBook","version":1,"source":"https://video.example.test","description":"Synthetic video plugin","type":"video"},
+  "script": {"search":"search.js","track":"track.js"}
+}

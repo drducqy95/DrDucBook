@@ -1,0 +1,36 @@
+{
+  "id": "quick-translator-2020-debug-source",
+  "revision": "2025-09-01",
+  "archive": {
+    "name": "Quick Translator 2020.rar",
+    "bytes": 15181253,
+    "sha256": "f1e84cef41dfbc2518bd4c359438b0ae959d738933c9653efe1f300c0bc81f26",
+    "source": "https://drive.google.com/drive/folders/11pyCRCImaUodiBpYWXVLxk2dKipFzVlf"
+  },
+  "debugOnly": true,
+  "licenseStatus": "not-declared-by-upstream",
+  "files": [
+    {"name":"Babylon.txt","bytes":955444,"lines":31132,"sha256":"bcaa63110a235ff4b0b16dc437834990c433665505d64d523d735d918525d9f0"},
+    {"name":"Bookmarks.txt","bytes":3,"lines":0,"sha256":"f1945cd6c19e56b3c1c78943ef5ec18116907a4ca1efc40a57d48ab1db7adfc5"},
+    {"name":"cedict_ts.u8","bytes":6329144,"lines":85987,"sha256":"92df8daad3612e447aa44b4bf1d75f7a47f6fc9fb6ea470e3f385f9fa7c24b36"},
+    {"name":"ChinesePhienAmEnglishWords.txt","bytes":3854,"lines":313,"sha256":"964f8de20e9a4deb0a4f184e85dad6b87f88816296fd5476b94be6ce45f33be7"},
+    {"name":"ChinesePhienAmWords.txt","bytes":136973,"lines":12570,"sha256":"dfca89326ff0e425445c861bdf95b8527edbfdeda50e8553f2e03382e8ab448b"},
+    {"name":"ChinesePhienAmWordsHistory.txt","bytes":1005,"lines":21,"sha256":"fc801a393887e41b4c71d07ed89e2586178d29ae1edbaa506975832b282c9110"},
+    {"name":"Dictionaries.ini","bytes":518,"lines":20,"sha256":"d56e12a4792f5173fe327d2ae576d159c931d10c33a42691ee6fde64eb46c656"},
+    {"name":"IgnoredChinesePhrases.txt","bytes":83080,"lines":2047,"sha256":"5897250a9e8826b6a1294ea1fc31a85dbf984551da2ab9c7ad01374c058a14a5"},
+    {"name":"LacViet.txt","bytes":5682980,"lines":66450,"sha256":"5a0859015d206a5dcedafaf16ae39c54594df72ef9d23aa098ecbd70316f37de"},
+    {"name":"LuatNhan.txt","bytes":11311,"lines":303,"sha256":"a547fb210ec9eab7f31a8e564744a241ac198aad9a0458fc5e1b44229938ed9e"},
+    {"name":"LuatNhancu.txt","bytes":635868,"lines":15789,"sha256":"41c8168e0147af02b7f2e66dc9bbe71bab12a8b2c4ab136a486339f27164d120"},
+    {"name":"Mark.txt","bytes":154,"lines":20,"sha256":"075ad08e45d52d5f7c5c2bb033e38de7837a78e407821e4d7b185b955e58325c"},
+    {"name":"Names.txt","bytes":28063,"lines":929,"sha256":"3de8d1a76849b3533a976076cbe47036d294b5a2807a58c5ec389a71424d8258"},
+    {"name":"Names2.txt","bytes":41591,"lines":1768,"sha256":"add1c5ed4a04ad22aab025790436cc10d3953be3a48e44b709fca88c2f53e7d5"},
+    {"name":"Names2History.txt","bytes":37420,"lines":655,"sha256":"1dfbc1d931bfa1f69c8ee0cf5a3a4eb6d9ecc40e59cc349701c7545dd2cf0db9"},
+    {"name":"NamesHistory.txt","bytes":17821,"lines":311,"sha256":"3ceaf6658d219d4182e66005d67fc4e45a17869a06d79cb926d34d0a0e7046cf"},
+    {"name":"Pronouns.txt","bytes":319598,"lines":12063,"sha256":"830635cdc2af2e6e377d6aadb9d108a40b3c7c3bb2d7b58df6222f328b71ed55"},
+    {"name":"ThieuChuu.txt","bytes":2181738,"lines":10027,"sha256":"0a3529beed797c63a3b61b8be09f59a19d007a1266039cdf30550e198c6a10c6"},
+    {"name":"TrichDan.txt","bytes":11500303,"lines":23449,"sha256":"2b78064574da20e96c182fcf97ced7e09f504058c479a80a1a92b1458bc5313e"},
+    {"name":"VietPhrase.txt","bytes":28358029,"lines":728698,"sha256":"071ab090ca7be127c8c3a78dba22489e3b7ba8d602e959f8d34648468763bf84"},
+    {"name":"VietPhrase2.txt","bytes":213100,"lines":4748,"sha256":"5bb1505c43a671fbffc291dcdea0e72dd52fc6c6b4b8bed7a6762c6ca65400e3"},
+    {"name":"VietPhraseHistory.txt","bytes":300285,"lines":5144,"sha256":"95d76db821221fbe8ffcea14a859b1911de5958836828ae6b436b51e53bf91f5"}
+  ]
+}

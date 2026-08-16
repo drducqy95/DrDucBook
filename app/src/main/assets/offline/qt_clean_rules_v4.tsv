@@ -1,0 +1,58 @@
+# QT Clean v4.1 structural grammar rules. License: CC0-1.0
+# actionType<TAB>priority<TAB>sourcePattern<TAB>replacement<TAB>category
+QT_TEMPLATE	112	{0}的一个{1}	một {1} của {0}	determiner_possession
+QT_TEMPLATE	112	{0}的一种{1}	một loại {1} của {0}	determiner_possession
+QT_TEMPLATE	112	{0}的这个{1}	{1} này của {0}	determiner_possession
+QT_TEMPLATE	110	所谓的{0}	cái gọi là {0}	determiner
+QT_TEMPLATE	110	所有的{0}	tất cả {0}	determiner
+QT_TEMPLATE	110	自己的{0}	{0} của mình	possession
+QT_TEMPLATE	110	本身的{0}	{0} của bản thân	possession
+QT_TEMPLATE	110	这个{0}	{0} này	determiner
+QT_TEMPLATE	110	这种{0}	loại {0} này	determiner
+QT_TEMPLATE	110	那个{0}	{0} kia	determiner
+QT_TEMPLATE	108	{0}的过程	quá trình {0}	nominalization
+QT_TEMPLATE	108	{0}的能力	khả năng {0}	nominalization
+QT_TEMPLATE	108	{0}的方法	phương pháp {0}	nominalization
+QT_TEMPLATE	108	{0}的方式	cách {0}	nominalization
+QT_TEMPLATE	108	{0}的知识	kiến thức về {0}	nominalization
+QT_TEMPLATE	108	{0}的问题	vấn đề về {0}	nominalization
+QT_TEMPLATE	108	{0}的结果	kết quả {0}	nominalization
+QT_TEMPLATE	108	{0}的原因	nguyên nhân {0}	nominalization
+QT_TEMPLATE	108	{0}的目的	mục đích {0}	nominalization
+QT_TEMPLATE	108	{0}的情况	tình hình {0}	nominalization
+QT_TEMPLATE	108	{0}的程度	mức độ {0}	nominalization
+QT_TEMPLATE	108	{0}的动作	động tác {0}	nominalization
+QT_TEMPLATE	108	{0}的感觉	cảm giác {0}	nominalization
+QT_TEMPLATE	108	{0}的想法	suy nghĩ {0}	nominalization
+QT_TEMPLATE	106	正在{0}	đang {0}	aspect
+QT_TEMPLATE	106	正{0}	đang {0}	aspect
+QT_TEMPLATE	104	{0}了	{0}	aspect
+QT_TEMPLATE	104	{0}地{1}	{0} {1}	adverbial
+QT_TEMPLATE	104	{0}得{1}	{0} {1}	complement
+QT_TEMPLATE	104	在{0}中	trong {0}	position
+QT_TEMPLATE	104	在{0}里	trong {0}	position
+QT_TEMPLATE	104	从{0}来看	xét từ {0}	viewpoint
+QT_TEMPLATE	104	从{0}看	xét từ {0}	viewpoint
+QT_TEMPLATE	104	对{0}来说	đối với {0}	topic
+QT_TEMPLATE	104	对于{0}来说	đối với {0}	topic
+QT_TEMPLATE	104	{0}的时候	khi {0}	time
+QT_TEMPLATE	104	当{0}时	khi {0}	time
+QT_TEMPLATE	104	如果{0}的话	nếu {0}	condition
+QT_TEMPLATE	104	远在{0}的{1}	{1} ở tận {0}	position
+QT_TEMPLATE	102	由{0}亲手编写提供	do {0} đích thân biên soạn và cung cấp	agent
+QT_TEMPLATE	102	被{0}选中的{1}	{1} được {0} lựa chọn	passive
+QT_TEMPLATE	102	{0}觉得{1}	{0} cảm thấy {1}	cognition
+QT_TEMPLATE	102	令{0}相当满意	khiến {0} khá hài lòng	causative
+QT_TEMPLATE	102	只需要{0}就可以{1}	chỉ cần {0} là có thể {1}	condition
+QT_TEMPLATE	102	代替{0}完成{1}	thay {0} hoàn thành {1}	substitution
+QT_TEMPLATE	102	跟{0}没有关系	không liên quan đến {0}	relation
+QT_TEMPLATE	102	如果一个{0}能够学会{1}	nếu một {0} có thể học được {1}	condition
+QT_TEMPLATE	102	等待{0}显灵	chờ {0} hiển linh	action
+QT_TEMPLATE	102	帮助{0}解决{1}	giúp {0} giải quyết {1}	action
+QT_TEMPLATE	102	{0}脑海凭空中出现的{1}	{1} đột nhiên xuất hiện trong đầu {0}	position
+QT_TEMPLATE	102	则是{0}临时想到的{1}	{1} mà {0} chợt nghĩ ra	cognition
+QT_TEMPLATE	102	让{0}相当满意的{1}	{1} khiến {0} khá hài lòng	causative
+QT_TEMPLATE	102	以{0}为代价{1}	{1}, đổi lại phải {0}	exchange
+REPLACE	-112	\b(cái gọi là)\s+của\b	$1	cleanup_particle
+REPLACE	-112	\bquá trình\s+của\b	quá trình	cleanup_particle
+REPLACE	-112	\bkhả năng\s+của\b	khả năng	cleanup_particle

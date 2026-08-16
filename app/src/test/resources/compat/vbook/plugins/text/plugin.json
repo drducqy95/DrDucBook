@@ -1,0 +1,4 @@
+{
+  "metadata": {"name":"Text Fixture","author":"DrDucBook","version":1,"source":"https://text.example.test","description":"Synthetic text plugin","type":"novel"},
+  "script": {"chap":"chap.js"}
+}

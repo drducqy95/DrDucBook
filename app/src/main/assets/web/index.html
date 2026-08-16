@@ -1,0 +1,164 @@
+<!DOCTYPE HTML>
+<!--
+	Forty by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html lang="vi">
+
+<head>
+    <title>DrDucBook Web</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+    <link rel="stylesheet" href="assets/css/main.css"/>
+    <style>
+        #pairing-dialog {
+            width: min(92vw, 420px);
+            border: 0;
+            border-radius: 12px;
+            padding: 24px;
+        }
+        #pairing-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+        #pairing-dialog input {
+            width: 100%;
+            margin: 12px 0;
+            padding: 10px;
+            color: #222;
+        }
+        #pairing-error { color: #d32f2f; min-height: 1.5em; }
+        #pairing-actions { display: flex; justify-content: flex-end; gap: 8px; }
+    </style>
+</head>
+
+<body class="is-preload">
+
+<!-- Wrapper -->
+<div id="wrapper">
+
+    <!-- Header -->
+    <header id="header" class="alt">
+        <nav>
+            <a href="#menu">Trình đơn</a>
+        </nav>
+    </header>
+
+    <!-- Menu -->
+    <nav id="menu">
+        <ul class="links">
+            <li><a href="https://github.com/gedoor/legado">Github</a></li>
+            <li><a href="https://github.com/zsakvo">zsakvo</a></li>
+            <li><a href="#">Design: HTML5 UP</a></li>
+        </ul>
+    </nav>
+
+    <!-- Banner -->
+    <section id="banner" class="major">
+        <div class="inner">
+            <header class="major">
+                <h1>Mở trang sách, thắp sáng một thế giới</h1>
+            </header>
+            <div class="content">
+                <!-- <p>A responsive site template designed by HTML5 UP<br />
+                    and released under the Creative Commons.</p> -->
+                <ul class="actions">
+                    <li><a href="vue/index.html" class="button next scrolly">Giá sách</a>
+                    </li>
+                </ul>
+                <ul class="actions">
+                    <li><a href="vue/index.html#/bookSource" class="button next scrolly"
+                           >Nguồn sách</a></li>
+                </ul>
+                <ul class="actions">
+                    <li><a href="uploadBook/index.html" class="button next scrolly">Tải sách lên</a>
+                    </li>
+                </ul>
+                <ul class="actions">
+                    <li><a href="vue/index.html#/rssSource" class="button next scrolly"
+                           >Nguồn RSS</a></li>
+                </ul>
+            </div>
+        </div>
+    </section>
+</div>
+
+<dialog id="pairing-dialog">
+    <form id="pairing-form">
+        <h2>Ghép đôi với DrDucBook</h2>
+        <p>Nhập mã ghép đôi 6 số đang hiển thị trong ứng dụng.</p>
+        <input id="pairing-code" inputmode="numeric" autocomplete="one-time-code"
+               maxlength="7" pattern="[0-9 ]{6,7}" required aria-label="Mã ghép đôi"/>
+        <p id="pairing-error" role="alert"></p>
+        <div id="pairing-actions">
+            <button id="pairing-cancel" type="button">Hủy</button>
+            <button id="pairing-submit" type="submit">Đồng ý</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Scripts -->
+<script src="assets/js/dist.js"></script>
+<script>
+    var pairingDialog = document.getElementById('pairing-dialog');
+    var pairingForm = document.getElementById('pairing-form');
+    var pairingCode = document.getElementById('pairing-code');
+    var pairingError = document.getElementById('pairing-error');
+    var pairingTarget = '';
+
+    document.querySelectorAll('a[href^="vue/"], a[href^="uploadBook/"]').forEach(function (link) {
+        link.addEventListener('click', async function (event) {
+            event.preventDefault();
+            pairingError.textContent = '';
+            try {
+                var instance = await fetch('api/v2/instance').then(function (response) {
+                    if (!response.ok) throw new Error('INSTANCE_UNAVAILABLE');
+                    return response.json();
+                });
+            } catch (error) {
+                pairingTarget = link.href;
+                pairingError.textContent = 'Dịch vụ web chưa phản hồi. Hãy thử lại.';
+                pairingDialog.showModal();
+                return;
+            }
+            if (!instance.requiresPairing || sessionStorage.getItem('drducbookWebSession')) {
+                location.href = link.href;
+                return;
+            }
+            pairingTarget = link.href;
+            pairingCode.value = '';
+            pairingDialog.showModal();
+            pairingCode.focus();
+        });
+    });
+
+    pairingForm.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        pairingError.textContent = '';
+        document.getElementById('pairing-submit').disabled = true;
+        try {
+            var response = await fetch('api/v2/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: pairingCode.value })
+            });
+            if (!response.ok) {
+                pairingError.textContent = 'Mã không đúng, đã hết hạn hoặc đã được sử dụng.';
+                return;
+            }
+            var session = await response.json();
+            sessionStorage.setItem('drducbookWebSession', session.sessionToken);
+            location.href = pairingTarget;
+        } catch (error) {
+            pairingError.textContent = 'Không thể kết nối dịch vụ web. Hãy thử lại.';
+        } finally {
+            document.getElementById('pairing-submit').disabled = false;
+        }
+    });
+
+    document.getElementById('pairing-cancel').addEventListener('click', function () {
+        pairingDialog.close();
+    });
+</script>
+
+</body>
+
+</html>

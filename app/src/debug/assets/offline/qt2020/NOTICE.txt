@@ -1,0 +1,33 @@
+Quick Translator 2020 debug/test data
+=====================================
+
+Source folder:
+https://drive.google.com/drive/folders/11pyCRCImaUodiBpYWXVLxk2dKipFzVlf
+
+Source archive:
+Quick Translator 2020.rar
+SHA-256: f1e84cef41dfbc2518bd4c359438b0ae959d738933c9653efe1f300c0bc81f26
+Source revision shown by the publisher: 2025-09-01
+
+The upstream publisher does not state a redistribution license in the archive
+or download page. For that reason this dataset is not included in release
+source sets. Only the runtime artifacts required by the QT algorithm and the
+five editable source dictionaries requested for debug are included:
+
+* qt2020-terms.qtdict: compiled Name, VietPhrase and Pronoun lookup
+* ChinesePhienAmWords.txt: Han-Viet character readings
+* LuatNhan.txt: current pronoun/template rules
+* Names2.txt, Names.txt, VietPhrase2.txt, VietPhrase.txt and Pronouns.txt:
+  editable source dictionaries used to rebuild the compiled lookup
+
+History files, editor metadata and unrelated reference dictionaries are
+deliberately excluded from the APK.
+
+qt2020-terms.qtdict is a deterministic, memory-mappable lookup index generated
+from Names2.txt, Names.txt, VietPhrase2.txt, VietPhrase.txt, and Pronouns.txt by:
+
+    node tools/qt2020/build_qt2020_index.mjs
+
+The source archive remains the source of truth. See qt2020-source-manifest.json
+for archive provenance and qt2020-index-manifest.json for the selected input
+lanes and deterministic output integrity.

@@ -1,0 +1,23 @@
+{
+  "authorityTemplate": "${applicationId}.readerProvider",
+  "postBodyKey": "json",
+  "resultColumn": "result",
+  "operations": [
+    {"method":"insert","path":"bookSource/insert"},
+    {"method":"insert","path":"bookSources/insert"},
+    {"method":"delete","path":"bookSources/delete"},
+    {"method":"query","path":"bookSource/query"},
+    {"method":"query","path":"bookSources/query"},
+    {"method":"insert","path":"rssSource/insert"},
+    {"method":"insert","path":"rssSources/insert"},
+    {"method":"delete","path":"rssSources/delete"},
+    {"method":"query","path":"rssSource/query"},
+    {"method":"query","path":"rssSources/query"},
+    {"method":"insert","path":"book/insert"},
+    {"method":"query","path":"books/query"},
+    {"method":"query","path":"book/refreshToc/query"},
+    {"method":"query","path":"book/chapter/query"},
+    {"method":"query","path":"book/content/query"},
+    {"method":"query","path":"book/cover/query"}
+  ]
+}

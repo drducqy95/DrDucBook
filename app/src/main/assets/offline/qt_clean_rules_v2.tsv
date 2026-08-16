@@ -1,0 +1,149 @@
+# QT Clean v2 structural rules. License: CC0-1.0
+# actionType<TAB>priority<TAB>sourcePattern<TAB>replacement<TAB>category
+QT_TEMPLATE	120	{0}对{1}说	{0} nói với {1}	speech_two_slots
+QT_TEMPLATE	120	{0}对{1}说道	{0} nói với {1}	speech_two_slots
+QT_TEMPLATE	120	{0}向{1}说道	{0} nói với {1}	speech_two_slots
+QT_TEMPLATE	120	{0}告诉{1}	{0} nói cho {1}	speech_two_slots
+QT_TEMPLATE	120	{0}问{1}	{0} hỏi {1}	speech_two_slots
+QT_TEMPLATE	120	{0}回答{1}	{0} trả lời {1}	speech_two_slots
+QT_TEMPLATE	120	{0}提醒{1}	{0} nhắc nhở {1}	speech_two_slots
+QT_TEMPLATE	120	{0}警告{1}	{0} cảnh cáo {1}	speech_two_slots
+QT_TEMPLATE	120	{0}命令{1}	{0} ra lệnh cho {1}	speech_two_slots
+QT_TEMPLATE	120	{0}请求{1}	{0} đề nghị {1}	speech_two_slots
+QT_TEMPLATE	118	{0}看着{1}	{0} nhìn {1}	perception_two_slots
+QT_TEMPLATE	118	{0}望着{1}	{0} nhìn về phía {1}	perception_two_slots
+QT_TEMPLATE	118	{0}盯着{1}	{0} nhìn chằm chằm {1}	perception_two_slots
+QT_TEMPLATE	118	{0}看见{1}	{0} nhìn thấy {1}	perception_two_slots
+QT_TEMPLATE	118	{0}发现{1}	{0} phát hiện {1}	perception_two_slots
+QT_TEMPLATE	118	{0}认出{1}	{0} nhận ra {1}	perception_two_slots
+QT_TEMPLATE	118	{0}听见{1}	{0} nghe thấy {1}	perception_two_slots
+QT_TEMPLATE	118	{0}注意到{1}	{0} chú ý đến {1}	perception_two_slots
+QT_TEMPLATE	116	{0}想起{1}	{0} nhớ đến {1}	cognition_two_slots
+QT_TEMPLATE	116	{0}想到{1}	{0} nghĩ đến {1}	cognition_two_slots
+QT_TEMPLATE	116	{0}记得{1}	{0} nhớ {1}	cognition_two_slots
+QT_TEMPLATE	116	{0}忘记{1}	{0} quên {1}	cognition_two_slots
+QT_TEMPLATE	116	{0}怀疑{1}	{0} nghi ngờ {1}	cognition_two_slots
+QT_TEMPLATE	116	{0}相信{1}	{0} tin tưởng {1}	cognition_two_slots
+QT_TEMPLATE	116	{0}理解{1}	{0} hiểu {1}	cognition_two_slots
+QT_TEMPLATE	116	{0}误会{1}	{0} hiểu lầm {1}	cognition_two_slots
+QT_TEMPLATE	114	{0}帮助{1}	{0} giúp đỡ {1}	relation_two_slots
+QT_TEMPLATE	114	{0}保护{1}	{0} bảo vệ {1}	relation_two_slots
+QT_TEMPLATE	114	{0}支持{1}	{0} ủng hộ {1}	relation_two_slots
+QT_TEMPLATE	114	{0}背叛{1}	{0} phản bội {1}	relation_two_slots
+QT_TEMPLATE	114	{0}救下{1}	{0} cứu {1}	relation_two_slots
+QT_TEMPLATE	114	{0}追上{1}	{0} đuổi kịp {1}	relation_two_slots
+QT_TEMPLATE	114	{0}跟随{1}	{0} đi theo {1}	relation_two_slots
+QT_TEMPLATE	114	{0}离开{1}	{0} rời khỏi {1}	relation_two_slots
+QT_TEMPLATE	112	{0}攻击{1}	{0} tấn công {1}	combat_two_slots
+QT_TEMPLATE	112	{0}击败{1}	{0} đánh bại {1}	combat_two_slots
+QT_TEMPLATE	112	{0}杀死{1}	{0} giết chết {1}	combat_two_slots
+QT_TEMPLATE	112	{0}挡住{1}	{0} ngăn cản {1}	combat_two_slots
+QT_TEMPLATE	112	{0}拦住{1}	{0} chặn {1}	combat_two_slots
+QT_TEMPLATE	112	{0}抓住{1}	{0} bắt lấy {1}	combat_two_slots
+QT_TEMPLATE	112	{0}放开{1}	{0} buông {1}	combat_two_slots
+QT_TEMPLATE	112	{0}推开{1}	{0} đẩy {1} ra	combat_two_slots
+QT_TEMPLATE	112	{0}拉住{1}	{0} kéo giữ {1}	combat_two_slots
+QT_TEMPLATE	112	{0}抱住{1}	{0} ôm lấy {1}	combat_two_slots
+QT_TEMPLATE	110	{0}被{1}发现	{0} bị {1} phát hiện	passive_two_slots
+QT_TEMPLATE	110	{0}被{1}看见	{0} bị {1} nhìn thấy	passive_two_slots
+QT_TEMPLATE	110	{0}被{1}抓住	{0} bị {1} bắt được	passive_two_slots
+QT_TEMPLATE	110	{0}被{1}击败	{0} bị {1} đánh bại	passive_two_slots
+QT_TEMPLATE	110	{0}被{1}杀死	{0} bị {1} giết chết	passive_two_slots
+QT_TEMPLATE	110	{0}被{1}救下	{0} được {1} cứu	passive_two_slots
+QT_TEMPLATE	110	{0}被{1}带走	{0} bị {1} đưa đi	passive_two_slots
+QT_TEMPLATE	108	{0}让{1}知道	{0} cho {1} biết	causative_two_slots
+QT_TEMPLATE	108	{0}让{1}明白	{0} khiến {1} hiểu	causative_two_slots
+QT_TEMPLATE	108	{0}让{1}离开	{0} để {1} rời đi	causative_two_slots
+QT_TEMPLATE	108	{0}让{1}失望	{0} khiến {1} thất vọng	causative_two_slots
+QT_TEMPLATE	108	{0}让{1}等待	{0} bảo {1} chờ đợi	causative_two_slots
+QT_TEMPLATE	108	{0}使{1}陷入	{0} khiến {1} rơi vào	causative_two_slots
+QT_TEMPLATE	106	{0}把{1}交给	{0} giao {1} cho	ba_construction
+QT_TEMPLATE	106	{0}把{1}拿出	{0} lấy {1} ra	ba_construction
+QT_TEMPLATE	106	{0}把{1}收起	{0} cất {1} đi	ba_construction
+QT_TEMPLATE	106	{0}把{1}放下	{0} đặt {1} xuống	ba_construction
+QT_TEMPLATE	106	{0}把{1}扔掉	{0} ném {1} đi	ba_construction
+QT_TEMPLATE	106	{0}把{1}推开	{0} đẩy {1} ra	ba_construction
+QT_TEMPLATE	106	{0}把{1}拉过来	{0} kéo {1} lại	ba_construction
+QT_TEMPLATE	104	{0}给{1}	{0} đưa cho {1}	transfer_two_slots
+QT_TEMPLATE	104	{0}送给{1}	{0} tặng cho {1}	transfer_two_slots
+QT_TEMPLATE	104	{0}交给{1}	{0} giao cho {1}	transfer_two_slots
+QT_TEMPLATE	104	{0}还给{1}	{0} trả lại cho {1}	transfer_two_slots
+QT_TEMPLATE	104	{0}从{1}手中	{0} từ tay {1}	transfer_two_slots
+QT_TEMPLATE	104	{0}从{1}那里	{0} từ chỗ {1}	transfer_two_slots
+QT_TEMPLATE	102	{0}和{1}一起	{0} cùng {1}	relation_two_slots
+QT_TEMPLATE	102	{0}与{1}一起	{0} cùng {1}	relation_two_slots
+QT_TEMPLATE	102	{0}跟{1}一起	{0} cùng {1}	relation_two_slots
+QT_TEMPLATE	102	{0}和{1}合作	{0} hợp tác với {1}	relation_two_slots
+QT_TEMPLATE	102	{0}与{1}合作	{0} hợp tác với {1}	relation_two_slots
+QT_TEMPLATE	102	{0}和{1}战斗	{0} chiến đấu với {1}	relation_two_slots
+QT_TEMPLATE	102	{0}与{1}战斗	{0} chiến đấu với {1}	relation_two_slots
+QT_TEMPLATE	102	{0}和{1}有关	{0} có liên quan đến {1}	relation_two_slots
+QT_TEMPLATE	102	{0}与{1}有关	{0} có liên quan đến {1}	relation_two_slots
+QT_TEMPLATE	100	{0}比{1}更强	{0} mạnh hơn {1}	comparison_two_slots
+QT_TEMPLATE	100	{0}比{1}更快	{0} nhanh hơn {1}	comparison_two_slots
+QT_TEMPLATE	100	{0}比{1}更高	{0} cao hơn {1}	comparison_two_slots
+QT_TEMPLATE	100	{0}比{1}更危险	{0} nguy hiểm hơn {1}	comparison_two_slots
+QT_TEMPLATE	100	{0}不如{1}	{0} không bằng {1}	comparison_two_slots
+QT_TEMPLATE	100	{0}和{1}一样	{0} giống {1}	comparison_two_slots
+QT_TEMPLATE	100	{0}与{1}一样	{0} giống {1}	comparison_two_slots
+QT_TEMPLATE	98	{0}来到{1}面前	{0} đi đến trước mặt {1}	motion_two_slots
+QT_TEMPLATE	98	{0}走到{1}身边	{0} đi đến bên cạnh {1}	motion_two_slots
+QT_TEMPLATE	98	{0}回到{1}身边	{0} trở lại bên cạnh {1}	motion_two_slots
+QT_TEMPLATE	98	{0}冲向{1}	{0} lao về phía {1}	motion_two_slots
+QT_TEMPLATE	98	{0}走向{1}	{0} đi về phía {1}	motion_two_slots
+QT_TEMPLATE	98	{0}靠近{1}	{0} đến gần {1}	motion_two_slots
+QT_TEMPLATE	96	{0}的{1}	{1} của {0}	possession_two_slots
+QT_TEMPLATE	96	属于{0}的{1}	{1} thuộc về {0}	possession_two_slots
+QT_TEMPLATE	94	当{0}看见{1}时	khi {0} nhìn thấy {1}	time_two_slots
+QT_TEMPLATE	94	当{0}遇见{1}时	khi {0} gặp {1}	time_two_slots
+QT_TEMPLATE	94	在{0}离开{1}之后	sau khi {0} rời khỏi {1}	time_two_slots
+QT_TEMPLATE	92	为了{0}	vì {0}	purpose
+QT_TEMPLATE	92	因为{0}	bởi vì {0}	cause
+QT_TEMPLATE	92	由于{0}	do {0}	cause
+QT_TEMPLATE	92	关于{0}	về {0}	topic
+QT_TEMPLATE	92	对于{0}而言	đối với {0}	topic
+QT_TEMPLATE	92	以{0}为目标	lấy {0} làm mục tiêu	purpose
+QT_TEMPLATE	92	以{0}为中心	lấy {0} làm trung tâm	purpose
+QT_TEMPLATE	90	{0}附近	gần {0}	position
+QT_TEMPLATE	90	{0}周围	xung quanh {0}	position
+QT_TEMPLATE	90	{0}内部	bên trong {0}	position
+QT_TEMPLATE	90	{0}外面	bên ngoài {0}	position
+QT_TEMPLATE	90	{0}上方	phía trên {0}	position
+QT_TEMPLATE	90	{0}下方	phía dưới {0}	position
+QT_TEMPLATE	90	{0}左侧	bên trái {0}	position
+QT_TEMPLATE	90	{0}右侧	bên phải {0}	position
+QT_TEMPLATE	90	{0}前方	phía trước {0}	position
+QT_TEMPLATE	90	{0}后方	phía sau {0}	position
+QT_TEMPLATE	88	进入{0}	tiến vào {0}	motion
+QT_TEMPLATE	88	离开{0}	rời khỏi {0}	motion
+QT_TEMPLATE	88	返回{0}	trở về {0}	motion
+QT_TEMPLATE	88	前往{0}	đi đến {0}	motion
+QT_TEMPLATE	88	赶往{0}	vội tới {0}	motion
+QT_TEMPLATE	88	抵达{0}	đến {0}	motion
+QT_TEMPLATE	88	经过{0}	đi qua {0}	motion
+QT_TEMPLATE	86	来自{0}	đến từ {0}	origin
+QT_TEMPLATE	86	属于{0}	thuộc về {0}	origin
+QT_TEMPLATE	86	代表{0}	đại diện cho {0}	origin
+QT_TEMPLATE	86	加入{0}	gia nhập {0}	organization
+QT_TEMPLATE	86	退出{0}	rời khỏi {0}	organization
+QT_TEMPLATE	86	背叛{0}	phản bội {0}	organization
+QT_TEMPLATE	84	{0}成员	thành viên của {0}	organization
+QT_TEMPLATE	84	{0}弟子	đệ tử của {0}	organization
+QT_TEMPLATE	84	{0}长老	trưởng lão của {0}	organization
+QT_TEMPLATE	84	{0}负责人	người phụ trách {0}	organization
+QT_TEMPLATE	84	{0}会长	hội trưởng {0}	title
+QT_TEMPLATE	84	{0}队长	đội trưởng {0}	title
+QT_TEMPLATE	84	{0}院长	viện trưởng {0}	title
+QT_TEMPLATE	84	{0}校长	hiệu trưởng {0}	title
+QT_TEMPLATE	84	{0}教授	giáo sư {0}	title
+QT_TEMPLATE	84	{0}博士	tiến sĩ {0}	title
+REPLACE	-105	\banh ấy\s+anh ấy\b	anh ấy	cleanup_pronoun
+REPLACE	-105	\bcô ấy\s+cô ấy\b	cô ấy	cleanup_pronoun
+REPLACE	-105	\bhắn\s+hắn\b	hắn	cleanup_pronoun
+REPLACE	-105	\bhọ\s+họ\b	họ	cleanup_pronoun
+REPLACE	-105	\bchúng tôi\s+chúng tôi\b	chúng tôi	cleanup_pronoun
+REPLACE	-105	\bkhông\s+không\b	không	cleanup
+REPLACE	-105	\brất\s+rất\b	rất	cleanup
+REPLACE	-105	\blại\s+lại\b	lại	cleanup
+REPLACE	-105	\bđược\s+được\b	được	cleanup
+REPLACE	-105	\bcó thể\s+có thể\b	có thể	cleanup

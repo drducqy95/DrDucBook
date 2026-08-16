@@ -1,0 +1,33 @@
+{
+  "bookSourceUrl": "https://books.example.test",
+  "bookSourceName": "Compatibility Books",
+  "bookSourceGroup": "Phase00",
+  "bookSourceType": 0,
+  "enabled": true,
+  "enabledExplore": true,
+  "enabledCookieJar": true,
+  "header": "{\"User-Agent\":\"DrDucBook-Compatibility\"}",
+  "loginUrl": "https://books.example.test/login",
+  "loginCheckJs": "return cookie.getCookie('https://books.example.test').indexOf('session=') >= 0;",
+  "exploreUrl": "Popular::https://books.example.test/explore",
+  "searchUrl": "https://books.example.test/search?q={{key}}",
+  "ruleSearch": {
+    "bookList": ".book",
+    "name": ".title@text",
+    "author": ".author@text",
+    "bookUrl": "a@href"
+  },
+  "ruleBookInfo": {
+    "name": "h1@text",
+    "author": ".author@text",
+    "tocUrl": ".toc@href"
+  },
+  "ruleToc": {
+    "chapterList": ".chapter",
+    "chapterName": "@text",
+    "chapterUrl": "@href"
+  },
+  "ruleContent": {
+    "content": "article@html"
+  }
+}

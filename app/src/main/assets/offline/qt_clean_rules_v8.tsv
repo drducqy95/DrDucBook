@@ -1,0 +1,16 @@
+# QT Clean v8 project-name-aware narrative grammar. License: CC0-1.0
+# actionType<TAB>priority<TAB>sourcePattern<TAB>replacement<TAB>category
+QT_TEMPLATE	872	再搭配{0:person}的仪态动作	kết hợp với dáng điệu của {0}	attributive_person
+QT_TEMPLATE	872	他受{0:person}表演的冲击不比哥哥弟弟们小	hắn cũng bị ấn tượng mạnh bởi màn biểu diễn của {0}, không kém các anh em	comparison_person
+QT_TEMPLATE	870	在那简陋棚子下的{0:person}	{0} dưới căn lều đơn sơ ấy	location_person
+QT_TEMPLATE	870	抓住了{0:person}的两侧肩膀	túm lấy hai bên vai của {0}	action_person
+QT_TEMPLATE	870	抱着{0:person}的腰向后发力	ôm eo {0}, dồn sức kéo về sau	action_person
+QT_TEMPLATE	868	{0:person}的眼里	trong mắt {0}	location_person
+QT_TEMPLATE	868	{0:person}来不及起身就对{1:person}吼了一声	{0} chưa kịp đứng dậy đã hét với {1}	speech_person
+QT_TEMPLATE	866	{0:person}朝那边看去	{0} nhìn về phía đó	directional_person
+QT_TEMPLATE	866	抱起{0:person}就跳下了船	bế {0} rồi nhảy xuống thuyền	sequence_person
+QT_TEMPLATE	866	{0:person}将竹篙一丢	{0} ném sào tre sang một bên	action_person
+QT_TEMPLATE	864	跑去将{0:person}扶起来	chạy tới đỡ {0} dậy	action_person
+QT_TEMPLATE	864	对着{0:person}的头发位置	nhắm vào vị trí tóc của {0}	location_person
+REPLACE	-132	,(?=["“‘])	, 	punctuation_spacing
+REPLACE	-115	\b([0-9]{4})\s+năm\s+ngày\s+([0-9]{1,2})\s+tháng\s+([0-9]{1,2})\b	ngày $2 tháng $3 năm $1	cleanup_hybrid_date_order

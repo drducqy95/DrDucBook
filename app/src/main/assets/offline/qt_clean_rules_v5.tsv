@@ -1,0 +1,148 @@
+# QT Clean v5 structural cleanup rules. License: CC0-1.0
+# actionType<TAB>priority<TAB>sourcePattern<TAB>replacement<TAB>category
+QT_TEMPLATE	132	因为{0}所以{1}	vì {0} nên {1}	cause_result
+QT_TEMPLATE	132	由于{0}所以{1}	do {0} nên {1}	cause_result
+QT_TEMPLATE	130	如果{0}就{1}	nếu {0} thì {1}	condition
+QT_TEMPLATE	130	若是{0}就{1}	nếu {0} thì {1}	condition
+QT_TEMPLATE	130	要是{0}就{1}	nếu {0} thì {1}	condition
+QT_TEMPLATE	130	只要{0}就{1}	chỉ cần {0} thì {1}	condition
+QT_TEMPLATE	130	只有{0}才{1}	chỉ khi {0} mới {1}	condition
+QT_TEMPLATE	130	虽然{0}但是{1}	tuy {0} nhưng {1}	concession
+QT_TEMPLATE	130	虽然{0}但{1}	tuy {0} nhưng {1}	concession
+QT_TEMPLATE	128	不是{0}而是{1}	không phải {0} mà là {1}	contrast
+QT_TEMPLATE	128	不但{0}而且{1}	không những {0} mà còn {1}	addition
+QT_TEMPLATE	126	一{0:verb}就{1:verb}	vừa {0} đã {1}	sequence
+QT_TEMPLATE	126	先{0:verb}再{1:verb}	trước {0} rồi {1}	sequence
+QT_TEMPLATE	126	越{0}越{1}	càng {0} càng {1}	comparison
+QT_TEMPLATE	124	又{0}又{1}	vừa {0} vừa {1}	parallel_state
+QT_TEMPLATE	124	既{0}又{1}	vừa {0} vừa {1}	parallel_state
+QT_TEMPLATE	124	一边{0:verb}一边{1:verb}	vừa {0} vừa {1}	parallel_action
+QT_TEMPLATE	124	边{0:verb}边{1:verb}	vừa {0} vừa {1}	parallel_action
+QT_TEMPLATE	122	{0}把{1}{2:verb}	{0} {2} {1}	ba_construction
+QT_TEMPLATE	122	{0}被{1}{2:verb}	{0} bị {1} {2}	passive
+QT_TEMPLATE	122	{0}让{1}{2:verb}	{0} bị {1} {2}	passive
+QT_TEMPLATE	122	{0}给{1}{2:verb}	{0} bị {1} {2}	passive
+QT_TEMPLATE	120	{0}比{1}{2:adj}	{0} {2} hơn {1}	comparison
+QT_TEMPLATE	120	{0}没有{1}那么{2:adj}	{0} không {2} bằng {1}	comparison
+QT_TEMPLATE	120	{0}不如{1}{2:adj}	{0} không {2} bằng {1}	comparison
+QT_TEMPLATE	118	{0:adj}的{1:noun}	{1} {0}	attributive_de
+QT_TEMPLATE	118	{0:location}的{1:noun}	{1} ở {0}	attributive_de
+QT_TEMPLATE	118	{0:verb}的{1:person}	{1} {0}	attributive_de_action
+QT_TEMPLATE	118	{0:verb}的{1:name}	{1} {0}	attributive_de_action
+QT_TEMPLATE	836	{0:adv}地{1:verb}	{1} {0}	adverbial_de
+QT_TEMPLATE	836	{0:verb}得{1:adj}	{0} đến mức {1}	complement_de
+QT_TEMPLATE	836	{0:verb}得很{1:adj}	{0} rất {1}	complement_de
+QT_TEMPLATE	836	{0:verb}得很	{0} rất	complement_de
+QT_TEMPLATE	114	正在{0:verb}	đang {0}	aspect
+QT_TEMPLATE	114	正{0:verb}	đang {0}	aspect
+QT_TEMPLATE	114	{0}正在{1:verb}	{0} đang {1}	aspect
+QT_TEMPLATE	114	{0}正{1:verb}	{0} đang {1}	aspect
+QT_TEMPLATE	834	{0:verb}着{1:noun}	{0} {1}	aspect
+QT_TEMPLATE	114	{0:verb}着	đang {0}	aspect
+QT_TEMPLATE	114	{0:verb}了	{0}	aspect
+QT_TEMPLATE	114	{0:verb}过	đã từng {0}	aspect
+QT_TEMPLATE	114	{0}{1:verb}过	{0} đã từng {1}	aspect
+QT_TEMPLATE	114	正给{0:noun}{1:verb}	đang {1} vào {0}	aspect_action
+QT_TEMPLATE	112	在{0:location}{1:verb}	{1} ở {0}	position
+QT_TEMPLATE	112	从{0:location}{1:verb}	{1} từ {0}	direction
+QT_TEMPLATE	112	向{0}{1:verb}	{1} về phía {0}	direction
+QT_TEMPLATE	112	对{0}{1:verb}	{1} với {0}	dative
+QT_TEMPLATE	112	给{0}{1:verb}	{1} cho {0}	dative
+QT_TEMPLATE	842	{0:name}省	tỉnh {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}市	thành phố {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}县	huyện {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}区	quận {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}镇	thị trấn {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}村	thôn {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}街	phố {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}路	đường {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}大道	đại lộ {0}	place_hierarchy
+QT_TEMPLATE	842	{0:name}街道	phường {0}	place_hierarchy
+QT_TEMPLATE	110	{0}吗	{0} không	question
+QT_TEMPLATE	110	{0}呢	{0} thì sao	question
+QT_TEMPLATE	108	{0}吧	có lẽ {0}	modal
+QT_TEMPLATE	108	并不{0}	không hề {0}	negation
+QT_TEMPLATE	108	并没有{0}	không hề {0}	negation
+QT_TEMPLATE	108	没有{0:verb}	không {0}	negation
+QT_TEMPLATE	106	将要{0:verb}	sắp {0}	future
+QT_TEMPLATE	106	快要{0:verb}	sắp {0}	future
+QT_TEMPLATE	106	已经{0:verb}	đã {0}	aspect
+QT_TEMPLATE	106	还在{0:verb}	vẫn đang {0}	aspect
+QT_TEMPLATE	900	让你受累{0}	làm phiền ông {0}	laoshiren_ch2
+QT_TEMPLATE	900	受累{0}	làm phiền {0}	laoshiren_ch2
+QT_TEMPLATE	128	受{0}的冲击不小	bị {0} tác động không nhỏ	effect
+QT_TEMPLATE	128	受{0}的冲击	bị {0} tác động	effect
+QT_TEMPLATE	126	不比{0}小	không kém {0}	comparison
+QT_TEMPLATE	116	来不及{0:verb}	không kịp {0}	aspect
+QT_TEMPLATE	116	顾不得{0:verb}	chẳng kịp {0}	aspect
+QT_TEMPLATE	116	将{0:noun}一丢	ném {0} sang một bên	action
+QT_TEMPLATE	116	把{0:noun}一丢	ném {0} sang một bên	action
+REPLACE	-116	\b(các|những|bọn|tụi)\s+([\p{L}][\p{L}\s]{1,24})\s+các\b	$1 $2	cleanup_plural_suffix
+REPLACE	-114	\b(của)\s+(của)\b	$1	cleanup_particle
+REPLACE	-116	\b(chạy|đi|nói|làm|đánh|mắng|gọi|cười|khóc|ăn|uống|ngủ|ngồi|đứng|nhìn|xem|nghe|đọc|viết)\s+được\s+(rất\s+[\p{L}]+)\b	$1 đến mức $2	cleanup_complement_de
+REPLACE	-116	\b([0-9]{4})\s+năm\s+([0-9]{1,2})\s+tháng\s+([0-9]{1,2})\s+ngày\b	ngày $3 tháng $2 năm $1	cleanup_date_order
+REPLACE	-117	ăn tịch	ăn cỗ	cleanup_laoshiren_address
+REPLACE	-117	anh ấy này cái đại nhân	người lớn như ông	cleanup_laoshiren_address
+REPLACE	-117	Phan Tử Lôi Tử	Phan Tử và Lôi Tử	cleanup_laoshiren_address
+REPLACE	-117	Viễn Tử,\s*Hổ Tử,\s*Thạch Đầu\s+5 đứa trẻ	Viễn Tử, Hổ Tử, Thạch Đầu, năm đứa trẻ	cleanup_laoshiren_address
+REPLACE	-117	5 cái đứa trẻ	năm đứa trẻ	cleanup_laoshiren_address
+REPLACE	-117	5 đứa trẻ	năm đứa trẻ	cleanup_laoshiren_address
+REPLACE	-117	có thể một hạt gạo không hướng chỗ bà giao	không góp cho chỗ bà lấy một hạt gạo	cleanup_laoshiren_address
+REPLACE	-117	theo người món mặn của phần	món mặn chia theo đầu người	cleanup_laoshiren_address
+REPLACE	-117	trước người trải giấy nhựa đỏ của bàn trên xé rách dưới 1 tệ, mang đến bao đồ ăn	xé một miếng giấy nhựa đỏ trải trên bàn trước mặt để gói đồ ăn	cleanup_laoshiren_address
+REPLACE	-118	\bphía gọi phía khều đang đánh nồi cháo mép\b	vừa gọi vừa gõ mép nồi cháo	cleanup_laoshiren_ch1
+REPLACE	-118	\bkhông vui vẻ mắng\b	bực bội mắng	cleanup_laoshiren_ch1
+REPLACE	-119	\b1 cái bà lão\b	một bà lão	cleanup_laoshiren_ch2
+REPLACE	-119	\b1 chiếc xe ba bánh\b	một chiếc xe ba bánh	cleanup_laoshiren_ch2
+REPLACE	-119	\bbị cưỡi đến\b	được đạp tới	cleanup_laoshiren_ch2
+REPLACE	-119	\bxe đang ngồi 1 cái bà lão\b	trên xe có một bà lão ngồi	cleanup_laoshiren_ch2
+REPLACE	-119	\bxe đang ngồi một bà lão\b	trên xe có một bà lão ngồi	cleanup_laoshiren_ch2
+REPLACE	-119	\bđể bạn thụ mệt mỏi,\s*thụ mệt mỏi\b	làm phiền ông rồi, làm phiền rồi	cleanup_laoshiren_ch2
+REPLACE	-119	\bkhông lớn không,\s*tiểu muốn kêu\b	không biết lớn nhỏ gì cả, phải gọi là	cleanup_laoshiren_ch2
+REPLACE	-120	nghĩ nguyên bác sĩ phòng khám ở thôn	bác sĩ phòng khám thôn Tư Nguyên	cleanup_laoshiren_ch2
+REPLACE	-120	để bạn thụ mệt mỏi,\s*thụ mệt mỏi	làm phiền ông rồi, làm phiền rồi	cleanup_laoshiren_ch2
+REPLACE	-120	không lớn không,\s*tiểu phải gọi là	không biết lớn nhỏ gì cả, phải gọi là	cleanup_laoshiren_ch2
+REPLACE	-120	lưu mù lòa	Lưu mù	cleanup_laoshiren_ch2
+REPLACE	-120	Trịnh gật đầu đại đồng	Trịnh Đại Đồng gật đầu	cleanup_laoshiren_ch2
+REPLACE	-121	\bBạn sống thế nào\?\b	sống	cleanup_definition_leak
+REPLACE	-121	\bCó chuyện gì vậy\?\b	thì sao	cleanup_definition_leak
+REPLACE	-121	\bbạn đang làm gì\?\b	làm gì	cleanup_definition_leak
+REPLACE	-121	\bcủa nó nó hỏi đề\b	vấn đề khác	cleanup_definition_leak
+REPLACE	-121	\bhài có lẽ tử\b	đứa trẻ	cleanup_laoshiren_ch2
+REPLACE	-121	\bLưu áng vàng\b	Lưu Kim Hà	cleanup_laoshiren_ch2
+REPLACE	-121	\blưu áng vàng\b	Lưu Kim Hà	cleanup_laoshiren_ch2
+REPLACE	-121	\bbà ấy người đàn ông\b	chồng bà	cleanup_laoshiren_ch2
+REPLACE	-121	\bcô ấy người đàn ông\b	chồng cô ấy	cleanup_laoshiren_ch2
+REPLACE	-121	\bđứa trẻ cho đến bây giờ đều bất tỉnh\b	đứa trẻ đến giờ vẫn hôn mê	cleanup_laoshiren_ch2
+REPLACE	-121	\bđợi trong vô vọng\b	chờ mãi	cleanup_laoshiren_ch2
+REPLACE	-121	\btối cuối cùng lời nói của chưa tỉnh lại\b	nếu đến tối vẫn chưa tỉnh	cleanup_laoshiren_ch2
+REPLACE	-121	\bcuối cùng buổi tối lời nói của chưa tỉnh lại\b	nếu đến tối vẫn chưa tỉnh	cleanup_laoshiren_ch2
+REPLACE	-122	có thể là của nó nó hỏi đề	có thể là vấn đề khác	cleanup_definition_leak
+REPLACE	-122	của nó nó hỏi đề	vấn đề khác	cleanup_definition_leak
+REPLACE	-122	bạn chăm sóc trẻ con có lẽ mà	bà chăm sóc đứa nhỏ đi	cleanup_laoshiren_ch2
+REPLACE	-122	bạn chăm sóc đứa trẻ có lẽ mà	bà chăm sóc đứa nhỏ đi	cleanup_laoshiren_ch2
+REPLACE	-122	bà chăm sóc trẻ con có lẽ mà	bà chăm sóc đứa nhỏ đi	cleanup_laoshiren_ch2
+REPLACE	-122	bà chăm sóc đứa trẻ có lẽ mà	bà chăm sóc đứa nhỏ đi	cleanup_laoshiren_ch2
+REPLACE	-122	khiến cậu lại ngủ một giấc	để nó ngủ thêm một giấc	cleanup_laoshiren_ch2
+REPLACE	-122	khiến nó lại ngủ một giấc	để nó ngủ thêm một giấc	cleanup_laoshiren_ch2
+REPLACE	-122	\bcậu gia\b	ông nó	cleanup_laoshiren_ch2
+REPLACE	-122	\bBạn cuối cùng tỉnh rồi\b	Cậu cuối cùng tỉnh rồi	cleanup_laoshiren_ch2
+REPLACE	-122	Bạn sống thế nào\?\s*Kiểu gì	sống thế nào	cleanup_definition_leak
+REPLACE	-123	thụ Tiểu Hoàng Oanh tấn công của biểu diễn không kém các ca ca đệ đệ	bị màn biểu diễn của Tiểu Hoàng Oanh tác động không kém các anh em	cleanup_laoshiren_ch2
+REPLACE	-123	thụ Tiểu Hoàng Oanh tấn công của biểu diễn không nhỏ	bị màn biểu diễn của Tiểu Hoàng Oanh tác động không nhỏ	cleanup_laoshiren_ch2
+REPLACE	-123	Mang trẻ con thị trấn mà đi trên sức khỏe viện lại làm kiểm tra đi	đưa đứa nhỏ lên trạm y tế trấn kiểm tra lại đi	cleanup_laoshiren_ch2
+REPLACE	-123	ông ấy không có biện pháp	ông ấy không có cách nào	cleanup_laoshiren_ch2
+REPLACE	-123	cậu không có biện pháp	ông ấy không có cách nào	cleanup_laoshiren_ch2
+REPLACE	-123	Thôi Quế Anh lại rút ra một điếu thuốc, đưa cho cậu	Thôi Quế Anh lại rút ra một điếu thuốc, đưa cho ông ấy	cleanup_laoshiren_ch2_doctor
+REPLACE	-123	sáng mai thị trấn liền hướng trên có lẽ đưa	sáng mai đưa lên trấn đi	cleanup_laoshiren_ch2
+REPLACE	-123	chờ Hán Hầu về, tôi và cậu	chờ Hán Hầu về, tôi và ông ấy	cleanup_laoshiren_ch2
+REPLACE	-123	chúng tôi trước gia đi	chúng tôi về nhà trước	cleanup_laoshiren_ch2
+REPLACE	-123	Bà ơi, Bà ơi	Bà ơi, bà ơi	cleanup_vocative_case
+REPLACE	-123	Bà ơi, bà tỉnh lại đi, Bà ơi	Bà ơi, bà tỉnh lại đi, bà ơi	cleanup_vocative_case
+REPLACE	-123	Lý Truy Viễn đã từng về đầu	Lý Truy Viễn quay đầu lại	cleanup_laoshiren_ch2
+REPLACE	-123	1 đôi màu đỏ giày cao gót	một đôi giày cao gót màu đỏ	cleanup_laoshiren_ch2
+REPLACE	-123	trắng nõn sưng mắt cá chân của trướng	cổ chân trắng bệch sưng phù	cleanup_laoshiren_ch2
+REPLACE	-123	Xường xám màu đen bó chặt thân thể của cô ta	Xường xám màu đen bó sát thân thể cô ta	cleanup_laoshiren_ch2
+REPLACE	-120	(^|\s)(Chương|Quyển|Tiết|Phần|Thiên|Tập|Hồi|Màn|Mùa)\s+\2\s+([0-9]+)(?=\s|$|[.,:;!?])	$1$2 $3	cleanup_repeated_heading_label
+REPLACE	-120	(^|\s)(Chương|Quyển|Tiết|Phần|Thiên|Tập|Hồi|Màn|Mùa)\s+([0-9]+)\s+\2\s+\3(?=\s|$|[.,:;!?])	$1$2 $3	cleanup_repeated_heading
+REPLACE	-120	(^|\s)(Chương mở đầu|Chương cuối|Chính văn|Ngoại truyện|Quyển thượng|Quyển trung|Quyển hạ)\s+\2(?=\s|$|[.,:;!?])	$1$2	cleanup_repeated_special_heading

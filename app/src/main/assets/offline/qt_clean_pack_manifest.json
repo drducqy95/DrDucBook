@@ -1,0 +1,196 @@
+{
+  "id": "drduc-qt-clean",
+  "version": "4.2.21",
+  "description": "Provenance-tracked Chinese-Vietnamese QT pack with project-authored web-novel overrides, a bounded high-frequency CVDICT 2-8-character phrase base, sanitized sentence-safe targets, Unicode Vietnamese readings, Converter by DrDuc Hán-Việt fallback coverage and CC0 real-person aliases. Ambiguous single-character CVDICT translations are deliberately excluded.",
+  "counts": {
+    "deduplicatedRuntimeTerms": 34016,
+    "legacyV1LexiconTerms": 408,
+    "vietPhraseV2Terms": 224,
+    "functionWordV3Terms": 312,
+    "reviewedCorrectionsV4Terms": 157,
+    "reviewedCorrectionsV5Terms": 23,
+    "reviewedCorrectionsV6Terms": 295,
+    "reviewedCorrectionsV7Terms": 122,
+    "reviewedCorrectionsV8Terms": 122,
+    "reviewedCorrectionsV9Terms": 26,
+    "webNovelV4Terms": 240,
+    "coreNameTerms": 146,
+    "wikidataNameTerms": 8608,
+    "cvdictBaseV3Terms": 24000,
+    "hanVietReadings": 17633,
+    "rulesV1": 136,
+    "rulesV2": 147,
+    "rulesV3": 47,
+    "rulesV4": 56,
+    "rulesV5": 146,
+    "rulesV6": 46,
+    "rulesV7": 16,
+    "rulesV8": 13,
+    "deduplicatedSourceTemplateRules": 474,
+    "deduplicatedPostRules": 127
+  },
+  "licenses": [
+    {
+      "component": "project-authored lexicon/rules",
+      "license": "CC0-1.0"
+    },
+    {
+      "component": "frequency-bounded Chinese-Vietnamese base lexicon",
+      "source": "CVDICT",
+      "revision": "c379d909e308343a247e51619f7839a2060a271c",
+      "url": "https://github.com/ph0ngp/CVDICT",
+      "license": "CC-BY-SA-4.0"
+    },
+    {
+      "component": "base-lexicon selection ranking",
+      "source": "wordfreq 3.1.1",
+      "url": "https://github.com/rspeer/wordfreq",
+      "license": "Apache-2.0"
+    },
+    {
+      "component": "real-person aliases",
+      "source": "Wikidata",
+      "url": "https://www.wikidata.org/",
+      "license": "CC0-1.0"
+    },
+    {
+      "component": "Hán-Việt readings and simplified/traditional variants",
+      "source": "Unicode Unihan 17.0.0 kVietnamese + kTraditionalVariant",
+      "url": "https://www.unicode.org/Public/17.0.0/ucd/Unihan.zip",
+      "license": "Unicode-3.0"
+    },
+    {
+      "component": "extended Hán-Việt single-character fallback",
+      "source": "Converter by DrDuc data/dictionaries/global/phien_am/_bulk_phienam.md",
+      "entries": 12570
+    }
+  ],
+  "files": [
+    {
+      "name": "qt_clean_lexicon_v1.tsv",
+      "bytes": 10832,
+      "sha256": "465065F21CA72C766784E810609641DAC889037E1E9DDDF53D75CEEA64E57D34"
+    },
+    {
+      "name": "qt_clean_vietphrase_v2.tsv",
+      "bytes": 11797,
+      "sha256": "A783CD7588B53F3E246187405CA4BD2D15764E86032AFDB8AF014654FDC13B41"
+    },
+    {
+      "name": "qt_clean_function_words_v3.tsv",
+      "bytes": 10694,
+      "sha256": "F61FCD39BECD69474F62945549327B29B24CB376C64AF163DB21C0BC8E883EC5"
+    },
+    {
+      "name": "qt_clean_corrections_v4.tsv",
+      "bytes": 11029,
+      "sha256": "4034EBB9C34581DFC28692238E5203BF4986E77AEA3069D942B3D099099209EE"
+    },
+    {
+      "name": "qt_clean_corrections_v5.tsv",
+      "bytes": 1883,
+      "sha256": "B9D259DF4F1F20F26F9BFB877DEC227DE231CEE746FB638ED6A87062EBBF1D28"
+    },
+    {
+      "name": "qt_clean_corrections_v6.tsv",
+      "bytes": 29104,
+      "sha256": "6BBF15D9C072AC8B435728C014C38EACACF52EF616B184E4EBEAB1C203AFEC1F"
+    },
+    {
+      "name": "qt_clean_corrections_v7.tsv",
+      "bytes": 9103,
+      "sha256": "5D45DE1AE647F9E72D90E2B407D27253227161B2B1D7A6AE3F2658F97D656E4D"
+    },
+    {
+      "name": "qt_clean_corrections_v8.tsv",
+      "bytes": 11200,
+      "sha256": "A9140CE8DDEE02605AC2C7A22D2EAE8379FD8609AC41A1F9AAF74877F3FC5FDD"
+    },
+    {
+      "name": "qt_clean_corrections_v9.tsv",
+      "bytes": 2889,
+      "sha256": "32821888F04EE4639A800B4E843F5A2F3DA6C6B7000117991DC5008BA1513680"
+    },
+    {
+      "name": "qt_clean_webnovel_v4.tsv",
+      "bytes": 16031,
+      "sha256": "651C054AE08A47D0EA138D6CAF5BD42C7C5E54C48D72CAD0C43D53788B63A463"
+    },
+    {
+      "name": "qt_clean_names_core_v2.tsv",
+      "bytes": 7023,
+      "sha256": "BCCFFA738E5029D5B905F0D5E198044046BDB2A23133A026D6DBF7C4736781E1"
+    },
+    {
+      "name": "qt_clean_names_wikidata_v2.tsv",
+      "bytes": 683567,
+      "sha256": "09C4F11DE1F86F5455DDB2846497928DDCC84B608EDF8667864A69F105FE3852"
+    },
+    {
+      "name": "qt_clean_cvdict_base_v3.tsv",
+      "bytes": 2212833,
+      "sha256": "97CB6912A904E63C7F447F9F0D9B7D36B1EFDDA79478007CB358F96670FB3C0F"
+    },
+    {
+      "name": "qt_clean_rules_v1.tsv",
+      "bytes": 7076,
+      "sha256": "53DA368EBBDD50CB0CBF586802A862107000A74A7B552BBF332162DEAF088A0F"
+    },
+    {
+      "name": "qt_clean_rules_v2.tsv",
+      "bytes": 9645,
+      "sha256": "C26FF8132F96811F90D96AFFA37BC36817497F4391891E09E6BFD9CE77DD0769"
+    },
+    {
+      "name": "qt_clean_rules_v3.tsv",
+      "bytes": 3897,
+      "sha256": "C8FED8D76837D70E12365AA321D1E25CD17D5190D1EF8768DD94F176A11ACB8F"
+    },
+    {
+      "name": "qt_clean_rules_v4.tsv",
+      "bytes": 3589,
+      "sha256": "44875B6AFEC9E62676713814DCBAAB5EFC5E42971632052AA87C9A3EDC212C2B"
+    },
+    {
+      "name": "qt_clean_rules_v5.tsv",
+      "bytes": 12472,
+      "sha256": "B2F5B826E49A3F8C3D475D0D3475E1FEFBE32CE9670EABF4F63EAF29EE21E26C"
+    },
+    {
+      "name": "qt_clean_rules_v6.tsv",
+      "bytes": 3059,
+      "sha256": "55A0C184513E5B5627860CEC138AF9BB4807AC434EB91D5D5303ECFC5CF19575"
+    },
+    {
+      "name": "qt_clean_rules_v7.tsv",
+      "bytes": 1402,
+      "sha256": "3D1A4B7E8F48A6F82916E5131C8CD8A2CC91C7197C799CE92A978D106EB14D1D"
+    },
+    {
+      "name": "qt_clean_rules_v8.tsv",
+      "bytes": 1471,
+      "sha256": "AED4E97EC1FEAD80A68D1844C4708EC1D801ABDF1B065B5BE75C015E867B5892"
+    },
+    {
+      "name": "qt_clean_phonetics_unihan17.tsv",
+      "bytes": 154847,
+      "sha256": "CCCD6C0E0E3D5A13827FEF5EACE975DFC51202C3E875F8AA032DB185E31A125D"
+    },
+    {
+      "name": "qt_clean_phonetics_supplement_v4.tsv",
+      "bytes": 583,
+      "sha256": "F2582733FA052673004139B451D3FF0A63EEB706C7E9A2609643FB33E04AC0D1"
+    },
+    {
+      "name": "qt_drduc_phonetics_v1.tsv",
+      "bytes": 137149,
+      "sha256": "1657A885DD2FB3105EB13A1F0DBD565861B02FC0038DC4C42917C6C9F5FDF25A"
+    },
+    {
+      "name": "NOTICE-CVDICT.txt",
+      "bytes": 516,
+      "sha256": "1169929D46DD3E7E0DDF5CD198BDACDFE751516C9ADA64D8BB7803ED002D6EBB"
+    }
+  ],
+  "legacyQuickTranslatorDataIncluded": false
+}

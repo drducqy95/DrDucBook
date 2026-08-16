@@ -1,0 +1,37 @@
+package io.legado.app.ui.welcome
+
+import io.legado.app.ui.config.otherConfig.OtherConfig
+import android.os.Bundle
+import android.view.View
+import com.drducbook.app.R
+import io.legado.app.base.BaseFragment
+import com.drducbook.app.databinding.FragmentBookFolderBinding
+import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.utils.viewbindingdelegate.viewBinding
+
+class BookFolderFragment : BaseFragment(R.layout.fragment_book_folder) {
+
+    private val binding by viewBinding(FragmentBookFolderBinding::bind)
+
+    private val selectBookFolder = registerForActivityResult(HandleFileContract()) { result ->
+        result.uri?.let { treeUri ->
+            OtherConfig.defaultBookTreeUri = treeUri.toString()
+            updatePathText()
+        }
+    }
+
+    override fun onFragmentCreated(view: View, savedInstanceState: Bundle?) {
+        binding.btnSelectFolder.setOnClickListener {
+            selectBookFolder.launch {
+                title = getString(R.string.select_book_folder)
+                mode = HandleFileContract.DIR_SYS
+            }
+        }
+        updatePathText()
+    }
+
+    private fun updatePathText() {
+        binding.tvFolderPath.text =
+            OtherConfig.defaultBookTreeUri ?: getString(R.string.welcome_book_folder_not_selected)
+    }
+}

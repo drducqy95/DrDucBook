@@ -1,0 +1,138 @@
+# DrDuc QuickTrans clean-room structural rules v1
+# Project-authored generic templates. License: CC0-1.0
+# Format: actionType<TAB>priority<TAB>sourcePattern<TAB>replacement<TAB>category
+QT_TEMPLATE	90	{0}先生	tiên sinh {0}	title
+QT_TEMPLATE	90	{0}小姐	tiểu thư {0}	title
+QT_TEMPLATE	90	{0}少爷	thiếu gia {0}	title
+QT_TEMPLATE	90	{0}大人	{0} đại nhân	title
+QT_TEMPLATE	90	{0}长老	trưởng lão {0}	title
+QT_TEMPLATE	90	{0}将军	tướng quân {0}	title
+QT_TEMPLATE	90	{0}师父	sư phụ {0}	title
+QT_TEMPLATE	90	{0}师兄	sư huynh {0}	title
+QT_TEMPLATE	90	{0}师姐	sư tỷ {0}	title
+QT_TEMPLATE	90	{0}师弟	sư đệ {0}	title
+QT_TEMPLATE	90	{0}师妹	sư muội {0}	title
+QT_TEMPLATE	88	{0}宗	tông {0}	organization
+QT_TEMPLATE	88	{0}门	môn {0}	organization
+QT_TEMPLATE	88	{0}派	phái {0}	organization
+QT_TEMPLATE	88	{0}家族	gia tộc {0}	organization
+QT_TEMPLATE	88	{0}王国	vương quốc {0}	organization
+QT_TEMPLATE	88	{0}帝国	đế quốc {0}	organization
+QT_TEMPLATE	88	{0}学院	học viện {0}	organization
+QT_TEMPLATE	88	{0}大学	đại học {0}	organization
+QT_TEMPLATE	88	{0}医院	bệnh viện {0}	organization
+QT_TEMPLATE	88	{0}公司	công ty {0}	organization
+QT_TEMPLATE	88	{0}集团	tập đoàn {0}	organization
+QT_TEMPLATE	88	{0}协会	hiệp hội {0}	organization
+QT_TEMPLATE	88	{0}公会	công hội {0}	organization
+QT_TEMPLATE	88	{0}军团	quân đoàn {0}	organization
+QT_TEMPLATE	88	{0}小队	tiểu đội {0}	organization
+QT_TEMPLATE	86	{0}城	thành {0}	place
+QT_TEMPLATE	86	{0}山	núi {0}	place
+QT_TEMPLATE	86	{0}峰	đỉnh {0}	place
+QT_TEMPLATE	86	{0}谷	thung lũng {0}	place
+QT_TEMPLATE	86	{0}河	sông {0}	place
+QT_TEMPLATE	86	{0}湖	hồ {0}	place
+QT_TEMPLATE	86	{0}岛	đảo {0}	place
+QT_TEMPLATE	86	{0}森林	rừng {0}	place
+QT_TEMPLATE	86	{0}广场	quảng trường {0}	place
+QT_TEMPLATE	86	{0}街	phố {0}	place
+QT_TEMPLATE	86	{0}路	đường {0}	place
+QT_TEMPLATE	84	{0}剑	kiếm {0}	item
+QT_TEMPLATE	84	{0}刀	đao {0}	item
+QT_TEMPLATE	84	{0}枪	thương {0}	item
+QT_TEMPLATE	84	{0}拳	quyền {0}	skill
+QT_TEMPLATE	84	{0}掌	chưởng {0}	skill
+QT_TEMPLATE	84	{0}剑法	kiếm pháp {0}	skill
+QT_TEMPLATE	84	{0}功法	công pháp {0}	skill
+QT_TEMPLATE	84	{0}神通	thần thông {0}	skill
+QT_TEMPLATE	84	{0}阵法	trận pháp {0}	skill
+QT_TEMPLATE	82	{0}的声音	giọng nói của {0}	possession
+QT_TEMPLATE	82	{0}的目光	ánh mắt của {0}	possession
+QT_TEMPLATE	82	{0}的视线	tầm mắt của {0}	possession
+QT_TEMPLATE	82	{0}的眼睛	đôi mắt của {0}	possession
+QT_TEMPLATE	82	{0}的脸	khuôn mặt của {0}	possession
+QT_TEMPLATE	82	{0}的表情	biểu cảm của {0}	possession
+QT_TEMPLATE	82	{0}的笑容	nụ cười của {0}	possession
+QT_TEMPLATE	82	{0}的气息	khí tức của {0}	possession
+QT_TEMPLATE	82	{0}的气势	khí thế của {0}	possession
+QT_TEMPLATE	82	{0}的身体	cơ thể của {0}	possession
+QT_TEMPLATE	82	{0}的灵魂	linh hồn của {0}	possession
+QT_TEMPLATE	82	{0}的记忆	ký ức của {0}	possession
+QT_TEMPLATE	82	{0}的名字	tên của {0}	possession
+QT_TEMPLATE	82	{0}的父亲	cha của {0}	possession
+QT_TEMPLATE	82	{0}的母亲	mẹ của {0}	possession
+QT_TEMPLATE	82	{0}的哥哥	anh trai của {0}	possession
+QT_TEMPLATE	82	{0}的姐姐	chị gái của {0}	possession
+QT_TEMPLATE	82	{0}的弟弟	em trai của {0}	possession
+QT_TEMPLATE	82	{0}的妹妹	em gái của {0}	possession
+QT_TEMPLATE	82	{0}的丈夫	chồng của {0}	possession
+QT_TEMPLATE	82	{0}的妻子	vợ của {0}	possession
+QT_TEMPLATE	80	在{0}面前	trước mặt {0}	position
+QT_TEMPLATE	80	在{0}身边	bên cạnh {0}	position
+QT_TEMPLATE	80	在{0}身后	sau lưng {0}	position
+QT_TEMPLATE	80	在{0}心中	trong lòng {0}	position
+QT_TEMPLATE	80	在{0}脑海中	trong đầu {0}	position
+QT_TEMPLATE	80	从{0}身边	từ bên cạnh {0}	position
+QT_TEMPLATE	80	从{0}手中	từ tay {0}	position
+QT_TEMPLATE	80	从{0}口中	từ miệng {0}	position
+QT_TEMPLATE	80	向{0}走去	đi về phía {0}	motion
+QT_TEMPLATE	80	朝{0}走去	đi về phía {0}	motion
+QT_TEMPLATE	80	来到{0}面前	đi đến trước mặt {0}	motion
+QT_TEMPLATE	80	回到{0}身边	trở lại bên cạnh {0}	motion
+QT_TEMPLATE	78	对{0}说	nói với {0}	speech
+QT_TEMPLATE	78	向{0}说道	nói với {0}	speech
+QT_TEMPLATE	78	告诉{0}	nói cho {0}	speech
+QT_TEMPLATE	78	问{0}	hỏi {0}	speech
+QT_TEMPLATE	78	回答{0}	trả lời {0}	speech
+QT_TEMPLATE	78	看着{0}	nhìn {0}	perception
+QT_TEMPLATE	78	望着{0}	nhìn {0}	perception
+QT_TEMPLATE	78	听见{0}	nghe thấy {0}	perception
+QT_TEMPLATE	78	想到{0}	nghĩ đến {0}	cognition
+QT_TEMPLATE	78	想起{0}	nhớ đến {0}	cognition
+QT_TEMPLATE	78	记得{0}	nhớ {0}	cognition
+QT_TEMPLATE	78	忘记{0}	quên {0}	cognition
+QT_TEMPLATE	76	和{0}一起	cùng {0}	relation
+QT_TEMPLATE	76	与{0}一起	cùng {0}	relation
+QT_TEMPLATE	76	跟{0}一起	cùng {0}	relation
+QT_TEMPLATE	76	和{0}战斗	chiến đấu với {0}	relation
+QT_TEMPLATE	76	与{0}战斗	chiến đấu với {0}	relation
+QT_TEMPLATE	76	和{0}合作	hợp tác với {0}	relation
+QT_TEMPLATE	76	与{0}合作	hợp tác với {0}	relation
+QT_TEMPLATE	76	和{0}有关	liên quan đến {0}	relation
+QT_TEMPLATE	76	与{0}有关	liên quan đến {0}	relation
+QT_TEMPLATE	76	保护{0}	bảo vệ {0}	relation
+QT_TEMPLATE	76	帮助{0}	giúp đỡ {0}	relation
+QT_TEMPLATE	76	相信{0}	tin tưởng {0}	relation
+QT_TEMPLATE	76	怀疑{0}	nghi ngờ {0}	relation
+QT_TEMPLATE	74	被{0}发现	bị {0} phát hiện	passive
+QT_TEMPLATE	74	被{0}看到	bị {0} nhìn thấy	passive
+QT_TEMPLATE	74	被{0}抓住	bị {0} bắt được	passive
+QT_TEMPLATE	74	被{0}杀死	bị {0} giết chết	passive
+QT_TEMPLATE	74	被{0}击败	bị {0} đánh bại	passive
+QT_TEMPLATE	74	让{0}知道	để {0} biết	causative
+QT_TEMPLATE	74	让{0}明白	khiến {0} hiểu	causative
+QT_TEMPLATE	74	让{0}失望	khiến {0} thất vọng	causative
+QT_TEMPLATE	74	让{0}离开	để {0} rời đi	causative
+QT_TEMPLATE	72	像{0}一样	giống như {0}	comparison
+QT_TEMPLATE	72	不如{0}	không bằng {0}	comparison
+QT_TEMPLATE	72	比{0}更	còn hơn {0}	comparison
+QT_TEMPLATE	72	和{0}一样	giống như {0}	comparison
+QT_TEMPLATE	72	与{0}一样	giống như {0}	comparison
+QT_TEMPLATE	70	在{0}之前	trước {0}	time
+QT_TEMPLATE	70	在{0}之后	sau {0}	time
+QT_TEMPLATE	70	当{0}出现时	khi {0} xuất hiện	time
+QT_TEMPLATE	70	等到{0}回来	đợi đến khi {0} trở về	time
+REPLACE	-100	[ \t]+([,.;:!?…])	$1	cleanup
+REPLACE	-100	([,.;:!?])([^\s”’)\]])	$1 $2	cleanup
+REPLACE	-110	\bcủa\s+của\b	của	cleanup
+REPLACE	-110	\bđã\s+đã\b	đã	cleanup
+REPLACE	-110	\bđang\s+đang\b	đang	cleanup
+REPLACE	-110	\bsẽ\s+sẽ\b	sẽ	cleanup
+REPLACE	-110	\bvẫn\s+vẫn\b	vẫn	cleanup
+REPLACE	-110	\blà\s+là\b	là	cleanup
+REPLACE	-110	\bvới\s+với\b	với	cleanup
+REPLACE	-110	\bvà\s+và\b	và	cleanup
+REPLACE	-110	\bnhưng\s+nhưng\b	nhưng	cleanup
+REPLACE	-110	\bở\s+tại\b	ở	cleanup
+REPLACE	-110	\btại\s+ở\b	ở	cleanup

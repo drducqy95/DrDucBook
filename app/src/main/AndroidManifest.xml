@@ -1,0 +1,635 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <application
+        android:name="com.drducbook.app.DrDucBookApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="${app_name}"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:requestLegacyExternalStorage="true"
+        android:enableOnBackInvokedCallback="true"
+        android:hardwareAccelerated="true"
+        android:localeConfig="@xml/locales_config"
+        android:supportsRtl="true"
+        android:theme="@style/Base.AppTheme"
+        tools:ignore="AllowBackup,GoogleAppIndexingWarning,UnusedAttribute">
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="ocr,ocr_chinese,ocr_japanese,ocr_korean" />
+        <!-- 图标0 -->
+        <activity
+            android:name="io.legado.app.ui.main.LauncherW"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <activity
+            android:name="io.legado.app.ui.main.Launcher0"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 图标1 -->
+        <activity
+            android:name="io.legado.app.ui.main.Launcher1"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 图标2 -->
+        <activity
+            android:name="io.legado.app.ui.main.Launcher2"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 图标3 -->
+        <activity
+            android:name="io.legado.app.ui.main.Launcher3"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 图标4 -->
+        <activity
+            android:name="io.legado.app.ui.main.Launcher4"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 图标5 -->
+        <activity
+            android:name="io.legado.app.ui.main.Launcher5"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 图标6 -->
+        <activity
+            android:name="io.legado.app.ui.main.Launcher6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 主界面 -->
+        <activity
+            android:name="io.legado.app.ui.main.MainActivity"
+            android:alwaysRetainTaskState="true"
+            android:enableOnBackInvokedCallback="true"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <activity
+            android:name="com.drducbook.app.auth.AuthCallbackActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:theme="@style/AppTheme.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="auth"
+                    android:path="/callback"
+                    android:scheme="drducbook" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="io.legado.app.ui.welcome.WelcomeActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:exported="false"
+            android:windowSoftInputMode="adjustPan|stateHidden" />
+        <!-- 阅读漫画界面 -->
+        <activity
+            android:name="io.legado.app.ui.book.manga.ReadMangaActivity"
+            android:exported="false"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="com.samsung.android.support.REMOTE_ACTION" />
+            </intent-filter>
+
+            <meta-data
+                android:name="com.samsung.android.support.REMOTE_ACTION"
+                android:resource="@xml/spen_remote_actions" />
+        </activity>
+        <!-- 书籍详情页 -->
+        <activity
+            android:name="io.legado.app.ui.book.info.BookInfoActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <activity
+            android:name="io.legado.app.ui.translation.memory.BookStoryMemoryActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <!-- 书籍信息编辑 -->
+        <activity
+            android:name="io.legado.app.ui.book.info.edit.BookInfoEditActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <!-- 音频播放界面 -->
+        <activity
+            android:name="io.legado.app.ui.book.audio.AudioPlayActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTask" />
+        <!-- 授权界面 -->
+        <activity
+            android:name="io.legado.app.lib.permission.PermissionActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:theme="@style/Activity.Permission" />
+        <!-- 二维码扫描 -->
+        <activity
+            android:name="io.legado.app.ui.qrcode.QrCodeActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTask" />
+        <!-- 书源编辑 -->
+        <activity
+            android:name="io.legado.app.ui.book.source.edit.BookSourceEditActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <!-- 订阅源编辑 -->
+        <activity
+            android:name="io.legado.app.ui.rss.source.edit.RssSourceEditActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize|stateHidden" />
+        <!-- 搜索界面 -->
+        <activity
+            android:name="io.legado.app.ui.book.search.SearchActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="standard" />
+        <activity
+            android:name="io.legado.app.ui.about.CrashReportActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask" />
+        <!-- 书源管理 -->
+        <activity
+            android:name="io.legado.app.ui.book.source.manage.BookSourceActivity"
+            android:enableOnBackInvokedCallback="false"
+            android:launchMode="singleTop" />
+        <!-- 订阅源管理 -->
+        <activity
+            android:name="io.legado.app.ui.rss.source.manage.RssSourceActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <!-- txt目录规则管理 -->
+        <activity
+            android:name="io.legado.app.ui.book.toc.rule.TxtTocRuleActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <!-- txt目录规则预览(阅读界面) -->
+        <activity
+            android:name="io.legado.app.ui.book.toc.rule.preview.TxtTocRulePreviewActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <!-- 替换规则界面 -->
+        <activity
+            android:name="io.legado.app.ui.replace.ReplaceRuleActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTop" />
+        <!-- 书源调试 -->
+        <activity
+            android:name="io.legado.app.ui.book.source.debug.BookSourceDebugActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <!-- 目录 -->
+        <activity
+            android:name="io.legado.app.ui.book.toc.TocActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <!-- 订阅源调试 -->
+        <activity
+            android:name="io.legado.app.ui.rss.source.debug.RssSourceDebugActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <!-- 书签 -->
+        <activity
+            android:name="io.legado.app.ui.book.bookmark.AllBookmarkActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop" />
+        <!-- WebView界面 -->
+        <activity
+            android:name="io.legado.app.ui.browser.WebViewActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:launchMode="standard" />
+        <!-- 书源登录 -->
+        <activity
+            android:name="io.legado.app.ui.login.SourceLoginActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="orientation|screenSize"
+            android:hardwareAccelerated="true"
+            android:theme="@style/AppTheme.Transparent" />
+        <!-- 字典管理 -->
+        <activity
+            android:name="io.legado.app.ui.dict.rule.DictRuleActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="orientation|screenSize"
+            android:hardwareAccelerated="true" />
+        <activity
+            android:name="io.legado.app.ui.dict.DictActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="orientation|screenSize"
+            android:hardwareAccelerated="true" />
+        <!-- 文件管理 -->
+        <activity
+            android:name="io.legado.app.ui.book.info.KindleSendActivity"
+            android:exported="false" />
+        <activity
+            android:name="io.legado.app.ui.file.FileManageActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="orientation|screenSize"
+            android:hardwareAccelerated="true" />
+        <!-- 选择文件 -->
+        <activity
+            android:name="io.legado.app.ui.file.HandleFileActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:configChanges="orientation|screenSize"
+            android:hardwareAccelerated="true"
+            android:theme="@style/AppTheme.Transparent" />
+        <!-- 文字处理 -->
+        <activity
+            android:name="io.legado.app.receiver.SharedReceiverActivity"
+            android:exported="true"
+            android:label="@string/receiving_shared_label"
+            android:theme="@style/AppTheme.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+        <!-- 一键导入 -->
+        <activity
+            android:name="io.legado.app.ui.association.OnLineImportActivity"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:exported="true"
+            android:theme="@style/AppTheme.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="legado" />
+                <data android:scheme="yuedu" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="import"
+                    android:scheme="drducbook" />
+            </intent-filter>
+        </activity>
+        <!-- 验证码输入 -->
+        <activity
+            android:name="io.legado.app.ui.association.VerificationCodeActivity"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:theme="@style/AppTheme.Transparent" />
+        <!-- 跳转确认 -->
+        <activity
+            android:name="io.legado.app.ui.association.OpenUrlConfirmActivity"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
+            android:theme="@style/AppTheme.Transparent" />
+        <!-- 打开文件 -->
+        <activity
+            android:name="io.legado.app.ui.association.FileAssociationActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/AppTheme.Transparent">
+            <!-- VIEW (Open with) action -->
+            <!-- Works when an app knows the media type of a file, e.g. Gmail or Chrome. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="app" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <!-- text -->
+                <data android:mimeType="text/plain" />
+                <!-- json -->
+                <data android:mimeType="application/json" />
+                <!-- EPUB -->
+                <data android:mimeType="application/epub+zip" />
+                <!-- pdf -->
+                <data android:mimeType="application/pdf" />
+                <!-- mobi -->
+                <data android:mimeType="application/mobi" />
+                <data android:mimeType="application/x-mobipocket-ebook" />
+                <!-- azw/azw3 -->
+                <data android:mimeType="application/azw" />
+                <data android:mimeType="application/azw3" />
+                <data android:mimeType="application/x-mobi8-ebook" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <!-- Works when an app doesn't know the media type, e.g. Dropbox -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:host="*" />
+
+                <data android:scheme="app" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <!-- This media type is necessary, otherwise it won't match on the file extension -->
+                <data android:mimeType="*/*" />
+                <!--TXT-->
+                <data android:pathAdvancedPattern=".*\\.[tT][xX][tT]" />
+                <data android:pathPattern=".*\\.txt" />
+                <data android:pathPattern=".*\\.TXT" />
+                <!--JSON-->
+                <data android:pathAdvancedPattern=".*\\.[jJ][sS][oO][nN]" />
+                <data android:pathPattern=".*\\.json" />
+                <data android:pathPattern=".*\\.JSON" />
+                <!-- EPUB -->
+                <data android:pathAdvancedPattern=".*\\.[eE][pP][uU][bB]" />
+                <data android:pathPattern=".*\\.epub" />
+                <data android:pathPattern=".*\\.EPUB" />
+                <!-- pdf -->
+                <data android:pathAdvancedPattern=".*\\.[pP][dD][fF]" />
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\.PDF" />
+                <!-- mobi -->
+                <data android:pathAdvancedPattern=".*\\.[mM][oO][bB][iI]" />
+                <data android:pathPattern=".*\\.mobi" />
+                <data android:pathPattern=".*\\.MOBI" />
+                <!-- azw -->
+                <data android:pathAdvancedPattern=".*\\.[aA][zZ][wW]" />
+                <data android:pathPattern=".*\\.azw" />
+                <data android:pathPattern=".*\\.AZW" />
+                <!-- azw3 -->
+                <data android:pathAdvancedPattern=".*\\.[aA][zZ][wW]3" />
+                <data android:pathPattern=".*\\.azw3" />
+                <data android:pathPattern=".*\\.AZW3" />
+                <!-- zip -->
+                <data android:pathAdvancedPattern=".*\\.[zZ][iI][pP]" />
+                <data android:pathPattern=".*\\.zip" />
+                <data android:pathPattern=".*\\.ZIP" />
+                <!-- rar -->
+                <data android:pathAdvancedPattern=".*\\.[rR][aA][rR]" />
+                <data android:pathPattern=".*\\.rar" />
+                <data android:pathPattern=".*\\.RAR" />
+                <!-- 7z -->
+                <data android:pathAdvancedPattern=".*\\.7[zZ]" />
+                <data android:pathPattern=".*\\.7z" />
+                <data android:pathPattern=".*\\.7Z" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name="io.legado.app.service.CheckSourceService"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name="io.legado.app.service.CacheBookService"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name="io.legado.app.service.ExportBookService"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name="io.legado.app.service.WebService"
+            android:foregroundServiceType="dataSync|specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="user initiated local web server for bookshelf management" />
+        </service>
+        <service
+            android:name="io.legado.app.service.WebTileService"
+            android:exported="true"
+            android:foregroundServiceType="dataSync"
+            android:icon="@drawable/ic_web_service_noti"
+            android:label="@string/web_service_tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            >
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
+            android:name="io.legado.app.service.TTSReadAloudService"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name="io.legado.app.service.HttpReadAloudService"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name="io.legado.app.service.LocalTtsReadAloudService"
+            android:process=":tts_onnx"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name="io.legado.app.service.NmtOnnxService"
+            android:process=":nmt_onnx"
+            android:exported="false" />
+        <service
+            android:name="io.legado.app.service.AudioPlayService"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name="io.legado.app.service.MediaPlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name="io.legado.app.service.MediaDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name="io.legado.app.service.DownloadService"
+            android:foregroundServiceType="dataSync" />
+        <service
+            android:name="io.legado.app.service.BookshelfAutomationJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <receiver
+            android:name="io.legado.app.receiver.MediaButtonReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="io.legado.app.api.ReaderProvider"
+            android:authorities="${applicationId}.readerProvider"
+            android:enabled="true"
+            android:exported="false" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileProvider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+                tools:node="remove" />
+        </provider>
+
+        <meta-data
+            android:name="channel"
+            android:value="${APP_CHANNEL_VALUE}" />
+    </application>
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data
+                android:mimeType="*/*"
+                android:scheme="*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+    </queries>
+
+</manifest>

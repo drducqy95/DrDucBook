@@ -1,0 +1,411 @@
+# DrDuc QuickTrans clean-room starter lexicon v1
+# Project-authored generic Chinese-Vietnamese mappings. License: CC0-1.0
+# Format: source<TAB>Vietnamese<TAB>type
+，	,	general
+。	.	general
+！	!	general
+？	?	general
+：	:	general
+；	;	general
+、	,	general
+……	…	general
+“	“	general
+”	”	general
+‘	‘	general
+’	’	general
+（	(	general
+）	)	general
+【	[	general
+】	]	general
+我	tôi	pronoun
+我们	chúng tôi	pronoun
+你	bạn	pronoun
+你们	các bạn	pronoun
+他	anh ấy	pronoun
+他们	họ	pronoun
+她	cô ấy	pronoun
+她们	họ	pronoun
+它	nó	pronoun
+它们	chúng	pronoun
+自己	bản thân	pronoun
+本人	bản thân	pronoun
+大家	mọi người	pronoun
+众人	mọi người	pronoun
+别人	người khác	pronoun
+对方	đối phương	pronoun
+此人	người này	pronoun
+那人	người kia	pronoun
+少年	thiếu niên	general
+少女	thiếu nữ	general
+青年	thanh niên	general
+老人	ông lão	general
+老者	lão giả	general
+男子	người đàn ông	general
+女人	người phụ nữ	general
+男人	người đàn ông	general
+孩子	đứa trẻ	general
+父亲	cha	general
+母亲	mẹ	general
+哥哥	anh trai	general
+姐姐	chị gái	general
+弟弟	em trai	general
+妹妹	em gái	general
+丈夫	chồng	general
+妻子	vợ	general
+师父	sư phụ	title
+师傅	sư phụ	title
+师兄	sư huynh	title
+师姐	sư tỷ	title
+师弟	sư đệ	title
+师妹	sư muội	title
+前辈	tiền bối	title
+晚辈	vãn bối	title
+长老	trưởng lão	title
+宗主	tông chủ	title
+门主	môn chủ	title
+掌门	chưởng môn	title
+家主	gia chủ	title
+族长	tộc trưởng	title
+城主	thành chủ	title
+国王	quốc vương	title
+皇帝	hoàng đế	title
+皇后	hoàng hậu	title
+太子	thái tử	title
+公主	công chúa	title
+王子	hoàng tử	title
+将军	tướng quân	title
+大人	đại nhân	title
+先生	tiên sinh	title
+小姐	tiểu thư	title
+少爷	thiếu gia	title
+陛下	bệ hạ	title
+殿下	điện hạ	title
+阁下	các hạ	title
+道友	đạo hữu	title
+仙子	tiên tử	title
+圣女	thánh nữ	title
+圣子	thánh tử	title
+神灵	thần linh	general
+神明	thần linh	general
+神祇	thần linh	general
+仙人	tiên nhân	general
+修士	tu sĩ	general
+修炼者	người tu luyện	general
+武者	võ giả	general
+魔法师	pháp sư	general
+骑士	kỵ sĩ	general
+牧师	mục sư	general
+刺客	thích khách	general
+猎人	thợ săn	general
+士兵	binh sĩ	general
+警察	cảnh sát	general
+医生	bác sĩ	general
+老师	giáo viên	general
+学生	học sinh	general
+同学	bạn học	general
+朋友	bạn bè	general
+敌人	kẻ địch	general
+对手	đối thủ	general
+主人	chủ nhân	general
+仆人	người hầu	general
+侍女	thị nữ	general
+守卫	hộ vệ	general
+弟子	đệ tử	general
+徒弟	đồ đệ	general
+宗门	tông môn	organization_name
+宗派	tông phái	organization_name
+门派	môn phái	organization_name
+家族	gia tộc	organization_name
+王国	vương quốc	organization_name
+帝国	đế quốc	organization_name
+学院	học viện	organization_name
+大学	đại học	organization_name
+学校	trường học	organization_name
+医院	bệnh viện	organization_name
+公司	công ty	organization_name
+集团	tập đoàn	organization_name
+协会	hiệp hội	organization_name
+公会	công hội	organization_name
+军团	quân đoàn	organization_name
+军队	quân đội	organization_name
+小队	tiểu đội	organization_name
+组织	tổ chức	organization_name
+教会	giáo hội	organization_name
+神殿	thần điện	place_name
+宫殿	cung điện	place_name
+皇宫	hoàng cung	place_name
+城市	thành phố	place_name
+村庄	thôn làng	place_name
+森林	rừng rậm	place_name
+山脉	dãy núi	place_name
+山峰	đỉnh núi	place_name
+山谷	thung lũng	place_name
+河流	dòng sông	place_name
+湖泊	hồ nước	place_name
+海洋	đại dương	place_name
+岛屿	hòn đảo	place_name
+大陆	đại lục	place_name
+世界	thế giới	place_name
+秘境	bí cảnh	place_name
+遗迹	di tích	place_name
+洞府	động phủ	place_name
+战场	chiến trường	place_name
+广场	quảng trường	place_name
+房间	căn phòng	place_name
+客厅	phòng khách	place_name
+书房	phòng sách	place_name
+办公室	văn phòng	place_name
+教室	lớp học	place_name
+商店	cửa hàng	place_name
+酒馆	tửu quán	place_name
+酒店	khách sạn	place_name
+餐厅	nhà hàng	place_name
+机场	sân bay	place_name
+车站	nhà ga	place_name
+道路	con đường	place_name
+街道	đường phố	place_name
+系统	hệ thống	general
+任务	nhiệm vụ	general
+奖励	phần thưởng	general
+技能	kỹ năng	skill_name
+能力	năng lực	skill_name
+天赋	thiên phú	skill_name
+法术	pháp thuật	skill_name
+魔法	ma pháp	skill_name
+神通	thần thông	skill_name
+功法	công pháp	skill_name
+武技	võ kỹ	skill_name
+剑法	kiếm pháp	skill_name
+拳法	quyền pháp	skill_name
+阵法	trận pháp	skill_name
+禁术	cấm thuật	skill_name
+境界	cảnh giới	general
+修为	tu vi	general
+灵力	linh lực	general
+真气	chân khí	general
+斗气	đấu khí	general
+魔力	ma lực	general
+精神力	tinh thần lực	general
+神力	thần lực	general
+力量	sức mạnh	general
+速度	tốc độ	general
+防御	phòng ngự	general
+攻击	tấn công	general
+生命	sinh mệnh	general
+血量	sinh lực	general
+等级	cấp độ	general
+经验	kinh nghiệm	general
+属性	thuộc tính	general
+装备	trang bị	item_name
+武器	vũ khí	item_name
+长剑	trường kiếm	item_name
+宝剑	bảo kiếm	item_name
+刀	đao	item_name
+剑	kiếm	item_name
+枪	thương	item_name
+弓	cung	item_name
+盔甲	áo giáp	item_name
+戒指	nhẫn	item_name
+项链	dây chuyền	item_name
+丹药	đan dược	item_name
+灵药	linh dược	item_name
+药材	dược liệu	item_name
+法宝	pháp bảo	item_name
+宝物	bảo vật	item_name
+储物袋	túi trữ vật	item_name
+空间戒指	nhẫn không gian	item_name
+手机	điện thoại	item_name
+电脑	máy tính	item_name
+汽车	ô tô	item_name
+飞船	phi thuyền	item_name
+机甲	cơ giáp	item_name
+机器人	rô-bốt	item_name
+人工智能	trí tuệ nhân tạo	general
+时间	thời gian	general
+空间	không gian	general
+命运	vận mệnh	general
+因果	nhân quả	general
+灵魂	linh hồn	general
+身体	cơ thể	general
+意识	ý thức	general
+记忆	ký ức	general
+声音	giọng nói	general
+目光	ánh mắt	general
+视线	tầm mắt	general
+眼睛	đôi mắt	general
+脸	sắc mặt	general
+表情	biểu cảm	general
+笑容	nụ cười	general
+气息	khí tức	general
+气势	khí thế	general
+心中	trong lòng	general
+脑海	trong đầu	general
+身后	sau lưng	general
+面前	trước mặt	general
+身边	bên cạnh	general
+附近	gần đó	general
+里面	bên trong	general
+外面	bên ngoài	general
+上面	phía trên	general
+下面	phía dưới	general
+前面	phía trước	general
+后面	phía sau	general
+这里	nơi này	general
+那里	nơi đó	general
+现在	bây giờ	general
+刚才	vừa rồi	general
+突然	đột nhiên	general
+终于	cuối cùng	general
+立刻	lập tức	general
+马上	ngay lập tức	general
+缓缓	chậm rãi	general
+轻轻	nhẹ nhàng	general
+冷冷	lạnh lùng	general
+淡淡	nhàn nhạt	general
+微微	khẽ	general
+再次	một lần nữa	general
+已经	đã	general
+正在	đang	general
+仍然	vẫn	general
+依然	vẫn	general
+可能	có thể	general
+应该	nên	general
+必须	phải	general
+需要	cần	general
+可以	có thể	general
+不能	không thể	general
+不会	sẽ không	general
+没有	không có	general
+不是	không phải	general
+因为	bởi vì	general
+所以	vì vậy	general
+但是	nhưng	general
+然而	tuy nhiên	general
+如果	nếu	general
+虽然	mặc dù	general
+而且	hơn nữa	general
+或者	hoặc	general
+然后	sau đó	general
+接着	tiếp đó	general
+同时	đồng thời	general
+果然	quả nhiên	general
+原来	hóa ra	general
+似乎	dường như	general
+仿佛	tựa như	general
+当然	đương nhiên	general
+其实	thật ra	general
+不过	có điều	general
+竟然	vậy mà	general
+居然	vậy mà	general
+怎么	thế nào	general
+为什么	tại sao	general
+什么	cái gì	general
+哪里	ở đâu	general
+什么时候	khi nào	general
+多少	bao nhiêu	general
+谁	ai	general
+看	nhìn	general
+看到	nhìn thấy	general
+看见	nhìn thấy	general
+听	nghe	general
+听到	nghe thấy	general
+说	nói	general
+说道	nói	general
+问	hỏi	general
+回答	trả lời	general
+告诉	nói cho	general
+知道	biết	general
+明白	hiểu	general
+觉得	cảm thấy	general
+认为	cho rằng	general
+想	nghĩ	general
+想到	nghĩ đến	general
+发现	phát hiện	general
+记得	nhớ	general
+忘记	quên	general
+喜欢	thích	general
+讨厌	ghét	general
+相信	tin tưởng	general
+怀疑	nghi ngờ	general
+希望	hy vọng	general
+决定	quyết định	general
+选择	lựa chọn	general
+开始	bắt đầu	general
+继续	tiếp tục	general
+停止	dừng lại	general
+结束	kết thúc	general
+等待	chờ đợi	general
+寻找	tìm kiếm	general
+找到	tìm thấy	general
+得到	nhận được	general
+失去	mất đi	general
+拿出	lấy ra	general
+收起	cất đi	general
+打开	mở ra	general
+关闭	đóng lại	general
+进入	đi vào	general
+离开	rời khỏi	general
+回来	trở về	general
+回去	quay về	general
+走	đi	general
+跑	chạy	general
+站	đứng	general
+坐	ngồi	general
+抬头	ngẩng đầu	general
+低头	cúi đầu	general
+转身	quay người	general
+点头	gật đầu	general
+摇头	lắc đầu	general
+笑	cười	general
+哭	khóc	general
+死	chết	general
+杀	giết	general
+攻击	tấn công	general
+战斗	chiến đấu	general
+修炼	tu luyện	general
+突破	đột phá	general
+成功	thành công	general
+失败	thất bại	general
+出现	xuất hiện	general
+消失	biến mất	general
+发生	xảy ra	general
+成为	trở thành	general
+拥有	sở hữu	general
+使用	sử dụng	general
+保护	bảo vệ	general
+帮助	giúp đỡ	general
+准备	chuẩn bị	general
+机会	cơ hội	general
+危险	nguy hiểm	general
+秘密	bí mật	general
+真相	sự thật	general
+问题	vấn đề	general
+办法	cách	general
+事情	chuyện	general
+消息	tin tức	general
+名字	tên	general
+第一	thứ nhất	general
+第二	thứ hai	general
+第三	thứ ba	general
+一	một	general
+二	hai	general
+三	ba	general
+四	bốn	general
+五	năm	general
+六	sáu	general
+七	bảy	general
+八	tám	general
+九	chín	general
+十	mười	general
+百	trăm	general
+千	nghìn	general
+万	vạn	general
+亿	trăm triệu	general
+个	cái	general
+人	người	general
+天	ngày	general
+年	năm	general
+月	tháng	general
+日	ngày	general
+次	lần	general
+章	chương	general

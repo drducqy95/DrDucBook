@@ -1,0 +1,614 @@
+package io.legado.app.help.storage
+
+import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
+import android.net.Uri
+import androidx.core.content.edit
+import androidx.documentfile.provider.DocumentFile
+import com.drducbook.app.BuildConfig
+import com.drducbook.app.R
+import io.legado.app.constant.AppLog
+import io.legado.app.constant.PreferKey
+import io.legado.app.data.appDb
+import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.BookGroup
+import io.legado.app.data.entities.BookSource
+import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.BrowserBookmarkEntity
+import io.legado.app.data.entities.DictRule
+import io.legado.app.data.entities.HighlightRule
+import io.legado.app.data.entities.HighlightTagRule
+import io.legado.app.data.entities.HomepageCustomSet
+import io.legado.app.data.entities.HomepageModule
+import io.legado.app.data.entities.HttpTTS
+import io.legado.app.data.entities.KeyboardAssist
+import io.legado.app.data.entities.MediaDownloadItemEntity
+import io.legado.app.data.entities.MediaDownloadTaskEntity
+import io.legado.app.data.entities.ReplaceRule
+import io.legado.app.data.entities.RssSource
+import io.legado.app.data.entities.RssStar
+import io.legado.app.data.entities.RuleSub
+import io.legado.app.data.entities.SearchKeyword
+import io.legado.app.data.entities.Server
+import io.legado.app.data.entities.SourceBookmarkPreferenceEntity
+import io.legado.app.data.entities.TagGroupRule
+import io.legado.app.data.entities.TxtTocRule
+import io.legado.app.data.entities.readRecord.ReadRecord
+import io.legado.app.data.entities.readRecord.ReadRecordDetail
+import io.legado.app.data.entities.readRecord.ReadRecordSession
+import io.legado.app.data.repository.AuthoringBackupFiles
+import io.legado.app.data.repository.SettingsRepository
+import io.legado.app.domain.gateway.AppearanceGateway
+import io.legado.app.help.DirectLinkUpload
+import io.legado.app.help.LauncherIconHelp
+import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.upType
+import io.legado.app.help.config.LocalConfig
+import io.legado.app.help.config.ThemeConfigStore
+import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.model.BookCover
+import io.legado.app.model.localBook.LocalBook
+import io.legado.app.utils.ACache
+import io.legado.app.utils.FileUtils
+import io.legado.app.utils.GSON
+import io.legado.app.utils.LogUtils
+import io.legado.app.utils.compress.ZipUtils
+import io.legado.app.utils.defaultSharedPreferences
+import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.getPrefString
+import io.legado.app.utils.isContentScheme
+import io.legado.app.utils.isJsonArray
+import io.legado.app.utils.openInputStream
+import io.legado.app.utils.toastOnUi
+import io.legado.app.utils.externalFiles
+import kotlinx.coroutines.Dispatchers.Main
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import org.xmlpull.v1.XmlPullParser
+import org.xmlpull.v1.XmlPullParserFactory
+import splitties.init.appCtx
+import java.io.File
+import java.io.FileInputStream
+
+/**
+ * 恢复
+ */
+object Restore : KoinComponent {
+
+    private val settingsRepository: SettingsRepository by inject()
+    private val appearanceGateway: AppearanceGateway by inject()
+    private const val TAG = "Restore"
+
+    suspend fun restore(context: Context, uri: Uri) {
+        BackupRestoreLock.withLock {
+            LogUtils.d(TAG, "开始恢复备份 uri:$uri")
+            val unzipResult = kotlin.runCatching {
+                FileUtils.delete(Backup.backupPath)
+                if (uri.isContentScheme()) {
+                    DocumentFile.fromSingleUri(context, uri)!!.openInputStream()!!.use {
+                        ZipUtils.unZipToPath(it, Backup.backupPath)
+                    }
+                } else {
+                    ZipUtils.unZipToPath(File(uri.path!!), Backup.backupPath)
+                }
+            }.onFailure {
+                AppLog.put("复制解压文件出错\n${it.localizedMessage}", it)
+            }
+            if (unzipResult.isSuccess) {
+                kotlin.runCatching {
+                    restoreUnzipped(Backup.backupPath)
+                    LocalConfig.lastBackup = System.currentTimeMillis()
+                }.onFailure {
+                    appCtx.toastOnUi(
+                        appCtx.getString(R.string.restore_fail_with_error, it.localizedMessage)
+                    )
+                    AppLog.put("恢复备份出错\n${it.localizedMessage}", it)
+                }
+            }
+        }
+    }
+
+    suspend fun restoreLocked(path: String) {
+        BackupRestoreLock.withLock {
+            restoreUnzipped(path)
+        }
+    }
+
+    internal suspend fun restoreUnzipped(path: String) {
+        restore(path)
+    }
+
+    private suspend fun restore(path: String) {
+        val aes = BackupAES()
+        fileToListT<Book>(path, "bookshelf.json")?.let {
+            it.forEach { book ->
+                book.upType()
+            }
+            it.filter { book -> book.isLocal }
+                .forEach { book ->
+                    book.coverUrl = LocalBook.getCoverPath(book)
+                }
+            val newBooks = arrayListOf<Book>()
+            val ignoreLocalBook = BackupConfig.ignoreLocalBook
+            it.forEach { book ->
+                if (ignoreLocalBook && book.isLocal) {
+                    return@forEach
+                }
+                if (appDb.bookDao.has(book.bookUrl)) {
+                    try {
+                        appDb.bookDao.update(book)
+                    } catch (_: SQLiteConstraintException) {
+                        appDb.bookDao.insert(book)
+                    }
+                } else {
+                    newBooks.add(book)
+                }
+            }
+            if (newBooks.isNotEmpty()) {
+                appDb.bookDao.insert(*newBooks.toTypedArray())
+            }
+        }
+        fileToListT<Bookmark>(path, "bookmark.json")?.let {
+            try {
+                appDb.bookmarkDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<BrowserBookmarkEntity>(path, "browserBookmarks.json")?.let {
+            try {
+                appDb.browserBookmarkDao.insertBookmarks(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<SourceBookmarkPreferenceEntity>(path, "sourceBookmarkPreferences.json")?.let {
+            try {
+                appDb.browserBookmarkDao.insertSourcePreferences(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<BookGroup>(path, "bookGroup.json")?.let {
+            appDb.bookGroupDao.replaceAll(it)
+        }
+        fileToListT<BookSource>(path, "bookSource.json")?.let {
+            try {
+                appDb.bookSourceDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        } ?: run {
+            val bookSourceFile = File(path, "bookSource.json")
+            if (bookSourceFile.exists()) {
+                val json = bookSourceFile.readText()
+                ImportOldData.importOldSource(json)
+            }
+        }
+        fileToListT<RssSource>(path, "rssSources.json")?.let {
+            try {
+                appDb.rssSourceDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<RssStar>(path, "rssStar.json")?.let {
+            try {
+                appDb.rssStarDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<ReplaceRule>(path, "replaceRule.json")?.let {
+            try {
+                appDb.replaceRuleDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<SearchKeyword>(path, "searchHistory.json")?.let {
+            try {
+                appDb.searchKeywordDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<RuleSub>(path, "sourceSub.json")?.let {
+            try {
+                appDb.ruleSubDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<TxtTocRule>(path, "txtTocRule.json")?.let {
+            try {
+                appDb.txtTocRuleDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<HttpTTS>(path, "httpTTS.json")?.let {
+            try {
+                appDb.httpTTSDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<DictRule>(path, "dictRule.json")?.let {
+            try {
+                appDb.dictRuleDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<KeyboardAssist>(path, "keyboardAssists.json")?.let {
+            try {
+                appDb.keyboardAssistsDao.insert(*it.toTypedArray())
+            } catch (_: SQLiteConstraintException) {
+            }
+        }
+        fileToListT<HomepageModule>(path, "homepageModules.json")?.let {
+            appDb.homepageModuleDao.replaceAll(it)
+        }
+        fileToListT<HomepageCustomSet>(path, "homepageCustomSets.json")?.let {
+            appDb.homepageCustomSetDao.replaceAll(it)
+        }
+        fileToListT<HighlightRule>(path, "highlightRule.json")?.let {
+            appDb.highlightRuleDao.replaceAll(it)
+        }
+        fileToListT<HighlightTagRule>(path, "highlightTagRule.json")?.let {
+            appDb.highlightTagRuleDao.replaceAll(it)
+        }
+        fileToListT<TagGroupRule>(path, "tagGroupRule.json")?.let {
+            appDb.tagGroupRuleDao.replaceAll(it)
+        }
+        fileToListT<ReadRecord>(path, "readRecord.json")?.let {
+            it.forEach { readRecord ->
+                try {
+                    restoreReadRecord(readRecord)
+                } catch (_: SQLiteConstraintException) {
+                }
+            }
+        }
+        fileToListT<ReadRecordDetail>(path, "readRecordDetail.json")?.let {
+            it.forEach { detail ->
+                try {
+                    restoreReadRecordDetail(detail)
+                } catch (_: SQLiteConstraintException) {
+                }
+            }
+        }
+        fileToListT<ReadRecordSession>(path, "readRecordSession.json")?.let {
+            it.forEach { session ->
+                try {
+                    restoreReadRecordSession(session)
+                } catch (_: SQLiteConstraintException) {
+                }
+            }
+        }
+        File(path, "servers.json").takeIf {
+            it.exists()
+        }?.runCatching {
+            var json = readText()
+            if (!json.isJsonArray()) {
+                json = aes.decryptStr(json)
+            }
+            GSON.fromJsonArray<Server>(json).getOrNull()?.let {
+                try {
+                    appDb.serverDao.insert(*it.toTypedArray())
+                } catch (_: SQLiteConstraintException) {
+                }
+            }
+        }?.onFailure {
+            AppLog.put("恢复服务器配置出错\n${it.localizedMessage}", it)
+        }
+        File(path, DirectLinkUpload.ruleFileName).takeIf {
+            it.exists()
+        }?.runCatching {
+            val json = readText()
+            ACache.get(cacheDir = false).put(DirectLinkUpload.ruleFileName, json)
+        }?.onFailure {
+            AppLog.put("恢复直链上传出错\n${it.localizedMessage}", it)
+        }
+        //恢复主题配置
+        if (!BackupConfig.ignoreThemeConfig) {
+            File(path, ThemeConfigStore.configFileName).takeIf {
+                it.exists()
+            }?.runCatching {
+                FileUtils.delete(ThemeConfigStore.configFilePath)
+                copyTo(File(ThemeConfigStore.configFilePath))
+                ThemeConfigStore.upConfig()
+            }?.onFailure {
+                AppLog.put("恢复主题出错\n${it.localizedMessage}", it)
+            }
+        }
+        File(path, BookCover.configFileName).takeIf {
+            it.exists() && !BackupConfig.ignoreCoverConfig
+        }?.runCatching {
+            val json = readText()
+            BookCover.saveCoverRule(json)
+        }?.onFailure {
+            AppLog.put("恢复封面规则出错\n${it.localizedMessage}", it)
+        }
+        if (!BackupConfig.ignoreReadConfig) {
+            //恢复阅读界面配置
+            File(path, ReadBookConfig.configFileName).takeIf {
+                it.exists()
+            }?.runCatching {
+                FileUtils.delete(ReadBookConfig.configFilePath)
+                copyTo(File(ReadBookConfig.configFilePath))
+                ReadBookConfig.initConfigs()
+            }?.onFailure {
+                AppLog.put("恢复阅读界面出错\n${it.localizedMessage}", it)
+            }
+            File(path, ReadBookConfig.shareConfigFileName).takeIf {
+                it.exists()
+            }?.runCatching {
+                FileUtils.delete(ReadBookConfig.shareConfigFilePath)
+                copyTo(File(ReadBookConfig.shareConfigFilePath))
+                ReadBookConfig.initShareConfig()
+            }?.onFailure {
+                AppLog.put("恢复阅读界面出错\n${it.localizedMessage}", it)
+            }
+        }
+        // 恢复配置文件 (手动解析 XML，替代反射逻辑)
+        val configFile = File(path, "config.xml")
+        if (configFile.exists()) {
+            try {
+                val map = readXmlToMap(configFile)
+                if (map.isNotEmpty()) {
+                    applyConfigMap(map, aes)
+                }
+            } catch (e: Exception) {
+                AppLog.put("恢复配置 XML 出错\n${e.localizedMessage}", e)
+            }
+        }
+
+        if (!BackupConfig.ignoreThemeConfig) {
+            File(path, "appearance").takeIf(File::isDirectory)?.let { appearanceSnapshot ->
+                runCatching {
+                    appearanceGateway.restoreSnapshot(appearanceSnapshot)
+                }.onFailure {
+                    AppLog.put(
+                        "Restore appearance snapshot failed: " + it.localizedMessage,
+                        it,
+                    )
+                }
+            }
+        }
+        File(path, "authoring").takeIf(File::isDirectory)?.let { authoringSnapshot ->
+            runCatching {
+                AuthoringBackupFiles.restoreValidatedSnapshot(
+                    source = authoringSnapshot,
+                    destination = File(appCtx.filesDir, "authoring"),
+                )
+            }.onFailure {
+                AppLog.put(
+                    "Restore authoring snapshot failed: " + it.localizedMessage,
+                    it,
+                )
+            }
+        }
+
+        restoreFullData(path)
+
+        appCtx.toastOnUi(R.string.restore_success)
+        withContext(Main) {
+            delay(100)
+            if (!BuildConfig.DEBUG) {
+                LauncherIconHelp.changeIcon(appCtx.getPrefString(PreferKey.launcherIcon))
+            }
+            ThemeConfigStore.applyDayNight(appCtx)
+        }
+    }
+
+    private suspend fun restoreFullData(path: String) {
+        val manifestFile = File(path, "backup-manifest.json")
+        val profile = if (manifestFile.isFile) {
+            runCatching {
+                FileInputStream(manifestFile).use {
+                    GSON.fromJson(it.reader(), BackupManifest::class.java).profile
+                }
+            }.getOrNull()
+        } else {
+            null
+        } ?: BackupContentProfile.METADATA
+        if (!BackupArchivePolicy.includesDownloadedContent(profile)) return
+
+        BackupArchivePolicy.fullDirectories.forEach { directoryName ->
+            File(path, directoryName).takeIf(File::isDirectory)?.let { source ->
+                source.copyRecursively(File(appCtx.externalFiles, directoryName), overwrite = true)
+            }
+        }
+        fileToListT<BookChapter>(path, "bookChapters.json")?.let { chapters ->
+            if (chapters.isNotEmpty()) {
+                appDb.bookChapterDao.insert(*chapters.toTypedArray())
+            }
+        }
+        fileToListT<MediaDownloadTaskEntity>(path, "mediaDownloadTasks.json")?.forEach {
+            appDb.mediaDownloadDao.insertTask(it)
+        }
+        fileToListT<MediaDownloadItemEntity>(path, "mediaDownloadItems.json")?.forEach { item ->
+            appDb.mediaDownloadDao.insertItem(
+                item.copy(
+                    localPath = remapMediaPath(item.localPath),
+                    tempPath = remapMediaPath(item.tempPath),
+                )
+            )
+        }
+    }
+
+    private fun remapMediaPath(path: String): String {
+        if (path.isBlank()) return path
+        val marker = "media_downloads${File.separator}"
+        val normalized = path.replace('\\', File.separatorChar).replace('/', File.separatorChar)
+        val index = normalized.indexOf(marker)
+        return if (index >= 0) {
+            File(appCtx.externalFiles, normalized.substring(index)).absolutePath
+        } else {
+            path
+        }
+    }
+
+    private suspend fun restoreReadRecord(readRecord: ReadRecord) {
+        val existing = appDb.readRecordDao.getReadRecord(
+            readRecord.deviceId,
+            readRecord.bookName,
+            readRecord.bookAuthor
+        )
+        appDb.readRecordDao.insert(
+            existing?.copy(
+                readTime = maxOf(existing.readTime, readRecord.readTime),
+                lastRead = maxOf(existing.lastRead, readRecord.lastRead)
+            ) ?: readRecord
+        )
+    }
+
+    private suspend fun restoreReadRecordDetail(detail: ReadRecordDetail) {
+        val existing = appDb.readRecordDao.getDetail(
+            detail.deviceId,
+            detail.bookName,
+            detail.bookAuthor,
+            detail.date
+        )
+        appDb.readRecordDao.insertDetail(
+            existing?.copy(
+                readTime = maxOf(existing.readTime, detail.readTime),
+                readWords = maxOf(existing.readWords, detail.readWords),
+                firstReadTime = minPositive(existing.firstReadTime, detail.firstReadTime),
+                lastReadTime = maxOf(existing.lastReadTime, detail.lastReadTime)
+            ) ?: detail
+        )
+    }
+
+    private suspend fun restoreReadRecordSession(session: ReadRecordSession) {
+        val existing = appDb.readRecordDao.getSession(
+            session.deviceId,
+            session.bookName,
+            session.bookAuthor,
+            session.startTime,
+            session.endTime
+        )
+        if (existing == null) {
+            appDb.readRecordDao.insertSession(session)
+        }
+    }
+
+    private fun minPositive(left: Long, right: Long): Long {
+        return when {
+            left <= 0L -> right
+            right <= 0L -> left
+            else -> minOf(left, right)
+        }
+    }
+
+    private suspend fun applyConfigMap(map: Map<String, Any?>, aes: BackupAES) {
+        val finalMap = mutableMapOf<String, Any>()
+        val legacyBookInfoBackground = map[PreferKey.bookInfoBackgroundBlur] as? String
+        val restoreNetworkCoverBackground =
+            legacyBookInfoBackground != null &&
+                    PreferKey.bookInfoNetworkCoverBackground !in map &&
+                    BackupConfig.keyIsNotIgnore(PreferKey.bookInfoBackgroundBlur) &&
+                    BackupConfig.keyIsNotIgnore(PreferKey.bookInfoNetworkCoverBackground)
+        val restoreDefaultCoverBackground =
+            legacyBookInfoBackground != null &&
+                    PreferKey.bookInfoDefaultCoverBackground !in map &&
+                    BackupConfig.keyIsNotIgnore(PreferKey.bookInfoBackgroundBlur) &&
+                    BackupConfig.keyIsNotIgnore(PreferKey.bookInfoDefaultCoverBackground)
+        appCtx.defaultSharedPreferences.edit {
+            map.forEach { (key, value) ->
+                if (BackupConfig.keyIsNotIgnore(key)) {
+                    when (key) {
+                        PreferKey.webDavPassword -> {
+                            val password = kotlin.runCatching {
+                                aes.decryptStr(value.toString())
+                            }.getOrNull() ?: let {
+                                if (appCtx.getPrefString(PreferKey.webDavPassword).isNullOrBlank()) {
+                                    value.toString()
+                                } else null
+                            }
+                            password?.let {
+                                putString(key, it)
+                                finalMap[key] = it
+                            }
+                        }
+
+                        else -> {
+                            if (value != null) {
+                                when (value) {
+                                    is Int -> { putInt(key, value); finalMap[key] = value }
+                                    is Boolean -> { putBoolean(key, value); finalMap[key] = value }
+                                    is Long -> { putLong(key, value); finalMap[key] = value }
+                                    is Double -> { // JSON 数字会被解析为 Double
+                                        val floatValue = value.toFloat()
+                                        putFloat(key, floatValue)
+                                        finalMap[key] = floatValue
+                                    }
+                                    is Float -> { putFloat(key, value); finalMap[key] = value }
+                                    is String -> { putString(key, value); finalMap[key] = value }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            legacyBookInfoBackground?.let { backgroundMode ->
+                if (restoreNetworkCoverBackground) {
+                    putString(PreferKey.bookInfoNetworkCoverBackground, backgroundMode)
+                    finalMap[PreferKey.bookInfoNetworkCoverBackground] = backgroundMode
+                }
+                if (restoreDefaultCoverBackground) {
+                    putString(PreferKey.bookInfoDefaultCoverBackground, backgroundMode)
+                    finalMap[PreferKey.bookInfoDefaultCoverBackground] = backgroundMode
+                }
+            }
+        }
+        // 同步恢复到 DataStore
+        settingsRepository.batchPutFromMap(finalMap)
+    }
+
+    private fun readXmlToMap(file: File): Map<String, Any?> {
+        val map = mutableMapOf<String, Any?>()
+        try {
+            val factory = XmlPullParserFactory.newInstance()
+            val parser = factory.newPullParser()
+            FileInputStream(file).use { fis ->
+                parser.setInput(fis, "UTF-8")
+                var eventType = parser.eventType
+                while (eventType != XmlPullParser.END_DOCUMENT) {
+                    if (eventType == XmlPullParser.START_TAG) {
+                        val tagName = parser.name
+                        val name = parser.getAttributeValue(null, "name")
+                        if (name != null) {
+                            when (tagName) {
+                                "string" -> map[name] = parser.nextText()
+                                "int" -> map[name] = parser.getAttributeValue(null, "value").toInt()
+                                "long" -> map[name] = parser.getAttributeValue(null, "value").toLong()
+                                "float" -> map[name] = parser.getAttributeValue(null, "value").toFloat()
+                                "boolean" -> map[name] = parser.getAttributeValue(null, "value").toBoolean()
+                            }
+                        }
+                    }
+                    eventType = parser.next()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return map
+    }
+
+    private inline fun <reified T> fileToListT(path: String, fileName: String): List<T>? {
+        try {
+            val file = File(path, fileName)
+            if (file.exists()) {
+                LogUtils.d(TAG, "阅读恢复备份 $fileName 文件大小 ${file.length()}")
+                FileInputStream(file).use {
+                    return GSON.fromJsonArray<T>(it).getOrThrow().also { list ->
+                        LogUtils.d(TAG, "阅读恢复备份 $fileName 列表大小 ${list.size}")
+                    }
+                }
+            } else {
+                LogUtils.d(TAG, "阅读恢复备份 $fileName 文件不存在")
+            }
+        } catch (e: Exception) {
+            AppLog.put("$fileName\n读取解析出错\n${e.localizedMessage}", e)
+            appCtx.toastOnUi(
+                appCtx.getString(R.string.file_read_failed, fileName, e.localizedMessage)
+            )
+        }
+        return null
+    }
+
+}

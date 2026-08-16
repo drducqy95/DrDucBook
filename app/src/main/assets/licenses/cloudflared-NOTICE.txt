@@ -1,0 +1,6 @@
+This product includes cloudflared 2026.5.2.
+Copyright Cloudflare, Inc.
+Upstream source: https://github.com/cloudflare/cloudflared/tree/2026.5.2
+
+The Android build adds only tools/cloudflared-android/android_dns.go so the
+Go resolver can use the DNS server supplied by Android.

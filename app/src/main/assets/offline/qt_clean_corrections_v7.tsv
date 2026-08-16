@@ -1,0 +1,124 @@
+# QT Clean v7 reviewed grammar and narrative corrections. License: CC0-1.0
+# source<TAB>Vietnamese<TAB>type<TAB>provenance
+过来了	đã đến	general	project:qt-corrections-v7:directional
+从画中走出	bước ra khỏi bức tranh	general	project:qt-corrections-v7:directional
+走向画里	đi vào trong tranh	general	project:qt-corrections-v7:directional
+伸出手	đưa tay ra	general	project:qt-corrections-v7:directional
+伸出了手	đưa tay ra	general	project:qt-corrections-v7:directional
+伸出两只手	đưa cả hai tay ra	general	project:qt-corrections-v7:directional
+走出来	bước ra	general	project:qt-corrections-v7:directional
+走进去	đi vào	general	project:qt-corrections-v7:directional
+走进屋	đi vào nhà	general	project:qt-corrections-v7:directional
+走出屋门	đi ra khỏi nhà	general	project:qt-corrections-v7:directional
+走到身边	đi đến bên cạnh	general	project:qt-corrections-v7:directional
+走到跟前	đi đến trước mặt	general	project:qt-corrections-v7:directional
+跑过来	chạy tới	general	project:qt-corrections-v7:directional
+跑过去	chạy tới	general	project:qt-corrections-v7:directional
+拉了上去	kéo lên	general	project:qt-corrections-v7:directional
+拉出水面	kéo lên khỏi mặt nước	general	project:qt-corrections-v7:directional
+飘了起来	nổi lên	general	project:qt-corrections-v7:directional
+浮出水面	nổi lên mặt nước	general	project:qt-corrections-v7:directional
+抓起来	nhấc lên	general	project:qt-corrections-v7:directional
+抓起	nhấc lên	general	project:qt-corrections-v7:directional
+拿起来	cầm lên	general	project:qt-corrections-v7:directional
+拿出	lấy ra	general	project:qt-corrections-v7:directional
+取下	lấy xuống	general	project:qt-corrections-v7:directional
+放回去	đặt lại	general	project:qt-corrections-v7:directional
+松开手	buông tay	general	project:qt-corrections-v7:directional
+睁开眼	mở mắt	general	project:qt-corrections-v7:directional
+睁开了眼	mở mắt	general	project:qt-corrections-v7:directional
+站起身	đứng dậy	general	project:qt-corrections-v7:directional
+起身	đứng dậy	general	project:qt-corrections-v7:directional
+坐起	ngồi dậy	general	project:qt-corrections-v7:directional
+蹲下来	ngồi xổm xuống	general	project:qt-corrections-v7:directional
+回过头	quay đầu lại	general	project:qt-corrections-v7:directional
+点点头	gật đầu	general	project:qt-corrections-v7:result
+点了点头	gật đầu	general	project:qt-corrections-v7:result
+摇摇头	lắc đầu	general	project:qt-corrections-v7:result
+摇了摇头	lắc đầu	general	project:qt-corrections-v7:result
+皱皱眉	khẽ cau mày	general	project:qt-corrections-v7:result
+皱了皱眉	khẽ cau mày	general	project:qt-corrections-v7:result
+叫不醒	không gọi tỉnh được	general	project:qt-corrections-v7:result
+醒不来	không tỉnh lại	general	project:qt-corrections-v7:result
+看不见	không nhìn thấy	general	project:qt-corrections-v7:result
+看不清楚	nhìn không rõ	general	project:qt-corrections-v7:result
+无法呼吸	không thể thở	general	project:qt-corrections-v7:result
+无法挣脱	không thể thoát ra	general	project:qt-corrections-v7:result
+两只手	hai bàn tay	general	project:qt-corrections-v7:classifier
+一双手	đôi tay	general	project:qt-corrections-v7:classifier
+一只手	một tay	general	project:qt-corrections-v7:classifier
+一双眼睛	đôi mắt	general	project:qt-corrections-v7:classifier
+一双鞋	một đôi giày	general	project:qt-corrections-v7:classifier
+一根烟	một điếu thuốc	general	project:qt-corrections-v7:classifier
+一根针	một cây kim	general	project:qt-corrections-v7:classifier
+一根鱼竿	một cần câu	general	project:qt-corrections-v7:classifier
+一张席子	một tấm chiếu	general	project:qt-corrections-v7:classifier
+一张脸	một khuôn mặt	general	project:qt-corrections-v7:classifier
+一辆车	một chiếc xe	general	project:qt-corrections-v7:classifier
+一条船	một chiếc thuyền	general	project:qt-corrections-v7:classifier
+一条绳子	một sợi dây	general	project:qt-corrections-v7:classifier
+一头牛	một con trâu	general	project:qt-corrections-v7:classifier
+一个孩子	một đứa trẻ	general	project:qt-corrections-v7:classifier
+一个人	một người	general	project:qt-corrections-v7:classifier
+一口气	một hơi	general	project:qt-corrections-v7:classifier
+一口烟	một hơi thuốc	general	project:qt-corrections-v7:classifier
+一股力量	một luồng sức mạnh	general	project:qt-corrections-v7:classifier
+一股力道	một luồng lực	general	project:qt-corrections-v7:classifier
+一团头发	một mớ tóc	general	project:qt-corrections-v7:classifier
+一层滤镜	một lớp bộ lọc	general	project:qt-corrections-v7:classifier
+在父母的教育下	dưới sự dạy dỗ của cha mẹ	general	project:qt-corrections-v7:location
+简陋棚子下	dưới căn lều đơn sơ	general	project:qt-corrections-v7:location
+水面上	trên mặt nước	general	project:qt-corrections-v7:location
+水面下	dưới mặt nước	general	project:qt-corrections-v7:location
+水中	trong nước	general	project:qt-corrections-v7:location
+水里	trong nước	general	project:qt-corrections-v7:location
+船上	trên thuyền	general	project:qt-corrections-v7:location
+船边	bên mạn thuyền	general	project:qt-corrections-v7:location
+船尾	đuôi thuyền	general	project:qt-corrections-v7:location
+脚下	dưới chân	general	project:qt-corrections-v7:location
+身后	sau lưng	general	project:qt-corrections-v7:location
+身边	bên cạnh	general	project:qt-corrections-v7:location
+眼里	trong mắt	general	project:qt-corrections-v7:location
+视野里	trong tầm mắt	general	project:qt-corrections-v7:location
+口鼻里	trong miệng và mũi	general	project:qt-corrections-v7:location
+嘴里	trong miệng	general	project:qt-corrections-v7:location
+耳朵上	trên tai	general	project:qt-corrections-v7:location
+里屋	buồng trong	general	project:qt-corrections-v7:location
+厨房里	trong bếp	general	project:qt-corrections-v7:location
+越来越近	ngày càng gần	general	project:qt-corrections-v7:degree
+越来越远	ngày càng xa	general	project:qt-corrections-v7:degree
+越来越小	ngày càng nhỏ	general	project:qt-corrections-v7:degree
+逐渐变慢	chậm dần	general	project:qt-corrections-v7:degree
+逐渐靠近	dần đến gần	general	project:qt-corrections-v7:degree
+渐渐露出	dần để lộ	general	project:qt-corrections-v7:degree
+不知疲倦	không biết mệt	general	project:qt-corrections-v7:degree
+轻手轻脚	rón rén	general	project:qt-corrections-v7:manner
+手脚并用	dùng cả tay chân	general	project:qt-corrections-v7:manner
+恰到好处	vừa phải	general	project:qt-corrections-v7:manner
+很懂规矩	rất hiểu quy củ	general	project:qt-corrections-v7:manner
+很守规矩	rất tuân thủ quy củ	general	project:qt-corrections-v7:manner
+光与影	ánh sáng và bóng tối	general	project:qt-corrections-v7:narrative
+仪态动作	dáng điệu	general	project:qt-corrections-v7:narrative
+专业的歌者与舞者	ca sĩ và vũ công chuyên nghiệp	general	project:qt-corrections-v7:narrative
+水波柔和荡漾	sóng nước nhẹ nhàng gợn	general	project:qt-corrections-v7:narrative
+将光与影恰到好处地扭折	bẻ cong ánh sáng và bóng tối vừa đủ	general	project:qt-corrections-v7:narrative
+再搭配小黄莺的仪态动作	kết hợp với dáng điệu của Tiểu Hoàng Oanh	general	project:qt-corrections-v7:narrative
+像是被渲染上了一层滤镜	như được phủ thêm một lớp bộ lọc	general	project:qt-corrections-v7:narrative
+展示出了另一种属于野性的风采	phô bày một vẻ đẹp hoang dã khác	general	project:qt-corrections-v7:narrative
+好美啊	đẹp quá	general	project:qt-corrections-v7:idiom
+好冷	lạnh quá	general	project:qt-corrections-v7:idiom
+好疼	đau quá	general	project:qt-corrections-v7:idiom
+好险	hú vía	general	project:qt-corrections-v7:idiom
+没啥事儿	không sao	general	project:qt-corrections-v7:idiom
+没办法	không còn cách nào	general	project:qt-corrections-v7:idiom
+收拾好东西	thu dọn đồ đạc xong	general	project:qt-corrections-v7:idiom
+中西医结合	kết hợp Đông Tây y	general	project:qt-corrections-v7:idiom
+这年头	thời buổi này	general	project:qt-corrections-v7:idiom
+没好气道	bực bội nói	general	project:qt-corrections-v7:speech
+没好气地说道	bực bội nói	general	project:qt-corrections-v7:speech
+吩咐道	dặn	general	project:qt-corrections-v7:speech
+催促道	thúc giục	general	project:qt-corrections-v7:speech
+小声道	nói nhỏ	general	project:qt-corrections-v7:speech
+回喊道	ngoái lại hô	general	project:qt-corrections-v7:speech
+四周	xung quanh	general	project:qt-corrections-v7:context
+最后停下了	cuối cùng dừng lại	general	project:qt-corrections-v7:context

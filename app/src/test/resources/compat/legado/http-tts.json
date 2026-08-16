@@ -1,0 +1,10 @@
+{
+  "id": 900000000001,
+  "name": "Compatibility TTS",
+  "url": "@js:return 'https://tts.example.test/speak?text=' + java.encodeURI(speakText);",
+  "contentType": "audio/mpeg",
+  "concurrentRate": "1/1000",
+  "header": "{\"Accept\":\"audio/mpeg\"}",
+  "enabledCookieJar": false,
+  "lastUpdateTime": 1
+}

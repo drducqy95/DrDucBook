@@ -1,0 +1,19 @@
+Quick Translator 2025 runtime snapshot
+======================================
+
+This directory contains the bounded-memory Android runtime artifacts rebuilt
+from the QT2025 project snapshot supplied for this application build.
+
+TranslatorEngine.dll is not packaged. Its dictionary precedence, Luat Nhan
+matching, numeric conversion, surname/title composition, and Han-Viet fallback
+were independently reimplemented in Kotlin. qt2025-terms.qtdict is a generated,
+memory-mappable index; its source inputs and hashes are recorded in
+qt2025-runtime-manifest.json.
+
+The source snapshot does not declare redistribution terms. Keep the generated
+runtime and source dictionaries within distributions authorized by the owner of
+that snapshot.
+
+Rebuild with:
+
+    node tools/qt2025/build_qt2025_runtime.mjs <QT2025 folder>

@@ -1,0 +1,502 @@
+package io.legado.app.ui.config.otherConfig
+
+import android.Manifest
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.drducbook.app.R
+import io.legado.app.domain.model.VbookContentLockPolicy
+import io.legado.app.help.config.BookshelfAutomationConfig
+import io.legado.app.help.config.AppConfig
+import io.legado.app.service.BookshelfAutomationScheduler
+import io.legado.app.service.WebService
+import io.legado.app.ui.config.readMangaConfig.ReadMangaConfig
+import io.legado.app.ui.theme.LegadoTheme
+import io.legado.app.ui.theme.adaptiveContentPadding
+import io.legado.app.ui.widget.components.AppScaffold
+import io.legado.app.ui.widget.components.AppTextField
+import io.legado.app.ui.widget.components.SplicedColumnGroup
+import io.legado.app.ui.widget.components.alert.AppAlertDialog
+import io.legado.app.ui.widget.components.filePicker.FilePickerSheet
+import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
+import io.legado.app.ui.widget.components.settingItem.DropdownListSettingItem
+import io.legado.app.ui.widget.components.settingItem.InputSettingItem
+import io.legado.app.ui.widget.components.settingItem.SwitchSettingItem
+import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
+import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
+import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
+import io.legado.app.utils.restart
+import io.legado.app.utils.takePersistablePermissionSafely
+import org.koin.androidx.compose.koinViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun OtherConfigScreen(
+    onBackClick: () -> Unit,
+    viewModel: OtherConfigViewModel = koinViewModel()
+) {
+    val context = LocalContext.current
+    val readAloudPreferences by viewModel.readAloudPreferences.collectAsStateWithLifecycle()
+    val webServiceAllowed by viewModel.webServiceAllowed.collectAsStateWithLifecycle()
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+
+    }
+
+    val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
+
+    var showClearWebViewDialog by remember { mutableStateOf(false) }
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var showCheckSourceSheet by remember { mutableStateOf(false) }
+    var showDirectLinkUploadSheet by remember { mutableStateOf(false) }
+    var showVbookUnlockCodeDialog by remember { mutableStateOf(false) }
+
+    var tempPassword by remember { mutableStateOf("") }
+    var vbookUnlockCode by remember {
+        mutableStateOf(AppConfig.vbookEbookUnlockCode.orEmpty())
+    }
+    var bookshelfAutomationEnabled by remember {
+        mutableStateOf(BookshelfAutomationConfig.enabled)
+    }
+    var bookshelfAutomationInterval by remember {
+        mutableStateOf(BookshelfAutomationConfig.intervalHours)
+    }
+    var bookshelfAutomationDownload by remember {
+        mutableStateOf(BookshelfAutomationConfig.autoDownloadNewChapters)
+    }
+    var bookshelfAutomationNotify by remember {
+        mutableStateOf(BookshelfAutomationConfig.notifyNewChapters)
+    }
+
+    var showFilePicker by remember { mutableStateOf(false) }
+    val selectDocTree = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            it.takePersistablePermissionSafely(context)
+            viewModel.updateLocalBookDir(it.toString())
+        }
+    }
+
+    AppScaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            GlassMediumFlexibleTopAppBar(
+                title = stringResource(R.string.other_setting),
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    TopBarNavigationButton(onClick = onBackClick)
+                }
+            )
+        }
+    ) { paddingValues ->
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = adaptiveContentPadding(
+                top = paddingValues.calculateTopPadding(),
+                bottom = 120.dp
+            )
+        ) {
+            item {
+                SplicedColumnGroup {
+                DropdownListSettingItem(
+                    title = stringResource(R.string.language),
+                    selectedValue = OtherConfig.language,
+                    displayEntries = stringArrayResource(R.array.language),
+                    entryValues = stringArrayResource(R.array.language_value),
+                    onValueChange = { newValue ->
+                        OtherConfig.language = newValue
+                        context.restart()
+                    }
+                )
+
+                DropdownListSettingItem(
+                    title = stringResource(R.string.update_to_variant_title),
+                    description = stringResource(R.string.update_to_variant_summary),
+                    selectedValue = OtherConfig.updateToVariant,
+                    displayEntries = stringArrayResource(R.array.default_app_variant),
+                    entryValues = stringArrayResource(R.array.default_app_variant_value),
+                    onValueChange = { OtherConfig.updateToVariant = it }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.auto_check_update_on_start_title),
+                    description = stringResource(R.string.auto_check_update_on_start_summary),
+                    checked = OtherConfig.autoCheckUpdateOnStart,
+                    onCheckedChange = { OtherConfig.autoCheckUpdateOnStart = it }
+                )
+
+                if (webServiceAllowed) {
+                    SwitchSettingItem(
+                        title = stringResource(R.string.web_service_auto_start),
+                        checked = OtherConfig.webServiceAutoStart,
+                        onCheckedChange = { OtherConfig.webServiceAutoStart = it }
+                    )
+                }
+            }
+
+            SplicedColumnGroup(title = stringResource(R.string.main_activity)) {
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.pt_auto_refresh),
+                    description = stringResource(R.string.ps_auto_refresh),
+                    checked = OtherConfig.autoRefresh,
+                    onCheckedChange = { OtherConfig.autoRefresh = it }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.pt_default_read),
+                    description = stringResource(R.string.ps_default_read),
+                    checked = OtherConfig.defaultToRead,
+                    onCheckedChange = { OtherConfig.defaultToRead = it }
+                )
+            }
+
+            SplicedColumnGroup(title = stringResource(R.string.bookshelf_automation_title)) {
+                SwitchSettingItem(
+                    title = stringResource(R.string.bookshelf_automation_enable),
+                    description = stringResource(R.string.bookshelf_automation_enable_summary),
+                    checked = bookshelfAutomationEnabled,
+                    onCheckedChange = { enabled ->
+                        bookshelfAutomationEnabled = enabled
+                        BookshelfAutomationConfig.enabled = enabled
+                        BookshelfAutomationScheduler.applyConfig(context)
+                    }
+                )
+
+                InputSettingItem(
+                    title = stringResource(R.string.bookshelf_automation_interval),
+                    value = bookshelfAutomationInterval.toString(),
+                    defaultValue = BookshelfAutomationConfig.DEFAULT_INTERVAL_HOURS.toString(),
+                    description = stringResource(R.string.bookshelf_automation_interval_summary),
+                    onConfirm = { raw ->
+                        raw.toIntOrNull()?.let { value ->
+                            bookshelfAutomationInterval = value.coerceIn(
+                                BookshelfAutomationConfig.MIN_INTERVAL_HOURS,
+                                BookshelfAutomationConfig.MAX_INTERVAL_HOURS,
+                            )
+                            BookshelfAutomationConfig.intervalHours = bookshelfAutomationInterval
+                            BookshelfAutomationScheduler.applyConfig(context)
+                        }
+                    }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.bookshelf_automation_download),
+                    description = stringResource(R.string.bookshelf_automation_download_summary),
+                    checked = bookshelfAutomationDownload,
+                    onCheckedChange = { enabled ->
+                        bookshelfAutomationDownload = enabled
+                        BookshelfAutomationConfig.autoDownloadNewChapters = enabled
+                    }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.bookshelf_automation_notify),
+                    description = stringResource(R.string.bookshelf_automation_notify_summary),
+                    checked = bookshelfAutomationNotify,
+                    onCheckedChange = { enabled ->
+                        bookshelfAutomationNotify = enabled
+                        BookshelfAutomationConfig.notifyNewChapters = enabled
+                    }
+                )
+            }
+
+            SplicedColumnGroup(title = stringResource(R.string.ebook_editor_title)) {
+                ClickableSettingItem(
+                    title = stringResource(R.string.vbook_ebook_unlock_code),
+                    description = stringResource(
+                        if (VbookContentLockPolicy.isUnlocked(vbookUnlockCode)) {
+                            R.string.vbook_ebook_access_unlocked
+                        } else {
+                            R.string.vbook_ebook_access_policy_summary
+                        }
+                    ),
+                    onClick = {
+                        vbookUnlockCode = AppConfig.vbookEbookUnlockCode.orEmpty()
+                        showVbookUnlockCodeDialog = true
+                    }
+                )
+            }
+
+            SplicedColumnGroup(title = stringResource(R.string.send_to_kindle)) {
+                InputSettingItem(
+                    title = stringResource(R.string.kindle_receiving_email),
+                    value = OtherConfig.kindleEmail,
+                    defaultValue = "",
+                    description = stringResource(R.string.kindle_email_hint),
+                    onConfirm = { OtherConfig.kindleEmail = it.trim() },
+                )
+            }
+
+            SplicedColumnGroup(title = stringResource(R.string.privacy)) {
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.notification_permission),
+                    description = stringResource(R.string.notification_permission_rationale),
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            Toast.makeText(context, R.string.permission_not_required, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                )
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.background_permission),
+                    description = stringResource(R.string.ignore_battery_permission_rationale),
+                    onClick = {
+
+                    }
+                )
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.set_local_password),
+                    description = stringResource(R.string.set_local_password_summary),
+                    onClick = { showPasswordDialog = true }
+                )
+
+            }
+
+            SplicedColumnGroup(title = stringResource(R.string.read)) {
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.book_tree_uri_t),
+                    description = OtherConfig.defaultBookTreeUri,
+                    onClick = { showFilePicker = true }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.anti_alias),
+                    description = stringResource(R.string.pref_anti_alias_summary),
+                    checked = OtherConfig.antiAlias,
+                    onCheckedChange = { OtherConfig.antiAlias = it }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.replace_enable_default_t),
+                    description = stringResource(R.string.replace_enable_default_s),
+                    checked = OtherConfig.replaceEnableDefault,
+                    onCheckedChange = { OtherConfig.replaceEnableDefault = it }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.media_button_on_exit_title),
+                    description = stringResource(R.string.media_button_on_exit_summary),
+                    checked = readAloudPreferences.mediaButtonOnExit,
+                    onCheckedChange = { viewModel.setMediaButtonOnExit(it) }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.read_aloud_by_media_button_title),
+                    description = stringResource(R.string.read_aloud_by_media_button_summary),
+                    checked = readAloudPreferences.readAloudByMediaButton,
+                    onCheckedChange = { viewModel.setReadAloudByMediaButton(it) }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.ignore_audio_focus_title),
+                    description = stringResource(R.string.ignore_audio_focus_summary),
+                    checked = readAloudPreferences.ignoreAudioFocus,
+                    onCheckedChange = { viewModel.setIgnoreAudioFocus(it) }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.auto_clear_expired),
+                    description = stringResource(R.string.auto_clear_expired_summary),
+                    checked = OtherConfig.autoClearExpired,
+                    onCheckedChange = { OtherConfig.autoClearExpired = it }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.show_add_to_shelf_alert_title),
+                    description = stringResource(R.string.show_add_to_shelf_alert_summary),
+                    checked = OtherConfig.showAddToShelfAlert,
+                    onCheckedChange = { OtherConfig.showAddToShelfAlert = it }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.show_manga_ui),
+                    checked = ReadMangaConfig.showMangaUi,
+                    onCheckedChange = { ReadMangaConfig.showMangaUi = it }
+                )
+            }
+
+                SplicedColumnGroup(title = stringResource(R.string.other_setting)) {
+
+                if (webServiceAllowed) {
+                    SwitchSettingItem(
+                        title = stringResource(R.string.web_service_wake_lock),
+                        description = stringResource(R.string.web_service_wake_lock_summary),
+                        checked = OtherConfig.webServiceWakeLock,
+                        onCheckedChange = { OtherConfig.webServiceWakeLock = it }
+                    )
+                }
+
+                InputSettingItem(
+                    title = stringResource(R.string.source_edit_text_max_line),
+                    value = OtherConfig.sourceEditMaxLine.toString(),
+                    defaultValue = 500.toString(),
+                    onConfirm = { OtherConfig.sourceEditMaxLine = it.toIntOrNull() ?: 500 }
+                )
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.check_source_config),
+                    onClick = { showCheckSourceSheet = true }
+                )
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.direct_link_upload_rule),
+                    description = stringResource(R.string.direct_link_upload_rule_summary),
+                    onClick = { showDirectLinkUploadSheet = true }
+                )
+
+                if (webServiceAllowed) {
+                    InputSettingItem(
+                        title = stringResource(R.string.web_port_title),
+                        value = OtherConfig.webPort.toString(),
+                        onConfirm = { newValue ->
+                            OtherConfig.webPort = newValue.toInt()
+                            if (WebService.isRun) {
+                                WebService.stop(context)
+                                WebService.start(context)
+                            }
+                        }
+                    )
+                }
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.clear_webview_data),
+                    description = stringResource(R.string.clear_webview_data_summary),
+                    onClick = { showClearWebViewDialog = true }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.add_to_text_context_menu_t),
+                    description = stringResource(R.string.add_to_text_context_menu_s),
+                    checked = OtherConfig.processText,
+                    onCheckedChange = { viewModel.setProcessTextEnable(it) }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.record_log),
+                    description = stringResource(R.string.record_debug_log),
+                    checked = OtherConfig.recordLog,
+                    onCheckedChange = { OtherConfig.recordLog = it }
+                )
+
+                SwitchSettingItem(
+                    title = stringResource(R.string.record_heap_dump_t),
+                    description = stringResource(R.string.record_heap_dump_s),
+                    checked = OtherConfig.recordHeapDump,
+                    onCheckedChange = { OtherConfig.recordHeapDump = it }
+                )
+                }
+            }
+        }
+
+        FilePickerSheet(
+            show = showFilePicker,
+            onDismissRequest = { showFilePicker = false },
+            onSelectSysDir = {
+                showFilePicker = false
+                try {
+                    selectDocTree.launch(null)
+                } catch (e: Exception) {
+
+                }
+            }
+        )
+
+        CheckSourceBottomSheet(
+            show = showCheckSourceSheet,
+            viewModel = viewModel,
+            onDismiss = { showCheckSourceSheet = false }
+        )
+
+        DirectLinkUploadBottomSheet(
+            show = showDirectLinkUploadSheet,
+            viewModel = viewModel,
+            onDismiss = { showDirectLinkUploadSheet = false }
+        )
+
+        AppAlertDialog(
+            show = showVbookUnlockCodeDialog,
+            onDismissRequest = { showVbookUnlockCodeDialog = false },
+            title = stringResource(R.string.vbook_ebook_unlock_code),
+            content = {
+                AppTextField(
+                    value = vbookUnlockCode,
+                    onValueChange = { vbookUnlockCode = it },
+                    label = stringResource(R.string.vbook_ebook_unlock_code),
+                    backgroundColor = LegadoTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmText = stringResource(R.string.ok),
+            onConfirm = {
+                val normalized = vbookUnlockCode.trim()
+                AppConfig.vbookEbookUnlockCode = normalized.takeIf(String::isNotEmpty)
+                vbookUnlockCode = normalized
+                showVbookUnlockCodeDialog = false
+            },
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { showVbookUnlockCodeDialog = false }
+        )
+
+        AppAlertDialog(
+            show = showClearWebViewDialog,
+            onDismissRequest = { showClearWebViewDialog = false },
+            title = stringResource(R.string.clear_webview_data),
+            text = stringResource(R.string.sure_del),
+            onConfirm = {
+                viewModel.clearWebViewData()
+                showClearWebViewDialog = false
+            },
+            onDismiss = { showClearWebViewDialog = false }
+        )
+
+        AppAlertDialog(
+            show = showPasswordDialog,
+            onDismissRequest = { showPasswordDialog = false },
+            title = stringResource(R.string.set_local_password),
+            content = {
+                AppTextField(
+                    value = tempPassword,
+                    onValueChange = { tempPassword = it },
+                    label = stringResource(R.string.password),
+                    backgroundColor = LegadoTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmText = stringResource(R.string.ok),
+            onConfirm = {
+                viewModel.setLocalPassword(tempPassword)
+                showPasswordDialog = false
+            },
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { showPasswordDialog = false }
+        )
+    }
+
+}

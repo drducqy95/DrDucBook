@@ -1,0 +1,4 @@
+{
+  "metadata": {"name":"Translator Fixture","author":"DrDucBook","version":1,"source":"https://translator.example.test","description":"Synthetic translator plugin","type":"translator"},
+  "script": {"translate":"translate.js"}
+}

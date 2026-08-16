@@ -1,0 +1,317 @@
+﻿{
+    "schemaVersion":  1,
+    "generatedAt":  "2026-08-02T04:15:18.4653770Z",
+    "projectRoot":  "D:\\Downloads\\Archives\\legado-with-MD3-main\\legado-with-MD3-main",
+    "version":  {
+                    "file":  "app\\version.properties",
+                    "properties":  {
+                                       "VERSION_MAJOR":  "3",
+                                       "VERSION_MINOR":  "26",
+                                       "VERSION_PATCH":  "13",
+                                       "VERSION_SUFFIX":  "0"
+                                   },
+                    "projectVersionName":  "3.26.13"
+                },
+    "buildGradle":  {
+                        "file":  "app\\build.gradle.kts",
+                        "applicationId":  "com.drducbook.app",
+                        "defaultVersionCode":  32640,
+                        "versionNameExpression":  "\"$versionMajor.$versionMinor.$versionPatch\"",
+                        "releaseMinifyEnabled":  true,
+                        "releaseShrinkResources":  true,
+                        "noR8BuildType":  true,
+                        "debugApplicationIdSuffix":  true,
+                        "abiSplits":  true,
+                        "universalApk":  true
+                    },
+    "apkSummary":  {
+                       "total":  12,
+                       "debug":  4,
+                       "release":  4,
+                       "noR8":  4,
+                       "validDebug":  4,
+                       "validRelease":  4,
+                       "validNoR8":  4,
+                       "invalidRelease":  0,
+                       "invalidNoR8":  0,
+                       "unsignedRelease":  4
+                   },
+    "apkArtifacts":  [
+                         {
+                             "name":  "app-app-arm64-v8a-release-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\release\\app-app-arm64-v8a-release-unsigned.apk",
+                             "variant":  "release",
+                             "sizeBytes":  127288577,
+                             "lastWriteUtc":  "2026-08-02T03:08:57.0917494Z",
+                             "sha256":  "ab79edf860bd507c001162a9a4401b0e73a1b9755a374c61aa8418596cfcc7be",
+                             "zipOk":  true,
+                             "zipEntries":  1876,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-x86_64-noR8-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\noR8\\app-app-x86_64-noR8-unsigned.apk",
+                             "variant":  "noR8",
+                             "sizeBytes":  180923127,
+                             "lastWriteUtc":  "2026-08-01T10:38:27.9831901Z",
+                             "sha256":  "efa1bf08611628a692928c66ab716a739294fb79a3277f9cbde6514abdcfc38c",
+                             "zipOk":  true,
+                             "zipEntries":  2488,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-universal-noR8-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\noR8\\app-app-universal-noR8-unsigned.apk",
+                             "variant":  "noR8",
+                             "sizeBytes":  273871660,
+                             "lastWriteUtc":  "2026-08-01T10:38:23.8935961Z",
+                             "sha256":  "fd481f1cd1b32cdf7c6b659d35b50c842c932adc8c9704cabab94aa9a190924b",
+                             "zipOk":  true,
+                             "zipEntries":  2513,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-x86_64-release-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\release\\app-app-x86_64-release-unsigned.apk",
+                             "variant":  "release",
+                             "sizeBytes":  149434949,
+                             "lastWriteUtc":  "2026-08-02T03:08:55.5958946Z",
+                             "sha256":  "2518dfa71225886bf8f6d635b7043c0830f90df2c6fdef98ff8644d1573f36b4",
+                             "zipOk":  true,
+                             "zipEntries":  1883,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-universal-release-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\release\\app-app-universal-release-unsigned.apk",
+                             "variant":  "release",
+                             "sizeBytes":  242383482,
+                             "lastWriteUtc":  "2026-08-02T03:08:53.0930489Z",
+                             "sha256":  "734fa131f8d5ed5e9b0d0a054a4d0c880433ec168ead3ebb36b1caa6333f7a50",
+                             "zipOk":  true,
+                             "zipEntries":  1908,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-armeabi-v7a-release-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\release\\app-app-armeabi-v7a-release-unsigned.apk",
+                             "variant":  "release",
+                             "sizeBytes":  88620390,
+                             "lastWriteUtc":  "2026-08-02T03:08:54.3086415Z",
+                             "sha256":  "2d59bf64de99bd67fb713392d4abd018bdee1452cd6342b0f74a33a52126b9d7",
+                             "zipOk":  true,
+                             "zipEntries":  1863,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-universal-debug.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\debug\\app-app-universal-debug.apk",
+                             "variant":  "debug",
+                             "sizeBytes":  340756224,
+                             "lastWriteUtc":  "2026-08-02T04:11:16.4132190Z",
+                             "sha256":  "6f6fc9cf11b87fc698391dd00fa4b73303bfd7aabf5474cf721afce204b65643",
+                             "zipOk":  true,
+                             "zipEntries":  2542,
+                             "zipError":  null,
+                             "unsigned":  false
+                         },
+                         {
+                             "name":  "app-app-armeabi-v7a-debug.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\debug\\app-app-armeabi-v7a-debug.apk",
+                             "variant":  "debug",
+                             "sizeBytes":  186993132,
+                             "lastWriteUtc":  "2026-08-02T04:11:16.9580863Z",
+                             "sha256":  "b7887c94494022262a42a0764afe05f677e3dabfa32280abdfda3343d4414493",
+                             "zipOk":  true,
+                             "zipEntries":  2497,
+                             "zipError":  null,
+                             "unsigned":  false
+                         },
+                         {
+                             "name":  "app-app-arm64-v8a-debug.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\debug\\app-app-arm64-v8a-debug.apk",
+                             "variant":  "debug",
+                             "sizeBytes":  225661319,
+                             "lastWriteUtc":  "2026-08-02T04:11:18.2236060Z",
+                             "sha256":  "d492218dfe24673552891f3481360d79b820e5b67a91a688f994ddcfaf7911eb",
+                             "zipOk":  true,
+                             "zipEntries":  2510,
+                             "zipError":  null,
+                             "unsigned":  false
+                         },
+                         {
+                             "name":  "app-app-armeabi-v7a-noR8-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\noR8\\app-app-armeabi-v7a-noR8-unsigned.apk",
+                             "variant":  "noR8",
+                             "sizeBytes":  120108568,
+                             "lastWriteUtc":  "2026-08-01T10:38:25.9616129Z",
+                             "sha256":  "51d54a4e7e8c9513d7e44621cbc41d686b8ba1d35d74c7a9307a3297180ac439",
+                             "zipOk":  true,
+                             "zipEntries":  2468,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-arm64-v8a-noR8-unsigned.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\noR8\\app-app-arm64-v8a-noR8-unsigned.apk",
+                             "variant":  "noR8",
+                             "sizeBytes":  158776755,
+                             "lastWriteUtc":  "2026-08-01T10:38:29.8996402Z",
+                             "sha256":  "a3f3a25ec8385c7f7b00d117e228939cb818ac8fc876fcdd8645113ea831084d",
+                             "zipOk":  true,
+                             "zipEntries":  2481,
+                             "zipError":  null,
+                             "unsigned":  true
+                         },
+                         {
+                             "name":  "app-app-x86_64-debug.apk",
+                             "relativePath":  "app\\build\\outputs\\apk\\app\\debug\\app-app-x86_64-debug.apk",
+                             "variant":  "debug",
+                             "sizeBytes":  247807691,
+                             "lastWriteUtc":  "2026-08-02T04:11:17.6203292Z",
+                             "sha256":  "7be9a60da06a33e26c2f9ab73abb1ffc4a6b871215b546f301dabad6f0cd95d1",
+                             "zipOk":  true,
+                             "zipEntries":  2517,
+                             "zipError":  null,
+                             "unsigned":  false
+                         }
+                     ],
+    "hfManifest":  {
+                       "exists":  true,
+                       "file":  "supabase\\artifacts\\hf-artifacts-manifest.json",
+                       "schemaVersion":  1,
+                       "manifestVersion":  "2026.07.31-p10t01",
+                       "repository":  "Drduc/Legadofork",
+                       "revision":  "main",
+                       "generatedAt":  "2026-08-01T23:05:15Z",
+                       "artifactCount":  35,
+                       "deliveryClassCounts":  {
+                                                   "hf_proxy":  35
+                                               },
+                       "inventoryStateCounts":  {
+                                                    "local_verified":  31,
+                                                    "local_verified_license_pending":  4
+                                                },
+                       "licenseCounts":  {
+                                             "upstream-license-required":  3,
+                                             "CC-BY-4.0":  1,
+                                             "Mixed: CC0-1.0, CC-BY-SA-4.0, Apache-2.0, Unicode-3.0":  1,
+                                             "Apache-2.0":  25,
+                                             "license-review-required":  4,
+                                             "CC-BY-NC-4.0":  1
+                                         }
+                   },
+    "staticControls":  {
+                           "featureFlags":  {
+                                                "file":  "app\\src\\main\\java\\io\\legado\\app\\constant\\FeatureFlags.kt",
+                                                "requiredFlags":  [
+                                                                      "aiRouterV2",
+                                                                      "agentMutation",
+                                                                      "agentSkill",
+                                                                      "agentPlugin",
+                                                                      "chatBubble",
+                                                                      "mangaTranslation",
+                                                                      "browserPageTranslation",
+                                                                      "sourceDailyHealth",
+                                                                      "mediaDownload",
+                                                                      "ebookFixedLayout"
+                                                                  ],
+                                                "presentFlags":  {
+                                                                     "aiRouterV2":  {
+                                                                                        "present":  true,
+                                                                                        "default":  "true"
+                                                                                    },
+                                                                     "agentMutation":  {
+                                                                                           "present":  true,
+                                                                                           "default":  "true"
+                                                                                       },
+                                                                     "agentSkill":  {
+                                                                                        "present":  true,
+                                                                                        "default":  "true"
+                                                                                    },
+                                                                     "agentPlugin":  {
+                                                                                         "present":  true,
+                                                                                         "default":  "true"
+                                                                                     },
+                                                                     "chatBubble":  {
+                                                                                        "present":  true,
+                                                                                        "default":  "true"
+                                                                                    },
+                                                                     "mangaTranslation":  {
+                                                                                              "present":  true,
+                                                                                              "default":  "false"
+                                                                                          },
+                                                                     "browserPageTranslation":  {
+                                                                                                    "present":  true,
+                                                                                                    "default":  "true"
+                                                                                                },
+                                                                     "sourceDailyHealth":  {
+                                                                                               "present":  true,
+                                                                                               "default":  "true"
+                                                                                           },
+                                                                     "mediaDownload":  {
+                                                                                           "present":  true,
+                                                                                           "default":  "true"
+                                                                                       },
+                                                                     "ebookFixedLayout":  {
+                                                                                              "present":  true,
+                                                                                              "default":  "true"
+                                                                                          }
+                                                                 },
+                                                "allPresent":  true
+                                            },
+                           "webServicePolicy":  {
+                                                    "modelFile":  "app\\src\\main\\java\\io\\legado\\app\\domain\\webservice\\WebServiceModels.kt",
+                                                    "serverFile":  "app\\src\\main\\java\\io\\legado\\app\\web\\KtorServer.kt",
+                                                    "webUiFile":  "modules\\web\\src\\views\\WebServiceSettings.vue",
+                                                    "exportDefaultOff":  true,
+                                                    "autoTranslationDefaultOff":  true,
+                                                    "backgroundEditable":  true,
+                                                    "exportGateInServer":  true,
+                                                    "autoTranslationGateInServer":  true
+                                                },
+                           "supabaseHfDelivery":  {
+                                                      "ticketFunctionFile":  "supabase\\functions\\asset-ticket\\index.ts",
+                                                      "downloadFunctionFile":  "supabase\\functions\\asset-download\\index.ts",
+                                                      "assetCatalogFile":  "app\\src\\main\\java\\io\\legado\\app\\domain\\model\\ExternalAssetCatalog.kt",
+                                                      "assetResolverFile":  "app\\src\\main\\java\\io\\legado\\app\\domain\\model\\AssetDeliveryModels.kt",
+                                                      "ticketFunctionExists":  true,
+                                                      "downloadFunctionExists":  true,
+                                                      "hfReadTokenOnlyInDownloadFunction":  true,
+                                                      "authenticatedTicketIssuer":  true,
+                                                      "ticketConsumer":  true,
+                                                      "rangeSupport":  true,
+                                                      "licensePendingTicketBlocked":  true,
+                                                      "publicPiperCatalogFiltered":  true
+                                                  }
+                       },
+    "blockers":  [
+                     {
+                         "code":  "release_apk_unsigned",
+                         "severity":  "blocker",
+                         "detail":  "Release APK files are unsigned; configure release signing before production rollout."
+                     },
+                     {
+                         "code":  "domain_privacy_release_metadata_pending",
+                         "severity":  "blocker",
+                         "detail":  "P11.T05 is still IN_PROGRESS; HTTPS domain, assetlinks, privacy/support URLs, and store metadata are not fully verified."
+                     },
+                     {
+                         "code":  "cloud_runtime_gates_pending",
+                         "severity":  "blocker",
+                         "detail":  "One or more Supabase/Auth/Drive/cloud runtime gates in P10 are still IN_PROGRESS."
+                     },
+                     {
+                         "code":  "phase11_predecessor_pending",
+                         "severity":  "blocker",
+                         "detail":  "P11.T01-P11.T05 are required predecessors and at least one is still IN_PROGRESS."
+                     }
+                 ],
+    "rehearsalDecision":  "blocked_for_production_rollout"
+}

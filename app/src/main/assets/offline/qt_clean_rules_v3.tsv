@@ -1,0 +1,49 @@
+# Clean-room structural rules for three known dictionary slots.
+# action_type	priority	source_pattern	target_template	rule_type
+QT_TEMPLATE	130	{0}把{1}交给{2}	{0} giao {1} cho {2}	transfer_three_slots
+QT_TEMPLATE	130	{0}把{1}送给{2}	{0} tặng {1} cho {2}	transfer_three_slots
+QT_TEMPLATE	130	{0}把{1}还给{2}	{0} trả {1} lại cho {2}	transfer_three_slots
+QT_TEMPLATE	130	{0}将{1}交给{2}	{0} giao {1} cho {2}	transfer_three_slots
+QT_TEMPLATE	128	{0}从{1}手中夺走{2}	{0} đoạt {2} khỏi tay {1}	transfer_three_slots
+QT_TEMPLATE	128	{0}从{1}手中接过{2}	{0} nhận {2} từ tay {1}	transfer_three_slots
+QT_TEMPLATE	128	{0}从{1}那里拿到{2}	{0} lấy được {2} từ {1}	transfer_three_slots
+QT_TEMPLATE	126	{0}告诉{1}关于{2}	{0} nói với {1} về {2}	speech_three_slots
+QT_TEMPLATE	126	{0}向{1}解释{2}	{0} giải thích {2} cho {1}	speech_three_slots
+QT_TEMPLATE	126	{0}提醒{1}注意{2}	{0} nhắc {1} chú ý {2}	speech_three_slots
+QT_TEMPLATE	126	{0}命令{1}保护{2}	{0} ra lệnh cho {1} bảo vệ {2}	speech_three_slots
+QT_TEMPLATE	126	{0}请求{1}帮助{2}	{0} đề nghị {1} giúp {2}	speech_three_slots
+QT_TEMPLATE	124	{0}带着{1}前往{2}	{0} mang theo {1} đi đến {2}	motion_three_slots
+QT_TEMPLATE	124	{0}陪着{1}来到{2}	{0} cùng {1} đến {2}	motion_three_slots
+QT_TEMPLATE	124	{0}跟随{1}进入{2}	{0} đi theo {1} vào {2}	motion_three_slots
+QT_TEMPLATE	124	{0}护送{1}返回{2}	{0} hộ tống {1} trở về {2}	motion_three_slots
+QT_TEMPLATE	124	{0}追着{1}来到{2}	{0} đuổi theo {1} đến {2}	motion_three_slots
+QT_TEMPLATE	122	{0}和{1}一起攻击{2}	{0} cùng {1} tấn công {2}	combat_three_slots
+QT_TEMPLATE	122	{0}与{1}联手对付{2}	{0} liên thủ với {1} đối phó {2}	combat_three_slots
+QT_TEMPLATE	122	{0}帮助{1}击败{2}	{0} giúp {1} đánh bại {2}	combat_three_slots
+QT_TEMPLATE	122	{0}保护{1}免受{2}攻击	{0} bảo vệ {1} khỏi đòn tấn công của {2}	combat_three_slots
+QT_TEMPLATE	122	{0}为了{1}背叛{2}	{0} phản bội {2} vì {1}	relation_three_slots
+QT_TEMPLATE	120	{0}把{1}藏在{2}	{0} giấu {1} trong {2}	location_three_slots
+QT_TEMPLATE	120	{0}在{1}找到{2}	{0} tìm thấy {2} tại {1}	location_three_slots
+QT_TEMPLATE	120	{0}将{1}留在{2}	{0} để {1} lại tại {2}	location_three_slots
+QT_TEMPLATE	120	{0}从{1}带走{2}	{0} đưa {2} rời khỏi {1}	location_three_slots
+QT_TEMPLATE	118	{0}用{1}打开{2}	{0} dùng {1} mở {2}	instrument_three_slots
+QT_TEMPLATE	118	{0}用{1}攻击{2}	{0} dùng {1} tấn công {2}	instrument_three_slots
+QT_TEMPLATE	118	{0}借助{1}找到{2}	{0} nhờ {1} tìm thấy {2}	instrument_three_slots
+QT_TEMPLATE	118	{0}通过{1}联系{2}	{0} liên lạc với {2} thông qua {1}	instrument_three_slots
+QT_TEMPLATE	116	{0}认为{1}不如{2}	{0} cho rằng {1} không bằng {2}	comparison_three_slots
+QT_TEMPLATE	116	{0}发现{1}比{2}更强	{0} phát hiện {1} mạnh hơn {2}	comparison_three_slots
+QT_TEMPLATE	116	{0}选择{1}而不是{2}	{0} chọn {1} thay vì {2}	choice_three_slots
+QT_TEMPLATE	116	{0}把{1}误认为{2}	{0} nhầm {1} là {2}	identity_three_slots
+QT_TEMPLATE	114	当{0}在{1}遇见{2}时	khi {0} gặp {2} tại {1}	time_three_slots
+QT_TEMPLATE	114	在{0}离开{1}前往{2}之后	sau khi {0} rời {1} đến {2}	time_three_slots
+QT_TEMPLATE	114	如果{0}帮助{1}对付{2}	nếu {0} giúp {1} đối phó {2}	condition_three_slots
+QT_TEMPLATE	114	因为{0}把{1}交给{2}	vì {0} giao {1} cho {2}	cause_three_slots
+QT_TEMPLATE	112	{0}是{1}的{2}	{0} là {2} của {1}	identity_three_slots
+QT_TEMPLATE	112	{0}成为{1}的{2}	{0} trở thành {2} của {1}	identity_three_slots
+REPLACE	-120	。	.	punctuation
+REPLACE	-120	，	,	punctuation
+REPLACE	-120	、	,	punctuation
+REPLACE	-120	：	:	punctuation
+REPLACE	-120	；	;	punctuation
+REPLACE	-120	！	!	punctuation
+REPLACE	-120	？	?	punctuation

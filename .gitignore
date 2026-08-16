@@ -1,0 +1,67 @@
+# IDE / Editor
+*.iml
+.idea/
+/.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Gradle & Android Build
+.gradle/
+**/.gradle/
+local.properties
+/build
+build/
+**/build/
+/captures
+.externalNativeBuild
+.cxx/
+**/.cxx/
+/release
+release/
+/tmp
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Java dumps & logs
+*.hprof
+*.log
+hs_err_pid*.log
+replay_pid*.log
+
+# Kotlin & Node
+.kotlin/
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+/package-lock.json
+
+# Supabase CLI temp
+supabase/.temp/
+
+# Agent & Scratch
+/.codex/skills
+/.codex-tmp/
+/.codex-build/
+/.kiro/
+/artifacts/
+/device-cache-check/
+/*.png
+/.codex-nox-window.xml
+
+# App specific & Secrets
+/app/app
+/app/google
+/app/gradle.properties
+/app/src/main/cpp/local-ai/third_party/llama.cpp/
+*.gguf
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+.secrets/
+**/service-account*.json
+**/*serviceAccountKey*.json

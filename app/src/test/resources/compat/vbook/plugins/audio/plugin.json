@@ -1,0 +1,4 @@
+{
+  "metadata": {"name":"Audio Fixture","author":"DrDucBook","version":1,"source":"https://audio.example.test","description":"Synthetic audiobook plugin","type":"audiobook"},
+  "script": {"track":"track.js"}
+}

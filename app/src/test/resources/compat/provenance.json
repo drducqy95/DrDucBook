@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-29T00:00:00Z",
+  "fixtures": [
+    {"id":"legado-book-source","path":"legado/book-source.json","origin":"synthetic","license":"CC0-1.0","sha256":"d6075d6d490e07df6cc3b1ca232fcb0b395f9a25202c6a1b293777140d024e68"},
+    {"id":"legado-rss-source","path":"legado/rss-source.json","origin":"synthetic","license":"CC0-1.0","sha256":"edcfc931351c825b43e25f8efe6e7b7cb2b93bb16c22aa8538784bb4fe57b786"},
+    {"id":"legado-http-tts","path":"legado/http-tts.json","origin":"synthetic","license":"CC0-1.0","sha256":"804de02b7afde110e481ede3bb2fe862d14cd3a91599f6eaca604068341ee524"},
+    {"id":"vbook-registry","path":"vbook/registry.json","origin":"synthetic","license":"CC0-1.0","sha256":"635cef0a1e2c70e903633bf4d960fbefcae203e2582994f192e616bfeadd7f05"},
+    {"id":"vbook-text-manifest","path":"vbook/plugins/text/plugin.json","origin":"synthetic","license":"CC0-1.0","sha256":"3d575b574b352e50d849b717a358572018497b70f7eb8575ece507f885e2acf1"},
+    {"id":"vbook-text-script","path":"vbook/plugins/text/src/chap.js","origin":"synthetic","license":"CC0-1.0","sha256":"4c4ed00a4c62c4044441273d42c91a3d7bcdeddfa593b2b5a063a3c277650566"},
+    {"id":"vbook-comic-manifest","path":"vbook/plugins/comic/plugin.json","origin":"synthetic","license":"CC0-1.0","sha256":"884a755ba94a081e3bfdf7ac652872fececb8eb6044d48bee0f69e41b8b2184c"},
+    {"id":"vbook-comic-script","path":"vbook/plugins/comic/src/chap.js","origin":"synthetic","license":"CC0-1.0","sha256":"eb21d5fdf4e8bf0b17f7a670acbf8de0ffba34dd3eabd28a00b4933ad572ee4f"},
+    {"id":"vbook-audio-manifest","path":"vbook/plugins/audio/plugin.json","origin":"synthetic","license":"CC0-1.0","sha256":"7728cfdc52040d46add1d9ceeb9092231fd2c0fea7573572531b66e23c4d412f"},
+    {"id":"vbook-audio-script","path":"vbook/plugins/audio/src/track.js","origin":"synthetic","license":"CC0-1.0","sha256":"8c214090bceae5c557482cdb1848fa850ef62bac93d2131f2b42d5bee16c369f"},
+    {"id":"vbook-video-manifest","path":"vbook/plugins/video/plugin.json","origin":"synthetic","license":"CC0-1.0","sha256":"87a41753d781108c2cd84e810105e019b5e613f89ac081817497dc20a87965c1"},
+    {"id":"vbook-video-search-script","path":"vbook/plugins/video/src/search.js","origin":"synthetic","license":"CC0-1.0","sha256":"204173e8be47ba6b0d957770eb079763d61bab8b8dee1569ecae8f03dd512a46"},
+    {"id":"vbook-video-script","path":"vbook/plugins/video/src/track.js","origin":"synthetic","license":"CC0-1.0","sha256":"c3b621e3d1f4566e7755f219c44302b88044054547bd52c217f16b7ce1fba9e7"},
+    {"id":"vbook-tts-manifest","path":"vbook/plugins/tts/plugin.json","origin":"synthetic","license":"CC0-1.0","sha256":"08b4c4cea5f77b3b4075df0182433d3f3c285ab783df4d1685136469602928ce"},
+    {"id":"vbook-tts-voice-script","path":"vbook/plugins/tts/src/voice.js","origin":"synthetic","license":"CC0-1.0","sha256":"eab2c64769bbf3cefa57948427fc963a03506a1c96a59e1034c794e0eba6478b"},
+    {"id":"vbook-tts-script","path":"vbook/plugins/tts/src/tts.js","origin":"synthetic","license":"CC0-1.0","sha256":"98d2772863c78ae33f18b7dae0522fcad84bd8a1ae6f37f5729b576bca193913"},
+    {"id":"vbook-translator-manifest","path":"vbook/plugins/translator/plugin.json","origin":"synthetic","license":"CC0-1.0","sha256":"9c2211859f47cb68871073dc61024a54e206c64d4c138b1f5c5464e75a9a6540"},
+    {"id":"vbook-translator-script","path":"vbook/plugins/translator/src/translate.js","origin":"synthetic","license":"CC0-1.0","sha256":"622a471a34ddfd0f2d33a292a346b65c3078ed1e2327b7fb04a1c0ed99909337"},
+    {"id":"reader-provider-contract","path":"contracts/reader-provider.json","origin":"synthetic","license":"CC0-1.0","sha256":"99a3566fd2614bf8357b7aeace99c70ee32850baa436a7bf07dbc80f173d8d30"},
+    {"id":"web-service-contract","path":"contracts/web-service.json","origin":"synthetic","license":"CC0-1.0","sha256":"84323b7b826684de6e9cdb09548152a36d3ea7e078f3da8413ee21e50664cd1f"},
+    {"id":"deep-link-contract","path":"contracts/deep-links.json","origin":"synthetic","license":"CC0-1.0","sha256":"3cb67749fa52cb2efd6b78fe8a7ba121fe61861848452f20fe17c4d1121ece6f"}
+  ]
+}

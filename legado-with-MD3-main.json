@@ -1,0 +1,28 @@
+{
+  "project_identity": {
+    "name": "legado-with-MD3-main",
+    "description": "Legado Material 3 fork with AI Router, Agent, translation, VBook, local TTS, media and ebook authoring",
+    "version": "0.1.0",
+    "created_at": "2026-07-19T20:52:14.903994",
+    "root_path": "."
+  },
+  "tech_stack": {
+    "language": "Kotlin",
+    "version": "JVM toolchain 21; CI JDK 17",
+    "dependency": "Gradle version catalog, Koin, OkHttp/Cronet, Media3, ONNX Runtime, ML Kit",
+    "framework": "Android Jetpack Compose Material 3 + legacy Views, Navigation 3, WorkManager",
+    "database": "SQLite, Room schema version 105",
+    "orm": "AndroidX Room",
+    "test_runner": "JUnit 4, Robolectric, AndroidJUnit4, Room MigrationTestHelper"
+  },
+  "architecture_rules": {
+    "pattern": "Clean Architecture with MVI/UDF Compose screens",
+    "layers": ["data", "domain", "ui", "help", "service"],
+    "banned_modules": ["new XML/View screens", "plaintext AI credentials"]
+  },
+  "environment_context": {
+    "sandbox_mode": "local",
+    "android_debug_device": "LDPlayer 127.0.0.1:5555",
+    "application_id_debug": "io.legato.kazusa.debug"
+  }
+}

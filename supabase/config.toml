@@ -1,0 +1,7 @@
+project_id = "drducbook-local"
+
+[functions.asset-ticket]
+verify_jwt = true
+
+[functions.asset-download]
+verify_jwt = false

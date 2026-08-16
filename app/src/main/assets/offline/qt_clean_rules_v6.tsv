@@ -1,0 +1,48 @@
+# QT Clean v6 grammar and response-time-safe cleanup rules. License: CC0-1.0
+# actionType<TAB>priority<TAB>sourcePattern<TAB>replacement<TAB>category
+QT_TEMPLATE	850	越来越{0:adj}	ngày càng {0}	degree
+QT_TEMPLATE	848	逐渐{0}	dần {0}	degree
+QT_TEMPLATE	848	渐渐{0}	dần {0}	degree
+QT_TEMPLATE	846	不再{0:verb}	không còn {0}	negation
+QT_TEMPLATE	846	仍然{0:verb|adj}	vẫn {0}	aspect
+QT_TEMPLATE	846	依然{0:verb|adj}	vẫn {0}	aspect
+QT_TEMPLATE	846	依旧{0:verb|adj}	vẫn {0}	aspect
+QT_TEMPLATE	844	刚{0}就{1}	vừa {0} đã {1}	sequence
+QT_TEMPLATE	844	刚刚{0}就{1}	vừa {0} đã {1}	sequence
+QT_TEMPLATE	842	直到{0}才{1}	mãi đến {0} mới {1}	time
+QT_TEMPLATE	842	不仅{0}而且{1}	không chỉ {0} mà còn {1}	addition
+QT_TEMPLATE	840	从{0}到{1}	từ {0} đến {1}	range
+QT_TEMPLATE	838	在{0}下	dưới {0}	position
+QT_TEMPLATE	838	在{0}上	trên {0}	position
+QT_TEMPLATE	838	在{0}旁边	bên cạnh {0}	position
+QT_TEMPLATE	838	在{0}身边	bên cạnh {0}	position
+QT_TEMPLATE	836	{0:verb}出来	{0} ra	directional_complement
+QT_TEMPLATE	836	{0:verb}进去	{0} vào	directional_complement
+QT_TEMPLATE	836	{0:verb}过来	{0} lại	directional_complement
+QT_TEMPLATE	836	{0:verb}过去	{0} qua	directional_complement
+QT_TEMPLATE	834	{0:verb}不开	không thể {0}	result_complement
+QT_TEMPLATE	834	{0:verb}不到	không thể {0} được	result_complement
+QT_TEMPLATE	832	一边{0:verb}一面{1:verb}	vừa {0} vừa {1}	parallel_action
+QT_TEMPLATE	832	一面{0:verb}一面{1:verb}	vừa {0} vừa {1}	parallel_action
+REPLACE	-130	(["”’])(?=[\p{L}\p{N}])	$1 	punctuation_spacing
+REPLACE	-130	(?<=[\p{L}\p{N}])(["“‘])	 $1	punctuation_spacing
+REPLACE	-130	(?<=[:：])(["“‘])	 $1	punctuation_spacing
+REPLACE	-130	\?\s*\?	?	punctuation_duplicate
+REPLACE	-130	!\s*!	!	punctuation_duplicate
+REPLACE	-129	\b1 cái đứa trẻ\b	một đứa trẻ	classifier_cleanup
+REPLACE	-129	\b1 cái người\b	một người	classifier_cleanup
+REPLACE	-129	\b2 con tay\b	hai bàn tay	classifier_cleanup
+REPLACE	-129	\b1 con tay\b	một tay	classifier_cleanup
+REPLACE	-128	\b4 tuần\b	xung quanh	lexical_leak
+REPLACE	-128	\b0 con\b	gật đầu	lexical_leak
+REPLACE	-128	\bđông và tây\b	đồ đạc	definition_leak
+REPLACE	-128	\bduỗi với ra tay\b	đưa tay ra	directional_cleanup
+REPLACE	-128	\bduỗi với là của ra hai bàn tay\b	đưa cả hai tay ra	directional_cleanup
+REPLACE	-128	\bduỗi với là của ra 2 con tay\b	đưa cả hai tay ra	directional_cleanup
+REPLACE	-128	\btrợn mở mắt\b	mở mắt	result_cleanup
+REPLACE	-128	\bgọi không dậy\b	không gọi tỉnh được	result_cleanup
+REPLACE	-128	\btỉnh không tới\b	không tỉnh lại	result_cleanup
+REPLACE	-128	\bthức dậy chạy tới\b	đứng dậy chạy tới	result_cleanup
+REPLACE	-127	\bdần dần của dần dần\b	dần dần	repetition_cleanup
+REPLACE	-127	\bdần dần\s+dần dần\b	dần dần	repetition_cleanup
+REPLACE	-127	\bkhông ngừng\s+không ngừng\b	không ngừng	repetition_cleanup

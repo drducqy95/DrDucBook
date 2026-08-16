@@ -1,0 +1,1214 @@
+package io.legado.app.help.config
+
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.annotation.Keep
+import com.google.gson.JsonParser
+import com.google.gson.annotations.SerializedName
+import com.drducbook.app.R
+import io.legado.app.data.repository.AppearanceAssetPolicy
+import io.legado.app.domain.gateway.AppearanceGateway
+import io.legado.app.domain.model.AppearanceAssetKind
+import io.legado.app.domain.model.AppearanceIconSpec
+import io.legado.app.domain.model.AppearanceProfile
+import io.legado.app.domain.model.AppearanceWallpaperSpec
+import io.legado.app.domain.model.CoverAlbumImageInput
+import io.legado.app.domain.usecase.CoverAlbumUseCase
+import io.legado.app.utils.EncoderUtils
+import io.legado.app.utils.GSON
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.io.OutputStream
+import java.net.URLEncoder
+import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+
+class ThemePackageManager(
+    private val context: Context,
+    private val coverAlbumUseCase: CoverAlbumUseCase,
+    private val appearanceGateway: AppearanceGateway,
+) {
+
+    companion object {
+        const val FILE_EXTENSION = "drductheme"
+        private const val FORMAT_VERSION = ThemePackageSecurityPolicy.CURRENT_VERSION
+        private const val MANIFEST_PATH = "manifest.json"
+        private const val SAVED_THEME_DIR = "saved_themes"
+        private const val MAX_ENTRY_COUNT = ThemePackageSecurityPolicy.MAX_ENTRY_COUNT
+        private const val MAX_ENTRY_BYTES = ThemePackageSecurityPolicy.MAX_ENTRY_BYTES
+        private const val MAX_TOTAL_BYTES = ThemePackageSecurityPolicy.MAX_TOTAL_BYTES
+
+        private const val ASSET_BACKGROUND_LIGHT = "background.light"
+        private const val ASSET_BACKGROUND_DARK = "background.dark"
+        private const val ASSET_NAV_HOME = "navigation.home"
+        private const val ASSET_NAV_BOOKSHELF = "navigation.bookshelf"
+        private const val ASSET_NAV_EXPLORE = "navigation.explore"
+        private const val ASSET_NAV_WORKSPACE = "navigation.workspace"
+        private const val ASSET_NAV_RSS = "navigation.rss"
+        private const val ASSET_NAV_MY = "navigation.my"
+        private const val ASSET_FONT = "font.app"
+    }
+
+    suspend fun exportPackage(
+        uri: Uri,
+        themeName: String? = null,
+        themeData: ThemeExportData? = null,
+        savedTheme: SavedTheme? = null,
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            val savedRoot = savedTheme?.packageRootPath?.let(::File)
+            if (savedRoot?.isDirectory == true && savedTheme.packageManifest != null) {
+                exportSavedThemeFolder(uri, savedRoot)
+                return@runSuspendCatching
+            }
+
+            val rawConfig = themeData ?: ThemeImportExport.exportFromCurrent(
+                includeEmbeddedAssets = false
+            )
+            val checksums = linkedMapOf<String, String>()
+            val mimeTypes = linkedMapOf<String, String>()
+            context.contentResolver.openOutputStream(uri)?.use { output ->
+                ZipOutputStream(BufferedOutputStream(output)).use { zip ->
+                    val assetEntries = exportAssets(zip, rawConfig, checksums, mimeTypes)
+                    val appearance = exportAppearanceAssets(
+                        zip = zip,
+                        profile = appearanceGateway.state.value.activeProfile,
+                        checksums = checksums,
+                        mimeTypes = mimeTypes,
+                    )
+                    val coverData = exportCoverAlbums(
+                        zip = zip,
+                        preferredAlbumId = rawConfig.selectedCoverAlbumId,
+                        checksums = checksums,
+                        mimeTypes = mimeTypes,
+                    )
+                    val manifest = ThemePackageManifest(
+                        formatVersion = FORMAT_VERSION,
+                        name = themeName,
+                        config = rawConfig.toPortableConfig(),
+                        assets = assetEntries,
+                        coverAlbums = coverData.albums,
+                        coverSelection = coverData.selection,
+                        appearanceProfile = appearance.profile,
+                        appearanceAssets = appearance.assets,
+                        checksums = checksums,
+                        mimeTypes = mimeTypes,
+                    )
+                    zip.writeEntry(
+                        MANIFEST_PATH,
+                        GSON.toJson(manifest).byteInputStream(),
+                    )
+                }
+            } ?: error("无法创建主题包")
+        }
+    }
+
+    suspend fun importPackage(uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            val tempRoot = File(context.cacheDir, "theme_import/${UUID.randomUUID()}")
+            val importedAlbumIds = mutableListOf<String>()
+            val copiedAssets = mutableListOf<File>()
+            try {
+                extractPackage(uri, tempRoot)
+                val manifestFile = resolvePackageFile(tempRoot, MANIFEST_PATH)
+                val manifestJson = manifestFile.readText()
+                val manifestRoot = JsonParser.parseString(manifestJson).asJsonObject
+                require(manifestRoot.has("formatVersion") && manifestRoot.has("config")) {
+                    "主题包清单不完整"
+                }
+                val manifest = GSON.fromJson(manifestJson, ThemePackageManifest::class.java)
+                require(manifest.formatVersion in
+                    ThemePackageSecurityPolicy.MIN_SUPPORTED_VERSION..FORMAT_VERSION) {
+                    "不支持的主题包版本: ${manifest.formatVersion}"
+                }
+
+                ThemePackageSecurityPolicy.validateExtracted(tempRoot, manifest)
+                val localAssets = importAssets(
+                    root = tempRoot,
+                    entries = manifest.assets,
+                    copiedFiles = copiedAssets,
+                )
+                val albumIdMap = importCoverAlbums(
+                    root = tempRoot,
+                    albums = manifest.coverAlbums,
+                    importedIds = importedAlbumIds,
+                )
+                val selectedAlbumId = resolveAlbumRef(
+                    manifest.coverSelection.albumRef,
+                    albumIdMap,
+                )
+                ThemeImportExport.applyToThemeConfig(
+                    manifest.config.copy(
+                        bgImageLight = localAssets[ASSET_BACKGROUND_LIGHT],
+                        bgImageDark = localAssets[ASSET_BACKGROUND_DARK],
+                        navIconHome = localAssets[ASSET_NAV_HOME].orEmpty(),
+                        navIconBookshelf = localAssets[ASSET_NAV_BOOKSHELF].orEmpty(),
+                        navIconExplore = localAssets[ASSET_NAV_EXPLORE].orEmpty(),
+                        navIconWorkspace = localAssets[ASSET_NAV_WORKSPACE].orEmpty(),
+                        navIconRss = localAssets[ASSET_NAV_RSS].orEmpty(),
+                        navIconMy = localAssets[ASSET_NAV_MY].orEmpty(),
+                        appFontPath = localAssets[ASSET_FONT],
+                        coverDefaultImage = "",
+                        coverDefaultImageDark = "",
+                        assets = null,
+                    )
+                )
+                importAppearanceProfile(tempRoot, manifest)
+                coverAlbumUseCase.selectAlbum(selectedAlbumId)
+                saveImportedTheme(
+                    name = importedThemeName(uri, manifest.name),
+                    selectedCoverAlbumId = selectedAlbumId,
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                importedAlbumIds.forEach { id ->
+                    runCatching { coverAlbumUseCase.deleteAlbum(id) }
+                }
+                copiedAssets.forEach(File::delete)
+                throw error
+            } finally {
+                tempRoot.deleteRecursively()
+            }
+        }
+    }
+
+    suspend fun inspectPackage(uri: Uri): Result<ThemePackagePreview> =
+        withContext(Dispatchers.IO) {
+            runSuspendCatching {
+                val tempRoot = File(context.cacheDir, "theme_preview/" + UUID.randomUUID())
+                try {
+                    extractPackage(uri, tempRoot)
+                    val manifestFile = resolvePackageFile(tempRoot, MANIFEST_PATH)
+                    val manifestJson = manifestFile.readText()
+                    val manifestRoot = JsonParser.parseString(manifestJson).asJsonObject
+                    require(manifestRoot.has("formatVersion") && manifestRoot.has("config")) {
+                        "Theme package manifest is incomplete"
+                    }
+                    val manifest = GSON.fromJson(
+                        manifestJson,
+                        ThemePackageManifest::class.java,
+                    )
+                    ThemePackageSecurityPolicy.validateVersion(manifest.formatVersion)
+                    ThemePackageSecurityPolicy.validateExtracted(tempRoot, manifest)
+                    ThemePackagePreview(
+                        name = importedThemeName(uri, manifest.name),
+                        formatVersion = manifest.formatVersion,
+                        composeEngine = manifest.appearanceProfile?.engine?.configValue
+                            ?: manifest.config.composeEngine,
+                        themeMode = manifest.appearanceProfile?.themeMode?.configValue
+                            ?: manifest.config.themeMode,
+                        primaryColor = manifest.appearanceProfile?.lightColors?.primary
+                            ?: manifest.config.themeColor
+                            .takeIf { it != 0 }
+                            ?: manifest.config.cPrimary,
+                        assetCount = manifest.assets.size + manifest.appearanceAssets.size,
+                        coverAlbumCount = manifest.coverAlbums.size,
+                    )
+                } finally {
+                    tempRoot.deleteRecursively()
+                }
+            }
+        }
+
+    suspend fun importLegacyJson(uri: Uri): Result<Unit> = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            val json = context.contentResolver.openInputStream(uri)?.use {
+                it.bufferedReader().readText()
+            } ?: error("无法读取旧主题配置")
+            val appliedAssets = ThemeImportExport.importFromJsonWithAssets(json)
+                ?: error("旧主题配置格式无效或字段已被混淆")
+            val name = importedThemeName(uri)
+            val selectedCoverAlbumId = importLegacyCoverAlbums(
+                albumName = name,
+                appliedAssets = appliedAssets,
+            )
+            saveImportedTheme(
+                name = name,
+                selectedCoverAlbumId = selectedCoverAlbumId,
+            )
+        }
+    }
+
+    suspend fun loadSavedThemes(): List<SavedTheme> = withContext(Dispatchers.IO) {
+        savedThemesRoot.mkdirs()
+        savedThemesRoot
+            .listFiles()
+            .orEmpty()
+            .filter(File::isDirectory)
+            .filterNot { it.name.endsWith(".tmp") }
+            .mapNotNull(::readSavedThemeFolder)
+    }
+
+    suspend fun saveTheme(
+        name: String,
+        data: ThemeExportData? = null,
+    ): SavedTheme = withContext(Dispatchers.IO) {
+        val themeData = data ?: ThemeImportExport.exportFromCurrent(includeEmbeddedAssets = false)
+        val selectedCoverAlbumId = themeData.selectedCoverAlbumId
+            ?: coverAlbumUseCase.selection.value.albumId
+        saveThemeFolder(
+            name = name,
+            data = themeData.copy(selectedCoverAlbumId = selectedCoverAlbumId),
+        )
+    }
+
+    suspend fun deleteSavedTheme(theme: SavedTheme): Result<Unit> = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            val folder = theme.packageRootPath
+                ?.let(::File)
+                ?.takeIf(File::exists)
+                ?: savedThemeDir(theme.name).takeIf(File::exists)
+            if (folder != null && !folder.deleteRecursively()) {
+                error("Failed to delete saved theme: ${theme.name}")
+            }
+
+        }
+    }
+
+    suspend fun applySavedTheme(theme: SavedTheme): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runSuspendCatching {
+                val packageRoot = requireNotNull(theme.packageRootPath?.let(::File)) {
+                    "Saved theme folder is missing: ${theme.name}"
+                }
+                val packageManifest = requireNotNull(theme.packageManifest) {
+                    "Saved theme manifest is missing: ${theme.name}"
+                }
+                require(packageRoot.isDirectory) {
+                    "Saved theme folder does not exist: ${theme.name}"
+                }
+                applySavedThemeFolder(theme, packageRoot, packageManifest)
+            }
+        }
+
+    private val savedThemesRoot: File
+        get() = File(context.filesDir, SAVED_THEME_DIR)
+
+    private fun readSavedThemeFolder(root: File): SavedTheme? {
+        return runCatching {
+            val manifestFile = resolvePackageFile(root, MANIFEST_PATH)
+            if (!manifestFile.isFile) return null
+            val manifestJson = manifestFile.readText()
+            val manifest = GSON.fromJson(manifestJson, ThemePackageManifest::class.java)
+            ThemePackageSecurityPolicy.validateVersion(manifest.formatVersion)
+            ThemePackageSecurityPolicy.validateExtracted(root, manifest)
+            val localAssets = resolveSavedAssets(root, manifest.assets)
+            val data = manifest.config.copy(
+                bgImageLight = localAssets[ASSET_BACKGROUND_LIGHT],
+                bgImageDark = localAssets[ASSET_BACKGROUND_DARK],
+                navIconHome = localAssets[ASSET_NAV_HOME].orEmpty(),
+                navIconBookshelf = localAssets[ASSET_NAV_BOOKSHELF].orEmpty(),
+                navIconExplore = localAssets[ASSET_NAV_EXPLORE].orEmpty(),
+                navIconWorkspace = localAssets[ASSET_NAV_WORKSPACE].orEmpty(),
+                navIconRss = localAssets[ASSET_NAV_RSS].orEmpty(),
+                navIconMy = localAssets[ASSET_NAV_MY].orEmpty(),
+                appFontPath = localAssets[ASSET_FONT],
+                assets = null,
+            )
+            SavedTheme(
+                name = manifest.name?.takeIf(String::isNotBlank) ?: root.name,
+                data = data,
+                packageRootPath = root.absolutePath,
+                packageManifest = manifest,
+            )
+        }.getOrNull()
+    }
+
+    private fun saveThemeFolder(
+        name: String,
+        data: ThemeExportData,
+    ): SavedTheme {
+        savedThemesRoot.mkdirs()
+        val targetRoot = savedThemeDir(name)
+        val tempRoot = File(savedThemesRoot, "${targetRoot.name}_${UUID.randomUUID()}.tmp")
+        tempRoot.mkdirs()
+        try {
+            val assetEntries = copyAssetsToFolder(tempRoot, data)
+            val appearance = copyAppearanceAssetsToFolder(
+                root = tempRoot,
+                profile = appearanceGateway.state.value.activeProfile,
+            )
+            val coverData = copyCoverAlbumsToFolder(
+                root = tempRoot,
+                preferredAlbumId = data.selectedCoverAlbumId,
+            )
+            val baseManifest = ThemePackageManifest(
+                formatVersion = FORMAT_VERSION,
+                name = name,
+                config = data.toSavedConfig(),
+                assets = assetEntries,
+                appearanceProfile = appearance.profile,
+                appearanceAssets = appearance.assets,
+                coverAlbums = coverData.albums,
+                coverSelection = coverData.selection,
+            )
+            val metadata = ThemePackageSecurityPolicy.buildMetadata(
+                tempRoot,
+                ThemePackageSecurityPolicy.referencedPaths(baseManifest),
+            )
+            val manifest = baseManifest.copy(
+                checksums = metadata.checksums,
+                mimeTypes = metadata.mimeTypes,
+            )
+            writeSavedManifest(tempRoot, manifest)
+            if (targetRoot.exists() && !targetRoot.deleteRecursively()) {
+                error("Failed to replace saved theme: $name")
+            }
+            if (!tempRoot.renameTo(targetRoot)) {
+                tempRoot.copyRecursively(targetRoot, overwrite = true)
+                tempRoot.deleteRecursively()
+            }
+            File(savedThemesRoot, "$name.json").takeIf(File::exists)?.delete()
+            return readSavedThemeFolder(targetRoot) ?: SavedTheme(name = name, data = data)
+        } catch (error: Exception) {
+            tempRoot.deleteRecursively()
+            throw error
+        }
+    }
+
+    private fun exportSavedThemeFolder(
+        uri: Uri,
+        root: File,
+    ) {
+        context.contentResolver.openOutputStream(uri)?.use { output ->
+            ZipOutputStream(BufferedOutputStream(output)).use { zip ->
+                root.walkTopDown()
+                    .filter(File::isFile)
+                    .forEach { file ->
+                        val entryPath = root.toPath()
+                            .relativize(file.toPath())
+                            .toString()
+                            .replace(File.separatorChar, '/')
+                        file.inputStream().use { input ->
+                            zip.writeEntry(entryPath, input)
+                        }
+                    }
+            }
+        } ?: error("Unable to create theme package")
+    }
+
+    private suspend fun applySavedThemeFolder(
+        theme: SavedTheme,
+        root: File,
+        manifest: ThemePackageManifest,
+    ) {
+        val localAssets = resolveSavedAssets(root, manifest.assets)
+        val savedAlbumId = theme.data.selectedCoverAlbumId
+            ?.takeIf { id -> coverAlbumUseCase.albums.value.any { it.id == id } }
+        val selectedAlbumId = if (savedAlbumId != null) {
+            coverAlbumUseCase.selectAlbum(savedAlbumId)
+            savedAlbumId
+        } else {
+            importSavedCoverAlbum(root, manifest)
+        }
+        ThemeImportExport.applyToThemeConfig(
+            data = manifest.config.copy(
+                bgImageLight = localAssets[ASSET_BACKGROUND_LIGHT],
+                bgImageDark = localAssets[ASSET_BACKGROUND_DARK],
+                navIconHome = localAssets[ASSET_NAV_HOME].orEmpty(),
+                navIconBookshelf = localAssets[ASSET_NAV_BOOKSHELF].orEmpty(),
+                navIconExplore = localAssets[ASSET_NAV_EXPLORE].orEmpty(),
+                navIconWorkspace = localAssets[ASSET_NAV_WORKSPACE].orEmpty(),
+                navIconRss = localAssets[ASSET_NAV_RSS].orEmpty(),
+                navIconMy = localAssets[ASSET_NAV_MY].orEmpty(),
+                appFontPath = localAssets[ASSET_FONT],
+                coverDefaultImage = "",
+                coverDefaultImageDark = "",
+                selectedCoverAlbumId = selectedAlbumId,
+                assets = null,
+            ),
+            applyEmbeddedCoverAssets = false,
+        )
+        importAppearanceProfile(root, manifest)
+        coverAlbumUseCase.selectAlbum(selectedAlbumId)
+        if (selectedAlbumId != manifest.config.selectedCoverAlbumId) {
+            writeSavedManifest(
+                root = root,
+                manifest = manifest.copy(
+                    config = manifest.config.copy(selectedCoverAlbumId = selectedAlbumId),
+                ),
+            )
+        }
+    }
+
+    private suspend fun importSavedCoverAlbum(
+        root: File,
+        manifest: ThemePackageManifest,
+    ): String? {
+        val albumRef = manifest.coverSelection.albumRef ?: return null
+        val importedIds = mutableListOf<String>()
+        return try {
+            val albumIdMap = importCoverAlbums(
+                root = root,
+                albums = manifest.coverAlbums,
+                importedIds = importedIds,
+            )
+            resolveAlbumRef(albumRef, albumIdMap)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            importedIds.forEach { id ->
+                runCatching { coverAlbumUseCase.deleteAlbum(id) }
+            }
+            throw error
+        }
+    }
+
+    private fun copyAssetsToFolder(
+        root: File,
+        config: ThemeExportData,
+    ): Map<String, String> {
+        val result = linkedMapOf<String, String>()
+        assetSources(config).forEach { source ->
+            val path = source.sourcePath?.takeIf(String::isNotBlank)
+                ?.takeUnless { it.startsWith("bundled://") }
+            if (path != null) {
+                val extension = sourceExtension(path, source.key)
+                val entryPath = "${source.entryBase}.$extension"
+                openSource(path).use { input ->
+                    input.copyToPackageFile(root, entryPath)
+                }
+                result[source.key] = entryPath
+            }
+        }
+        copyEmbeddedAssetsToFolder(root, config, result)
+        return result
+    }
+
+    private fun copyEmbeddedAssetsToFolder(
+        root: File,
+        config: ThemeExportData,
+        result: MutableMap<String, String>,
+    ) {
+        val sources = mapOf(
+            "bgImageLight" to AssetSource(ASSET_BACKGROUND_LIGHT, null, "assets/background/light"),
+            "bgImageDark" to AssetSource(ASSET_BACKGROUND_DARK, null, "assets/background/dark"),
+            "navIconHome" to AssetSource(ASSET_NAV_HOME, null, "assets/navigation/home"),
+            "navIconBookshelf" to AssetSource(
+                ASSET_NAV_BOOKSHELF,
+                null,
+                "assets/navigation/bookshelf",
+            ),
+            "navIconExplore" to AssetSource(ASSET_NAV_EXPLORE, null, "assets/navigation/explore"),
+            "navIconWorkspace" to AssetSource(
+                ASSET_NAV_WORKSPACE,
+                null,
+                "assets/navigation/workspace",
+            ),
+            "navIconRss" to AssetSource(ASSET_NAV_RSS, null, "assets/navigation/rss"),
+            "navIconMy" to AssetSource(ASSET_NAV_MY, null, "assets/navigation/my"),
+            "appFontPath" to AssetSource(ASSET_FONT, null, "assets/fonts/app"),
+        )
+        config.assets.orEmpty().forEach { (legacyKey, base64) ->
+            val source = sources[legacyKey] ?: return@forEach
+            if (source.key in result || base64.isBlank()) return@forEach
+            val extension = if (source.key == ASSET_FONT) "ttf" else "img"
+            val entryPath = "${source.entryBase}.$extension"
+            val target = resolvePackageFile(root, entryPath)
+            target.parentFile?.mkdirs()
+            FileOutputStream(target).use { output ->
+                output.write(EncoderUtils.base64DecodeToByteArray(base64))
+            }
+            result[source.key] = entryPath
+        }
+    }
+
+    private fun exportAppearanceAssets(
+        zip: ZipOutputStream,
+        profile: AppearanceProfile,
+        checksums: MutableMap<String, String>,
+        mimeTypes: MutableMap<String, String>,
+    ): ExportedAppearanceData = portableAppearance(profile) { fileName, bytes ->
+        val entryPath = "appearance/assets/$fileName"
+        if (entryPath !in checksums) {
+            zip.writeEntry(entryPath, bytes.inputStream())
+            checksums[entryPath] = ThemePackageSecurityPolicy.sha256(bytes)
+            mimeTypes[entryPath] =
+                ThemePackageSecurityPolicy.detectMimeType(bytes, entryPath)
+        }
+        entryPath
+    }
+
+    private fun copyAppearanceAssetsToFolder(
+        root: File,
+        profile: AppearanceProfile,
+    ): ExportedAppearanceData = portableAppearance(profile) { fileName, bytes ->
+        val entryPath = "appearance/assets/$fileName"
+        val target = resolvePackageFile(root, entryPath)
+        target.parentFile?.mkdirs()
+        if (!target.isFile) target.writeBytes(bytes)
+        entryPath
+    }
+
+    private fun portableAppearance(
+        profile: AppearanceProfile,
+        writeAsset: (fileName: String, bytes: ByteArray) -> String,
+    ): ExportedAppearanceData {
+        val exportedAssets = linkedMapOf<String, String>()
+
+        fun exportAsset(
+            assetId: String,
+            legacyLocation: String?,
+            kind: AppearanceAssetKind,
+        ): String? {
+            val source = appearanceGateway.resolveAsset(assetId, legacyLocation)
+                ?: return null
+            val bytes = openSource(source).use { it.readBytes() }
+            val validated = AppearanceAssetPolicy.validate(
+                bytes = bytes,
+                displayName = source.substringAfterLast('/').substringAfterLast('\\'),
+                mimeType = null,
+                kind = kind,
+            )
+            val portableId = validated.sha256 + "." + validated.extension
+            exportedAssets.getOrPut(portableId) {
+                writeAsset(portableId, validated.bytes)
+            }
+            return portableId
+        }
+
+        fun AppearanceIconSpec.portable(): AppearanceIconSpec {
+            if (bundledIcon != null && assetId.isBlank() && legacyLocation.isNullOrBlank()) {
+                return this
+            }
+            val portableId = exportAsset(assetId, legacyLocation, AppearanceAssetKind.ICON)
+            return copy(assetId = portableId.orEmpty(), legacyLocation = null)
+        }
+
+        fun AppearanceWallpaperSpec.portable(): AppearanceWallpaperSpec {
+            val portableId = exportAsset(assetId, legacyLocation, AppearanceAssetKind.WALLPAPER)
+            return copy(assetId = portableId.orEmpty(), legacyLocation = null)
+        }
+
+        return ExportedAppearanceData(
+            profile = profile.copy(
+                iconSlots = profile.iconSlots.mapValues { (_, spec) -> spec.portable() },
+                lightWallpapers = profile.lightWallpapers.mapValues { (_, spec) ->
+                    spec.portable()
+                },
+                darkWallpapers = profile.darkWallpapers.mapValues { (_, spec) ->
+                    spec.portable()
+                },
+            ),
+            assets = exportedAssets,
+        )
+    }
+
+    private suspend fun importAppearanceProfile(
+        root: File,
+        manifest: ThemePackageManifest,
+    ) {
+        val profile = manifest.appearanceProfile ?: return
+        val assetKinds = buildMap {
+            profile.iconSlots.values.forEach { spec ->
+                if (spec.assetId.isNotBlank()) put(spec.assetId, AppearanceAssetKind.ICON)
+            }
+            (profile.lightWallpapers.values + profile.darkWallpapers.values).forEach { spec ->
+                if (spec.assetId.isNotBlank()) put(spec.assetId, AppearanceAssetKind.WALLPAPER)
+            }
+        }
+        require(assetKinds.keys == manifest.appearanceAssets.keys) {
+            "Appearance profile assets do not match the theme manifest"
+        }
+        val importedIds = assetKinds.mapValues { (assetId, kind) ->
+            val entryPath = manifest.appearanceAssets.getValue(assetId)
+            appearanceGateway.importAssetFile(resolvePackageFile(root, entryPath), kind)
+        }
+        fun AppearanceIconSpec.imported() = copy(
+            assetId = importedIds[assetId] ?: assetId,
+            legacyLocation = null,
+        )
+        fun AppearanceWallpaperSpec.imported() = copy(
+            assetId = importedIds[assetId] ?: assetId,
+            legacyLocation = null,
+        )
+        var importedProfile = profile.copy(
+            iconSlots = profile.iconSlots.mapValues { (_, spec) -> spec.imported() },
+            lightWallpapers = profile.lightWallpapers.mapValues { (_, spec) -> spec.imported() },
+            darkWallpapers = profile.darkWallpapers.mapValues { (_, spec) -> spec.imported() },
+        )
+        val existing = appearanceGateway.state.value.profiles.firstOrNull {
+            it.id == importedProfile.id
+        }
+        if (existing != null) {
+            if (existing.copy(updatedAt = 0L) == importedProfile.copy(updatedAt = 0L)) {
+                appearanceGateway.activate(existing.id)
+                return
+            } else {
+                importedProfile = importedProfile.copy(
+                    id = "custom-" + UUID.randomUUID(),
+                    name = importedProfile.name + " - imported",
+                    builtIn = false,
+                )
+            }
+        }
+        appearanceGateway.saveProfile(importedProfile, activate = true)
+    }
+
+    private fun copyCoverAlbumsToFolder(
+        root: File,
+        preferredAlbumId: String?,
+    ): ExportedCoverData {
+        val albumsById = coverAlbumUseCase.albums.value.associateBy { it.id }
+        val selectedAlbumId = preferredAlbumId
+            ?.takeIf(albumsById::containsKey)
+            ?: coverAlbumUseCase.selection.value.albumId
+        val selectedIds = listOfNotNull(selectedAlbumId)
+        val refById = selectedIds.associateWith { "album_0" }
+        val exportedAlbums = selectedIds.mapNotNull { albumId ->
+            val album = albumsById[albumId] ?: return@mapNotNull null
+            val albumRef = refById.getValue(albumId)
+            fun copyImages(
+                group: String,
+                images: List<io.legado.app.domain.model.CoverAlbumImage>,
+            ) = images.mapIndexed { index, image ->
+                val file = File(image.path)
+                require(file.isFile) { "Cover album image does not exist: ${image.path}" }
+                val extension = file.extension
+                    .lowercase()
+                    .takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
+                    ?: "img"
+                val entryPath = "cover-albums/$albumRef/$group/image_$index.$extension"
+                file.inputStream().use { input ->
+                    input.copyToPackageFile(root, entryPath)
+                }
+                ThemePackageCoverImage(path = entryPath)
+            }
+            ThemePackageCoverAlbum(
+                ref = albumRef,
+                name = album.name,
+                lightImages = copyImages("light", album.lightImages),
+                darkImages = copyImages("dark", album.darkImages),
+            )
+        }
+        return ExportedCoverData(
+            albums = exportedAlbums,
+            selection = ThemePackageCoverSelection(
+                albumRef = selectedAlbumId?.let(refById::get),
+            ),
+        )
+    }
+
+    private fun resolveSavedAssets(
+        root: File,
+        entries: Map<String, String>,
+    ): Map<String, String> {
+        return entries.mapNotNull { (key, entryPath) ->
+            val source = resolvePackageFile(root, entryPath)
+            if (source.isFile) key to source.absolutePath else null
+        }.toMap()
+    }
+
+    private fun savedThemeDir(name: String): File {
+        val encoded = URLEncoder.encode(name, Charsets.UTF_8.name())
+            .ifBlank { "theme" }
+        return File(savedThemesRoot, "theme_$encoded")
+    }
+
+    private fun writeSavedManifest(
+        root: File,
+        manifest: ThemePackageManifest,
+    ) {
+        val manifestFile = resolvePackageFile(root, MANIFEST_PATH)
+        manifestFile.parentFile?.mkdirs()
+        manifestFile.writeText(GSON.toJson(manifest))
+    }
+
+    private fun exportAssets(
+        zip: ZipOutputStream,
+        config: ThemeExportData,
+        checksums: MutableMap<String, String>,
+        mimeTypes: MutableMap<String, String>,
+    ): Map<String, String> {
+        val result = linkedMapOf<String, String>()
+        assetSources(config).forEach { source ->
+            val path = source.sourcePath?.takeIf(String::isNotBlank) ?: return@forEach
+            if (path.startsWith("bundled://")) return@forEach
+            val extension = sourceExtension(path, source.key)
+            val entryPath = "${source.entryBase}.$extension"
+            val bytes = openSource(path).use { input -> input.readBytes() }
+            require(bytes.size.toLong() <= MAX_ENTRY_BYTES) { "Theme asset is too large" }
+            zip.writeEntry(entryPath, bytes.inputStream())
+            checksums[entryPath] = ThemePackageSecurityPolicy.sha256(bytes)
+            mimeTypes[entryPath] = ThemePackageSecurityPolicy.detectMimeType(bytes, entryPath)
+            result[source.key] = entryPath
+        }
+        return result
+    }
+
+    private fun exportCoverAlbums(
+        zip: ZipOutputStream,
+        preferredAlbumId: String?,
+        checksums: MutableMap<String, String>,
+        mimeTypes: MutableMap<String, String>,
+    ): ExportedCoverData {
+        val albumsById = coverAlbumUseCase.albums.value.associateBy { it.id }
+        val selectedAlbumId = preferredAlbumId
+            ?.takeIf(albumsById::containsKey)
+            ?: coverAlbumUseCase.selection.value.albumId
+        val selectedIds = listOfNotNull(selectedAlbumId)
+        val refById = selectedIds.associateWith { "album_0" }
+        val exportedAlbums = selectedIds.mapNotNull { albumId ->
+            val album = albumsById[albumId] ?: return@mapNotNull null
+            val albumRef = refById.getValue(albumId)
+            fun exportImages(
+                group: String,
+                images: List<io.legado.app.domain.model.CoverAlbumImage>,
+            ) = images.mapIndexed { index, image ->
+                val file = File(image.path)
+                require(file.isFile) { "图集图片不存在: ${image.path}" }
+                val extension = file.extension
+                    .lowercase()
+                    .takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
+                    ?: "img"
+                val entryPath = "cover-albums/$albumRef/$group/image_$index.$extension"
+                val bytes = file.readBytes()
+                require(bytes.size.toLong() <= MAX_ENTRY_BYTES) { "Theme image is too large" }
+                zip.writeEntry(entryPath, bytes.inputStream())
+                checksums[entryPath] = ThemePackageSecurityPolicy.sha256(bytes)
+                mimeTypes[entryPath] =
+                    ThemePackageSecurityPolicy.detectMimeType(bytes, entryPath)
+                ThemePackageCoverImage(path = entryPath)
+            }
+            ThemePackageCoverAlbum(
+                ref = albumRef,
+                name = album.name,
+                lightImages = exportImages("light", album.lightImages),
+                darkImages = exportImages("dark", album.darkImages),
+            )
+        }
+        return ExportedCoverData(
+            albums = exportedAlbums,
+            selection = ThemePackageCoverSelection(
+                albumRef = selectedAlbumId?.let(refById::get),
+            ),
+        )
+    }
+
+    private fun importAssets(
+        root: File,
+        entries: Map<String, String>,
+        copiedFiles: MutableList<File>,
+    ): Map<String, String> {
+        return entries.mapNotNull { (key, entryPath) ->
+            val source = resolvePackageFile(root, entryPath)
+            require(source.isFile) { "主题资源不存在: $entryPath" }
+            val extension = source.extension
+                .lowercase()
+                .takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
+                ?: "asset"
+            val targetDir = when (key) {
+                ASSET_BACKGROUND_LIGHT, ASSET_BACKGROUND_DARK -> {
+                    File(context.getExternalFilesDir(null) ?: context.filesDir, "theme_assets")
+                }
+
+                ASSET_NAV_HOME, ASSET_NAV_BOOKSHELF, ASSET_NAV_EXPLORE,
+                ASSET_NAV_WORKSPACE,
+                ASSET_NAV_RSS, ASSET_NAV_MY -> File(context.filesDir, "nav_icons")
+
+                ASSET_FONT -> File(context.filesDir, "fonts")
+                else -> return@mapNotNull null
+            }.apply { mkdirs() }
+            val target = File(
+                targetDir,
+                "theme_${key.substringAfterLast('.')}_${UUID.randomUUID()}.$extension",
+            )
+            source.copyTo(target)
+            copiedFiles += target
+            key to target.absolutePath
+        }.toMap()
+    }
+
+    private suspend fun importCoverAlbums(
+        root: File,
+        albums: List<ThemePackageCoverAlbum>,
+        importedIds: MutableList<String>,
+    ): Map<String, String> {
+        val existingNames = coverAlbumUseCase.albums.value.mapTo(mutableSetOf()) { it.name }
+        val result = mutableMapOf<String, String>()
+        val albumRefs = mutableSetOf<String>()
+        albums.forEach { album ->
+            require(album.ref.isNotBlank()) { "主题包图集标识为空" }
+            require(albumRefs.add(album.ref)) { "主题包图集标识重复: ${album.ref}" }
+        }
+        albums.forEach { album ->
+            fun toInputs(images: List<ThemePackageCoverImage>) = images.map { image ->
+                val source = resolvePackageFile(root, image.path)
+                require(source.isFile) { "图集图片不存在: ${image.path}" }
+                CoverAlbumImageInput(
+                    displayName = source.name,
+                    openStream = source::inputStream,
+                )
+            }
+            val importedName = uniqueImportedAlbumName(album.name, existingNames)
+            val albumId = coverAlbumUseCase.importAlbum(
+                name = importedName,
+                lightImages = toInputs(album.lightImages),
+                darkImages = toInputs(album.darkImages),
+            )
+            importedIds += albumId
+            result[album.ref] = albumId
+            existingNames += importedName
+        }
+        return result
+    }
+
+    private suspend fun importLegacyCoverAlbums(
+        albumName: String,
+        appliedAssets: AppliedThemeAssets,
+    ): String? {
+        val importedIds = mutableListOf<String>()
+        try {
+            val lightFiles = appliedAssets.lightCoverPaths.toExistingFiles()
+            val darkFiles = appliedAssets.darkCoverPaths.toExistingFiles()
+            val albumId = if (lightFiles.isNotEmpty() || darkFiles.isNotEmpty()) {
+                val existingNames = coverAlbumUseCase.albums.value.mapTo(mutableSetOf()) { it.name }
+                val name = uniqueImportedAlbumName(
+                    albumName,
+                    existingNames,
+                )
+                coverAlbumUseCase.importAlbum(
+                    name = name,
+                    lightImages = lightFiles.toInputs(),
+                    darkImages = darkFiles.toInputs(),
+                ).also {
+                    importedIds += it
+                }
+            } else {
+                null
+            }
+            coverAlbumUseCase.selectAlbum(albumId)
+            return albumId
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            importedIds.forEach { id ->
+                runCatching { coverAlbumUseCase.deleteAlbum(id) }
+            }
+            throw error
+        }
+    }
+
+    private suspend fun saveImportedTheme(
+        name: String,
+        selectedCoverAlbumId: String?,
+    ) {
+        saveTheme(
+            name = uniqueSavedThemeName(name),
+            data = ThemeImportExport.exportFromCurrent().copy(
+                selectedCoverAlbumId = selectedCoverAlbumId,
+            ),
+        )
+    }
+
+    private fun uniqueSavedThemeName(name: String): String {
+        if (!savedThemeDir(name).exists()) return name
+        var index = 2
+        while (savedThemeDir("$name $index").exists()) index++
+        return "$name $index"
+    }
+
+    private fun importedThemeName(
+        uri: Uri,
+        packageName: String? = null,
+    ): String {
+        val displayName = context.contentResolver.query(
+            uri,
+            arrayOf(OpenableColumns.DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+        val rawName = packageName
+            ?.takeIf(String::isNotBlank)
+            ?: displayName?.substringBeforeLast('.')
+            ?: uri.lastPathSegment?.substringBeforeLast('.')
+            ?: context.getString(R.string.import_theme)
+        return rawName
+            .replace(Regex("""[\\/:*?"<>|]"""), "_")
+            .trim()
+            .trim('.')
+            .ifBlank { context.getString(R.string.import_theme) }
+    }
+
+    private fun extractPackage(uri: Uri, root: File) {
+        root.mkdirs()
+        var entryCount = 0
+        var totalBytes = 0L
+        val entryNames = mutableSetOf<String>()
+        val input = context.contentResolver.openInputStream(uri)
+            ?: error("无法读取主题包")
+        ZipInputStream(BufferedInputStream(input)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entryCount++
+                require(entryCount <= MAX_ENTRY_COUNT) { "主题包文件数量过多" }
+                require(entryNames.add(entry.name.removeSuffix("/"))) {
+                    "主题包包含重复路径: ${entry.name}"
+                }
+                val target = resolvePackageFile(root, entry.name)
+                if (entry.isDirectory) {
+                    target.mkdirs()
+                } else {
+                    target.parentFile?.mkdirs()
+                    FileOutputStream(target).use { output ->
+                        totalBytes += zip.copyLimitedTo(
+                            output = output,
+                            maxEntryBytes = MAX_ENTRY_BYTES,
+                            currentTotalBytes = totalBytes,
+                        )
+                    }
+                    require(totalBytes <= MAX_TOTAL_BYTES) { "主题包解压后体积过大" }
+                }
+                zip.closeEntry()
+            }
+        }
+        require(entryCount > 0) { "主题包为空" }
+    }
+
+    private fun resolvePackageFile(root: File, relativePath: String): File {
+        val normalizedPath = relativePath.removeSuffix("/")
+        require(normalizedPath.isNotBlank()) { "主题包包含空路径" }
+        require(!normalizedPath.startsWith("/") && '\\' !in normalizedPath) {
+            "主题包路径无效: $relativePath"
+        }
+        require(normalizedPath.split('/').none { it.isBlank() || it == "." || it == ".." }) {
+            "主题包路径无效: $relativePath"
+        }
+        val canonicalRoot = root.canonicalFile
+        val target = File(canonicalRoot, normalizedPath).canonicalFile
+        require(target.path.startsWith(canonicalRoot.path + File.separator)) {
+            "主题包路径越界: $relativePath"
+        }
+        return target
+    }
+
+    private fun resolveAlbumRef(
+        albumRef: String?,
+        albumIdMap: Map<String, String>,
+    ): String? {
+        if (albumRef == null) return null
+        return requireNotNull(albumIdMap[albumRef]) {
+            "主题包引用了不存在的图集: $albumRef"
+        }
+    }
+
+    private fun uniqueImportedAlbumName(
+        originalName: String,
+        existingNames: Set<String>,
+    ): String {
+        val original = originalName.ifBlank { context.getString(R.string.cover_albums) }
+        if (original !in existingNames) return original
+        val baseName = context.getString(
+            R.string.cover_album_imported_name,
+            original,
+        )
+        if (baseName !in existingNames) return baseName
+        var index = 2
+        while ("$baseName $index" in existingNames) index++
+        return "$baseName $index"
+    }
+
+    private fun ThemeExportData.toPortableConfig() = copy(
+        bgImageLight = null,
+        bgImageDark = null,
+        navIconHome = "",
+        navIconBookshelf = "",
+        navIconExplore = "",
+        navIconWorkspace = "",
+        navIconRss = "",
+        navIconMy = "",
+        appFontPath = null,
+        coverDefaultImage = "",
+        coverDefaultImageDark = "",
+        selectedCoverAlbumId = null,
+        assets = null,
+    )
+
+    private fun ThemeExportData.toSavedConfig() = toPortableConfig().copy(
+        selectedCoverAlbumId = selectedCoverAlbumId,
+    )
+
+    private fun assetSources(config: ThemeExportData) = listOf(
+        AssetSource(ASSET_BACKGROUND_LIGHT, config.bgImageLight, "assets/background/light"),
+        AssetSource(ASSET_BACKGROUND_DARK, config.bgImageDark, "assets/background/dark"),
+        AssetSource(ASSET_NAV_HOME, config.navIconHome, "assets/navigation/home"),
+        AssetSource(
+            ASSET_NAV_BOOKSHELF,
+            config.navIconBookshelf,
+            "assets/navigation/bookshelf",
+        ),
+        AssetSource(ASSET_NAV_EXPLORE, config.navIconExplore, "assets/navigation/explore"),
+        AssetSource(
+            ASSET_NAV_WORKSPACE,
+            config.navIconWorkspace,
+            "assets/navigation/workspace",
+        ),
+        AssetSource(ASSET_NAV_RSS, config.navIconRss, "assets/navigation/rss"),
+        AssetSource(ASSET_NAV_MY, config.navIconMy, "assets/navigation/my"),
+        AssetSource(ASSET_FONT, config.appFontPath, "assets/fonts/app"),
+    )
+
+    private fun openSource(path: String): InputStream {
+        return if (path.startsWith("content://")) {
+            context.contentResolver.openInputStream(Uri.parse(path))
+                ?: error("无法读取主题资源")
+        } else {
+            File(path).inputStream()
+        }
+    }
+
+    private fun sourceExtension(path: String, key: String): String {
+        val candidate = Uri.parse(path).lastPathSegment
+            ?.substringAfterLast('.', "")
+            ?.lowercase()
+            ?.takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
+        return candidate ?: if (key == ASSET_FONT) "ttf" else "img"
+    }
+
+    private fun ZipOutputStream.writeEntry(path: String, input: InputStream) {
+        putNextEntry(ZipEntry(path))
+        input.use { it.copyTo(this) }
+        closeEntry()
+    }
+
+    private fun InputStream.copyToPackageFile(root: File, path: String) {
+        val target = resolvePackageFile(root, path)
+        target.parentFile?.mkdirs()
+        FileOutputStream(target).use { output ->
+            use { input -> input.copyTo(output) }
+        }
+    }
+
+    private fun InputStream.copyLimitedTo(
+        output: OutputStream,
+        maxEntryBytes: Long,
+        currentTotalBytes: Long,
+    ): Long {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var entryBytes = 0L
+        while (true) {
+            val read = read(buffer)
+            if (read < 0) break
+            entryBytes += read
+            require(entryBytes <= maxEntryBytes) { "主题包单个文件过大" }
+            require(currentTotalBytes + entryBytes <= MAX_TOTAL_BYTES) {
+                "主题包解压后体积过大"
+            }
+            output.write(buffer, 0, read)
+        }
+        return entryBytes
+    }
+
+    private fun List<String>.toExistingFiles(): List<File> =
+        map(String::trim)
+            .filter(String::isNotEmpty)
+            .map(::File)
+            .filter(File::isFile)
+
+    private fun List<File>.toInputs(): List<CoverAlbumImageInput> = map { file ->
+        CoverAlbumImageInput(
+            displayName = file.name,
+            openStream = file::inputStream,
+        )
+    }
+
+    private suspend inline fun <T> runSuspendCatching(
+        crossinline block: suspend () -> T,
+    ): Result<T> {
+        return try {
+            Result.success(block())
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+    }
+
+    private data class AssetSource(
+        val key: String,
+        val sourcePath: String?,
+        val entryBase: String,
+    )
+
+    private data class ExportedCoverData(
+        val albums: List<ThemePackageCoverAlbum>,
+        val selection: ThemePackageCoverSelection,
+    )
+
+    private data class ExportedAppearanceData(
+        val profile: AppearanceProfile,
+        val assets: Map<String, String>,
+    )
+}
+
+@Keep
+data class ThemePackageManifest(
+    @SerializedName("formatVersion")
+    val formatVersion: Int = 1,
+    @SerializedName("name")
+    val name: String? = null,
+    @SerializedName("config")
+    val config: ThemeExportData = ThemeExportData(),
+    @SerializedName("assets")
+    val assets: Map<String, String> = emptyMap(),
+    @SerializedName("appearanceProfile")
+    val appearanceProfile: AppearanceProfile? = null,
+    @SerializedName("appearanceAssets")
+    val appearanceAssets: Map<String, String> = emptyMap(),
+    @SerializedName("coverAlbums")
+    val coverAlbums: List<ThemePackageCoverAlbum> = emptyList(),
+    @SerializedName("coverSelection")
+    val coverSelection: ThemePackageCoverSelection = ThemePackageCoverSelection(),
+    @SerializedName("checksums")
+    val checksums: Map<String, String> = emptyMap(),
+    @SerializedName("mimeTypes")
+    val mimeTypes: Map<String, String> = emptyMap(),
+)
+
+@Keep
+data class ThemePackagePreview(
+    val name: String,
+    val formatVersion: Int,
+    val composeEngine: String,
+    val themeMode: String,
+    val primaryColor: Int,
+    val assetCount: Int,
+    val coverAlbumCount: Int,
+)
+
+@Keep
+data class ThemePackageCoverAlbum(
+    @SerializedName("ref")
+    val ref: String = "",
+    @SerializedName("name")
+    val name: String = "",
+    @SerializedName("lightImages")
+    val lightImages: List<ThemePackageCoverImage> = emptyList(),
+    @SerializedName("darkImages")
+    val darkImages: List<ThemePackageCoverImage> = emptyList(),
+)
+
+@Keep
+data class ThemePackageCoverImage(
+    @SerializedName("path")
+    val path: String = "",
+)
+
+@Keep
+data class ThemePackageCoverSelection(
+    @SerializedName("albumRef")
+    val albumRef: String? = null,
+)

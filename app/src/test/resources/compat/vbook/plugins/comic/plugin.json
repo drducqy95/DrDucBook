@@ -1,0 +1,4 @@
+{
+  "metadata": {"name":"Comic Fixture","author":"DrDucBook","version":1,"source":"https://comic.example.test","description":"Synthetic comic plugin","type":"comic"},
+  "script": {"chap":"chap.js"}
+}
