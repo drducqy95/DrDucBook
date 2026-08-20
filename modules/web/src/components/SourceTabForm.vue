@@ -5,7 +5,7 @@
       :label="name"
       :key="name"
     >
-      <el-form label-position="right" label-width="auto">
+      <el-form label-position="right" label-width="auto" class="source-form">
         <el-form-item
           v-for="{
             type,
@@ -78,10 +78,30 @@ const { currentSource } = storeToRefs(store);
 
 <style lang="scss" scoped>
 :deep(.el-tab-pane) {
-  height: calc(100vh - 55px);
+  min-height: 0;
+  height: auto;
+  max-height: calc(100vh - 130px);
   padding-top: 15px;
   padding-right: 5px;
   overflow-y: auto;
+}
+:deep(.el-form-item__label) {
+  color: var(--web-text-muted, #334155);
+  font-weight: 600;
+}
+:deep(.el-input__wrapper),
+:deep(.el-textarea__inner),
+:deep(.el-select),
+:deep(.el-input-number) {
+  width: 100%;
+  font-size: 16px;
+}
+@media (max-width: 700px) {
+  :deep(.el-tab-pane) { max-height: none; overflow: visible; padding: 12px 0 18px; }
+  :deep(.el-tabs__nav-wrap) { overflow-x: auto; }
+  :deep(.el-form-item) { display: block; margin-bottom: 16px; }
+  :deep(.el-form-item__label) { display: block; line-height: 1.35; margin-bottom: 6px; text-align: left; }
+  :deep(.el-form-item__content) { margin-left: 0 !important; }
 }
 :deep(.el-tabs__header) {
   margin: 0;

@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import android.net.Uri
 import androidx.lifecycle.viewModelScope
 import com.drducbook.app.auth.GoogleAuthNonce
+import com.drducbook.app.auth.AuthCallbackStateStore
 import com.drducbook.app.cloud.SupabasePublicConfig
 import io.legado.app.domain.model.AccountAccess
 import io.legado.app.domain.model.AccountAuthResult
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import splitties.init.appCtx
 
 class AccountViewModel(
     private val savedStateHandle: SavedStateHandle,
@@ -64,6 +66,9 @@ class AccountViewModel(
     private var pendingGoogleDrivePassword: String = ""
 
     init {
+        AuthCallbackStateStore.consumeError(appCtx)?.let { message ->
+            _effects.tryEmit(AccountEffect.ShowMessage(message))
+        }
         viewModelScope.launch {
             accountAuthUseCase.observeSession()
                 .catch { error ->

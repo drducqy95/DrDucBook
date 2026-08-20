@@ -1,24 +1,24 @@
 <template>
   <div class="web-service-settings">
     <header class="settings-header">
-      <el-button text @click="goBack">Quay lại</el-button>
+      <el-button text @click="goBack">{{ t('settingsBack') }}</el-button>
       <div>
-        <h1>WebService</h1>
+        <h1>{{ serviceName || 'WebService' }}</h1>
         <p>{{ instanceText }}</p>
       </div>
-      <el-button :loading="loading" @click="refresh">Làm mới</el-button>
+      <el-button :loading="loading" @click="refresh">{{ t('refresh') }}</el-button>
     </header>
 
     <main class="settings-layout">
       <section class="settings-panel">
         <div class="panel-heading">
-          <h2>Chức năng</h2>
-          <el-tag type="info">Điều khiển từ web</el-tag>
+          <h2>{{ t('features') }}</h2>
+          <el-tag type="info">{{ t('webControl') }}</el-tag>
         </div>
         <div class="setting-line">
           <div>
             <strong>Export</strong>
-            <span>Cho phép các lệnh xuất dữ liệu qua web.</span>
+            <span>{{ t('exportDescription') }}</span>
           </div>
           <el-switch
             :model-value="policy?.exportEnabled ?? false"
@@ -29,8 +29,8 @@
         </div>
         <div class="setting-line">
           <div>
-            <strong>Dịch tự động</strong>
-            <span>Cho phép web tạo tác vụ dịch chương bằng cấu hình của app.</span>
+            <strong>{{ t('autoTranslation') }}</strong>
+            <span>{{ t('autoTranslationDescription') }}</span>
           </div>
           <el-switch
             :model-value="policy?.autoTranslationEnabled ?? false"
@@ -41,17 +41,26 @@
         </div>
       </section>
 
+      <section class="settings-panel">
+        <div class="panel-heading">
+          <h2>{{ t('serviceName') }}</h2>
+          <el-tag type="info">{{ t('displayedOnWeb') }}</el-tag>
+        </div>
+        <p class="readonly-service-name">{{ serviceName || 'WebService' }}</p>
+        <p class="settings-note">{{ t('serviceNameNativeOnly') }}</p>
+      </section>
+
       <section class="settings-panel background-panel">
         <div class="panel-heading">
-          <h2>Ảnh nền</h2>
+          <h2>{{ t('background') }}</h2>
           <el-tag :type="policy?.backgroundAssetId ? 'success' : 'info'">
-            {{ policy?.backgroundAssetId ? 'Đang dùng ảnh riêng' : 'Mặc định' }}
+            {{ policy?.backgroundAssetId ? t('customBackground') : t('default') }}
           </el-tag>
         </div>
 
         <div class="background-preview" :class="{ empty: !previewObjectUrl }">
           <div class="background-preview-image" :style="previewImageStyle"></div>
-          <span v-if="!previewObjectUrl">Chưa chọn ảnh nền</span>
+          <span v-if="!previewObjectUrl">{{ t('noBackground') }}</span>
         </div>
 
         <div class="background-actions">
@@ -63,35 +72,35 @@
             @change="onFileChange"
           />
           <el-button :disabled="!canEdit" :loading="saving === 'upload'" @click="pickFile">
-            Chọn ảnh
+            {{ t('chooseImage') }}
           </el-button>
           <el-button
             :disabled="!canEdit || !policy?.backgroundAssetId"
             :loading="saving === 'delete'"
             @click="deleteBackground"
           >
-            Xóa nền
+            {{ t('deleteBackground') }}
           </el-button>
           <el-button :disabled="!canEdit" :loading="saving === 'reset'" @click="resetPolicy">
-            Đặt lại
+            {{ t('reset') }}
           </el-button>
         </div>
 
         <div class="background-controls">
           <label>
-            Kiểu hiển thị
+            {{ t('displayMode') }}
             <el-radio-group
               :model-value="policy?.backgroundFit ?? 'cover'"
               :disabled="!canEdit"
               @change="updateFit"
             >
-              <el-radio-button label="cover">Cover</el-radio-button>
-              <el-radio-button label="contain">Contain</el-radio-button>
+              <el-radio-button label="cover">{{ t('cover') }}</el-radio-button>
+              <el-radio-button label="contain">{{ t('contain') }}</el-radio-button>
             </el-radio-group>
           </label>
 
           <label>
-            Vị trí
+            {{ t('position') }}
             <el-select
               :model-value="policy?.backgroundPosition ?? 'center'"
               :disabled="!canEdit"
@@ -107,7 +116,7 @@
           </label>
 
           <label>
-            Độ tối
+            {{ t('dimLabel') }}
             <el-slider
               :model-value="policy?.backgroundDim ?? 0.22"
               :disabled="!canEdit"
@@ -119,7 +128,7 @@
           </label>
 
           <label>
-            Blur
+            {{ t('blurLabel') }}
             <el-slider
               :model-value="policy?.backgroundBlur ?? 0"
               :disabled="!canEdit"
@@ -151,6 +160,7 @@ import {
   type WebServicePolicyPatch,
 } from '@/api/webService'
 import { useWebServiceStore } from '@/store'
+import { t } from '@/i18n'
 
 const MAX_CLIENT_BACKGROUND_BYTES = 5 * 1024 * 1024
 type BackgroundFit = WebServicePolicy['backgroundFit']
@@ -165,33 +175,41 @@ const previewObjectUrl = ref('')
 let activePreviewUrl = ''
 
 const policy = computed(() => webServiceStore.policy)
+const serviceName = computed(() => {
+  const instance = webServiceStore.instance
+  return typeof instance?.serviceName === 'string' && instance.serviceName.trim()
+    ? instance.serviceName.trim()
+    : typeof instance?.appName === 'string' ? instance.appName.trim() : ''
+})
 const canEdit = computed(() => Boolean(policy.value))
 const instanceText = computed(() => {
   const instance = webServiceStore.instance
-  const appName = typeof instance?.appName === 'string' ? instance.appName.trim() : ''
+  const appName = typeof instance?.serviceName === 'string' && instance.serviceName.trim()
+    ? instance.serviceName.trim()
+    : typeof instance?.appName === 'string' ? instance.appName.trim() : ''
   const versionName = typeof instance?.versionName === 'string' ? instance.versionName.trim() : ''
   const httpPort = Number.isFinite(instance?.httpPort) ? instance?.httpPort : null
   const webSocketPort = Number.isFinite(instance?.webSocketPort) ? instance?.webSocketPort : null
   if (!appName || !versionName || httpPort === null || webSocketPort === null) {
-    return 'Đang chờ WebService từ app'
+    return t('waitingService')
   }
   return `${appName} ${versionName} · HTTP ${httpPort} · WS ${webSocketPort}`
 })
 
-const positionOptions: Array<{
+const positionOptions = computed<Array<{
   label: string
   value: WebServicePolicy['backgroundPosition']
-}> = [
-  { label: 'Giữa', value: 'center' },
-  { label: 'Trên', value: 'top' },
-  { label: 'Dưới', value: 'bottom' },
-  { label: 'Trái', value: 'left' },
-  { label: 'Phải', value: 'right' },
-  { label: 'Trái trên', value: 'left top' },
-  { label: 'Trái dưới', value: 'left bottom' },
-  { label: 'Phải trên', value: 'right top' },
-  { label: 'Phải dưới', value: 'right bottom' },
-]
+}>>(() => [
+  { label: t('center'), value: 'center' },
+  { label: t('top'), value: 'top' },
+  { label: t('bottom'), value: 'bottom' },
+  { label: t('left'), value: 'left' },
+  { label: t('right'), value: 'right' },
+  { label: `${t('left')} ${t('top')}`, value: 'left top' },
+  { label: `${t('left')} ${t('bottom')}`, value: 'left bottom' },
+  { label: `${t('right')} ${t('top')}`, value: 'right top' },
+  { label: `${t('right')} ${t('bottom')}`, value: 'right bottom' },
+])
 
 const previewImageStyle = computed<CSSProperties>(() => ({
   backgroundImage: previewObjectUrl.value
@@ -241,7 +259,7 @@ const updatePolicy = async (
   try {
     await webServiceStore.patchPolicy(patch)
   } catch {
-    ElMessage.error('Cấu hình đã thay đổi, đang tải lại')
+    ElMessage.error(t('configReloading'))
     await webServiceStore.loadPolicy().catch(() => undefined)
   } finally {
     saving.value = ''
@@ -283,19 +301,19 @@ const onFileChange = async (event: Event) => {
   if (!file) return
   input.value = ''
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
-    ElMessage.warning('Chỉ hỗ trợ PNG, JPG hoặc WebP')
+    ElMessage.warning(t('imageTypeSupport'))
     return
   }
   if (file.size > MAX_CLIENT_BACKGROUND_BYTES) {
-    ElMessage.warning('Ảnh nền tối đa 5 MB')
+    ElMessage.warning(t('imageTooLarge'))
     return
   }
   saving.value = 'upload'
   try {
     await webServiceStore.uploadBackground(file)
-    ElMessage.success('Đã cập nhật ảnh nền')
+    ElMessage.success(t('backgroundUpdated'))
   } catch {
-    ElMessage.error('Không thể cập nhật ảnh nền')
+    ElMessage.error(t('backgroundUpdateFailed'))
   } finally {
     saving.value = ''
   }
@@ -306,9 +324,9 @@ const deleteBackground = async () => {
   try {
     await webServiceStore.deleteBackground()
     clearPreviewObjectUrl()
-    ElMessage.success('Đã xóa ảnh nền')
+    ElMessage.success(t('backgroundDeleted'))
   } catch {
-    ElMessage.error('Không thể xóa ảnh nền')
+    ElMessage.error(t('backgroundDeleteFailed'))
   } finally {
     saving.value = ''
   }
@@ -319,9 +337,9 @@ const resetPolicy = async () => {
   try {
     await webServiceStore.resetPolicy()
     clearPreviewObjectUrl()
-    ElMessage.success('Đã đặt lại cấu hình WebService')
+    ElMessage.success(t('settingsReset'))
   } catch {
-    ElMessage.error('Không thể đặt lại cấu hình')
+    ElMessage.error(t('settingsResetFailed'))
   } finally {
     saving.value = ''
   }
@@ -400,6 +418,20 @@ onBeforeUnmount(clearPreviewObjectUrl)
 .panel-heading h2 {
   margin: 0;
   font-size: 18px;
+}
+
+.readonly-service-name {
+  margin: 18px 0 6px;
+  color: #22302a;
+  font-size: 20px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.settings-note {
+  margin: 0;
+  color: #66746d;
+  line-height: 1.5;
 }
 
 .setting-line span {

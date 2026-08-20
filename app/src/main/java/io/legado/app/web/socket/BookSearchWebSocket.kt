@@ -9,6 +9,7 @@ import io.ktor.websocket.send
 import com.drducbook.app.R
 import io.legado.app.data.local.preferences.LocalPreferencesKeys
 import io.legado.app.data.local.preferences.LocalPreferencesRepository
+import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.domain.model.BookSearchScope
 import io.legado.app.domain.model.MatchMode
 import io.legado.app.domain.usecase.BookSearchControl
@@ -20,6 +21,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.isJson
 import io.legado.app.utils.printOnDebug
+import io.legado.app.web.WebServicePolicyStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,15 +53,15 @@ class BookSearchWebSocket(private val session: DefaultWebSocketServerSession) : 
                         session.close(CloseReason(CloseReason.Codes.NORMAL, SEARCH_FINISH))
                         break
                     }
-                    val searchMap = GSON.fromJsonObject<Map<String, String>>(text).getOrNull()
-                    if (searchMap != null) {
-                        val key = searchMap["key"]?.trim()
+                    val searchRequest = GSON.fromJsonObject<WebSearchRequest>(text).getOrNull()
+                    if (searchRequest != null) {
+                        val key = searchRequest.key.trim()
                         if (key.isNullOrBlank()) {
                             session.send(appCtx.getString(R.string.cannot_empty))
                             session.close(CloseReason(CloseReason.Codes.NORMAL, SEARCH_FINISH))
                             break
                         }
-                        startSearch(key)
+                        startSearch(key, searchRequest.sourceUrls)
                     }
                 }
             }
@@ -70,7 +72,7 @@ class BookSearchWebSocket(private val session: DefaultWebSocketServerSession) : 
         }
     }
 
-    private fun startSearch(key: String) {
+    private fun startSearch(key: String, requestedSourceUrls: List<String>?) {
         searchJob?.cancel()
         sentBookUrls.clear()
         searchControl.resume()
@@ -81,11 +83,7 @@ class BookSearchWebSocket(private val session: DefaultWebSocketServerSession) : 
                         BookSearchRequest(
                             keyword = key,
                             page = 1,
-                            scope = BookSearchScope(
-                                localPreferencesRepository
-                                    .getPreference(LocalPreferencesKeys.SEARCH_SCOPE, "")
-                                    .first()
-                            ),
+                            scope = resolveScope(requestedSourceUrls),
                             matchMode = MatchMode.of(
                                 localPreferencesRepository
                                     .getPreference(
@@ -118,4 +116,41 @@ class BookSearchWebSocket(private val session: DefaultWebSocketServerSession) : 
             }
         }
     }
+
+    /**
+     * Web source selection must be independent from the native search preference. The web UI
+     * stores its selected sources in the WebService policy; an explicit request list is accepted
+     * as well for external web clients. If neither is present, preserve the native preference.
+     */
+    private suspend fun resolveScope(requestedSourceUrls: List<String>?): BookSearchScope {
+        val requested = requestedSourceUrls
+            .orEmpty()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+        val policySources = WebServicePolicyStore.read(appCtx).webDiscoverySourceUrls
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+        val sourceUrls = (requested.ifEmpty { policySources })
+        if (sourceUrls.isNotEmpty()) {
+            val sourceDao = GlobalContext.get().get<BookSourceDao>()
+            val sources = sourceUrls.mapNotNull { url ->
+                sourceDao.getBookSource(url)?.let { source ->
+                    BookSearchScope.ScopeSourceItem(source.bookSourceName, source.bookSourceUrl)
+                }
+            }
+            if (sources.isNotEmpty()) return BookSearchScope.encodeSources(sources).let(::BookSearchScope)
+        }
+        return BookSearchScope(
+            localPreferencesRepository
+                .getPreference(LocalPreferencesKeys.SEARCH_SCOPE, "")
+                .first()
+        )
+    }
+
+    private data class WebSearchRequest(
+        val key: String = "",
+        val sourceUrls: List<String>? = null,
+    )
 }

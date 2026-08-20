@@ -1,6 +1,5 @@
 package io.legado.app.web
 
-import io.legado.app.data.repository.MediaResolverRepository
 import io.legado.app.domain.model.MediaProtocol
 import io.legado.app.domain.model.ResolvedBookMedia
 import io.legado.app.domain.model.ResolvedMediaVariant
@@ -87,10 +86,11 @@ object WebServiceMediaController {
         session.media.media.variants.firstOrNull { it.id == id }
 
     fun source(session: MediaSession, uri: String, headers: Map<String, String>): SourceTarget {
-        val resolved = runCatching { URI(uri) }.getOrNull()
-        if (resolved?.scheme.equals("file", true) && resolved != null) {
-            return SourceTarget.Local(File(resolved), headers)
+        val localFile = when {
+            uri.startsWith("file:", ignoreCase = true) -> runCatching { File(URI(uri)) }.getOrNull()
+            else -> File(uri).takeIf { it.isAbsolute }
         }
+        if (localFile != null) return SourceTarget.Local(localFile, headers)
         return SourceTarget.Remote(uri, headers)
     }
 
@@ -103,12 +103,16 @@ object WebServiceMediaController {
         okHttpClient.newCall(builder.get().build()).execute()
     }
 
-    suspend fun openManifest(session: MediaSession, variant: ResolvedMediaVariant): ManifestResult? {
+    suspend fun openManifest(
+        session: MediaSession,
+        variant: ResolvedMediaVariant,
+        accessToken: String? = null,
+    ): ManifestResult? {
         if (variant.protocol != MediaProtocol.HLS && variant.protocol != MediaProtocol.DASH) return null
         val response = openRemote(source(session, variant.uri, variant.headers) as SourceTarget.Remote, null)
         val body = response.body.string()
         response.close()
-        val rewritten = rewriteManifest(session, variant.uri, variant.protocol, variant.headers, body)
+        val rewritten = rewriteManifest(session, variant.uri, variant.protocol, variant.headers, body, accessToken)
         val mime = if (variant.protocol == MediaProtocol.HLS) "application/vnd.apple.mpegurl" else "application/dash+xml"
         return ManifestResult(rewritten, mime)
     }
@@ -121,7 +125,7 @@ object WebServiceMediaController {
         response.close()
         if (!contentType.contains("mpegurl", true) && !resource.uri.looksLikePlaylist()) return null
         return ManifestResult(
-            rewriteManifest(session, resource.uri, MediaProtocol.HLS, resource.headers, body),
+            rewriteManifest(session, resource.uri, MediaProtocol.HLS, resource.headers, body, resource.accessToken),
             "application/vnd.apple.mpegurl",
         )
     }
@@ -132,13 +136,14 @@ object WebServiceMediaController {
         protocol: MediaProtocol,
         headers: Map<String, String>,
         body: String,
+        accessToken: String?,
     ): String {
         val base = "/api/v2/media/sessions/${session.id}/resources/"
         val rewrite = { raw: String ->
             val absolute = runCatching { URI(baseUri).resolve(raw).toString() }.getOrDefault(raw)
             val token = UUID.randomUUID().toString()
-            session.resources[token] = ResourceTarget(absolute, headers)
-            base + token
+            session.resources[token] = ResourceTarget(absolute, headers, accessToken)
+            appendAccessToken(base + token, accessToken)
         }
         var result = body.replace(Regex("URI=\\\"([^\\\"]+)\\\"")) { match -> "URI=\\\"${rewrite(match.groupValues[1])}\\\"" }
         if (protocol == MediaProtocol.HLS) {
@@ -161,6 +166,11 @@ object WebServiceMediaController {
 
     private fun encode(value: String) = java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
 
+    private fun appendAccessToken(path: String, accessToken: String?): String =
+        accessToken?.takeIf(String::isNotBlank)?.let {
+            "$path?access_token=${encode(it)}"
+        } ?: path
+
     class MediaSession(val id: String, val media: ResolvedBookMedia, initialExpiresAt: Long) {
         @Volatile var expiresAt: Long = initialExpiresAt
         val resources = ConcurrentHashMap<String, ResourceTarget>()
@@ -176,7 +186,11 @@ object WebServiceMediaController {
         data class Local(val file: File, override val headers: Map<String, String>) : SourceTarget
     }
 
-    data class ResourceTarget(val uri: String, val headers: Map<String, String>)
+    data class ResourceTarget(
+        val uri: String,
+        val headers: Map<String, String>,
+        val accessToken: String? = null,
+    )
     data class ManifestResult(val body: String, val mimeType: String)
 
     private fun String.looksLikePlaylist(): Boolean =

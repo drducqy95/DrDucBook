@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import io.legado.app.constant.AppConst
 import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.repository.validateInternetFetchUrl
 import io.legado.app.domain.gateway.VbookImportGateway
@@ -155,8 +156,13 @@ class VbookImportRepository(
 
     private suspend fun readRegistryInput(input: String): RawRegistryInput {
         return if (input.startsWith("http://", true) || input.startsWith("https://", true)) {
-            val validatedUrl = validateUrl(input)
-            val request = Request.Builder().url(validatedUrl).get().build()
+            val requestUrl = input.removeSuffix("#requestWithoutUA")
+            val validatedUrl = validateUrl(requestUrl)
+            val request = Request.Builder().url(validatedUrl).get().apply {
+                if (input.endsWith("#requestWithoutUA", true)) {
+                    header(AppConst.UA_NAME, "null")
+                }
+            }.build()
             client.newCall(request).await().use { response ->
                 if (!response.isSuccessful) {
                     throw IOException("Cannot load VBook registry: HTTP ${response.code}")

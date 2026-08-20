@@ -86,6 +86,7 @@ import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext.startKoin
 import splitties.init.appCtx
+import splitties.init.injectAsAppCtx
 import splitties.systemservices.notificationManager
 import java.io.File
 import java.net.URL
@@ -99,6 +100,10 @@ open class App : Application(), ImageLoaderFactory {
     /** ONNX NMT runs in a deliberately minimal process; do not boot the app's DI/database there. */
     protected val isNmtOnnxProcess: Boolean
         get() = currentProcessName().endsWith(":nmt_onnx")
+
+    /** Local TTS needs the app DI/database, but must not run UI/WebView startup in its process. */
+    protected val isTtsOnnxProcess: Boolean
+        get() = currentProcessName().endsWith(":tts_onnx")
 
     private fun currentProcessName(): String {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) return Application.getProcessName()
@@ -114,8 +119,21 @@ open class App : Application(), ImageLoaderFactory {
     }
 
     override fun onCreate() {
+        // App Startup does not initialize splitties-appctx in non-default processes such as
+        // :tts_onnx. Inject the Application context explicitly before any shared config, Koin,
+        // or service code touches appCtx.
+        injectAsAppCtx()
         if (isNmtOnnxProcess) {
             super.onCreate()
+            return
+        }
+        if (isTtsOnnxProcess) {
+            super.onCreate()
+            startKoin {
+                androidContext(this@App)
+                modules(appDatabaseModule, appModule)
+            }
+            ReadBookConfig.ensureSnapshotStateInitialized()
             return
         }
         startKoin {

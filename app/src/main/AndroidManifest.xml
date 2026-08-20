@@ -552,6 +552,16 @@
             android:name="io.legado.app.service.LocalTtsReadAloudService"
             android:process=":tts_onnx"
             android:foregroundServiceType="mediaPlayback" />
+        <receiver
+            android:name="io.legado.app.receiver.LocalTtsBridgeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="localTtsState" />
+                <action android:name="localTtsProgress" />
+                <action android:name="localTtsNext" />
+                <action android:name="localTtsPrev" />
+            </intent-filter>
+        </receiver>
         <service
             android:name="io.legado.app.service.NmtOnnxService"
             android:process=":nmt_onnx"

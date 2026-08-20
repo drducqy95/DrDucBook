@@ -8,7 +8,7 @@
       edit: sourceUrl == currentSourceUrl,
     }"
   >
-    {{ getSourceName(source) }}
+    {{ dynamicText('sources', getSourceName(source)) }}
     <el-button text :icon="Edit" @click="handleSourceClick(source)" />
   </el-checkbox>
 </template>
@@ -17,6 +17,7 @@
 import { Edit } from '@element-plus/icons-vue'
 import { getSourceUniqueKey, getSourceName } from '@/utils/souce'
 import type { Source } from '@/source'
+import { dynamicText } from '@/i18n'
 
 const props = defineProps<{
   source: Source

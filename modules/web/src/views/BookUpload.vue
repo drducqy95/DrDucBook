@@ -1,11 +1,11 @@
 <template>
   <div class="upload-page">
-    <section class="upload-head glass-panel"><div><span class="eyebrow">THƯ VIỆN CÁ NHÂN</span><h1>Tải sách lên thiết bị</h1><p>Nhập sách vào thư mục sách đang dùng trong DrDucBook. Tệp chỉ được gửi tới thiết bị đang chạy dịch vụ web.</p></div><el-button @click="router.push({ name: 'shelf' })">Về trang chủ</el-button></section>
+    <section class="upload-head glass-panel"><div><span class="eyebrow">{{ t('uploadEyebrow') }}</span><h1>{{ t('uploadTitle') }}</h1><p>{{ t('uploadDescription') }}</p></div><el-button @click="router.push({ name: 'shelf' })">{{ t('backHome') }}</el-button></section>
     <section class="upload-box glass-panel" :class="{ dragging }" @dragover.prevent="dragging = true" @dragleave.prevent="dragging = false" @drop.prevent="onDrop">
       <input ref="fileInput" type="file" multiple accept=".txt,.epub,.umd,.pdf,.mobi,.azw,.azw3" hidden @change="onFileChange" />
-      <div class="upload-icon">↥</div><h2>Thả tệp vào đây</h2><p>TXT · EPUB · UMD · PDF · MOBI · AZW · AZW3 · tối đa 512 MB mỗi tệp</p><el-button type="primary" @click="chooseFiles">Chọn tệp</el-button>
+      <div class="upload-icon">↥</div><h2>{{ t('dropFiles') }}</h2><p>{{ t('supportedFormats') }}</p><el-button type="primary" @click="chooseFiles">{{ t('chooseFiles') }}</el-button>
     </section>
-    <section v-if="items.length" class="upload-list glass-panel"><div class="list-heading"><h2>Tiến trình nhập</h2><el-button text @click="items = []">Xóa danh sách</el-button></div><article v-for="item in items" :key="item.id" class="upload-item"><div class="file-name"><span class="file-type">{{ extension(item.file.name) }}</span><div><strong>{{ item.file.name }}</strong><small>{{ formatSize(item.file.size) }}</small></div></div><div class="file-progress"><el-progress :percentage="item.progress" :status="item.status === 'error' ? 'exception' : item.status === 'done' ? 'success' : undefined" /><span>{{ item.message }}</span></div></article></section>
+    <section v-if="items.length" class="upload-list glass-panel"><div class="list-heading"><h2>{{ t('uploadProgress') }}</h2><el-button text @click="items = []">{{ t('clearList') }}</el-button></div><article v-for="item in items" :key="item.id" class="upload-item"><div class="file-name"><span class="file-type">{{ extension(item.file.name) }}</span><div><strong>{{ item.file.name }}</strong><small>{{ formatSize(item.file.size) }}</small></div></div><div class="file-progress"><el-progress :percentage="item.progress" :status="item.status === 'error' ? 'exception' : item.status === 'done' ? 'success' : undefined" /><span>{{ item.message }}</span></div></article></section>
   </div>
 </template>
 
@@ -13,6 +13,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { uploadLocalBook } from '@/api/webService'
+import { t } from '@/i18n'
 
 const router = useRouter()
 const fileInput = ref<HTMLInputElement>()
@@ -28,21 +29,21 @@ const chooseFiles = () => fileInput.value?.click()
 const enqueue = (files: File[]) => {
   const valid = normalizeFiles(files)
   const rejected = files.length - valid.length
-  if (rejected) ElMessage.warning(`${rejected} tệp bị bỏ qua do sai định dạng hoặc quá lớn`)
-  const added = valid.map(file => ({ id: `${file.name}-${file.lastModified}-${Math.random()}`, file, progress: 0, status: 'queued' as const, message: 'Đang chờ' }))
+  if (rejected) ElMessage.warning(`${rejected} ${t('skippedFiles')}`)
+  const added = valid.map(file => ({ id: `${file.name}-${file.lastModified}-${Math.random()}`, file, progress: 0, status: 'queued' as const, message: t('waiting') }))
   items.value.push(...added)
-  void processQueue(); void processQueue()
+  void processQueue()
 }
 const processQueue = async () => {
   const active = items.value.filter(item => item.status === 'uploading').length
   const next = items.value.find(item => item.status === 'queued')
   if (!next || active >= 2) return
-  next.status = 'uploading'; next.message = 'Đang tải lên...'
+  next.status = 'uploading'; next.message = t('uploading')
   try {
     await uploadLocalBook(next.file, value => { next.progress = value })
-    next.progress = 100; next.status = 'done'; next.message = 'Đã nhập vào giá sách'
+    next.progress = 100; next.status = 'done'; next.message = t('importedToShelf')
   } catch (error) {
-    next.status = 'error'; next.message = error instanceof Error ? error.message : 'Không thể nhập tệp'
+    next.status = 'error'; next.message = error instanceof Error ? error.message : t('importFailed')
   } finally {
     void processQueue()
   }

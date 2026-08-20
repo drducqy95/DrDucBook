@@ -51,6 +51,7 @@ export type ReaderPreferences = {
 
 const backgroundCookie = 'drducbook_web_background_v2'
 const readerStorageKey = 'drducbook_reader_preferences_v2'
+const chineseSearchStorageKey = 'drducbook_search_chinese_v1'
 const backgroundDbName = 'drducbook-web-client'
 const backgroundStoreName = 'backgrounds'
 const customBackgroundKey = 'custom'
@@ -213,3 +214,8 @@ export const saveReaderPreferences = (value: ReaderPreferences) => {
   localStorage.setItem(readerStorageKey, JSON.stringify({ ...getReaderPreferences(), ...value }))
 }
 
+export const getChineseSearchEnabled = () => localStorage.getItem(chineseSearchStorageKey) === 'true'
+
+export const setChineseSearchEnabled = (enabled: boolean) => {
+  localStorage.setItem(chineseSearchStorageKey, String(enabled))
+}

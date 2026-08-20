@@ -14,7 +14,8 @@
   </div>
   <el-dialog
     v-model="hotkeysDialogVisible"
-    :show-close="false"
+    width="min(92vw, 560px)"
+    :show-close="true"
     :before-close="stopRecordKeyDown"
   >
     <template #header="{ titleClass, titleId }">
@@ -216,7 +217,7 @@ const buttons = ref<{ name: string; hotKeys: string[]; action: () => void }[]>(
     { name: '✓ Lưu nguồn', hotKeys: [], action: saveSource },
   ),
 )
-const hotkeysDialogVisible = ref(true)
+const hotkeysDialogVisible = ref(false)
 
 const recordKeyDowning = ref(false)
 

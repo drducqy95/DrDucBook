@@ -12,6 +12,35 @@ import io.legado.app.utils.putPrefStringSync
 
 object WebServicePolicyStore {
 
+    fun addWebDiscoverySources(context: Context, sourceUrls: List<String>) {
+        val current = read(context)
+        val urls = (current.webDiscoverySourceUrls + sourceUrls)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+        save(
+            context,
+            current.copy(
+                webDiscoverySourceUrls = urls,
+                revision = current.revision + 1L,
+                updatedAt = System.currentTimeMillis(),
+            )
+        )
+        WebServiceDiscoveryController.clearCache()
+    }
+
+    fun setWebDiscoverySources(context: Context, sourceUrls: List<String>): WebServicePolicy {
+        val current = read(context)
+        val updated = current.copy(
+            webDiscoverySourceUrls = sourceUrls,
+            revision = current.revision + 1L,
+            updatedAt = System.currentTimeMillis(),
+        )
+        save(context, updated)
+        WebServiceDiscoveryController.clearCache()
+        return updated
+    }
+
     @Synchronized
     fun read(context: Context): WebServicePolicy =
         context.getPrefString(PreferKey.webServicePolicy)
@@ -31,6 +60,9 @@ object WebServicePolicyStore {
         return when (val result = WebServicePolicyRevision.applyPatch(current, request, ifMatch, now)) {
             is WebServicePolicyPatchResult.Success -> {
                 save(context, result.policy)
+                if (result.policy.webDiscoverySourceUrls != current.webDiscoverySourceUrls) {
+                    WebServiceDiscoveryController.clearCache()
+                }
                 result
             }
 
@@ -50,6 +82,7 @@ object WebServicePolicyStore {
             updatedAt = now,
         )
         save(context, policy)
+        WebServiceDiscoveryController.clearCache()
         return policy
     }
 

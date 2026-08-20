@@ -1,6 +1,6 @@
 <template>
   <div class="editor">
-    <source-tab-form class="left" :config="config" />
+    <source-tab-form class="left" :config="config" :key="sourceKind" />
     <tool-bar />
     <source-tab-tools class="right" />
   </div>
@@ -9,20 +9,18 @@
 import bookSourceConfig from '@/config/bookSourceEditConfig'
 import rssSourceConfig from '@/config/rssSourceEditConfig'
 import '@/assets/sourceeditor.css'
-import { useDark } from '@vueuse/core'
+import { computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { SourceConfig } from '@/config/sourceConfig'
 
-useDark()
-
-let config: SourceConfig
-
-if (/bookSource/i.test(location.href)) {
-  config = bookSourceConfig as SourceConfig
-  document.title = 'Quản lý nguồn sách'
-} else {
-  config = rssSourceConfig as SourceConfig
-  document.title = 'Quản lý nguồn RSS'
-}
+const route = useRoute()
+const sourceKind = computed(() => /bookSource/i.test(`${String(route.name || '')}${route.path}`) ? 'book' : 'rss')
+const config = computed<SourceConfig>(() => sourceKind.value === 'book'
+  ? bookSourceConfig as SourceConfig
+  : rssSourceConfig as SourceConfig)
+watch(sourceKind, kind => {
+  document.title = kind === 'book' ? 'Quản lý nguồn sách' : 'Quản lý nguồn RSS'
+}, { immediate: true })
 </script>
 <style lang="scss" scoped>
 .editor {

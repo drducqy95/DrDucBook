@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('../views/WebServiceSettings.vue'),
     },
     {
+      path: '/discovery',
+      name: 'discovery',
+      component: () => import('../views/Discovery.vue'),
+    },
+    {
       path: '/upload',
       name: 'upload',
       component: () => import('../views/BookUpload.vue'),

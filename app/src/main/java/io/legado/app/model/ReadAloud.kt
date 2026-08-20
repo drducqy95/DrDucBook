@@ -6,6 +6,7 @@ import android.os.Bundle
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.IntentAction
+import io.legado.app.constant.Status
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.domain.model.PlaybackTimer
@@ -21,11 +22,34 @@ import io.legado.app.utils.postEvent
 import io.legado.app.utils.startForegroundServiceCompat
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
+import java.io.File
 
 object ReadAloud {
     private var aloudClass: Class<*> = getReadAloudClass()
     val ttsEngine get() = ReadBook.book?.getTtsEngine() ?: ReadConfig.ttsEngine
     var httpTTS: HttpTTS? = null
+
+    /** BaseReadAloudService.isRun is process-local; keep a marker for the local TTS process. */
+    @Volatile
+    private var localSessionStarted = false
+
+    @Volatile
+    private var localSessionPaused = false
+
+    @Volatile
+    private var localSessionId = 0L
+
+    val isLocalSessionRunning: Boolean
+        get() = localSessionStarted
+
+    val isLocalSessionPaused: Boolean
+        get() = localSessionPaused
+
+    fun updateLocalSessionState(state: Int, sessionId: Long = 0L) {
+        if (sessionId != 0L && localSessionId != 0L && sessionId != localSessionId) return
+        localSessionStarted = state != Status.STOP
+        localSessionPaused = state == Status.PAUSE
+    }
 
     private fun getReadAloudClass(): Class<*> {
         val ttsEngine = ttsEngine
@@ -60,6 +84,30 @@ object ReadAloud {
         intent.putExtra("play", play)
         intent.putExtra("pageIndex", pageIndex)
         intent.putExtra("startPos", startPos)
+        if (aloudClass == LocalTtsReadAloudService::class.java) {
+            localSessionId = System.nanoTime().takeIf { it != 0L } ?: 1L
+            val chapterText = ReadBook.curTextChapter
+                ?.getNeedReadAloud(0, ReadConfig.readAloudByPage, 0)
+                .orEmpty()
+            if (chapterText.isBlank()) {
+                context.toastOnUi("Chương hiện tại chưa sẵn sàng để đọc")
+                return
+            }
+            val sessionFile = File(appCtx.cacheDir, "local_tts_read_aloud_session.txt")
+            runCatching {
+                sessionFile.parentFile?.mkdirs()
+                sessionFile.writeText(chapterText, Charsets.UTF_8)
+            }.onFailure { error ->
+                AppLog.put("Không thể chuẩn bị nội dung cho TTS local\n${error.localizedMessage}", error)
+                context.toastOnUi("Không thể chuẩn bị nội dung đọc")
+                return
+            }
+            intent.putExtra("localTtsSessionFile", sessionFile.absolutePath)
+            intent.putExtra("localTtsEngine", ttsEngine.orEmpty())
+            intent.putExtra("localTtsSessionId", localSessionId)
+            localSessionStarted = true
+            localSessionPaused = !play
+        }
         LogUtils.d("ReadAloud", intent.toString())
         try {
             context.startForegroundServiceCompat(intent)
@@ -84,31 +132,44 @@ object ReadAloud {
     }
 
     fun pause(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
+            localSessionPaused = true
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.pause
+            if (aloudClass == LocalTtsReadAloudService::class.java) {
+                intent.putExtra("localTtsSessionId", localSessionId)
+            }
             context.startForegroundServiceCompat(intent)
         }
     }
 
     fun resume(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
+            localSessionPaused = false
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.resume
+            if (aloudClass == LocalTtsReadAloudService::class.java) {
+                intent.putExtra("localTtsSessionId", localSessionId)
+            }
             context.startForegroundServiceCompat(intent)
         }
     }
 
     fun stop(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.stop
+            if (aloudClass == LocalTtsReadAloudService::class.java) {
+                intent.putExtra("localTtsSessionId", localSessionId)
+            }
             context.startForegroundServiceCompat(intent)
+            localSessionStarted = false
+            localSessionPaused = false
         }
     }
 
     fun prevParagraph(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.prevParagraph
             context.startForegroundServiceCompat(intent)
@@ -116,7 +177,7 @@ object ReadAloud {
     }
 
     fun nextParagraph(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.nextParagraph
             context.startForegroundServiceCompat(intent)
@@ -124,7 +185,7 @@ object ReadAloud {
     }
 
     fun upTtsSpeechRate(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.upTtsSpeechRate
             context.startForegroundServiceCompat(intent)
@@ -132,7 +193,7 @@ object ReadAloud {
     }
 
     fun syncLayout(context: Context = appCtx) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.syncReadAloudLayout
             context.startForegroundServiceCompat(intent)
@@ -140,7 +201,7 @@ object ReadAloud {
     }
 
     fun setTimer(context: Context, minute: Int) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.setTimer
             intent.putExtra("minute", PlaybackTimer.normalize(minute))

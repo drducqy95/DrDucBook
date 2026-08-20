@@ -34,6 +34,7 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
     private var speakJob: Coroutine<*>? = null
     private var utteranceStartPos = 0
     private var utteranceStartReadAloudNumber = 0
+    private var utteranceTextMapping = SpeechTextMapping("", IntArray(0))
     private var needParagraphInterval = false // 是否需要进行段落间隔延迟
     private val TAG = "TTSReadAloudService"
 
@@ -102,90 +103,59 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         speakJob = execute {
             val interval = ReadConfig.ttsParagraphInterval.toLong()
             AppLog.putDebug("TTS_PLAY: nowSpeak=$nowSpeak, isDelay=$isDelay, interval=$interval")
+
+            // Do not schedule a paragraph delay for entries that contain only
+            // whitespace, control characters, or punctuation. These entries
+            // are kept in contentList so the reader position mapping remains
+            // intact, but they must be skipped before handing work to the TTS
+            // engine.
+            if (!skipNonSpeechParagraphs()) {
+                nextChapter()
+                return@execute
+            }
             
-            if (interval > 0) {
-                // 段落间隔模式：单段播放
-                if (isDelay) {
-                    AppLog.putDebug("TTS开始延迟: $interval 毫秒")
-                    delay(interval)
-                    AppLog.putDebug("TTS延迟结束，准备播放")
-                }
-                ensureActive()
-                
-                LogUtils.d(TAG, "朗读列表大小 ${contentList.size}")
-                val tts = textToSpeech ?: throw NoStackTraceException("tts is null")
-                var text = contentList[nowSpeak]
-                if (paragraphStartPos > 0) {
-                    text = text.substring(paragraphStartPos)
-                }
-                if (text.matches(AppPattern.notReadAloudRegex)) {
-                    AppLog.putDebug("TTS段落全标点跳过: nowSpeak=$nowSpeak")
+            if (interval > 0 && isDelay) {
+                AppLog.putDebug("TTS开始延迟: $interval 毫秒")
+                delay(interval)
+                AppLog.putDebug("TTS延迟结束，准备播放")
+            }
+            // Always enqueue exactly one utterance. Queueing the whole chapter
+            // with QUEUE_ADD makes onRangeStart run before nowSpeak is advanced,
+            // which causes the highlight to lag behind the spoken sentence.
+            ensureActive()
+            val tts = textToSpeech ?: throw NoStackTraceException("tts is null")
+            var sourceText = contentList[nowSpeak]
+            var sourceStartPos = 0
+            if (paragraphStartPos > 0) {
+                sourceStartPos = paragraphStartPos.coerceAtMost(sourceText.length)
+                sourceText = sourceText.substring(sourceStartPos)
+            }
+            val mapping = compactSpeechTextWithOffsets(sourceText, sourceStartPos)
+            val text = mapping.text
+            if (!isSpeakableText(text)) {
+                AppLog.putDebug("TTS段落全标点跳过: nowSpeak=$nowSpeak")
+                if (skipNonSpeechParagraphs()) {
                     ttsUtteranceListener.onDone(AppConst.APP_TAG + nowSpeak)
-                    return@execute
-                }
-                AppLog.putDebug("TTS开始Speak: $text")
-                val result = tts.runCatching {
-                    speak(text, TextToSpeech.QUEUE_FLUSH, null, AppConst.APP_TAG + nowSpeak)
-                }.getOrElse {
-                    AppLog.put("tts出错\n${it.localizedMessage}", it, true)
-                    TextToSpeech.ERROR
-                }
-                if (result == TextToSpeech.ERROR) {
-                    AppLog.put("tts出错 尝试重新初始化")
-                    clearTTS()
-                    initTts()
-                    return@execute
-                }
-                LogUtils.d(TAG, "朗读内容添加完成")
-            } else {
-                // 无间隔模式：保持原有的队列式连续播放，确保无缝衔接
-                LogUtils.d(TAG, "朗读列表大小 ${contentList.size}")
-                LogUtils.d(TAG, "朗读页数 ${textChapter?.pageSize}")
-                val tts = textToSpeech ?: throw NoStackTraceException("tts is null")
-                val contentList = contentList
-                var isAddedText = false
-                for (i in nowSpeak until contentList.size) {
-                    ensureActive()
-                    var text = contentList[i]
-                    if (paragraphStartPos > 0 && i == nowSpeak) {
-                        text = text.substring(paragraphStartPos)
-                    }
-                    if (text.matches(AppPattern.notReadAloudRegex)) {
-                        continue
-                    }
-                    if (!isAddedText) {
-                        val result = tts.runCatching {
-                            speak(text, TextToSpeech.QUEUE_FLUSH, null, AppConst.APP_TAG + i)
-                        }.getOrElse {
-                            AppLog.put("tts出错\n${it.localizedMessage}", it, true)
-                            TextToSpeech.ERROR
-                        }
-                        if (result == TextToSpeech.ERROR) {
-                            AppLog.put("tts出错 尝试重新初始化")
-                            clearTTS()
-                            initTts()
-                            return@execute
-                        }
-                    } else {
-                        val result = tts.runCatching {
-                            speak(text, TextToSpeech.QUEUE_ADD, null, AppConst.APP_TAG + i)
-                        }.getOrElse {
-                            AppLog.put("tts出错\n${it.localizedMessage}", it, true)
-                            TextToSpeech.ERROR
-                        }
-                        if (result == TextToSpeech.ERROR) {
-                            AppLog.put("tts朗读出错:$text")
-                        }
-                    }
-                    isAddedText = true
-                }
-                LogUtils.d(TAG, "朗读内容添加完成")
-                if (!isAddedText) {
-                    playStop()
-                    delay(1000)
+                } else {
                     nextChapter()
                 }
+                return@execute
             }
+            utteranceTextMapping = mapping
+            AppLog.putDebug("TTS开始Speak: $text")
+            val result = tts.runCatching {
+                speak(text, TextToSpeech.QUEUE_FLUSH, null, AppConst.APP_TAG + nowSpeak)
+            }.getOrElse {
+                AppLog.put("tts出错\n${it.localizedMessage}", it, true)
+                TextToSpeech.ERROR
+            }
+            if (result == TextToSpeech.ERROR) {
+                AppLog.put("tts出错 尝试重新初始化")
+                clearTTS()
+                initTts()
+                return@execute
+            }
+            LogUtils.d(TAG, "朗读内容添加完成")
         }.onError {
             AppLog.putDebug("TTS协程异常: ${it.localizedMessage}")
         }
@@ -195,6 +165,37 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
         textToSpeech?.runCatching {
             stop()
         }
+    }
+
+    /**
+     * Android TTS engines may turn repeated newlines, NBSPs, or zero-width
+     * characters into very long pauses. Keep paragraph tracking unchanged, but
+     * always send a compact speech string to the engine.
+     */
+    private fun normalizeSpeechText(value: String): String =
+        compactSpeechTextWithOffsets(value).text
+
+    private fun isSpeakableText(value: String): Boolean {
+        val normalized = compactSpeechTextWithOffsets(value).text
+        return normalized.isNotEmpty() && !normalized.matches(AppPattern.notReadAloudRegex)
+    }
+
+    /**
+     * Advance over non-speech entries without applying the user-configured
+     * paragraph interval. The original entries are retained for progress
+     * accounting, so skipping still advances the chapter position correctly.
+     */
+    private fun skipNonSpeechParagraphs(): Boolean {
+        while (nowSpeak in contentList.indices && !isSpeakableText(contentList[nowSpeak])) {
+            readAloudNumber = nextParagraphPosition(
+                currentPosition = readAloudNumber,
+                paragraphLength = contentList[nowSpeak].length,
+                paragraphStartPosition = paragraphStartPos,
+            )
+            paragraphStartPos = 0
+            nowSpeak++
+        }
+        return nowSpeak in contentList.indices
     }
 
     /**
@@ -246,9 +247,6 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
             utteranceStartPos = paragraphStartPos
             utteranceStartReadAloudNumber = readAloudNumber
             textChapter?.let {
-                if (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex)) {
-                    nextParagraph()
-                }
                 if (pageIndex + 1 < it.pageSize
                     && readAloudNumber + 1 > it.getReadLength(pageIndex + 1)
                 ) {
@@ -262,17 +260,24 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
 
         override fun onDone(s: String) {
             LogUtils.d(TAG, "onDone utteranceId:$s")
-            nextParagraph()
-            if (!pause && ReadConfig.ttsParagraphInterval > 0) {
-                needParagraphInterval = true
+            val hasNext = nextParagraph()
+            if (hasNext && !pause) {
+                needParagraphInterval = ReadConfig.ttsParagraphInterval > 0
                 play()
             }
         }
 
         override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
             super.onRangeStart(utteranceId, start, end, frame)
-            paragraphStartPos = utteranceStartPos + start
-            readAloudNumber = currentRangePosition(utteranceStartReadAloudNumber, start)
+            val originalStart = utteranceTextMapping.originalOffsetFor(
+                normalizedOffset = start,
+                fallback = utteranceStartPos + start,
+            )
+            paragraphStartPos = originalStart
+            readAloudNumber = currentRangePosition(
+                utteranceStartReadAloudNumber,
+                originalStart - utteranceStartPos,
+            )
             updateReadAloudProgressSnapshot(readAloudNumber + 1)
             val msg =
                 "onRangeStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$utteranceId start:$start end:$end frame:$frame"
@@ -287,15 +292,15 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                 TAG,
                 "onError nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$utteranceId errorCode:$errorCode"
             )
-            nextParagraph()
-            if (!pause && ReadConfig.ttsParagraphInterval > 0) {
-                needParagraphInterval = true
+            val hasNext = nextParagraph()
+            if (hasNext && !pause) {
+                needParagraphInterval = ReadConfig.ttsParagraphInterval > 0
                 play()
             }
         }
 
-        private fun nextParagraph() {
-            //跳过全标点段落
+        private fun nextParagraph(): Boolean {
+            if (nowSpeak !in contentList.indices) return false
             do {
                 readAloudNumber = nextParagraphPosition(
                     currentPosition = readAloudNumber,
@@ -304,19 +309,20 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                 )
                 paragraphStartPos = 0
                 nowSpeak++
-                if (nowSpeak >= contentList.size) {
-                    nextChapter()
-                    return
-                }
-            } while (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex))
+            } while (nowSpeak < contentList.size && !isSpeakableText(contentList[nowSpeak]))
+            if (nowSpeak >= contentList.size) {
+                nextChapter()
+                return false
+            }
+            return true
         }
 
         @Deprecated("Deprecated in Java")
         override fun onError(s: String) {
             LogUtils.d(TAG, "onError nowSpeak:$nowSpeak pageIndex:$pageIndex s:$s")
-            nextParagraph()
-            if (!pause && ReadConfig.ttsParagraphInterval > 0) {
-                needParagraphInterval = true
+            val hasNext = nextParagraph()
+            if (hasNext && !pause) {
+                needParagraphInterval = ReadConfig.ttsParagraphInterval > 0
                 play()
             }
         }

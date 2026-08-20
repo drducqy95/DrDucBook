@@ -27,6 +27,7 @@ import io.legado.app.help.config.BookshelfAutomationConfig
 import io.legado.app.help.config.AppConfig
 import io.legado.app.service.BookshelfAutomationScheduler
 import io.legado.app.service.WebService
+import io.legado.app.web.WebServiceIdentityStore
 import io.legado.app.ui.config.readMangaConfig.ReadMangaConfig
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.adaptiveContentPadding
@@ -146,6 +147,13 @@ fun OtherConfigScreen(
                 )
 
                 if (webServiceAllowed) {
+                    InputSettingItem(
+                        title = "Tên dịch vụ web",
+                        value = WebServiceIdentityStore.getServiceName(context),
+                        defaultValue = "DrDucBook",
+                        description = "Tên hiển thị khi mở dịch vụ web",
+                        onConfirm = { value -> WebServiceIdentityStore.setServiceName(context, value) },
+                    )
                     SwitchSettingItem(
                         title = stringResource(R.string.web_service_auto_start),
                         checked = OtherConfig.webServiceAutoStart,

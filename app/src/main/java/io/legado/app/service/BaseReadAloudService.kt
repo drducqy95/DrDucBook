@@ -148,6 +148,12 @@ abstract class BaseReadAloudService : BaseService(),
     var readAloudByPage = false
         private set
 
+    /** Session data prepared by the main process for a service running in another process. */
+    protected var sessionFilePath: String? = null
+        private set
+    protected var sessionTtsEngine: String? = null
+        private set
+
     private val broadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (AudioManager.ACTION_AUDIO_BECOMING_NOISY == intent.action) {
@@ -214,7 +220,7 @@ abstract class BaseReadAloudService : BaseService(),
         currentProgress = 0
         abandonFocus()
         unregisterReceiver(broadcastReceiver)
-        postEvent(EventBus.ALOUD_STATE, Status.STOP)
+        publishReadAloudState(Status.STOP)
         notificationManager.cancel(NotificationId.ReadAloudService)
         upMediaSessionPlaybackState(PlaybackStateCompat.STATE_STOPPED)
         mediaSessionCompat.release()
@@ -230,6 +236,8 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        intent?.getStringExtra("localTtsSessionFile")?.let { sessionFilePath = it }
+        intent?.getStringExtra("localTtsEngine")?.let { sessionTtsEngine = it }
         when (intent?.action) {
             IntentAction.play -> newReadAloud(
                 intent.getBooleanExtra("play", true),
@@ -252,7 +260,7 @@ abstract class BaseReadAloudService : BaseService(),
         return super.onStartCommand(intent, flags, startId)
     }
 
-    private fun newReadAloud(play: Boolean, pageIndex: Int, startPos: Int) {
+    protected open fun newReadAloud(play: Boolean, pageIndex: Int, startPos: Int) {
         execute(executeContext = IO) {
             this@BaseReadAloudService.pageIndex = pageIndex
             textChapter = ReadBook.curTextChapter
@@ -264,7 +272,7 @@ abstract class BaseReadAloudService : BaseService(),
             readAloudByPage = ReadConfig.readAloudByPage
             contentList = textChapter.getNeedReadAloud(0, readAloudByPage, 0)
                 .split("\n")
-                .filter { it.isNotEmpty() }
+                .filter(String::isNotBlank)
             var pos = startPos
             val page = textChapter.getPage(pageIndex)!!
             if (pos > 0) {
@@ -310,7 +318,7 @@ abstract class BaseReadAloudService : BaseService(),
         needResumeOnAudioFocusGain = false
         needResumeOnCallStateIdle = false
         upReadAloudNotification()
-        postEvent(EventBus.ALOUD_STATE, Status.PLAY)
+        publishReadAloudState(Status.PLAY)
         if (!ReadBook.isAutoSaveSessionRunning) {
             ReadBook.startReadSession()
         }
@@ -331,7 +339,7 @@ abstract class BaseReadAloudService : BaseService(),
         }
         upReadAloudNotification()
         upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PAUSED)
-        postEvent(EventBus.ALOUD_STATE, Status.PAUSE)
+        publishReadAloudState(Status.PAUSE)
         ReadBook.uploadProgress()
         doDs()
         if (!ReadBook.isUiActive) {
@@ -352,13 +360,21 @@ abstract class BaseReadAloudService : BaseService(),
         needResumeOnCallStateIdle = false
         upReadAloudNotification()
         upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PLAYING)
-        postEvent(EventBus.ALOUD_STATE, Status.PLAY)
+        publishReadAloudState(Status.PLAY)
         if (!ReadBook.isAutoSaveSessionRunning) {
             ReadBook.startReadSession()
         }
     }
 
     abstract fun upSpeechRate(reset: Boolean = false)
+
+    /**
+     * LiveEventBus is process-local. Local ONNX TTS overrides this to forward state to the
+     * reader process so its controls and read-aloud icon stay synchronized.
+     */
+    protected open fun publishReadAloudState(state: Int) {
+        postEvent(EventBus.ALOUD_STATE, state)
+    }
 
     fun upTtsProgress(progress: Int) {
         ReadBook.upReadTime()
@@ -878,6 +894,54 @@ abstract class BaseReadAloudService : BaseService(),
         }
     }
 
+}
+
+internal class SpeechTextMapping(
+    val text: String,
+    private val originalOffsets: IntArray,
+) {
+    fun originalOffsetFor(normalizedOffset: Int, fallback: Int): Int {
+        if (originalOffsets.isEmpty()) return fallback
+        return originalOffsets[normalizedOffset.coerceIn(0, originalOffsets.lastIndex)]
+    }
+}
+
+internal fun compactSpeechTextWithOffsets(
+    value: String,
+    baseOffset: Int = 0,
+): SpeechTextMapping {
+    val text = StringBuilder(value.length)
+    val offsets = ArrayList<Int>(value.length)
+    var pendingWhitespaceOffset: Int? = null
+
+    fun flushWhitespace() {
+        val offset = pendingWhitespaceOffset ?: return
+        if (text.isNotEmpty()) {
+            text.append(' ')
+            offsets.add(offset)
+        }
+        pendingWhitespaceOffset = null
+    }
+
+    value.forEachIndexed { index, character ->
+        val mapped = when (character) {
+            '\u00A0' -> ' '
+            '\u200B', '\u200C', '\u200D', '\uFEFF' -> null
+            else -> character
+        }
+        if (mapped == null) return@forEachIndexed
+        if (mapped.isWhitespace()) {
+            if (text.isNotEmpty() && pendingWhitespaceOffset == null) {
+                pendingWhitespaceOffset = baseOffset + index
+            }
+        } else {
+            flushWhitespace()
+            text.append(mapped)
+            offsets.add(baseOffset + index)
+        }
+    }
+
+    return SpeechTextMapping(text.toString(), offsets.toIntArray())
 }
 
 internal inline fun findReadAloudPageIndex(

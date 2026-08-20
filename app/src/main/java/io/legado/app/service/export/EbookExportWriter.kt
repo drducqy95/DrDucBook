@@ -86,7 +86,7 @@ class EbookExportWriter(
             EbookExportFormat.EPUB3 -> writeEpub3(payload, output)
             EbookExportFormat.PDF -> writePdf(payload, output)
             EbookExportFormat.CBZ -> writeCbz(payload, output)
-            EbookExportFormat.EPUB2 -> error("EPUB2 uses the legacy writer")
+            EbookExportFormat.EPUB2 -> writeEpub2(payload, output)
         }
     }
 
@@ -135,6 +135,14 @@ class EbookExportWriter(
     }
 
     private fun writeEpub3(payload: EbookExportPayload, output: OutputStream) {
+        writeEpub(payload, output, epub3 = true)
+    }
+
+    private fun writeEpub2(payload: EbookExportPayload, output: OutputStream) {
+        writeEpub(payload, output, epub3 = false)
+    }
+
+    private fun writeEpub(payload: EbookExportPayload, output: OutputStream, epub3: Boolean) {
         ZipOutputStream(output).use { zip ->
             val mime = "application/epub+zip".toByteArray()
             val crc = CRC32().apply { update(mime) }
@@ -184,8 +192,12 @@ class EbookExportWriter(
                 )
                 onProgress(index + 1, payload.chapters.size)
             }
-            zip.textEntry("OEBPS/nav.xhtml", buildNavigation(payload))
-            zip.textEntry("OEBPS/content.opf", buildPackage(payload, imageNames, coverImageName))
+            if (epub3) {
+                zip.textEntry("OEBPS/nav.xhtml", buildNavigation(payload))
+            } else {
+                zip.textEntry("OEBPS/toc.ncx", buildNcx(payload))
+            }
+            zip.textEntry("OEBPS/content.opf", buildPackage(payload, imageNames, coverImageName, epub3))
         }
     }
 
@@ -537,6 +549,7 @@ class EbookExportWriter(
         payload: EbookExportPayload,
         imageNames: Set<String>,
         coverImageName: String?,
+        epub3: Boolean,
     ): String {
         val metadataDate = payload.metadataDate
             ?.trim()
@@ -548,7 +561,9 @@ class EbookExportWriter(
             ?: "urn:uuid:${UUID.nameUUIDFromBytes("${payload.title}\u0000${payload.author}".toByteArray())}"
         return buildString {
             append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-            append("<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" unique-identifier=\"book-id\">")
+            append("<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"")
+                .append(if (epub3) "3.0" else "2.0")
+                .append("\" unique-identifier=\"book-id\">")
             append("<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">")
             append("<dc:identifier id=\"book-id\">").append(xml(id)).append("</dc:identifier>")
             append("<dc:title>").append(xml(payload.title)).append("</dc:title>")
@@ -560,14 +575,21 @@ class EbookExportWriter(
             payload.subjects.map(String::trim).filter(String::isNotBlank).distinct().forEach { subject ->
                 append("<dc:subject>").append(xml(subject)).append("</dc:subject>")
             }
-            append("<meta property=\"dcterms:modified\">").append(xml(metadataDate)).append("</meta>")
-            if (payload.layoutMode == "FIXED_PAGE") {
+            if (epub3) {
+                append("<meta property=\"dcterms:modified\">").append(xml(metadataDate)).append("</meta>")
+            }
+            if (epub3 && payload.layoutMode == "FIXED_PAGE") {
                 append("<meta property=\"rendition:layout\">pre-paginated</meta>")
                 append("<meta property=\"rendition:orientation\">auto</meta>")
                 append("<meta property=\"rendition:spread\">auto</meta>")
             }
             append("</metadata>")
-            append("<manifest><item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/>")
+            append("<manifest>")
+            if (epub3) {
+                append("<item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/>")
+            } else {
+                append("<item id=\"ncx\" href=\"toc.ncx\" media-type=\"application/x-dtbncx+xml\"/>")
+            }
             append("<item id=\"css\" href=\"styles.css\" media-type=\"text/css\"/>")
             append("<item id=\"intro\" href=\"intro.xhtml\" media-type=\"application/xhtml+xml\"/>")
             payload.chapters.indices.forEach { index ->
@@ -588,11 +610,40 @@ class EbookExportWriter(
                         .append("\"/>")
                 }
             }
-            append("</manifest><spine><itemref idref=\"intro\"/>")
+            append("</manifest><spine")
+            if (!epub3) append(" toc=\"ncx\"")
+            append("><itemref idref=\"intro\"/>")
             payload.chapters.indices.forEach { index ->
                 append("<itemref idref=\"chapter_").append(index).append("\"/>")
             }
             append("</spine></package>")
+        }
+    }
+
+    private fun buildNcx(payload: EbookExportPayload): String {
+        val identifier = payload.identifier
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?: "urn:uuid:${UUID.nameUUIDFromBytes("${payload.title}\u0000${payload.author}".toByteArray())}"
+        return buildString {
+        append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+        append("<ncx xmlns=\"http://www.daisy.org/z3986/2005/ncx/\" version=\"2005-1\">")
+        append("<head><meta name=\"dtb:uid\" content=\"")
+            .append(xml(identifier))
+            .append("\"/></head>")
+        append("<docTitle><text>").append(xml(payload.title)).append("</text></docTitle>")
+        append("<navMap>")
+        append("<navPoint id=\"intro\" playOrder=\"1\"><navLabel><text>")
+            .append(xml(payload.labels.introduction))
+            .append("</text></navLabel><content src=\"intro.xhtml\"/></navPoint>")
+        payload.chapters.forEachIndexed { index, chapter ->
+            val order = index + 2
+            append("<navPoint id=\"chapter_").append(index).append("\" playOrder=\"").append(order)
+                .append("\"><navLabel><text>").append(xml(chapter.title))
+                .append("</text></navLabel><content src=\"Text/chapter_").append(index)
+                .append(".xhtml\"/></navPoint>")
+        }
+        append("</navMap></ncx>")
         }
     }
 

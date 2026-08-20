@@ -1,8 +1,12 @@
 <template>
-  <div class="title" data-chapterpos="0" ref="titleRef">{{ title }}</div>
+  <div class="title" :class="{ 'tts-active-title': activeParagraphIndex === -2 }" data-chapterpos="0" ref="titleRef">{{ title }}</div>
   <div
     v-for="(para, index) in contents"
     :key="index"
+    :class="{
+      'tts-active-paragraph': activeParagraphIndex === index,
+      'image-content': containsImage(para),
+    }"
     ref="paragraphRef"
     :data-chapterpos="chapterPos[index]"
   >
@@ -35,11 +39,12 @@ const props = defineProps<{
   fontFamily: string
   fontSize: string
   readMode: 'vertical' | 'paged'
+  activeParagraphIndex?: number
 }>()
 
 const getImageSrc = (content: string) => {
-  const imgPattern = /<img[^>]*src="([^"]*(?:"[^>]+\})?)"[^>]*>/
-  const src = content.match(imgPattern)![1] //reg tested in template
+  const imgPattern = /<img\b[^>]*\bsrc\s*=\s*(["'])(.*?)\1[^>]*>/i
+  const src = content.match(imgPattern)?.[2]?.trim() || ''
   if (isLegadoUrl(src))
     return API.getProxyImageUrl(
       bookUrl.value,
@@ -55,6 +60,8 @@ const proxyImage = (event: Event) => {
     readWidth.value,
   )
 }
+
+const containsImage = (content: string) => /<img\b/i.test(content)
 
 const calculateWordCount = (paragraph: string) => {
   const imgPattern = /<img[^>]*src="[^"]*(?:"[^>]+\})?"[^>]*>/g
@@ -87,8 +94,16 @@ const scrollToReadedLength = (length: number) => {
     }
   })
 }
+const scrollToParagraph = (index: number, behavior: ScrollBehavior = 'auto') => {
+  nextTick(() => {
+    const paragraph = paragraphRef.value?.[index]
+    if (!paragraph) return
+    paragraph.scrollIntoView({ behavior, block: 'center', inline: 'start' })
+  })
+}
 defineExpose({
   scrollToReadedLength,
+  scrollToParagraph,
 })
 let intersectionObserver: IntersectionObserver | null = null
 const emit = defineEmits(['readedLengthChange'])
@@ -132,6 +147,18 @@ onUnmounted(() => {
     sans-serif;
 }
 
+.tts-active-title,
+.tts-active-paragraph p {
+  font-weight: 700;
+}
+
+.tts-active-paragraph {
+  padding: 0 10px;
+  border-inline-start: 3px solid #b97935;
+  border-radius: 4px;
+  background: rgba(230, 184, 102, 0.18);
+}
+
 p {
   display: block;
   word-wrap: break-word;
@@ -148,5 +175,17 @@ p {
 .full {
   display: block;
   width: 100%;
+}
+
+.image-content p {
+  margin: 0;
+}
+
+.image-content :deep(img) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto !important;
+  object-fit: contain;
 }
 </style>

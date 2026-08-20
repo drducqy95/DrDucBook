@@ -24,6 +24,8 @@ import io.legado.app.help.vbook.VbookPluginAdapter
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.TextEncodingRepair
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -73,78 +75,65 @@ class MediaResolverRepository(
                         System.currentTimeMillis(),
                     )
                 }
-                val media = if (offline != null) {
-                    ResolvedMedia(
-                        sourceId = "offline",
-                        contentId = offline.id,
-                        title = chapter.title,
-                        variants = listOf(
-                            ResolvedMediaVariant(
-                                id = "offline:${offline.id}",
-                                title = "Offline",
-                                uri = File(offline.localPath).toURI().toString(),
-                                contentKind = if (book.isVideo) {
-                                    MediaContentKind.VIDEO
-                                } else {
-                                    MediaContentKind.AUDIO
-                                },
-                                protocol = MediaProtocol.DIRECT,
-                                mimeType = offline.mimeType,
-                                headers = emptyMap(),
-                                referer = "",
-                                expiresAt = null,
-                                downloadSupported = false,
-                                externalPlayerRequired = false,
-                            )
-                        ),
-                        subtitles = emptyList(),
-                        audioTracks = emptyList(),
-                        resolvedAt = System.currentTimeMillis(),
-                    )
-                } else if (book.origin == BookType.localTag && !chapter.resourceUrl.isNullOrBlank()) {
-                    val localMedia = MediaUriResolver.resolve(
-                        sourceId = BookType.localTag,
-                        contentId = chapter.url,
-                        title = chapter.title,
-                        uri = chapter.resourceUrl!!,
-                        defaultKind = MediaContentKind.AUDIO,
-                        headers = emptyMap(),
-                    )
-                    localMedia.copy(
-                        variants = localMedia.variants.map {
-                            it.copy(downloadSupported = false)
-                        }
-                    )
-                } else if (source != null && VbookPluginAdapter.canHandle(source)) {
-                    VbookPluginAdapter.resolveMedia(source, book, chapter)
-                } else if (source != null && (book.isAudio || book.isVideo)) {
-                    resolveSourceContentRuleMedia(
-                        source = source,
-                        book = book,
-                        chapter = chapter,
-                        nextChapterUrl = chapters.getOrNull(position + 1)?.url,
-                    )
-                } else {
-                    val analyzed = AnalyzeUrl(
-                        mUrl = chapter.getAbsoluteURL(),
-                        source = source,
-                        ruleData = book,
-                        chapter = chapter,
-                        coroutineContext = coroutineContext,
-                    )
-                    val (resolvedUrl, headers) = analyzed.getUrlAndHeaders()
-                    MediaUriResolver.resolve(
-                        sourceId = source?.bookSourceUrl.orEmpty().ifBlank { book.origin },
-                        contentId = chapter.url,
-                        title = chapter.title,
-                        uri = resolvedUrl,
-                        defaultKind = if (book.isVideo) {
+                val offlineVariant = offline?.let { item ->
+                    val localFile = File(item.localPath)
+                    ResolvedMediaVariant(
+                        id = "offline:${item.id}",
+                        title = "Ngoại tuyến",
+                        uri = localFile.toURI().toString(),
+                        contentKind = if (book.isVideo) {
                             MediaContentKind.VIDEO
                         } else {
                             MediaContentKind.AUDIO
                         },
-                        headers = headers,
+                        protocol = MediaProtocol.DIRECT,
+                        mimeType = item.mimeType.ifBlank { mimeTypeForLocalFile(localFile, book.isVideo) },
+                        headers = emptyMap(),
+                        referer = "",
+                        expiresAt = null,
+                        downloadSupported = false,
+                        externalPlayerRequired = false,
                     )
+                }
+                // A completed download retains the URL and request headers used by the app.
+                // Expose that URL directly so the web can switch back to the original source
+                // without resolving the source again (and without delaying offline playback).
+                val downloadedSourceVariant = offline?.let { item ->
+                    val uri = item.sourceUri.trim()
+                    if (uri.isBlank() || !uri.startsWith("http", ignoreCase = true)) null
+                    else ResolvedMediaVariant(
+                        id = "source:${item.id}",
+                        title = "Nguồn gốc",
+                        uri = uri,
+                        contentKind = if (book.isVideo) MediaContentKind.VIDEO else MediaContentKind.AUDIO,
+                        protocol = runCatching { MediaProtocol.valueOf(item.protocol) }
+                            .getOrDefault(MediaProtocol.DIRECT),
+                        mimeType = item.mimeType.ifBlank { if (book.isVideo) "video/*" else "audio/*" },
+                        headers = GSON.fromJsonObject<HashMap<String, String>>(item.headersJson)
+                            .getOrNull().orEmpty(),
+                        referer = "",
+                        expiresAt = item.expiresAt,
+                        downloadSupported = true,
+                        externalPlayerRequired = false,
+                    )
+                }
+                val onlineMedia = if (offlineVariant != null) null else resolveOnlineMedia(
+                    source = source,
+                    book = book,
+                    chapter = chapter,
+                    nextChapterUrl = chapters.getOrNull(position + 1)?.url,
+                )
+                val media = when {
+                    offlineVariant != null -> ResolvedMedia(
+                        sourceId = "offline",
+                        contentId = requireNotNull(offline).id,
+                        title = chapter.title,
+                        variants = listOfNotNull(offlineVariant, downloadedSourceVariant),
+                        subtitles = emptyList(),
+                        audioTracks = emptyList(),
+                        resolvedAt = System.currentTimeMillis(),
+                    )
+                    else -> requireNotNull(onlineMedia)
                 }
                 val normalizedMedia = media.copy(
                     title = TextEncodingRepair.repair(media.title).orEmpty(),
@@ -222,6 +211,69 @@ class MediaResolverRepository(
         }
         bookDao.update(book)
         return loaded.filterNot { it.isVolume }
+    }
+
+    private suspend fun resolveOnlineMedia(
+        source: BookSource?,
+        book: Book,
+        chapter: BookChapter,
+        nextChapterUrl: String?,
+    ): ResolvedMedia {
+        return if (book.origin == BookType.localTag && !chapter.resourceUrl.isNullOrBlank()) {
+            val localMedia = MediaUriResolver.resolve(
+                sourceId = BookType.localTag,
+                contentId = chapter.url,
+                title = chapter.title,
+                uri = chapter.resourceUrl!!,
+                defaultKind = MediaContentKind.AUDIO,
+                headers = emptyMap(),
+            )
+            localMedia.copy(
+                variants = localMedia.variants.map { it.copy(downloadSupported = false) },
+            )
+        } else if (source != null && VbookPluginAdapter.canHandle(source)) {
+            VbookPluginAdapter.resolveMedia(source, book, chapter)
+        } else if (source != null && (book.isAudio || book.isVideo)) {
+            resolveSourceContentRuleMedia(
+                source = source,
+                book = book,
+                chapter = chapter,
+                nextChapterUrl = nextChapterUrl,
+            )
+        } else {
+            val analyzed = AnalyzeUrl(
+                mUrl = chapter.getAbsoluteURL(),
+                source = source,
+                ruleData = book,
+                chapter = chapter,
+                coroutineContext = coroutineContext,
+            )
+            val (resolvedUrl, headers) = analyzed.getUrlAndHeaders()
+            MediaUriResolver.resolve(
+                sourceId = source?.bookSourceUrl.orEmpty().ifBlank { book.origin },
+                contentId = chapter.url,
+                title = chapter.title,
+                uri = resolvedUrl,
+                defaultKind = if (book.isVideo) MediaContentKind.VIDEO else MediaContentKind.AUDIO,
+                headers = headers,
+            )
+        }
+    }
+
+    private fun mimeTypeForLocalFile(file: File, isVideo: Boolean): String {
+        return when (file.extension.lowercase()) {
+            "mp4" -> "video/mp4"
+            "webm" -> "video/webm"
+            "mkv" -> "video/x-matroska"
+            "ts" -> "video/mp2t"
+            "mp3" -> "audio/mpeg"
+            "m4a" -> "audio/mp4"
+            "aac" -> "audio/aac"
+            "ogg", "opus" -> "audio/ogg"
+            "flac" -> "audio/flac"
+            "wav" -> "audio/wav"
+            else -> if (isVideo) "video/*" else "audio/*"
+        }
     }
 
     private suspend fun resolveSourceContentRuleMedia(

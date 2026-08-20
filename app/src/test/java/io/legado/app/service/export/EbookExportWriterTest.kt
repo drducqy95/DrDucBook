@@ -145,6 +145,37 @@ class EbookExportWriterTest {
     }
 
     @Test
+    fun epub2ExportUsesNcxAndVersionTwoPackage() {
+        val directory = Files.createTempDirectory("ebook-writer-epub2").toFile()
+        try {
+            val target = EbookExportWriter(outputDirectory(directory), Charsets.UTF_8)
+                .write(
+                    EbookExportPayload(
+                        title = "Book",
+                        author = "Author",
+                        intro = "Intro",
+                        language = "vi",
+                        chapters = listOf(EbookExportChapter(0, "One", "<p>Text</p>", "Text")),
+                    ),
+                    EbookExportFormat.EPUB2,
+                    "book.epub",
+                ).asFile()!!
+
+            ZipFile(target).use { zip ->
+                val packageText = zip.getInputStream(zip.getEntry("OEBPS/content.opf"))
+                    .bufferedReader().use { it.readText() }
+                assertTrue(packageText.contains("version=\"2.0\""))
+                assertTrue(packageText.contains("href=\"toc.ncx\""))
+                assertTrue(packageText.contains("<spine toc=\"ncx\">"))
+                assertTrue(zip.getEntry("OEBPS/toc.ncx") != null)
+                assertTrue(zip.getEntry("OEBPS/nav.xhtml") == null)
+            }
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun exportRewritesAbsoluteAndRelativeImageReferences() {
         val directory = Files.createTempDirectory("ebook-writer-image-alias").toFile()
         val assets = Files.createTempDirectory("ebook-writer-image-alias-assets").toFile()

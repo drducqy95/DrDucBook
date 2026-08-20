@@ -233,7 +233,16 @@ class ReadBookViewModel(
 
     // --- MVI State ---
 
-    private val _uiState = MutableStateFlow(ReadBookUiState())
+    private val _uiState = MutableStateFlow(
+        ReadBookUiState(
+            isReadAloudRunning = BaseReadAloudService.isRun || ReadAloud.isLocalSessionRunning,
+            isReadAloudPaused = if (ReadAloud.isLocalSessionRunning) {
+                ReadAloud.isLocalSessionPaused
+            } else {
+                BaseReadAloudService.pause
+            },
+        )
+    )
     val uiState = _uiState.asStateFlow()
 
     private val _effects = MutableSharedFlow<ReadBookEffect>(extraBufferCapacity = 16)
@@ -246,6 +255,23 @@ class ReadBookViewModel(
         )
     )
     val readAloudProgress = _readAloudProgress.asStateFlow()
+
+    /** Reconcile the reader icon with the service, including isolated local TTS. */
+    fun syncReadAloudState() {
+        val running = BaseReadAloudService.isRun || ReadAloud.isLocalSessionRunning
+        val paused = if (ReadAloud.isLocalSessionRunning) {
+            ReadAloud.isLocalSessionPaused
+        } else {
+            BaseReadAloudService.pause
+        }
+        _uiState.update {
+            if (it.isReadAloudRunning == running && it.isReadAloudPaused == paused) {
+                it
+            } else {
+                it.copy(isReadAloudRunning = running, isReadAloudPaused = paused)
+            }
+        }
+    }
 
     private suspend fun emitEffectWhenSubscribed(effect: ReadBookEffect) {
         _effects.subscriptionCount.first { it > 0 }
@@ -434,7 +460,7 @@ class ReadBookViewModel(
             }
 
             is ReadBookIntent.ToggleReadAloud -> {
-                if (!BaseReadAloudService.isRun) {
+                if (!BaseReadAloudService.isRun && !ReadAloud.isLocalSessionRunning) {
                     openReadMenuRoute(ReadBookMenuRoute.ReadAloud)
                 }
                 _effects.tryEmit(ReadBookEffect.ToggleReadAloud)
@@ -2237,7 +2263,8 @@ class ReadBookViewModel(
     }
 
     private fun updateReadAloudProgress(chapterStart: Int) {
-        if (BaseReadAloudService.isPlay() && chapterStart > 0) {
+        val localPlaying = ReadAloud.isLocalSessionRunning && !ReadAloud.isLocalSessionPaused
+        if ((BaseReadAloudService.isPlay() || localPlaying) && chapterStart > 0) {
             _readAloudProgress.value = chapterStart
         }
     }

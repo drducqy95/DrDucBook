@@ -52,8 +52,8 @@
           popper-class="translation-provider-popover"
         >
           <div class="translation-provider-panel" @click.stop>
-            <strong>Đọc bản dịch</strong>
-            <label>Provider</label>
+            <strong>{{ t('translationReader') }}</strong>
+            <label>{{ t('provider') }}</label>
             <el-select
               v-model="selectedTranslationProvider"
               :disabled="translationLoading"
@@ -66,7 +66,7 @@
                 :value="provider.id"
               />
             </el-select>
-            <label>Ngôn ngữ đích</label>
+            <label>{{ t('targetLanguage') }}</label>
             <el-select
               v-model="selectedTargetLanguage"
               :disabled="translationLoading"
@@ -87,8 +87,40 @@
             >
               {{ translationToolText }}
             </el-button>
-            <el-button plain :loading="ttsLoading" :disabled="noPoint || chapterData.length === 0" @click="speakCurrentChapter">
-              Nghe chương hiện tại
+            <div class="pretranslate-controls">
+              <el-input-number
+                v-model="pretranslateCount"
+                :min="1"
+                :max="50"
+                :step="1"
+                size="small"
+                controls-position="right"
+                :disabled="pretranslateLoading || noPoint"
+                :aria-label="t('pretranslateCount')"
+              />
+              <el-button
+                plain
+                size="small"
+                :loading="pretranslateLoading"
+                :disabled="noPoint || !canUseWebTranslation"
+                @click="pretranslateChapters"
+              >
+                {{ t('pretranslate') }}
+              </el-button>
+            </div>
+            <el-button plain :loading="ttsLoading" :disabled="noPoint || chapterData.length === 0" @click="ttsPlaying ? stopWebTts() : speakCurrentChapter()">
+              {{ ttsPlaying ? t('stopReading') : t('listenCurrent') }}
+            </el-button>
+            <el-select v-model="exportFormat" size="small" :disabled="exportLoading || noPoint" aria-label="Định dạng ebook">
+              <el-option label="EPUB 3" value="epub3" />
+              <el-option label="EPUB 2" value="epub2" />
+              <el-option label="PDF" value="pdf" />
+              <el-option label="HTML" value="html" />
+              <el-option label="TXT" value="txt" />
+              <el-option label="CBZ" value="cbz" />
+            </el-select>
+            <el-button plain :loading="exportLoading" :disabled="noPoint" @click="exportCurrentBook">
+              {{ t('exportEbook') }}
             </el-button>
           </div>
           <template #reference>
@@ -144,6 +176,30 @@
     <div v-if="translationStatusText" class="translation-status">
       {{ translationStatusText }}
     </div>
+    <div v-if="ttsControlVisible" class="tts-control-panel" @click.stop>
+      <div class="tts-control-heading">
+        <strong>{{ t('listenCurrent') }}</strong>
+        <span>{{ ttsProgressLabel }}</span>
+      </div>
+      <div class="tts-progress-track" role="progressbar" :aria-valuenow="ttsProgress" aria-valuemin="0" aria-valuemax="100">
+        <span class="tts-progress-value" :style="{ width: `${ttsProgress}%` }" />
+      </div>
+      <div class="tts-control-actions">
+        <button type="button" :aria-label="t('previousChapter')" :title="t('previousChapter')" @click="skipWebTtsChapter(-1)">‹</button>
+        <button
+          type="button"
+          class="tts-main-action"
+          :disabled="!ttsAudioReady || ttsLoading"
+          :aria-label="ttsPaused ? t('resumeReading') : t('pauseReading')"
+          :title="ttsPaused ? t('resumeReading') : t('pauseReading')"
+          @click="toggleWebTtsPause"
+        >
+          {{ ttsPaused ? '▶' : 'Ⅱ' }}
+        </button>
+        <button type="button" :aria-label="t('stopReading')" :title="t('stopReading')" @click="stopWebTts">■</button>
+        <button type="button" :aria-label="t('nextChapter')" :title="t('nextChapter')" @click="skipWebTtsChapter(1)">›</button>
+      </div>
+    </div>
     <div
       class="chapter"
       ref="content"
@@ -178,6 +234,7 @@
             :fontSize="fontSize"
             :fontFamily="fontFamily"
             :readMode="readMode"
+            :activeParagraphIndex="ttsActiveChapter === data.index ? ttsActiveParagraph : -1"
             @readedLengthChange="onReadedLengthChange"
             v-if="showContent"
           />
@@ -196,10 +253,15 @@ import API from '@api'
 import {
   cancelWebServiceTranslationJob,
   createWebServiceTranslationJob,
+  downloadWebServiceExportEbook,
+  getWebServiceTtsCapabilities,
   getWebServiceTranslationContent,
   getWebServiceTranslationJob,
   getWebServiceTranslationProviders,
+  pretranslateWebServiceChapters,
+  resolveWebServiceUrl,
   synthesizeWebServiceTts,
+  type WebServiceTtsSynthesisResponse,
   type WebServiceTranslationProvider,
   type WebServiceTranslationJobResponse,
 } from '@/api/webService'
@@ -208,6 +270,8 @@ import { useThrottleFn } from '@vueuse/shared'
 import { isNullOrBlank } from '@/utils/utils'
 import { initXboxGamepad } from '@/utils/xboxGamepad'
 import { getReaderPreferences } from '@/utils/clientPreferences'
+import { withWebSession } from '@/api/webSession'
+import { t } from '@/i18n'
 
 const content = ref()
 // loading spinner
@@ -215,7 +279,31 @@ const { isLoading, loadingWrapper } = useLoading(content, 'Đang tải thông ti
 const store = useBookStore()
 const webServiceStore = useWebServiceStore()
 const ttsLoading = ref(false)
+const ttsPlaying = ref(false)
+const ttsPaused = ref(false)
+const ttsAudioReady = ref(false)
+const ttsActiveChapter = ref<number | null>(null)
+const ttsActiveParagraph = ref(-1)
+const ttsActiveParagraphCount = ref(0)
+const exportLoading = ref(false)
+const pretranslateLoading = ref(false)
+const pretranslateCount = ref(10)
+const exportFormat = ref<'epub2' | 'epub3' | 'pdf' | 'txt' | 'html' | 'cbz'>('epub3')
 let ttsAudio: HTMLAudioElement | null = null
+let ttsPlaybackToken = 0
+
+const ttsControlVisible = computed(() =>
+  ttsPlaying.value || ttsPaused.value || ttsLoading.value || ttsActiveChapter.value !== null,
+)
+const ttsProgress = computed(() => {
+  if (ttsActiveParagraphCount.value <= 0 || ttsActiveParagraph.value < 0) return 0
+  return Math.min(100, Math.round(((ttsActiveParagraph.value + 1) / ttsActiveParagraphCount.value) * 100))
+})
+const ttsProgressLabel = computed(() => {
+  const title = catalog.value[ttsActiveChapter.value ?? chapterIndex.value]?.title || t('listenCurrent')
+  if (ttsActiveParagraphCount.value <= 0 || ttsActiveParagraph.value < 0) return title
+  return `${title} · ${ttsActiveParagraph.value + 1}/${ttsActiveParagraphCount.value}`
+})
 
 const {
   catalog,
@@ -228,6 +316,40 @@ const {
   isNight,
 } = storeToRefs(store)
 const readMode = computed(() => store.config.readMode || 'vertical')
+
+const saveBlob = (blob: Blob, fileName: string) => {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+const exportCurrentBook = async () => {
+  if (!webServiceStore.policy?.exportEnabled) {
+    ElMessage.warning('Export đang tắt trong WebService')
+    return
+  }
+  const bookUrl = store.readingBook.bookUrl
+  if (!bookUrl) return
+  exportLoading.value = true
+  try {
+    const download = await downloadWebServiceExportEbook({
+      bookUrl,
+      format: exportFormat.value,
+      scope: 'all',
+      contentSource: 'original',
+      imageOptimization: 'balanced',
+    })
+    saveBlob(download.blob, download.fileName || `book.${exportFormat.value}`)
+    ElMessage.success('Đã tạo ebook và tải xuống')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'Không thể xuất ebook')
+  } finally {
+    exportLoading.value = false
+  }
+}
 
 const chapterPos = computed({
   get: () => store.readingBook.chapterPos,
@@ -460,24 +582,395 @@ const translationToolText = computed(() => {
   return translationReadingEnabled.value ? 'Bản gốc' : 'Bản dịch'
 })
 
-const speakCurrentChapter = async () => {
-  const text = chapterData.value
-    .map(item => `${item.title}\n${(translatedChapters.value[item.index] ?? item.content).join('\n')}`)
-    .join('\n\n')
+type WebTtsChapter = {
+  displayIndex: number
+  title: string
+  paragraphs: string[]
+}
+
+type WebTtsChunk = {
+  text: string
+  startParagraph: number
+  parts: Array<{ paragraphIndex: number; text: string }>
+}
+
+// Valtec ONNX currently accepts at most 420 characters per synthesis call.
+// Keep a margin for punctuation and engine-specific tokenization.
+const WEB_TTS_CHUNK_LIMIT = 360
+const WEB_TTS_PREFETCH_AHEAD = 2
+const WEB_TTS_PREFETCH_CACHE_LIMIT = 6
+const webTtsPrefetchCache = new Map<string, Promise<WebServiceTtsSynthesisResponse | null>>()
+const webTtsChapterCache = new Map<string, Promise<WebTtsChapter>>()
+
+const stopWebTts = () => {
+  ttsPlaybackToken += 1
+  ttsAudio?.pause()
+  if (ttsAudio) {
+    ttsAudio.removeAttribute('src')
+    ttsAudio.load()
+  }
+  ttsAudio = null
+  ttsAudioReady.value = false
+  ttsLoading.value = false
+  ttsPlaying.value = false
+  ttsPaused.value = false
+  ttsActiveChapter.value = null
+  ttsActiveParagraph.value = -1
+  ttsActiveParagraphCount.value = 0
+  webTtsPrefetchCache.clear()
+  webTtsChapterCache.clear()
+}
+
+const toggleWebTtsPause = () => {
+  if (!ttsAudio || !ttsAudioReady.value || !ttsPlaying.value) return
+  if (ttsPaused.value) {
+    ttsAudio.play().then(() => {
+      ttsPaused.value = false
+    }).catch(() => {
+      ElMessage.error('Không thể tiếp tục phát TTS')
+    })
+  } else {
+    ttsAudio.pause()
+    ttsPaused.value = true
+  }
+}
+
+const stripUnsupportedLocalTtsText = (value: string) =>
+  value
+    .replace(/[\u2E80-\u9FFF\uAC00-\uD7AF\u3040-\u30FF\u0400-\u04FF\u0600-\u06FF]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 20_000)
-  if (!text) return
+
+const speechText = (value: string, localOnly = false) => {
+  if (!value || /^\s*<img\b/i.test(value)) return ''
+  const element = document.createElement('div')
+  element.innerHTML = value
+  const text = (element.textContent || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return localOnly ? stripUnsupportedLocalTtsText(text) : text
+}
+
+const splitLongWebTtsParagraph = (paragraph: string, paragraphIndex: number): WebTtsChunk[] => {
+  const chunks: WebTtsChunk[] = []
+  let remaining = paragraph.trim()
+  while (remaining.length > WEB_TTS_CHUNK_LIMIT) {
+    const candidate = remaining.slice(0, WEB_TTS_CHUNK_LIMIT + 1)
+    const breakPositions = [...candidate.matchAll(/[\s၊。！？；：,.!?;:]/g)].map(match => match.index ?? 0)
+    const preferredBreak = breakPositions.filter(position => position >= WEB_TTS_CHUNK_LIMIT * 0.55).pop()
+    const cutAt = preferredBreak && preferredBreak > 0
+      ? preferredBreak + 1
+      : WEB_TTS_CHUNK_LIMIT
+    const text = remaining.slice(0, cutAt).trim()
+    if (!text) break
+    chunks.push({
+      text,
+      startParagraph: paragraphIndex,
+      parts: [{ paragraphIndex, text }],
+    })
+    remaining = remaining.slice(cutAt).trim()
+  }
+  if (remaining) {
+    chunks.push({
+      text: remaining,
+      startParagraph: paragraphIndex,
+      parts: [{ paragraphIndex, text: remaining }],
+    })
+  }
+  return chunks
+}
+
+const splitWebTtsChunks = (paragraphs: string[]): WebTtsChunk[] => {
+  return paragraphs.flatMap((paragraph, index) =>
+    splitLongWebTtsParagraph(paragraph, index),
+  )
+}
+
+const webTtsChunkCacheKey = (chunk: WebTtsChunk) =>
+  `${store.readingBook.bookUrl}\u0000${chunk.text}`
+
+const synthesizeWebTtsChunk = async (chunk: WebTtsChunk) => {
+  try {
+    return await synthesizeWebServiceTts(chunk.text, undefined, store.readingBook.bookUrl)
+  } catch (error: any) {
+    const serverError = error?.response?.data?.error || error?.response?.data?.message
+    if (serverError === 'TTS_TEXT_UNSUPPORTED_LOCAL' || serverError === 'TTS_TEXT_REQUIRED') return null
+    throw error
+  }
+}
+
+const trimWebTtsPrefetchCache = () => {
+  while (webTtsPrefetchCache.size > WEB_TTS_PREFETCH_CACHE_LIMIT) {
+    const oldest = webTtsPrefetchCache.keys().next().value
+    if (!oldest) break
+    webTtsPrefetchCache.delete(oldest)
+  }
+}
+
+const prefetchWebTtsChunks = (chunks: WebTtsChunk[], token: number) => {
+  let previousTask: Promise<WebServiceTtsSynthesisResponse | null> = Promise.resolve(null)
+  chunks.forEach(chunk => {
+    if (token !== ttsPlaybackToken) return
+    const key = webTtsChunkCacheKey(chunk)
+    const existingTask = webTtsPrefetchCache.get(key)
+    if (existingTask) {
+      previousTask = existingTask.catch(() => null)
+      return
+    }
+    const task = previousTask
+      .catch(() => null)
+      .then(() => {
+        if (token !== ttsPlaybackToken) return null
+        return synthesizeWebTtsChunk(chunk).catch(() => null)
+      })
+    webTtsPrefetchCache.set(key, task)
+    previousTask = task
+  })
+  trimWebTtsPrefetchCache()
+}
+
+const getWebTtsChunkSynthesis = async (chunk: WebTtsChunk) => {
+  const key = webTtsChunkCacheKey(chunk)
+  const prefetched = webTtsPrefetchCache.get(key)
+  if (prefetched) {
+    webTtsPrefetchCache.delete(key)
+    const result = await prefetched
+    if (result) return result
+  }
+  return synthesizeWebTtsChunk(chunk)
+}
+
+const loadWebTtsChapter = async (displayIndex: number, localOnly = false): Promise<WebTtsChapter> => {
+  const cacheKey = `${store.readingBook.bookUrl}\u0000${displayIndex}\u0000${localOnly ? 'local' : 'full'}`
+  const cached = webTtsChapterCache.get(cacheKey)
+  if (cached) return cached
+  const task = (async () => {
+    const chapter = catalog.value[displayIndex]
+    if (!chapter) throw new Error('Không tìm thấy chương cần đọc')
+    let paragraphs = translatedChapters.value[displayIndex]
+    const loaded = chapterData.value.find(item => item.index === displayIndex)
+    if (!paragraphs && loaded) paragraphs = loaded.content
+    if (!paragraphs) {
+      const response = await API.getBookContent(store.readingBook.bookUrl, chapter.index)
+      if (!response.data.isSuccess) throw new Error(response.data.errorMsg || 'Không tải được chương để đọc')
+      paragraphs = splitChapterContent(response.data.data || '')
+    }
+    const spokenParagraphs = paragraphs.map(paragraph => speechText(paragraph, localOnly))
+    return { displayIndex, title: speechText(chapter.title, localOnly), paragraphs: spokenParagraphs }
+  })().catch(error => {
+    webTtsChapterCache.delete(cacheKey)
+    throw error
+  })
+  webTtsChapterCache.set(cacheKey, task)
+  return task
+}
+
+const prefetchWebTtsChapterHead = async (
+  displayIndex: number,
+  localOnly: boolean,
+  token: number,
+  limit: number,
+) => {
+  if (displayIndex < 0 || displayIndex >= catalog.value.length || limit <= 0 || token !== ttsPlaybackToken) return
+  try {
+    const chapter = await loadWebTtsChapter(displayIndex, localOnly)
+    if (token !== ttsPlaybackToken) return
+    const chapterParagraphs = [chapter.title, ...chapter.paragraphs]
+    prefetchWebTtsChunks(splitWebTtsChunks(chapterParagraphs).slice(0, limit), token)
+  } catch {
+    // The normal chapter loop will surface a load/synthesis error if the user
+    // actually reaches this chapter. Prefetch failures should not interrupt
+    // the current audio.
+  }
+}
+
+const waitForWebTtsChapter = async (displayIndex: number, token: number) => {
+  for (let attempt = 0; attempt < 160 && token === ttsPlaybackToken; attempt += 1) {
+    if (chapterData.value.some(item => item.index === displayIndex) && showContent.value) return true
+    await new Promise(resolve => window.setTimeout(resolve, 50))
+  }
+  return token === ttsPlaybackToken
+}
+
+const updateWebTtsPosition = async (
+  displayIndex: number,
+  startParagraph: number,
+  paragraphCount: number,
+  token: number,
+) => {
+  if (token !== ttsPlaybackToken) return
+  ttsActiveChapter.value = displayIndex
+  ttsActiveParagraph.value = startParagraph === 0 ? -2 : startParagraph - 1
+  ttsActiveParagraphCount.value = Math.max(0, paragraphCount - 1)
+  if (chapterIndex.value !== displayIndex || !chapterData.value.some(item => item.index === displayIndex)) {
+    getContent(displayIndex)
+    await waitForWebTtsChapter(displayIndex, token)
+  }
+  if (token !== ttsPlaybackToken) return
+  const position = Math.max(0, startParagraph === 0
+    ? 0
+    : Math.round(startParagraph / Math.max(1, paragraphCount) * 20_000))
+  saveReadingBookProgressToBrowser(displayIndex, position)
+  await nextTick()
+  if (readMode.value === 'paged' && content.value) {
+    const maxScroll = Math.max(0, content.value.scrollWidth - content.value.clientWidth)
+    const ratio = startParagraph / Math.max(1, paragraphCount)
+    content.value.scrollTo({ left: maxScroll * ratio, behavior: 'smooth' })
+  } else {
+    const renderedIndex = chapterData.value.findIndex(item => item.index === displayIndex)
+    const renderedChapter = chapterRef.value?.[renderedIndex]
+    renderedChapter?.scrollToReadedLength(position)
+  }
+}
+
+const playWebTtsChunk = async (
+  chunk: WebTtsChunk,
+  token: number,
+  displayIndex: number,
+  paragraphCount: number,
+  prefetchChunks: WebTtsChunk[] = [],
+  afterCurrentReady?: () => void,
+) => {
+  if (token !== ttsPlaybackToken) return
+  const result = await getWebTtsChunkSynthesis(chunk)
+  if (!result) return
+  if (token !== ttsPlaybackToken) return
+  prefetchWebTtsChunks(prefetchChunks, token)
+  afterCurrentReady?.()
+  ttsAudio?.pause()
+  const audioUrl = withWebSession(new URL(resolveWebServiceUrl(result.audioUrl)))
+  audioUrl.searchParams.set('t', String(Date.now()))
+  const audio = new Audio(audioUrl.toString())
+  audio.preload = 'auto'
+  audio.setAttribute('playsinline', 'true')
+  ttsAudio = audio
+  ttsAudioReady.value = true
+  ttsPaused.value = false
+  let lastParagraphIndex = chunk.startParagraph
+  const syncActiveParagraph = () => {
+    if (token !== ttsPlaybackToken || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+    const targetLength = Math.min(chunk.text.length, Math.max(0, audio.currentTime / audio.duration * chunk.text.length))
+    let offset = 0
+    let paragraphIndex = chunk.startParagraph
+    for (const part of chunk.parts) {
+      offset += part.text.length + 1
+      if (targetLength <= offset) {
+        paragraphIndex = part.paragraphIndex
+        break
+      }
+    }
+    if (paragraphIndex === lastParagraphIndex) return
+    lastParagraphIndex = paragraphIndex
+    ttsActiveChapter.value = displayIndex
+    ttsActiveParagraph.value = paragraphIndex === 0 ? -2 : paragraphIndex - 1
+    void nextTick(() => {
+      const renderedIndex = chapterData.value.findIndex(item => item.index === displayIndex)
+      const renderedChapter = chapterRef.value?.[renderedIndex]
+      if (paragraphIndex > 0) renderedChapter?.scrollToParagraph(paragraphIndex - 1)
+    })
+  }
+  audio.addEventListener('loadedmetadata', syncActiveParagraph)
+  audio.addEventListener('timeupdate', syncActiveParagraph)
+  await updateWebTtsPosition(displayIndex, chunk.startParagraph, paragraphCount, token)
+  if (token !== ttsPlaybackToken) return
+  await new Promise<void>((resolve, reject) => {
+    audio.onended = () => {
+      audio.removeEventListener('loadedmetadata', syncActiveParagraph)
+      audio.removeEventListener('timeupdate', syncActiveParagraph)
+      resolve()
+    }
+    audio.onerror = () => {
+      audio.removeEventListener('loadedmetadata', syncActiveParagraph)
+      audio.removeEventListener('timeupdate', syncActiveParagraph)
+      reject(new Error('TTS_AUDIO_PLAYBACK_FAILED'))
+    }
+    audio.play()
+      .then(() => {
+        if (token === ttsPlaybackToken) ttsLoading.value = false
+      })
+      .catch(reject)
+  })
+}
+
+const skipWebTtsChapter = async (direction: number) => {
+  const current = ttsActiveChapter.value ?? chapterIndex.value
+  const target = current + direction
+  if (target < 0 || target >= catalog.value.length) {
+    ElMessage.info(direction < 0 ? 'Đây là chương đầu' : 'Đây là chương cuối')
+    return
+  }
+  const shouldResume = ttsPlaying.value || ttsPaused.value || ttsLoading.value
+  stopWebTts()
+  getContent(target)
+  if (!shouldResume) return
+  await waitForWebTtsChapter(target, ttsPlaybackToken)
+  if (target === chapterIndex.value) void speakCurrentChapter()
+}
+
+const speakCurrentChapter = async () => {
+  if (ttsPlaying.value) return
+  const token = ++ttsPlaybackToken
+  ttsPlaying.value = true
   ttsLoading.value = true
   try {
-    const result = await synthesizeWebServiceTts(text)
-    ttsAudio?.pause()
-    const base = /^https?:\/\//i.test(result.audioUrl) ? '' : window.location.origin
-    ttsAudio = new Audio(`${base}${result.audioUrl}${result.audioUrl.includes('?') ? '&' : '?'}t=${Date.now()}`)
-    await ttsAudio.play()
-  } catch {
-    ElMessage.error('Không thể phát TTS từ ứng dụng')
+    const capabilities = await getWebServiceTtsCapabilities(store.readingBook.bookUrl)
+    const localOnly = capabilities.engine === 'local' &&
+      !/^(zh|ja|ko|ru|ar)\b/i.test(capabilities.language || '')
+    for (let displayIndex = chapterIndex.value; displayIndex < catalog.value.length; displayIndex += 1) {
+      if (token !== ttsPlaybackToken) return
+      const chapter = await loadWebTtsChapter(displayIndex, localOnly)
+      // Keep empty/image entries so the TTS paragraph index stays aligned with
+      // the exact list rendered by ChapterContent.
+      const chapterParagraphs = [chapter.title, ...chapter.paragraphs]
+      const chunks = splitWebTtsChunks(chapterParagraphs)
+      if (chunks.length === 0) continue
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+        if (token !== ttsPlaybackToken) return
+        const prefetchChunks = chunks.slice(
+          chunkIndex + 1,
+          chunkIndex + 1 + WEB_TTS_PREFETCH_AHEAD,
+        )
+        const missingLookahead = WEB_TTS_PREFETCH_AHEAD - prefetchChunks.length
+        const prefetchNextChapter = missingLookahead > 0 && displayIndex + 1 < catalog.value.length
+          ? () => {
+              void prefetchWebTtsChapterHead(
+                displayIndex + 1,
+                localOnly,
+                token,
+                missingLookahead,
+              )
+            }
+          : undefined
+        await playWebTtsChunk(
+          chunks[chunkIndex],
+          token,
+          displayIndex,
+          chapterParagraphs.length,
+          prefetchChunks,
+          prefetchNextChapter,
+        )
+        ttsLoading.value = false
+      }
+    }
+    if (token === ttsPlaybackToken) ElMessage.success('Đã đọc hết sách')
+  } catch (error: any) {
+    if (token !== ttsPlaybackToken) return
+    const serverError = error?.response?.data?.error || error?.response?.data?.message
+    const code = typeof serverError === 'string' ? serverError : error instanceof Error ? error.message : ''
+    ElMessage.error(code ? `Không thể phát TTS từ ứng dụng: ${code}` : 'Không thể phát TTS từ ứng dụng')
   } finally {
-    ttsLoading.value = false
+    if (token === ttsPlaybackToken) {
+      ttsLoading.value = false
+      ttsPlaying.value = false
+      ttsPaused.value = false
+      ttsAudioReady.value = false
+      ttsActiveChapter.value = null
+      ttsActiveParagraph.value = -1
+      ttsActiveParagraphCount.value = 0
+      ttsAudio = null
+    }
   }
 }
 const translationStatusText = computed(() => {
@@ -698,6 +1191,39 @@ const translateChapterForReading = async (displayIndex: number) => {
     ElMessage.error('Không thể đọc hoặc tạo bản dịch cho chương')
   } finally {
     translationLoading.value = false
+  }
+}
+
+const pretranslateChapters = async () => {
+  const bookUrl = store.readingBook.bookUrl
+  if (!bookUrl) return
+  if (!selectedTranslationProvider.value || !selectedTargetLanguage.value) {
+    ElMessage.warning('Hãy chọn provider và ngôn ngữ đích trước')
+    translationPanelVisible.value = true
+    return
+  }
+  if (!webServiceStore.policy) {
+    await webServiceStore.loadPolicy().catch(() => undefined)
+  }
+  if (!canUseWebTranslation.value) {
+    ElMessage.warning('Dịch tự động đang tắt trong WebService')
+    return
+  }
+  pretranslateLoading.value = true
+  try {
+    const result = await pretranslateWebServiceChapters({
+      bookUrl,
+      fromChapter: Math.max(0, chapterIndex.value),
+      count: pretranslateCount.value,
+      provider: selectedTranslationProvider.value,
+      targetLanguage: selectedTargetLanguage.value,
+    }) as { jobs?: Array<unknown> }
+    const count = result.jobs?.length || pretranslateCount.value
+    ElMessage.success(`Đã bắt đầu dịch trước ${count} chương`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : 'Không thể dịch trước chương')
+  } finally {
+    pretranslateLoading.value = false
   }
 }
 
@@ -1033,8 +1559,7 @@ onUnmounted(() => {
   popCataVisible.value = false
   scrollObserver?.disconnect()
   scrollObserver = null
-  ttsAudio?.pause()
-  ttsAudio = null
+  stopWebTts()
 })
 
 const addToBookShelfConfirm = async () => {
@@ -1233,6 +1758,25 @@ onBeforeRouteLeave(async (to, from, next) => {
   .el-button {
     margin-top: 4px;
   }
+
+  :deep(.el-select) {
+    width: 100%;
+  }
+
+  .pretranslate-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    :deep(.el-input-number) {
+      width: 96px;
+    }
+
+    .el-button {
+      flex: 1;
+      min-width: 0;
+    }
+  }
 }
 
 .translation-status {
@@ -1248,6 +1792,98 @@ onBeforeRouteLeave(async (to, from, next) => {
   font-size: 12px;
   line-height: 1.4;
   pointer-events: none;
+}
+
+.tts-control-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 18px;
+  z-index: 103;
+  width: min(360px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid rgba(185, 121, 53, 0.32);
+  border-radius: 14px;
+  background: rgba(255, 251, 242, 0.96);
+  box-shadow: 0 10px 28px rgba(37, 40, 30, 0.2);
+  color: #29413d;
+  backdrop-filter: blur(12px);
+}
+
+.tts-control-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+
+  strong,
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    color: #7c6a54;
+    font-size: 11px;
+  }
+}
+
+.tts-progress-track {
+  height: 5px;
+  margin: 10px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(111, 126, 112, 0.2);
+}
+
+.tts-progress-value {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #b97935;
+  transition: width 0.2s ease;
+}
+
+.tts-control-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  button {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(41, 65, 61, 0.22);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.68);
+    color: #29413d;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+
+    &:hover:not(:disabled) {
+      border-color: #b97935;
+      background: #fff1d8;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+    }
+  }
+
+  .tts-main-action {
+    width: 42px;
+    height: 36px;
+    border-color: #b97935;
+    background: #fff1d8;
+    font-size: 16px;
+  }
 }
 
 .day {
@@ -1295,6 +1931,27 @@ onBeforeRouteLeave(async (to, from, next) => {
     color: #666;
   }
 
+  .tts-control-panel {
+    border-color: rgba(230, 184, 102, 0.35);
+    background: rgba(35, 40, 38, 0.96);
+    color: #f2eee4;
+
+    .tts-control-heading span,
+    .tts-control-actions button {
+      color: #ddd4c2;
+    }
+
+    .tts-control-actions button {
+      border-color: rgba(230, 184, 102, 0.36);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .tts-control-actions .tts-main-action,
+    .tts-control-actions button:hover:not(:disabled) {
+      background: rgba(185, 121, 53, 0.28);
+    }
+  }
+
   :deep(.popper__arrow) {
     background: #666;
   }
@@ -1303,6 +1960,13 @@ onBeforeRouteLeave(async (to, from, next) => {
 @media screen and (max-width: 776px) {
   .translation-status {
     top: 58px;
+  }
+
+  .tts-control-panel {
+    right: 8px;
+    bottom: 52px;
+    left: 8px;
+    width: auto;
   }
 
   .chapter-wrapper {

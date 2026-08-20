@@ -34,7 +34,9 @@ export default defineConfig(({ mode }) => {
             enabledCollections: ["ep"],
           }),
         ],
-        dts: "./src/components.d.ts",
+          // The declaration is checked into the repo; avoid rewriting it during production
+          // builds because the Windows file watcher can keep the generated file locked.
+          dts: false,
       }),
       Icons({
         autoInstall: true,

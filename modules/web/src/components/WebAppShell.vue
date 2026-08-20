@@ -4,77 +4,103 @@
       <div class="brand" role="button" tabindex="0" @click="goHome" @keyup.enter="goHome">
         <span class="brand-mark">D</span>
         <span>
-          <strong>DrDucBook</strong>
-          <small>Kho sách của bạn</small>
+          <strong>{{ serviceName }}</strong>
+          <small>{{ t('library') }}</small>
         </span>
       </div>
 
       <nav class="desktop-nav" aria-label="Điều hướng chính">
         <el-dropdown trigger="click">
-          <button class="nav-button">Danh sách <span>⌄</span></button>
+          <button class="nav-button">{{ t('list') }} <span>⌄</span></button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="goShelf({ status: 'updating' })">Truyện đang cập nhật</el-dropdown-item>
-              <el-dropdown-item @click="goShelf({ status: 'completed' })">Truyện đã hoàn thành</el-dropdown-item>
-              <el-dropdown-item @click="goShelf({})">Toàn bộ giá sách</el-dropdown-item>
+            <el-dropdown-item @click="goShelf({ status: 'updating' })">{{ t('updating') }}</el-dropdown-item>
+            <el-dropdown-item @click="goShelf({ status: 'completed' })">{{ t('completed') }}</el-dropdown-item>
+            <el-dropdown-item @click="goShelf({})">{{ t('allBooks') }}</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
         <el-dropdown trigger="click">
-          <button class="nav-button">Thể loại <span>⌄</span></button>
+          <button class="nav-button">{{ t('types') }} <span>⌄</span></button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item v-for="item in typeItems" :key="item.value" @click="goShelf({ type: item.value })">
                 {{ item.label }}
               </el-dropdown-item>
-              <el-dropdown-item @click="goShelf({})">Tất cả thể loại</el-dropdown-item>
+              <el-dropdown-item @click="goShelf({})">{{ t('allTypes') }}</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
         <el-dropdown trigger="click">
-          <button class="nav-button">Cài đặt hiển thị <span>⌄</span></button>
+          <button class="nav-button">{{ t('display') }} <span>⌄</span></button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="showDisplaySettings = true">Mở cài đặt</el-dropdown-item>
-              <el-dropdown-item @click="showDisplaySettings = true">Hình nền & độ rõ chữ</el-dropdown-item>
+              <el-dropdown-item @click="showDisplaySettings = true">{{ t('openSettings') }}</el-dropdown-item>
+              <el-dropdown-item @click="showDisplaySettings = true">{{ t('backgroundText') }}</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <button class="nav-button" @click="router.push({ name: 'book-home' })">Nguồn sách</button>
-        <button class="nav-button" @click="router.push({ name: 'upload' })">Tải sách lên</button>
-        <button class="nav-button" @click="router.push({ name: 'rss-home' })">Nguồn RSS</button>
+        <button class="nav-button" @click="router.push({ name: 'book-home' })">{{ t('sources') }}</button>
+        <button class="nav-button" @click="router.push({ name: 'discovery' })">{{ t('discovery') }}</button>
+        <button class="nav-button" @click="router.push({ name: 'upload' })">{{ t('upload') }}</button>
+        <button class="nav-button" @click="router.push({ name: 'rss-home' })">{{ t('rss') }}</button>
+        <button class="nav-button" @click="router.push({ name: 'web-service' })">{{ t('webServiceSettings') }}</button>
       </nav>
 
       <div class="header-actions">
-        <el-input
-          v-model="searchText"
-          class="header-search"
-          clearable
-          placeholder="Tìm truyện..."
-          @keyup.enter="submitSearch"
-        >
-          <template #prefix>⌕</template>
-        </el-input>
-        <button class="mobile-menu" aria-label="Mở menu" @click="showMobileMenu = !showMobileMenu">☰</button>
+        <div class="search-control">
+          <el-input
+            v-model="searchText"
+            class="header-search"
+            clearable
+            :placeholder="t('search')"
+            @keyup.enter="submitSearch"
+          >
+            <template #prefix>⌕</template>
+          </el-input>
+          <el-popover placement="bottom-end" trigger="click" width="280">
+            <div class="search-options-panel">
+              <el-switch
+                v-model="chineseSearchEnabled"
+                :active-text="t('searchChinese')"
+                @change="saveSearchPreference"
+              />
+              <p>{{ t('searchChineseHint') }}</p>
+            </div>
+            <template #reference>
+              <button
+                class="search-option-button"
+                :class="{ active: chineseSearchEnabled }"
+                type="button"
+                :aria-label="t('searchChinese')"
+              >
+                中
+              </button>
+            </template>
+          </el-popover>
+        </div>
+        <button class="mobile-menu" :aria-label="t('mobileMenu')" @click="showMobileMenu = !showMobileMenu">☰</button>
       </div>
     </header>
 
     <div v-if="showMobileMenu" class="mobile-nav">
-      <button @click="goShelf({ status: 'updating' })">Đang cập nhật</button>
-      <button @click="goShelf({ status: 'completed' })">Đã hoàn thành</button>
+      <button @click="goShelf({ status: 'updating' })">{{ t('updating') }}</button>
+      <button @click="goShelf({ status: 'completed' })">{{ t('completed') }}</button>
       <button v-for="item in typeItems" :key="item.value" @click="goShelf({ type: item.value })">{{ item.label }}</button>
-      <button @click="showDisplaySettings = true">Cài đặt hiển thị</button>
-      <button @click="router.push({ name: 'book-home' })">Nguồn sách</button>
-      <button @click="router.push({ name: 'upload' })">Tải sách lên</button>
-      <button @click="router.push({ name: 'rss-home' })">Nguồn RSS</button>
+      <button @click="showDisplaySettings = true">{{ t('display') }}</button>
+        <button @click="router.push({ name: 'book-home' })">{{ t('sources') }}</button>
+      <button @click="router.push({ name: 'discovery' })">{{ t('discovery') }}</button>
+      <button @click="router.push({ name: 'upload' })">{{ t('upload') }}</button>
+      <button @click="router.push({ name: 'rss-home' })">{{ t('rss') }}</button>
+      <button @click="router.push({ name: 'web-service' })">{{ t('webServiceSettings') }}</button>
     </div>
 
     <main class="app-main"><slot /></main>
 
-    <el-dialog v-model="showDisplaySettings" title="Cài đặt hiển thị" width="min(94vw, 640px)">
+    <el-dialog v-model="showDisplaySettings" :title="t('display')" width="min(94vw, 640px)">
       <div class="display-settings">
         <section>
-          <h3>Hình nền</h3>
+          <h3>{{ t('background') }}</h3>
           <div class="background-grid">
             <button
               v-for="preset in backgroundPresets"
@@ -88,30 +114,31 @@
             </button>
           </div>
           <div class="settings-row">
-            <el-button @click="backgroundFileInput?.click()">Tải ảnh riêng</el-button>
-            <el-button @click="resetBackground">Đặt lại</el-button>
+            <el-button @click="backgroundFileInput?.click()">{{ t('uploadImage') }}</el-button>
+            <el-button @click="resetBackground">{{ t('reset') }}</el-button>
             <input ref="backgroundFileInput" type="file" accept="image/png,image/jpeg,image/webp,image/avif" hidden @change="onBackgroundFile" />
           </div>
           <div class="settings-row slider-row">
-            <label>Độ mờ</label><el-slider v-model="blur" :min="0" :max="20" :step="1" @change="saveVisualPreferences" />
+            <label>{{ t('blur') }}</label><el-slider v-model="blur" :min="0" :max="20" :step="1" @change="saveVisualPreferences" />
           </div>
           <div class="settings-row slider-row">
-            <label>Độ tối</label><el-slider v-model="dimPercent" :min="0" :max="75" :step="1" @change="saveVisualPreferences" />
+            <label>{{ t('dim') }}</label><el-slider v-model="dimPercent" :min="0" :max="75" :step="1" @change="saveVisualPreferences" />
           </div>
         </section>
         <section>
-          <h3>Đọc và dịch trên trình duyệt này</h3>
+          <h3>{{ t('reader') }}</h3>
+          <div class="settings-row"><label>{{ t('language') }}</label><el-select :model-value="webLocale" @change="setWebLocale"><el-option v-for="item in localeOptions" :key="item.value" :label="item.label" :value="item.value" /></el-select></div>
           <div class="settings-row">
-            <label>Cỡ chữ</label>
+            <label>{{ t('fontSize') }}</label>
             <el-select v-model="fontSize" @change="saveReaderVisualPreferences"><el-option v-for="size in [14,16,18,20,22,24,28]" :key="size" :label="`${size}px`" :value="size" /></el-select>
           </div>
           <div class="settings-row">
-            <label>Font chữ</label>
-            <el-select v-model="fontFamily" @change="saveReaderVisualPreferences"><el-option label="Sans hiện đại" value="system-ui" /><el-option label="Serif dễ đọc" value="Georgia, serif" /><el-option label="Monospace" value="ui-monospace, monospace" /></el-select>
+            <label>{{ t('font') }}</label>
+            <el-select v-model="fontFamily" @change="saveReaderVisualPreferences"><el-option :label="t('modernSans')" value="system-ui" /><el-option :label="t('readableSerif')" value="Georgia, serif" /><el-option :label="t('monospace')" value="ui-monospace, monospace" /></el-select>
           </div>
           <div class="settings-row">
-            <label>Chế độ dịch</label>
-            <el-switch v-model="translationEnabled" active-text="Bật dịch khi đọc" @change="saveReaderVisualPreferences" />
+            <label>{{ t('translation') }}</label>
+            <el-switch v-model="translationEnabled" :active-text="t('enableTranslation')" @change="saveReaderVisualPreferences" />
           </div>
         </section>
       </div>
@@ -125,16 +152,21 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   backgroundPresets,
   clientBackground,
+  getChineseSearchEnabled,
   getReaderPreferences,
   initializeClientBackground,
   resetBackgroundPreference,
   saveBackgroundPreference,
   saveCustomBackground,
   saveReaderPreferences,
+  setChineseSearchEnabled,
 } from '@/utils/clientPreferences'
+import { localeOptions, setWebLocale, t, webLocale } from '@/i18n'
+import { useWebServiceStore } from '@/store'
 
 const router = useRouter()
 const route = useRoute()
+const webServiceStore = useWebServiceStore()
 const showDisplaySettings = ref(false)
 const showMobileMenu = ref(false)
 const searchText = ref(typeof route.query.q === 'string' ? route.query.q : '')
@@ -145,12 +177,14 @@ const dimPercent = ref(Math.round(clientBackground.preference.dim * 100))
 const fontSize = ref(readerPreferences.fontSize || 18)
 const fontFamily = ref(readerPreferences.fontFamily || 'system-ui')
 const translationEnabled = ref(readerPreferences.translationEnabled ?? false)
+const chineseSearchEnabled = ref(getChineseSearchEnabled())
 const isReader = computed(() => route.name === 'chapter' || route.name === 'media')
+const serviceName = computed(() => webServiceStore.instance?.serviceName || webServiceStore.instance?.appName || 'DrDucBook')
 const typeItems = [
-  { label: 'Truyện chữ', value: 'text' },
-  { label: 'Truyện tranh', value: 'image' },
-  { label: 'Sách nói', value: 'audio' },
-  { label: 'Video', value: 'video' },
+  { get label() { return t('textBooks') }, value: 'text' },
+  { get label() { return t('comics') }, value: 'image' },
+  { get label() { return t('audio') }, value: 'audio' },
+  { get label() { return t('video') }, value: 'video' },
 ]
 
 const goHome = () => router.push({ name: 'shelf' })
@@ -199,12 +233,17 @@ const saveReaderVisualPreferences = () => {
   saveReaderPreferences({ fontSize: fontSize.value, fontFamily: fontFamily.value, translationEnabled: translationEnabled.value })
   ElMessage.success('Đã lưu cho trình duyệt này')
 }
+const saveSearchPreference = (value: string | number | boolean) => {
+  chineseSearchEnabled.value = Boolean(value)
+  setChineseSearchEnabled(chineseSearchEnabled.value)
+}
 
 watch(() => route.query.q, value => {
   searchText.value = typeof value === 'string' ? value : ''
 })
 const openDisplaySettingsEvent = () => { showDisplaySettings.value = true }
 onMounted(() => {
+  if (!webServiceStore.instance) webServiceStore.loadInstance().catch(() => undefined)
   initializeClientBackground()
   document.addEventListener('open-display-settings', openDisplaySettingsEvent)
 })
@@ -218,7 +257,7 @@ onBeforeUnmount(() => document.removeEventListener('open-display-settings', open
 .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 12px; background: #e6c783; color: #173d3c; font: 800 20px Georgia, serif; }
 .brand strong,.brand small { display: block; }.brand small { margin-top: 2px; color: rgba(255,255,255,.68); font-size: 11px; }
 .desktop-nav { display: flex; align-items: center; gap: 3px; flex: 1; }.nav-button { border: 0; background: transparent; color: rgba(255,255,255,.9); cursor: pointer; padding: 9px 10px; border-radius: 8px; font-size: 13px; }.nav-button:hover { background: rgba(255,255,255,.12); }
-.header-actions { display: flex; align-items: center; gap: 10px; }.header-search { width: 185px; }.header-search :deep(.el-input__wrapper) { border-radius: 99px; background: rgba(255,255,255,.14); box-shadow: none; }.header-search :deep(input) { color: white; }.header-search :deep(input::placeholder) { color: rgba(255,255,255,.7); }
+.header-actions { display: flex; align-items: center; gap: 10px; }.search-control { display: flex; align-items: center; gap: 5px; }.header-search { width: 185px; }.header-search :deep(.el-input__wrapper) { border-radius: 99px; background: rgba(255,255,255,.14); box-shadow: none; }.header-search :deep(input) { color: white; }.header-search :deep(input::placeholder) { color: rgba(255,255,255,.7); }.search-option-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid rgba(255,255,255,.42); border-radius: 50%; background: rgba(255,255,255,.08); color: rgba(255,255,255,.88); cursor: pointer; font-weight: 700; }.search-option-button.active { border-color: #f1d49b; background: #f1d49b; color: #173d3c; }.search-options-panel { display: grid; gap: 9px; color: #244b49; }.search-options-panel p { margin: 0; color: #71827e; font-size: 12px; line-height: 1.5; }
 .mobile-menu { display: none; border: 0; color: white; background: transparent; font-size: 22px; }.mobile-nav { display: none; }
 .app-main { min-height: calc(100vh - 68px); }.reader-shell .app-header { position: fixed; width: 100%; transform: translateY(-100%); transition: transform .22s ease; }.reader-shell .app-header:hover,.reader-shell .app-header:focus-within { transform: translateY(0); }.reader-shell .app-main { min-height: 100vh; }
 .display-settings { display: grid; grid-template-columns: 1.15fr .85fr; gap: 24px; }.display-settings h3 { margin: 0 0 12px; color: #244b4a; }.background-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }.background-choice { padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 10px; background: #f3f5f4; cursor: pointer; text-align: left; }.background-choice.active { border-color: #d69d49; }.background-choice img { display: block; width: 100%; height: 74px; object-fit: cover; }.background-choice span { display: block; padding: 6px; font-size: 12px; }.settings-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }.settings-row label { min-width: 76px; font-size: 13px; }.slider-row :deep(.el-slider) { flex: 1; }.settings-row .el-select { flex: 1; }

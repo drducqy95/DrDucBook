@@ -27,9 +27,14 @@ import io.legado.app.domain.webservice.WebServiceBookImportResponse
 import io.legado.app.domain.webservice.WebServiceMediaSessionRequest
 import io.legado.app.domain.webservice.WebServiceExportBookshelfRequest
 import io.legado.app.domain.webservice.WebServiceExportBookTextRequest
+import io.legado.app.domain.webservice.WebServiceExportEbookRequest
 import io.legado.app.domain.webservice.WebServiceExportChapterRequest
 import io.legado.app.domain.webservice.WebServiceExportSourcesRequest
 import io.legado.app.domain.webservice.WebServiceInstanceResponse
+import io.legado.app.domain.webservice.WebServiceSourceImportRequest
+import io.legado.app.domain.webservice.WebServiceVbookRegistryImportRequest
+import io.legado.app.domain.webservice.WebServiceDiscoverySourcesPatchRequest
+import io.legado.app.domain.webservice.WebServiceDiscoveryKindValuesPatchRequest
 import io.legado.app.domain.webservice.WebServiceLegacyContract
 import io.legado.app.domain.webservice.WebServiceOriginPolicy
 import io.legado.app.domain.webservice.WebServicePairingCenter
@@ -44,6 +49,8 @@ import io.legado.app.domain.webservice.WebServicePorts
 import io.legado.app.domain.webservice.WebServiceRequestPolicy
 import io.legado.app.domain.webservice.WebServiceSessionStatusResponse
 import io.legado.app.domain.webservice.WebServiceTranslationJobRequest
+import io.legado.app.domain.webservice.WebServicePretranslateRequest
+import io.legado.app.domain.webservice.WebServiceUiTranslationRequest
 import io.legado.app.domain.webservice.WebServiceTtsSynthesisRequest
 import io.legado.app.domain.webservice.WebServiceTtsCapabilitiesResponse
 import io.legado.app.domain.webservice.WebServiceTtsSynthesisResponse
@@ -62,6 +69,9 @@ import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.RandomAccessFile
+import java.net.URLConnection
+import kotlin.math.min
 
 class KtorServer(
     private val port: Int,
@@ -84,8 +94,11 @@ class KtorServer(
                 // Browsers on some Android builds keep local-loopback HTTP/1.1
                 // connections open indefinitely. Closing each short API/static
                 // response prevents the CIO worker pool from being exhausted by
-                // half-closed WebView sockets.
-                call.response.header(HttpHeaders.Connection, "close")
+                // half-closed WebView sockets. WebSocket upgrades must keep the
+                // Upgrade/Connection handshake untouched.
+                if (call.request.headers[HttpHeaders.Upgrade].isNullOrBlank()) {
+                    call.response.header(HttpHeaders.Connection, "close")
+                }
             }
             install(ContentNegotiation) {
                 gson {
@@ -335,13 +348,105 @@ class KtorServer(
             val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 48) ?: 24
             val type = call.request.queryParameters["type"]
             val refresh = call.request.queryParameters["refresh"].toBoolean()
+            val sourceUrl = call.request.queryParameters["sourceUrl"]
+            val exploreUrl = call.request.queryParameters["exploreUrl"]
+            val args = call.request.queryParameters["args"]
+            val page = call.request.queryParameters["page"]?.toIntOrNull()?.coerceAtLeast(1) ?: 1
             runCatching {
-                WebServiceDiscoveryController.home(type, limit, refresh)
+                WebServiceDiscoveryController.home(
+                    type = type,
+                    limit = limit,
+                    refresh = refresh,
+                    sourceUrl = sourceUrl,
+                    exploreUrl = exploreUrl,
+                    args = args,
+                    page = page,
+                )
             }.onSuccess { response -> call.respond(response) }
                 .onFailure { error ->
                     LogUtils.e(TAG, error.stackTraceStr)
                     call.respond(HttpStatusCode.ServiceUnavailable, WebServiceErrorResponse("DISCOVERY_UNAVAILABLE"))
                 }
+        }
+
+        get("/api/v2/discovery/sources") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            call.respond(WebServiceDiscoveryController.sources())
+        }
+
+        get("/api/v2/discovery/kinds") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            try {
+                call.respond(
+                    WebServiceDiscoveryController.kinds(
+                        call.request.queryParameters["sourceUrl"].orEmpty()
+                    )
+                )
+            } catch (error: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, WebServiceErrorResponse(error.message ?: "DISCOVERY_KINDS_INVALID"))
+            }
+        }
+
+        patch("/api/v2/discovery/kinds") {
+            WebService.serve()
+            if (!requireWebAccess()) return@patch
+            try {
+                val payload = receiveOrDefault(WebServiceDiscoveryKindValuesPatchRequest())
+                WebServiceDiscoveryController.updateKindValues(payload.sourceUrl, payload.values)
+                call.respond(WebServiceDiscoveryController.kinds(payload.sourceUrl))
+            } catch (error: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, WebServiceErrorResponse(error.message ?: "DISCOVERY_KINDS_INVALID"))
+            }
+        }
+
+        patch("/api/v2/discovery/sources") {
+            WebService.serve()
+            if (!requireWebAccess()) return@patch
+            val request = receiveOrDefault(WebServiceDiscoverySourcesPatchRequest())
+            call.respond(WebServicePolicyStore.setWebDiscoverySources(appCtx, request.sourceUrls).toResponse())
+        }
+
+        post("/api/v2/sources/import") {
+            WebService.serve()
+            if (!requireWebAccess()) return@post
+            try {
+                val request = receiveOrDefault(WebServiceSourceImportRequest())
+                call.respond(
+                    WebServiceSourceController.import(
+                        payload = request.payload,
+                        commit = request.commit,
+                        sourceType = request.sourceType,
+                    )
+                )
+            } catch (error: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, WebServiceErrorResponse(error.message ?: "SOURCE_IMPORT_INVALID"))
+            } catch (error: Exception) {
+                LogUtils.e(TAG, error.stackTraceStr)
+                call.respond(HttpStatusCode.ServiceUnavailable, WebServiceErrorResponse("SOURCE_IMPORT_FAILED"))
+            }
+        }
+
+        post("/api/v2/vbook/registry/import") {
+            WebService.serve()
+            if (!requireWebAccess()) return@post
+            try {
+                val request = receiveOrDefault(WebServiceVbookRegistryImportRequest())
+                call.respond(
+                    WebServiceVbookController.import(
+                        payload = request.payload,
+                        commit = request.commit,
+                        selectedPluginIds = request.selectedPluginIds,
+                        allowDowngrade = request.allowDowngrade,
+                    )
+                )
+            } catch (error: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, WebServiceErrorResponse(error.message ?: "VBOOK_REGISTRY_INVALID"))
+            } catch (error: Exception) {
+                LogUtils.e(TAG, error.stackTraceStr)
+                call.respond(HttpStatusCode.ServiceUnavailable, WebServiceErrorResponse("VBOOK_REGISTRY_IMPORT_FAILED"))
+            }
         }
 
         post("/api/v2/books/import") {
@@ -413,7 +518,7 @@ class KtorServer(
         get("/api/v2/tts/capabilities") {
             WebService.serve()
             if (!requireWebAccess()) return@get
-            val (engine, language) = WebServiceTtsController.capabilities()
+            val (engine, language) = WebServiceTtsController.capabilities(call.request.queryParameters["bookUrl"])
             call.respond(WebServiceTtsCapabilitiesResponse(true, engine, language))
         }
 
@@ -422,11 +527,11 @@ class KtorServer(
             if (!requireWebAccess()) return@post
             try {
                 val request = receiveOrDefault(WebServiceTtsSynthesisRequest())
-                val file = WebServiceTtsController.synthesize(request.text, request.language)
+                val file = WebServiceTtsController.synthesize(request.text, request.language, request.bookUrl)
                 call.respond(
                     WebServiceTtsSynthesisResponse(
                         audioUrl = "/api/v2/tts/audio/${file.id}",
-                        engine = WebServiceTtsController.capabilities().first,
+                        engine = WebServiceTtsController.capabilities(request.bookUrl).first,
                         language = file.language,
                         expiresAt = file.expiresAt,
                     )
@@ -446,7 +551,7 @@ class KtorServer(
             if (file == null || !file.file.isFile) {
                 call.respond(HttpStatusCode.NotFound, WebServiceErrorResponse("TTS_AUDIO_NOT_FOUND"))
             } else {
-                call.response.header(HttpHeaders.ContentType, "audio/wav")
+                call.response.header(HttpHeaders.ContentType, file.contentType)
                 call.respondFile(file.file)
             }
         }
@@ -473,14 +578,14 @@ class KtorServer(
             }
             val target = WebServiceMediaController.source(session, variant.uri, variant.headers)
             if (target is WebServiceMediaController.SourceTarget.Local) {
-                if (!target.file.isFile) call.respond(HttpStatusCode.NotFound, WebServiceErrorResponse("MEDIA_FILE_NOT_FOUND"))
-                else {
-                    call.response.header(HttpHeaders.ContentType, variant.mimeType)
-                    call.respondFile(target.file)
-                }
+                respondLocalMedia(target.file, variant.mimeType, call.request.headers[HttpHeaders.Range])
                 return@get
             }
-            val manifest = WebServiceMediaController.openManifest(session, variant)
+            val manifest = WebServiceMediaController.openManifest(
+                session,
+                variant,
+                call.request.queryParameters["access_token"],
+            )
             if (manifest != null) {
                 call.respondText(manifest.body, ContentType.parse(manifest.mimeType))
                 return@get
@@ -499,8 +604,7 @@ class KtorServer(
             }
             val target = WebServiceMediaController.source(session, resource.uri, resource.headers)
             if (target is WebServiceMediaController.SourceTarget.Local) {
-                if (!target.file.isFile) call.respond(HttpStatusCode.NotFound, WebServiceErrorResponse("MEDIA_FILE_NOT_FOUND"))
-                else call.respondFile(target.file)
+                respondLocalMedia(target.file, null, call.request.headers[HttpHeaders.Range])
             } else {
                 val nestedManifest = WebServiceMediaController.openNestedManifest(
                     session,
@@ -791,6 +895,16 @@ class KtorServer(
             }
         }
 
+        post("/api/v2/export/ebook") {
+            WebService.serve()
+            if (!requireExportEnabled()) return@post
+            respondExportFile {
+                WebServiceExportController.ebook(
+                    receiveOrDefault(WebServiceExportEbookRequest())
+                )
+            }
+        }
+
         get("/api/v2/translation/content") {
             WebService.serve()
             if (!requireWebAccess()) return@get
@@ -810,12 +924,32 @@ class KtorServer(
             call.respond(WebServiceTranslationJobController.providers())
         }
 
+        post("/api/v2/translation/ui") {
+            WebService.serve()
+            if (!requireWebAccess()) return@post
+            call.respond(
+                WebServiceUiTranslationController.translate(
+                    receiveOrDefault(WebServiceUiTranslationRequest())
+                )
+            )
+        }
+
         post("/api/v2/translation/jobs") {
             WebService.serve()
             if (!requireAutoTranslationEnabled()) return@post
             respondTranslationJob {
                 WebServiceTranslationJobController.create(
                     receiveOrDefault(WebServiceTranslationJobRequest())
+                )
+            }
+        }
+
+        post("/api/v2/translation/pretranslate") {
+            WebService.serve()
+            if (!requireAutoTranslationEnabled()) return@post
+            respondTranslationJob {
+                WebServiceTranslationJobController.pretranslate(
+                    receiveOrDefault(WebServicePretranslateRequest())
                 )
             }
         }
@@ -956,6 +1090,71 @@ class KtorServer(
         }
     }
 
+    private suspend fun RoutingContext.respondLocalMedia(
+        file: File,
+        mimeType: String?,
+        rangeHeader: String?,
+    ) {
+        if (!file.isFile || file.length() <= 0L) {
+            call.respond(HttpStatusCode.NotFound, WebServiceErrorResponse("MEDIA_FILE_NOT_FOUND"))
+            return
+        }
+        val length = file.length()
+        val requestedRange = parseMediaRange(rangeHeader, length)
+        if (rangeHeader != null && requestedRange == null) {
+            call.response.status(HttpStatusCode.RequestedRangeNotSatisfiable)
+            call.response.header(HttpHeaders.ContentRange, "bytes */$length")
+            call.respondText("")
+            return
+        }
+        val start = requestedRange?.first ?: 0L
+        val end = requestedRange?.last ?: (length - 1)
+        val contentLength = end - start + 1
+        call.response.status(if (requestedRange == null) HttpStatusCode.OK else HttpStatusCode.PartialContent)
+        call.response.header(HttpHeaders.AcceptRanges, "bytes")
+        call.response.header(HttpHeaders.ContentLength, contentLength.toString())
+        call.response.header(
+            HttpHeaders.ContentType,
+            mimeType?.takeIf(String::isNotBlank) ?: URLConnection.guessContentTypeFromName(file.name)
+                ?: ContentType.Application.OctetStream.toString(),
+        )
+        requestedRange?.let {
+            call.response.header(HttpHeaders.ContentRange, "bytes ${it.first}-${it.last}/$length")
+        }
+        call.respondOutputStream {
+            withContext(Dispatchers.IO) {
+                RandomAccessFile(file, "r").use { input ->
+                    input.seek(start)
+                    var remaining = contentLength
+                    val buffer = ByteArray(64 * 1024)
+                    while (remaining > 0) {
+                        val read = input.read(buffer, 0, min(buffer.size.toLong(), remaining).toInt())
+                        if (read <= 0) break
+                        write(buffer, 0, read)
+                        remaining -= read
+                    }
+                }
+            }
+        }
+    }
+
+    private fun parseMediaRange(value: String?, length: Long): LongRange? {
+        if (value.isNullOrBlank()) return null
+        val match = Regex("^bytes=(\\d*)-(\\d*)$").matchEntire(value.trim()) ?: return null
+        val startText = match.groupValues[1]
+        val endText = match.groupValues[2]
+        if (startText.isBlank() && endText.isBlank()) return null
+        return if (startText.isBlank()) {
+            val suffix = endText.toLongOrNull()?.coerceAtLeast(0L) ?: return null
+            if (suffix == 0L) null else (length - suffix).coerceAtLeast(0L)..(length - 1)
+        } else {
+            val start = startText.toLongOrNull() ?: return null
+            if (start >= length) return null
+            val end = endText.toLongOrNull()?.coerceIn(start, length - 1) ?: (length - 1)
+            start..end
+        }
+    }
+
     private suspend fun RoutingContext.respondPolicyPreconditionRequired() {
         call.respond(
             HttpStatusCode(428, "Precondition Required"),
@@ -1071,6 +1270,7 @@ class KtorServer(
     private fun buildInstanceResponse(call: ApplicationCall): WebServiceInstanceResponse =
         WebServiceInstanceResponse(
             appName = APP_NAME,
+            serviceName = WebServiceIdentityStore.getServiceName(appCtx),
             packageName = BuildConfig.APPLICATION_ID,
             versionName = BuildConfig.VERSION_NAME,
             versionCode = BuildConfig.VERSION_CODE.toLong(),

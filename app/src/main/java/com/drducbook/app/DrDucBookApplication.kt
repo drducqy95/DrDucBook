@@ -7,6 +7,6 @@ class DrDucBookApplication : App() {
 
     override fun onCreate() {
         super.onCreate()
-        if (!isNmtOnnxProcess) SupabaseClientProvider.client
+        if (!isNmtOnnxProcess && !isTtsOnnxProcess) SupabaseClientProvider.client
     }
 }

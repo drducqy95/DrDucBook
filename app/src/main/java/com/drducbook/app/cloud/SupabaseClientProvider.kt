@@ -3,6 +3,7 @@ package com.drducbook.app.cloud
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.FlowType
+import com.drducbook.app.auth.DrDucBookDeepLinks
 import io.github.jan.supabase.auth.MemoryCodeVerifierCache
 import io.github.jan.supabase.auth.SessionManager
 import io.github.jan.supabase.createSupabaseClient
@@ -31,6 +32,7 @@ object SupabaseClientProvider {
             install(Auth) {
                 scheme = "drducbook"
                 host = "auth"
+                defaultRedirectUrl = DrDucBookDeepLinks.AUTH_CALLBACK
                 flowType = FlowType.PKCE
                 sessionManager = sessionManagerOverride ?: EncryptedSessionManager(
                     context = appCtx,

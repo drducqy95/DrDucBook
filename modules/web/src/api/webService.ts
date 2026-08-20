@@ -6,6 +6,7 @@ import type { SeachBook } from '@/book'
 
 export type WebServiceInstanceResponse = {
   appName: string
+  serviceName?: string
   packageName: string
   versionName: string
   versionCode: number
@@ -19,6 +20,54 @@ export type WebServiceInstanceResponse = {
   requiresPairing: boolean
   pairingCodeTtlMillis: number
   sessionTtlMillis: number
+}
+
+export type WebServiceSourceImportResponse = {
+  items: Array<{
+    sourceUrl: string
+    name: string
+    existing: boolean
+    lastUpdateTime: number
+  }>
+  committed: boolean
+}
+
+export type WebServiceVbookRegistryImportResponse = {
+  sourceLabel: string
+  classification: string
+  total: number
+  compatible: number
+  rejected: number
+  selected: number
+  installed: number
+  failed: number
+  committed: boolean
+}
+
+export type WebServiceDiscoverySource = {
+  sourceUrl: string
+  name: string
+  group?: string | null
+  enabled: boolean
+  selectedForWeb: boolean
+}
+
+export type WebServiceDiscoveryKind = {
+  title: string
+  displayName: string
+  url?: string | null
+  type: 'url' | 'text' | 'button' | 'toggle' | 'select' | string
+  action?: string | null
+  chars: string[]
+  defaultValue?: string | null
+  currentValue: string
+}
+
+export type WebServiceDiscoveryKindsResponse = {
+  sourceUrl: string
+  sourceName: string
+  group?: string | null
+  kinds: WebServiceDiscoveryKind[]
 }
 
 export type WebServicePolicy = {
@@ -38,6 +87,7 @@ export type WebServicePolicy = {
     | 'right bottom'
   backgroundDim: number
   backgroundBlur: number
+  webDiscoverySourceUrls: string[]
   revision: number
   updatedAt: number
   etag: string
@@ -50,6 +100,7 @@ export type WebServicePolicyPatch = {
   backgroundPosition?: WebServicePolicy['backgroundPosition']
   backgroundDim?: number
   backgroundBlur?: number
+  webDiscoverySourceUrls?: string[]
 }
 
 export type WebServicePolicyEnvelope = {
@@ -89,6 +140,14 @@ export type WebServiceExportChapterRequest = {
 export type WebServiceExportBookTextRequest = {
   bookUrl: string
   chapterIndices?: number[]
+}
+
+export type WebServiceExportEbookRequest = {
+  bookUrl: string
+  format: 'epub2' | 'epub3' | 'pdf' | 'txt' | 'html' | 'cbz'
+  scope?: string
+  contentSource?: 'original' | 'translation' | 'both'
+  imageOptimization?: 'original' | 'balanced' | 'small'
 }
 
 export type WebServiceTranslationJobStatus =
@@ -220,6 +279,11 @@ const baseURL = () =>
   (typeof ajax.defaults.baseURL === 'string' ? ajax.defaults.baseURL : '') ||
   location.origin
 
+export const resolveWebServiceUrl = (path: string) => {
+  const root = baseURL().replace(/\/$/, '')
+  return /^https?:\/\//i.test(path) ? path : `${root}/${path.replace(/^\//, '')}`
+}
+
 const policyEnvelope = (
   policy: WebServicePolicy,
   etag?: string,
@@ -235,7 +299,83 @@ export const getWebServiceInstance = async () => {
   return response.data
 }
 
-export const getDiscoveryHome = async (options: { type?: string; limit?: number; refresh?: boolean } = {}) => {
+export const importWebServiceSources = async (
+  payload: string,
+  sourceType: 'book' | 'rss',
+  commit = true,
+) => {
+  const response = await v2.post<WebServiceSourceImportResponse>(
+    'api/v2/sources/import',
+    { payload, sourceType, commit },
+    { baseURL: baseURL(), timeout: 120_000 },
+  )
+  return response.data
+}
+
+export const importWebServiceVbookRegistry = async (
+  payload: string,
+  commit = true,
+) => {
+  const response = await v2.post<WebServiceVbookRegistryImportResponse>(
+    'api/v2/vbook/registry/import',
+    { payload, commit },
+    { baseURL: baseURL(), timeout: 180_000 },
+  )
+  return response.data
+}
+
+export const getWebServiceDiscoverySources = async () => {
+  const response = await v2.get<WebServiceDiscoverySource[]>('api/v2/discovery/sources', { baseURL: baseURL() })
+  return response.data
+}
+
+export const patchWebServiceDiscoverySources = async (sourceUrls: string[]) => {
+  const response = await v2.patch('api/v2/discovery/sources', { sourceUrls }, { baseURL: baseURL() })
+  return response.data
+}
+
+export const getWebServiceDiscoveryKinds = async (sourceUrl: string) => {
+  const response = await v2.get<WebServiceDiscoveryKindsResponse>('api/v2/discovery/kinds', {
+    baseURL: baseURL(),
+    params: { sourceUrl },
+  })
+  return response.data
+}
+
+export const patchWebServiceDiscoveryKinds = async (
+  sourceUrl: string,
+  values: Record<string, string>,
+) => {
+  const response = await v2.patch<WebServiceDiscoveryKindsResponse>(
+    'api/v2/discovery/kinds',
+    { sourceUrl, values },
+    { baseURL: baseURL() },
+  )
+  return response.data
+}
+
+export const translateWebServiceUi = async (
+  scopeKey: string,
+  texts: string[],
+  targetLanguage: string,
+) => {
+  const response = await v2.post<{ targetLanguage: string; texts: string[] }>(
+    'api/v2/translation/ui',
+    { scopeKey, texts, targetLanguage },
+    { baseURL: baseURL(), timeout: 120_000 },
+  )
+  return response.data
+}
+
+export const getDiscoveryHome = async (options: {
+  type?: string
+  limit?: number
+  refresh?: boolean
+  sourceUrl?: string
+  exploreUrl?: string
+  args?: string
+  page?: number
+} = {}) => {
   const response = await v2.get<WebServiceDiscoveryResponse>('api/v2/discovery/home', {
     baseURL: baseURL(),
     params: options,
@@ -267,17 +407,18 @@ export const getMediaSession = async (sessionId: string) => {
   return response.data
 }
 
-export const getWebServiceTtsCapabilities = async () => {
+export const getWebServiceTtsCapabilities = async (bookUrl?: string) => {
   const response = await v2.get<WebServiceTtsCapabilities>('api/v2/tts/capabilities', {
     baseURL: baseURL(),
+    params: bookUrl ? { bookUrl } : undefined,
   })
   return response.data
 }
 
-export const synthesizeWebServiceTts = async (text: string, language?: string) => {
+export const synthesizeWebServiceTts = async (text: string, language?: string, bookUrl?: string) => {
   const response = await v2.post<WebServiceTtsSynthesisResponse>(
     'api/v2/tts/synthesize',
-    { text, language },
+    { text, language, bookUrl },
     { baseURL: baseURL(), timeout: 120_000 },
   )
   return response.data
@@ -406,6 +547,15 @@ export const downloadWebServiceExportBookText = async (
 ): Promise<WebServiceDownload> =>
   downloadV2('api/v2/export/book-txt', request, 'book.txt')
 
+export const downloadWebServiceExportEbook = async (
+  request: WebServiceExportEbookRequest,
+): Promise<WebServiceDownload> =>
+  downloadV2(
+    'api/v2/export/ebook',
+    request,
+    `book.${request.format === 'epub2' || request.format === 'epub3' ? 'epub' : request.format}`,
+  )
+
 export const createWebServiceTranslationJob = async (
   request: WebServiceTranslationJobRequest,
 ) => {
@@ -416,6 +566,18 @@ export const createWebServiceTranslationJob = async (
       baseURL: baseURL(),
     },
   )
+  return response.data
+}
+
+export const pretranslateWebServiceChapters = async (request: {
+  bookUrl: string
+  fromChapter: number
+  count: number
+  provider?: string
+  targetLanguage?: string
+  forceRetranslate?: boolean
+}) => {
+  const response = await v2.post('api/v2/translation/pretranslate', request, { baseURL: baseURL() })
   return response.data
 }
 

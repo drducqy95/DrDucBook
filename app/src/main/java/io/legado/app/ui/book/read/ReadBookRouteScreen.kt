@@ -163,6 +163,15 @@ fun ReadBookRouteScreen(
         }
     }
 
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (isActive) {
+                viewModel.syncReadAloudState()
+                delay(500)
+            }
+        }
+    }
+
     // ── ActivityResult Launchers ──────────────────────────────────────
 
     val tocLauncher = rememberLauncherForActivityResult(TocActivityResult()) { result ->

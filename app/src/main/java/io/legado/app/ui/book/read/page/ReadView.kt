@@ -520,7 +520,9 @@ class ReadView(
                 { context.longToastOnUi(context.getString(R.string.upload_book_success)) },
                 { context.longToastOnUi(context.getString(R.string.sync_book_progress_success)) })
             13 -> {
-                if (BaseReadAloudService.isPlay()) {
+                if (BaseReadAloudService.isPlay() ||
+                    (ReadAloud.isLocalSessionRunning && !ReadAloud.isLocalSessionPaused)
+                ) {
                     ReadAloud.pause(context)
                 } else {
                     ReadAloud.resume(context)

@@ -5,6 +5,8 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.domain.webservice.WebServiceTranslationJobListResponse
 import io.legado.app.domain.webservice.WebServiceTranslationJobRequest
+import io.legado.app.domain.webservice.WebServicePretranslateRequest
+import io.legado.app.domain.webservice.WebServicePretranslateResponse
 import io.legado.app.domain.webservice.WebServiceTranslationJobResponse
 import io.legado.app.domain.webservice.WebServiceTranslationContentResponse
 import io.legado.app.domain.webservice.WebServiceTranslationProviderListResponse
@@ -152,6 +154,25 @@ object WebServiceTranslationJobController {
         jobsById[record.jobId] = record
         jobIdsByKey[key] = record.jobId
         return responseFor(record, flow.value)
+    }
+
+    suspend fun pretranslate(request: WebServicePretranslateRequest): WebServicePretranslateResponse {
+        val bookUrl = WebServiceTranslationJobs.normalizedOptionalText(request.bookUrl)
+            ?: throw IllegalArgumentException("BOOK_URL_REQUIRED")
+        require(request.fromChapter >= 0) { "FROM_CHAPTER_INVALID" }
+        val count = request.count.coerceIn(1, 50)
+        val jobs = (request.fromChapter until request.fromChapter + count).map { chapterIndex ->
+            create(
+                WebServiceTranslationJobRequest(
+                    bookUrl = bookUrl,
+                    chapterIndex = chapterIndex,
+                    forceRetranslate = request.forceRetranslate,
+                    provider = request.provider,
+                    targetLanguage = request.targetLanguage,
+                )
+            )
+        }
+        return WebServicePretranslateResponse(bookUrl, jobs)
     }
 
     fun get(jobId: String?): WebServiceTranslationJobResponse {

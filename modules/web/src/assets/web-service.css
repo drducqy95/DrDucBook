@@ -1,7 +1,22 @@
 body,
 #app {
   min-height: 100vh;
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", sans-serif;
+  color: #172a2a;
+  background: #edf3f0;
+  -webkit-text-size-adjust: 100%;
 }
+
+:root {
+  --web-text: #172a2a;
+  --web-text-muted: #405654;
+  --web-border: #cbd9d5;
+  --web-panel: #f9fcfa;
+}
+
+button, input, textarea, select { font: inherit; }
+.el-button, .el-input__wrapper, .el-select, .el-checkbox { min-height: 42px; }
 
 .web-service-shell {
   min-height: 100vh;
@@ -13,6 +28,16 @@ body,
   --web-service-background-position: center;
   --web-service-background-dim: 0.22;
   --web-service-background-blur: 0px;
+}
+
+.web-service-shell .editor,
+.web-service-shell .upload-page,
+.web-service-shell .web-service-settings { color: var(--web-text); }
+
+@media (max-width: 700px) {
+  .web-service-content { overflow-x: hidden; }
+  .web-service-shell .el-dialog { width: min(94vw, 560px) !important; margin-top: 5vh; }
+  .web-service-shell .app-main { min-height: calc(100vh - 56px); }
 }
 
 .web-service-background-layer,

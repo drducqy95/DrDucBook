@@ -17,13 +17,17 @@ class AuthCallbackActivity : Activity() {
         }
         val client = SupabaseClientProvider.client
         if (client == null) {
+            AuthCallbackStateStore.saveError(this, IllegalStateException("Supabase chưa được cấu hình"))
             returnToApp()
             return
         }
         client.handleDeeplinks(
             intent = intent,
             onSessionSuccess = { returnToApp() },
-            onError = { returnToApp() },
+            onError = { error ->
+                AuthCallbackStateStore.saveError(this, error)
+                returnToApp()
+            },
         )
     }
 

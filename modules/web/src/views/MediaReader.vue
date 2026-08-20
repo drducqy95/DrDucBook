@@ -4,7 +4,7 @@
     <section v-if="error" class="state-panel glass-panel"><h2>Không thể mở nội dung</h2><p>{{ error }}</p><el-button @click="loadSession">Thử lại</el-button></section>
     <section v-else-if="loading" class="state-panel glass-panel"><el-icon class="is-loading"><Loading /></el-icon> Đang phân giải nguồn media...</section>
     <template v-else-if="session">
-      <section class="player-panel glass-panel"><div class="player-wrap"><video v-if="session.isVideo" ref="videoElement" class="player" controls playsinline @error="onPlaybackError"><track v-for="track in session.subtitles" :key="track.id" kind="subtitles" :src="track.playbackUrl" :srclang="track.language || 'vi'" :label="displayText(track.label)" :default="track.isDefault" /></video><audio v-else ref="audioElement" class="audio-player" controls @error="onPlaybackError" /></div><div class="player-caption"><span>{{ displayText(selectedVariant?.title) }}</span><span v-if="selectedVariant?.drmUnsupported" class="warning">Nguồn DRM không hỗ trợ trên web</span></div></section>
+      <section class="player-panel glass-panel"><div class="player-wrap"><video v-if="session.isVideo" ref="videoElement" class="player" controls playsinline @error="onPlaybackError"><track v-for="track in session.subtitles" :key="track.id" kind="subtitles" :src="trackUrl(track.playbackUrl)" :srclang="track.language || 'vi'" :label="displayText(track.label)" :default="track.isDefault" /></video><audio v-else ref="audioElement" class="audio-player" controls @error="onPlaybackError" /></div><div class="player-caption"><span>{{ displayText(selectedVariant?.title) }}</span><span v-if="selectedVariant?.drmUnsupported" class="warning">Nguồn DRM không hỗ trợ trên web</span></div></section>
       <section class="variant-panel glass-panel"><div class="section-title"><h2>Chất lượng và nguồn phát</h2><span>{{ session.variants.length }} lựa chọn</span></div><div class="variant-list"><button v-for="variant in session.variants" :key="variant.id" class="variant-button" :class="{ active: selectedVariant?.id === variant.id }" @click="selectVariant(variant)"><strong>{{ displayText(variant.title) || variant.protocol }}</strong><small>{{ variant.protocol }} · {{ variant.mimeType || 'media' }}</small></button></div><a v-if="selectedVariant?.externalPlayerRequired || selectedVariant?.drmUnsupported" class="external-link" :href="playbackUrl(selectedVariant)" target="_blank" rel="noopener">Mở bằng trình phát ngoài</a></section>
       <section class="chapters-panel glass-panel"><div class="section-title"><h2>Mục lục</h2><span>{{ session.chapterCount }} tập/chương</span></div><div class="chapter-list"><button v-for="chapter in session.chapters" :key="chapter.index" :class="{ active: chapter.index === session.chapterIndex }" @click="openChapter(chapter.index)"><span>{{ displayText(chapter.title) }}</span><small v-if="chapter.isOffline">Ngoại tuyến</small></button></div></section>
     </template>
@@ -17,6 +17,7 @@ import { useRouter } from 'vue-router'
 import Hls from 'hls.js'
 import dashjs from 'dashjs'
 import { createMediaSession, type WebServiceMediaSession, type WebServiceMediaVariant } from '@/api/webService'
+import { withWebSession } from '@/api/webSession'
 
 const router = useRouter()
 const videoElement = ref<HTMLVideoElement>()
@@ -59,7 +60,11 @@ const currentChapterTitle = computed(() => {
   return displayText(chapter?.title) || `Chương ${session.value?.chapterIndex ?? chapterIndex}`
 })
 
-const playbackUrl = (variant?: WebServiceMediaVariant) => variant ? new URL(variant.playbackUrl, location.origin).toString() : ''
+const playbackUrl = (variant?: WebServiceMediaVariant) => {
+  if (!variant) return ''
+  return withWebSession(new URL(variant.playbackUrl, location.origin)).toString()
+}
+const trackUrl = (url: string) => withWebSession(new URL(url, location.origin)).toString()
 const disposePlayer = () => {
   hls?.destroy(); hls = undefined
   dash?.reset(); dash = undefined

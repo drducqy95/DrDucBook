@@ -1,6 +1,8 @@
 package com.drducbook.app.auth
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
@@ -10,6 +12,9 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import com.drducbook.app.cloud.SupabaseClientProvider
+import io.github.jan.supabase.auth.providers.Google
+import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.CancellationException
 import java.security.SecureRandom
 import java.security.MessageDigest
@@ -23,6 +28,16 @@ class GoogleCredentialToken(
 }
 
 object GoogleCredentialBridge {
+
+    /** Uses Supabase PKCE in the external browser when Credential Manager is blocked on a device. */
+    fun openBrowserFallback(context: Context): Result<Unit> = runCatching {
+        val client = SupabaseClientProvider.client ?: error("Supabase is not configured")
+        val url = client.auth.getOAuthUrl(
+            Google,
+            redirectUrl = DrDucBookDeepLinks.AUTH_CALLBACK,
+        )
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+    }
 
     /** Converts provider errors into an actionable message without exposing token details. */
     fun userMessage(error: Throwable): String {

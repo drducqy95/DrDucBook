@@ -79,6 +79,7 @@ object PreferKey {
     const val readSliderMode = "read_slider_mode"
     const val webService = "webService"
     const val webServiceInstanceId = "webServiceInstanceId"
+    const val webServiceName = "webServiceName"
     const val webServicePolicy = "webServicePolicy"
     const val webDavUrl = "web_dav_url"
     const val webDavAccount = "web_dav_account"

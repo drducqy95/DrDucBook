@@ -5,11 +5,23 @@ import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import io.legado.app.data.entities.HttpTTS
+import io.legado.app.data.appDb
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.model.ReadAloud
+import io.legado.app.model.tts.LocalTtsModelRegistry
 import io.legado.app.model.tts.parseLocalTtsEngine
+import io.legado.app.model.tts.LocalTtsSynthesis
+import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.ui.config.readConfig.ReadConfig
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
+import io.legado.app.lib.dialogs.SelectItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import splitties.init.appCtx
 import java.io.File
 import java.util.Locale
@@ -22,23 +34,58 @@ object WebServiceTtsController {
     private const val TTL_MILLIS = 30 * 60 * 1000L
     private val files = ConcurrentHashMap<String, TtsFile>()
 
-    fun capabilities(): Pair<String, String> {
-        val configured = ReadAloud.ttsEngine.orEmpty()
+    fun capabilities(bookUrl: String? = null): Pair<String, String> {
+        val configured = normalizedEngine(resolveEngine(bookUrl))
         val engine = when {
-            configured.isBlank() || configured.all(Char::isDigit) || parseLocalTtsEngine(configured) != null -> "system"
+            configured.isBlank() -> "system"
+            parseLocalTtsEngine(configured) != null -> "local"
+            configured.toLongOrNull() != null -> "http"
             else -> configured
         }
-        return engine to Locale.getDefault().toLanguageTag()
+        val language = if (engine == "local") {
+            localModelLanguage(configured) ?: Locale.getDefault().toLanguageTag()
+        } else {
+            Locale.getDefault().toLanguageTag()
+        }
+        return engine to language
     }
 
-    suspend fun synthesize(text: String, language: String?): TtsFile {
-        val cleanText = text.trim().take(20_000).takeIf(String::isNotBlank)
+    suspend fun synthesize(text: String, language: String?, bookUrl: String? = null): TtsFile {
+        val cleanText = normalizeSpeechText(text).take(20_000).takeIf(String::isNotBlank)
             ?: throw IllegalArgumentException("TTS_TEXT_REQUIRED")
-        val requestedLocale = language?.trim()?.takeIf(String::isNotBlank)
+        val requestedLanguage = language?.trim()?.takeIf(String::isNotBlank)
+        val requestedLocale = requestedLanguage
             ?.let(Locale::forLanguageTag)
-            ?: Locale.getDefault()
+            ?.takeIf { it.language.isNotBlank() }
+            ?: inferLocale(cleanText)
         val id = UUID.randomUUID().toString()
         val file = File(appCtx.cacheDir, "web_tts_$id.wav")
+        val configuredEngine = normalizedEngine(resolveEngine(bookUrl))
+        val localEngine = parseLocalTtsEngine(configuredEngine)
+        if (localEngine != null) {
+            val localText = localSpeechText(cleanText, configuredEngine)
+                ?: throw IllegalArgumentException("TTS_TEXT_UNSUPPORTED_LOCAL")
+            // Do not hide a local model/runtime failure behind a second attempt
+            // with Android system TTS. On devices without a system provider
+            // that fallback only produces the misleading TTS_INIT_FAILED.
+            val localFile = LocalTtsSynthesis.synthesizeToWav(appCtx, configuredEngine, localText)
+            if (hasUsableDuration(localFile, localText)) {
+                val expiresAt = System.currentTimeMillis() + TTL_MILLIS
+                files[id] = TtsFile(id, localFile, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+                trimExpired()
+                return files[id]!!
+            }
+            throw IllegalStateException("TTS_LOCAL_AUDIO_INVALID")
+        }
+        val engineForSystemTts = configuredEngine.takeUnless { parseLocalTtsEngine(it) != null }
+        val httpTts = configuredEngine.toLongOrNull()?.let(appDb.httpTTSDao::get)
+        if (httpTts != null) {
+            val contentType = synthesizeHttp(httpTts, cleanText, file)
+            val expiresAt = System.currentTimeMillis() + TTL_MILLIS
+            files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, contentType)
+            trimExpired()
+            return files[id]!!
+        }
         withContext(Dispatchers.Main.immediate) {
             suspendCancellableCoroutine<Unit> { continuation ->
                 lateinit var tts: TextToSpeech
@@ -55,7 +102,13 @@ object WebServiceTtsController {
                         finish(Result.failure(IllegalStateException("TTS_INIT_FAILED")))
                         return@TextToSpeech
                     }
-                    tts.language = requestedLocale
+                    val languageResult = tts.setLanguage(requestedLocale)
+                    if (languageResult == TextToSpeech.LANG_MISSING_DATA ||
+                        languageResult == TextToSpeech.LANG_NOT_SUPPORTED
+                    ) {
+                        finish(Result.failure(IllegalStateException("TTS_LANGUAGE_UNAVAILABLE")))
+                        return@TextToSpeech
+                    }
                     tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(id: String?) = Unit
                         override fun onDone(id: String?) = finish(Result.success(Unit))
@@ -65,19 +118,125 @@ object WebServiceTtsController {
                     if (result == TextToSpeech.ERROR) {
                         finish(Result.failure(IllegalStateException("TTS_SYNTHESIS_FAILED")))
                     }
-                }, ReadAloud.ttsEngine?.takeIf {
-                    it.isNotBlank() && !it.all(Char::isDigit) && parseLocalTtsEngine(it) == null
-                })
+                }, engineForSystemTts?.takeIf { it.isNotBlank() && !it.all(Char::isDigit) })
                 continuation.invokeOnCancellation { handler.post { tts.runCatching { shutdown() } } }
             }
         }
         val expiresAt = System.currentTimeMillis() + TTL_MILLIS
-        files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt)
+        if (!file.isFile || file.length() <= 44L) {
+            file.delete()
+            throw IllegalStateException("TTS_AUDIO_EMPTY")
+        }
+        files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
         trimExpired()
         return files[id]!!
     }
 
     fun get(id: String): TtsFile? = files[id]?.takeIf { it.expiresAt > System.currentTimeMillis() }
+
+    private fun resolveEngine(bookUrl: String?): String {
+        val bookEngine = bookUrl
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?.let { url -> appDb.bookDao.getBook(url)?.getTtsEngine() }
+            ?.takeIf(String::isNotBlank)
+        val configured = bookEngine ?: ReadAloud.ttsEngine.orEmpty()
+        if (configured.isNotBlank()) return configured
+
+        // A release device may not ship with Android's system TTS provider. If
+        // the app already has an imported ONNX model, use that model as the
+        // deterministic WebService fallback instead of returning
+        // TTS_INIT_FAILED from TextToSpeech.
+        return runCatching {
+            LocalTtsModelRegistry(appCtx).list().firstOrNull()?.engineValue()
+        }.getOrNull().orEmpty()
+    }
+
+    private fun normalizeSpeechText(value: String): String = value
+        .replace('\u00A0', ' ')
+        .replace(Regex("[\\u200B-\\u200D\\uFEFF]"), "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+
+    private fun normalizedEngine(raw: String): String {
+        val value = raw.trim()
+        if (value.isBlank()) return ""
+        return GSON.fromJsonObject<SelectItem<String>>(value).getOrNull()?.value?.trim()
+            ?: value
+    }
+
+    private fun localModelLanguage(engineReference: String): String? {
+        val reference = parseLocalTtsEngine(engineReference) ?: return null
+        return LocalTtsModelRegistry(appCtx).get(reference.modelId)?.language?.takeIf(String::isNotBlank)
+    }
+
+    private fun localSpeechText(text: String, engineReference: String): String? {
+        val language = localModelLanguage(engineReference)?.lowercase(Locale.ROOT).orEmpty()
+        val sanitized = if (language.startsWith("zh") ||
+            language.startsWith("ja") ||
+            language.startsWith("ko") ||
+            language.startsWith("ru") ||
+            language.startsWith("ar")
+        ) {
+            text
+        } else {
+            stripUnsupportedLocalCharacters(text)
+        }
+        return normalizeSpeechText(sanitized).takeIf(String::isNotBlank)
+    }
+
+    private suspend fun synthesizeHttp(
+        httpTts: HttpTTS,
+        text: String,
+        target: File,
+    ): String {
+        val analyzeUrl = AnalyzeUrl(
+            mUrl = httpTts.url,
+            speakText = text,
+            speakSpeed = ReadConfig.speechRatePlay + 5,
+            source = httpTts,
+            readTimeout = 300_000L,
+            coroutineContext = currentCoroutineContext(),
+        )
+        var response = analyzeUrl.getResponseAwait()
+        val loginCheckJs = httpTts.loginCheckJs?.trim().orEmpty()
+        if (loginCheckJs.isNotBlank()) {
+            currentCoroutineContext().ensureActive()
+            val checkedResponse = analyzeUrl.evalJS(loginCheckJs, response) as? okhttp3.Response
+                ?: run {
+                    response.close()
+                    throw IllegalStateException("HTTP_TTS_LOGIN_CHECK_FAILED")
+                }
+            if (checkedResponse !== response) response.close()
+            response = checkedResponse
+        }
+        var contentType = ""
+        response.use { result ->
+            if (!result.isSuccessful) {
+                throw IllegalStateException("HTTP_TTS_FAILED_${result.code}")
+            }
+            contentType = result.header("Content-Type").orEmpty().substringBefore(';').trim()
+            if (contentType.startsWith("text/", true) || contentType.contains("json", true)) {
+                throw NoStackTraceException(result.body.string().take(512).ifBlank { "HTTP_TTS_INVALID_AUDIO" })
+            }
+            val expectedContentType = httpTts.contentType?.trim().orEmpty()
+            if (expectedContentType.isNotBlank() &&
+                (contentType.isBlank() || !Regex(expectedContentType).matches(contentType))
+            ) {
+                throw NoStackTraceException(
+                    "HTTP_TTS_CONTENT_TYPE_INVALID:" + result.body.string().take(512)
+                )
+            }
+            result.body.byteStream().use { input ->
+                target.outputStream().buffered().use { output -> input.copyTo(output) }
+            }
+        }
+        if (!target.isFile || target.length() == 0L) {
+            target.delete()
+            throw IllegalStateException("TTS_AUDIO_EMPTY")
+        }
+        return contentType.ifBlank { "audio/mpeg" }
+    }
 
     private fun trimExpired() {
         val now = System.currentTimeMillis()
@@ -89,10 +248,63 @@ object WebServiceTtsController {
         }
     }
 
+    private fun stripUnsupportedLocalCharacters(text: String): String =
+        buildString(text.length) {
+            text.forEach { character ->
+                append(
+                    if (isUnsupportedLocalCharacter(character)) ' ' else character
+                )
+            }
+        }
+
+    private fun isUnsupportedLocalCharacter(character: Char): Boolean =
+        character in '\u2E80'..'\u9FFF' ||
+            character in '\uAC00'..'\uD7AF' ||
+            character in '\u3040'..'\u30FF' ||
+            character in '\u0400'..'\u04FF' ||
+            character in '\u0600'..'\u06FF'
+
+    private fun hasUsableDuration(file: File, text: String): Boolean {
+        if (!file.isFile || file.length() <= 44L) return false
+        return runCatching {
+            file.inputStream().use { input ->
+                val header = ByteArray(44)
+                if (input.read(header) != header.size) return false
+                val sampleRate = littleEndianInt(header, 24)
+                val channels = littleEndianShort(header, 22)
+                val bits = littleEndianShort(header, 34)
+                val dataSize = littleEndianInt(header, 40)
+                if (sampleRate <= 0 || channels <= 0 || bits <= 0 || dataSize <= 0) return false
+                val seconds = dataSize.toDouble() / (sampleRate * channels * (bits / 8.0))
+                val expected = (text.count { !it.isWhitespace() } * 0.018).coerceIn(0.35, 45.0)
+                seconds >= expected * 0.35
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun littleEndianShort(bytes: ByteArray, offset: Int): Int =
+        (bytes[offset].toInt() and 0xff) or ((bytes[offset + 1].toInt() and 0xff) shl 8)
+
+    private fun littleEndianInt(bytes: ByteArray, offset: Int): Int =
+        (bytes[offset].toInt() and 0xff) or
+            ((bytes[offset + 1].toInt() and 0xff) shl 8) or
+            ((bytes[offset + 2].toInt() and 0xff) shl 16) or
+            ((bytes[offset + 3].toInt() and 0xff) shl 24)
+
+    private fun inferLocale(text: String): Locale = when {
+        text.any { it in '\u3040'..'\u30FF' } -> Locale.JAPAN
+        text.any { it in '\uAC00'..'\uD7AF' } -> Locale.KOREA
+        text.any { it in '\u2E80'..'\u9FFF' } -> Locale.SIMPLIFIED_CHINESE
+        text.any { it in '\u0400'..'\u04FF' } -> Locale("ru")
+        text.any { it in '\u0600'..'\u06FF' } -> Locale("ar")
+        else -> Locale.getDefault()
+    }
+
     data class TtsFile(
         val id: String,
         val file: File,
         val language: String,
         val expiresAt: Long,
+        val contentType: String,
     )
 }

@@ -11,7 +11,7 @@
     </div>
     <el-dialog
       :model-value="pairingRequired"
-      title="Ghép đôi với DrDucBook"
+      :title="`Ghép đôi với ${serviceName}`"
       width="min(92vw, 420px)"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
@@ -68,6 +68,7 @@ const pairingRequired = ref(false)
 const pairingCode = ref('')
 const pairingError = ref('')
 const pairingBusy = ref(false)
+const serviceName = computed(() => webServiceStore.instance?.serviceName || webServiceStore.instance?.appName || 'DrDucBook')
 
 const backgroundStyle = computed<CSSProperties>(() => ({
   '--web-service-background-image': clientBackground.imageUrl
@@ -96,6 +97,7 @@ onMounted(async () => {
   await initializeClientBackground()
   try {
     const instance = await getWebServiceInstance()
+    webServiceStore.instance = instance
     if (instance.requiresPairing) {
       if (getWebSessionToken()) {
         try {

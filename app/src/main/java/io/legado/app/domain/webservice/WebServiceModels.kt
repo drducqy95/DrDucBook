@@ -141,6 +141,7 @@ object WebServiceLegacyContract {
 
 data class WebServiceInstanceResponse(
     val appName: String,
+    val serviceName: String = appName,
     val packageName: String,
     val versionName: String,
     val versionCode: Long,
@@ -155,6 +156,76 @@ data class WebServiceInstanceResponse(
     val pairingCodeTtlMillis: Long,
     val sessionTtlMillis: Long,
 )
+
+data class WebServiceSourceImportRequest(
+    val payload: String = "",
+    val commit: Boolean = false,
+    val sourceType: String = "book",
+)
+
+data class WebServiceSourceImportItem(
+    val sourceUrl: String,
+    val name: String,
+    val existing: Boolean,
+    val lastUpdateTime: Long,
+)
+
+data class WebServiceSourceImportResponse(
+    val items: List<WebServiceSourceImportItem>,
+    val committed: Boolean,
+)
+
+data class WebServiceVbookRegistryImportRequest(
+    val payload: String = "",
+    val commit: Boolean = true,
+    val selectedPluginIds: List<String>? = null,
+    val allowDowngrade: Boolean = false,
+)
+
+data class WebServiceVbookRegistryImportResponse(
+    val sourceLabel: String,
+    val classification: String,
+    val total: Int,
+    val compatible: Int,
+    val rejected: Int,
+    val selected: Int,
+    val installed: Int,
+    val failed: Int,
+    val committed: Boolean,
+)
+
+data class WebServiceDiscoverySourceResponse(
+    val sourceUrl: String,
+    val name: String,
+    val group: String? = null,
+    val enabled: Boolean,
+    val selectedForWeb: Boolean,
+)
+
+data class WebServiceDiscoveryKindResponse(
+    val title: String,
+    val displayName: String,
+    val url: String? = null,
+    val type: String,
+    val action: String? = null,
+    val chars: List<String> = emptyList(),
+    val defaultValue: String? = null,
+    val currentValue: String = "",
+)
+
+data class WebServiceDiscoveryKindsResponse(
+    val sourceUrl: String,
+    val sourceName: String,
+    val group: String? = null,
+    val kinds: List<WebServiceDiscoveryKindResponse>,
+)
+
+data class WebServiceDiscoveryKindValuesPatchRequest(
+    val sourceUrl: String = "",
+    val values: Map<String, String> = emptyMap(),
+)
+
+data class WebServiceDiscoverySourcesPatchRequest(val sourceUrls: List<String> = emptyList())
 
 data class WebServiceDiscoveryBook(
     val bookUrl: String,
@@ -282,6 +353,7 @@ data class WebServicePolicy(
     val backgroundBlur: Int = WebServiceBackgroundPolicy.DEFAULT_BLUR,
     val revision: Long = 1L,
     val updatedAt: Long = 0L,
+    val webDiscoverySourceUrls: List<String> = emptyList(),
 ) {
     val etag: String
         get() = WebServicePolicyRevision.etag(revision)
@@ -293,6 +365,7 @@ data class WebServicePolicy(
             backgroundPosition = WebServiceBackgroundPolicy.normalizePosition(backgroundPosition),
             backgroundDim = WebServiceBackgroundPolicy.normalizeDim(backgroundDim),
             backgroundBlur = WebServiceBackgroundPolicy.normalizeBlur(backgroundBlur),
+            webDiscoverySourceUrls = webDiscoverySourceUrls.map(String::trim).filter(String::isNotBlank).distinct(),
             revision = revision.takeIf { it > 0L } ?: 1L,
         )
 
@@ -306,6 +379,7 @@ data class WebServicePolicy(
             backgroundPosition = clean.backgroundPosition,
             backgroundDim = clean.backgroundDim,
             backgroundBlur = clean.backgroundBlur,
+            webDiscoverySourceUrls = clean.webDiscoverySourceUrls,
             revision = clean.revision,
             updatedAt = clean.updatedAt,
             etag = clean.etag,
@@ -324,6 +398,7 @@ data class WebServicePolicyResponse(
     val revision: Long,
     val updatedAt: Long,
     val etag: String,
+    val webDiscoverySourceUrls: List<String> = emptyList(),
 )
 
 data class WebServicePolicyPatchRequest(
@@ -335,6 +410,7 @@ data class WebServicePolicyPatchRequest(
     val backgroundPosition: String? = null,
     val backgroundDim: Float? = null,
     val backgroundBlur: Int? = null,
+    val webDiscoverySourceUrls: List<String>? = null,
 )
 
 data class WebServiceBackgroundAssetResponse(
@@ -371,12 +447,46 @@ data class WebServiceExportBookTextRequest(
     val chapterIndices: List<Int>? = null,
 )
 
+data class WebServiceExportEbookRequest(
+    val bookUrl: String? = null,
+    val format: String = "epub3",
+    val scope: String? = null,
+    val contentSource: String = "original",
+    val imageOptimization: String = "original",
+)
+
 data class WebServiceTranslationJobRequest(
     val bookUrl: String? = null,
     val chapterIndex: Int? = null,
     val forceRetranslate: Boolean = false,
     val provider: String? = null,
     val targetLanguage: String? = null,
+)
+
+data class WebServicePretranslateRequest(
+    val bookUrl: String? = null,
+    val fromChapter: Int = 0,
+    val count: Int = 1,
+    val provider: String? = null,
+    val targetLanguage: String? = null,
+    val forceRetranslate: Boolean = false,
+)
+
+data class WebServicePretranslateResponse(
+    val bookUrl: String,
+    val jobs: List<WebServiceTranslationJobResponse>,
+)
+
+data class WebServiceUiTranslationRequest(
+    val scopeKey: String = "web",
+    val texts: List<String> = emptyList(),
+    val targetLanguage: String = "vi",
+    val forceRetranslate: Boolean = false,
+)
+
+data class WebServiceUiTranslationResponse(
+    val targetLanguage: String,
+    val texts: List<String>,
 )
 
 data class WebServiceTranslationProviderResponse(
@@ -441,6 +551,7 @@ data class WebServiceTranslationJobListResponse(
 data class WebServiceTtsSynthesisRequest(
     val text: String = "",
     val language: String? = null,
+    val bookUrl: String? = null,
 )
 
 data class WebServiceTtsCapabilitiesResponse(
@@ -454,6 +565,48 @@ data class WebServiceTtsSynthesisResponse(
     val engine: String,
     val language: String,
     val expiresAt: Long,
+)
+
+data class WebServiceTtsVoiceResponse(
+    val id: Int,
+    val name: String,
+)
+
+data class WebServiceTtsModelResponse(
+    val id: String,
+    val name: String,
+    val engine: String,
+    val language: String,
+    val sampleRate: Int,
+    val voices: List<WebServiceTtsVoiceResponse>,
+    val defaultVoiceId: Int,
+    val selectedVoiceId: Int?,
+    val isDefault: Boolean,
+    val runtimeReady: Boolean,
+    val sizeBytes: Long,
+    val checksum: String,
+)
+
+data class WebServiceTtsCatalogItemResponse(
+    val id: String,
+    val displayName: String,
+    val fileName: String,
+    val sizeBytes: Long,
+    val sha256: String,
+    val engine: String,
+    val importSupported: Boolean,
+    val installed: Boolean,
+)
+
+data class WebServiceTtsModelsResponse(
+    val models: List<WebServiceTtsModelResponse>,
+    val catalog: List<WebServiceTtsCatalogItemResponse>,
+    val selectedEngine: String,
+)
+
+data class WebServiceTtsModelSelectRequest(
+    val modelId: String = "",
+    val voiceId: Int? = null,
 )
 
 object WebServiceExportRequests {
@@ -556,6 +709,11 @@ object WebServicePolicyRevision {
                 backgroundBlur = request.backgroundBlur
                     ?.let(WebServiceBackgroundPolicy::normalizeBlur)
                     ?: cleanCurrent.backgroundBlur,
+                webDiscoverySourceUrls = request.webDiscoverySourceUrls
+                    ?.map(String::trim)
+                    ?.filter(String::isNotBlank)
+                    ?.distinct()
+                    ?: cleanCurrent.webDiscoverySourceUrls,
                 revision = cleanCurrent.revision + 1L,
                 updatedAt = now,
             )

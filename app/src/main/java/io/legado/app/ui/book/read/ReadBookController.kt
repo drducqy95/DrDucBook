@@ -293,7 +293,7 @@ class ReadBookController(
     override fun showActionMenu() {
         val state = viewModel.uiState.value
         when {
-            BaseReadAloudService.isRun -> viewModel.onIntent(
+            BaseReadAloudService.isRun || ReadAloud.isLocalSessionRunning -> viewModel.onIntent(
                 ReadBookIntent.OpenReadMenuRoute(ReadBookMenuRoute.ReadAloud)
             )
 
@@ -1082,9 +1082,10 @@ class ReadBookController(
     }
 
     fun updateReadAloudProgress(chapterStart: Int) {
-        if (!BaseReadAloudService.isPlay()) return
+        val localPlaying = ReadAloud.isLocalSessionRunning && !ReadAloud.isLocalSessionPaused
+        if (!BaseReadAloudService.isPlay() && !localPlaying) return
         val textChapter = ReadBook.curTextChapter ?: return
-        if (textChapter.chapter.index != BaseReadAloudService.currentChapterIndex) return
+        if (!localPlaying && textChapter.chapter.index != BaseReadAloudService.currentChapterIndex) return
         val pageIndex = textChapter.getPageIndexByCharIndex(chapterStart)
         if (pageIndex < 0 || pageIndex != ReadBook.durPageIndex) return
         val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
@@ -1097,7 +1098,7 @@ class ReadBookController(
     private fun toggleReadAloud() {
         viewModel.onIntent(ReadBookIntent.StopAutoPage)
         when {
-            !BaseReadAloudService.isRun -> {
+            !BaseReadAloudService.isRun && !ReadAloud.isLocalSessionRunning -> {
                 ReadAloud.upReadAloudClass()
                 val scrollPageAnim = ReadBook.pageAnim() == 3
                 val readView = refs?.readView
@@ -1121,7 +1122,8 @@ class ReadBookController(
                 }
             }
 
-            BaseReadAloudService.pause -> {
+            ReadAloud.isLocalSessionRunning && ReadAloud.isLocalSessionPaused ||
+                !ReadAloud.isLocalSessionRunning && BaseReadAloudService.pause -> {
                 val scrollPageAnim = ReadBook.pageAnim() == 3
                 val readView = refs?.readView
                 if (scrollPageAnim && pageChanged && readView != null) {
