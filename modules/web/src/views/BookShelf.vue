@@ -33,7 +33,19 @@
     </section>
 
     <section class="section-block">
-      <div class="section-heading"><div><span class="eyebrow">{{ t('yourBookshelf') }}</span><h2>{{ searchWord ? `${t('searchResultFor')} “${searchWord}”` : t('updatedBooks') }}</h2><p v-if="translatedSearchWord" class="search-key-hint">{{ t('searchKeywordUsed') }}: {{ translatedSearchWord }}</p></div><span class="count-label">{{ filteredBooks.length }} {{ t('books') }}</span></div>
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">{{ t('yourBookshelf') }}</span>
+          <h2>{{ searchWord ? `${t('searchResultFor')} “${searchWord}”` : t('updatedBooks') }}</h2>
+          <p v-if="translatingSearchWord" class="search-key-hint translating">
+            <el-icon class="is-loading"><Loading /></el-icon> {{ t('translatingKeyword') }}
+          </p>
+          <p v-else-if="translatedSearchWord" class="search-key-hint">
+            {{ t('searchKeywordUsed') }}: <strong>{{ translatedSearchWord }}</strong>
+          </p>
+        </div>
+        <span class="count-label">{{ filteredBooks.length }} {{ t('books') }}</span>
+      </div>
       <div v-if="loading" class="empty-panel glass-panel"><el-icon class="is-loading"><Loading /></el-icon> {{ t('waiting') }}</div>
       <div v-else-if="filteredBooks.length === 0" class="empty-panel glass-panel">{{ t('noMatchingBooks') }}</div>
       <div v-else class="book-grid">
@@ -75,6 +87,7 @@ const onlineError = ref(false)
 const searchWord = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const searchResults = ref<SeachBook[]>([])
 const translatedSearchWord = ref('')
+const translatingSearchWord = ref(false)
 const discovery = ref<SeachBook[]>([])
 const recentBook = ref<Book | undefined>()
 const readerPreferences = getReaderPreferences()
@@ -83,6 +96,7 @@ const shelf = computed(() => store.shelf)
 const dynamicValues = computed(() => [
   ...shelf.value.flatMap(book => [book.name, book.author, book.durChapterTitle, book.latestChapterTitle]),
   ...discovery.value.flatMap(book => [book.name, book.author, book.originName, book.latestChapterTitle]),
+  ...searchResults.value.flatMap(book => [book.name, book.author, book.latestChapterTitle, book.kind, 'originName' in book ? (book as any).originName : '']),
 ])
 const displayDynamic = (value: string | null | undefined) => dynamicText('shelf', value)
 
@@ -183,16 +197,24 @@ const runSearch = async () => {
   if (!query) { searchResults.value = []; return }
   let searchKey = query
   if (getChineseSearchEnabled() && !hasChineseText(query)) {
+    translatingSearchWord.value = true
     try {
       const translated = await translateWebServiceUi('search-keyword', [query], 'zh-CN')
       if (requestId !== searchRequestId) return
       const candidate = translated.texts?.[0]?.trim()
-      if (candidate) {
+      if (candidate && candidate !== query) {
         searchKey = candidate
         translatedSearchWord.value = candidate
+      } else {
+        ElMessage.warning(t('searchTranslationUnchanged'))
       }
     } catch {
-      // Keep the original keyword if the configured AI provider is unavailable.
+      if (requestId !== searchRequestId) return
+      ElMessage.warning(t('searchTranslationFailed'))
+    } finally {
+      if (requestId === searchRequestId) {
+        translatingSearchWord.value = false
+      }
     }
   }
   if (requestId !== searchRequestId) return
@@ -204,6 +226,7 @@ const runSearch = async () => {
     const merged = new Map(searchResults.value.map(book => [book.bookUrl, book]))
     books.forEach(book => merged.set(book.bookUrl, book))
     searchResults.value = [...merged.values()]
+    void translateDynamicTexts('shelf', books.flatMap(b => [b.name, b.author, b.latestChapterTitle, b.kind, 'originName' in b ? (b as any).originName : '']))
   }, () => { if (requestId === searchRequestId && !searchResults.value.length) ElMessage.info(t('noOnlineResults')) })
 }
 watch(() => route.query.q, value => { searchWord.value = typeof value === 'string' ? value : ''; runSearch() })

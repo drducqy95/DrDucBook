@@ -1985,10 +1985,14 @@
     <string name="ai_rewrite_preset_delete_confirm">删除“%1$s”？</string>
     <string name="ai_rewrite_preset_polish_name">润色文风</string>
     <string name="ai_rewrite_preset_polish_instruction">保持剧情、人物称呼、关系和事实不变，润色病句与生硬表达，让段落更顺畅，保留原意。</string>
-    <string name="ai_rewrite_preset_concise_name">精简段落</string>
-    <string name="ai_rewrite_preset_concise_instruction">保持关键信息和剧情不变，删去重复和拖沓表达，让文字更简洁清楚。</string>
+    <string name="ai_rewrite_preset_convert_name">转换机翻文风</string>
+    <string name="ai_rewrite_preset_convert_instruction">将生硬机翻/Convert文风改写为自然流畅的文学语言。调整汉越倒装句式，消除机械重复主语，意译成语，依上下文润色称谓，保留100%剧情与专有名词。</string>
     <string name="ai_rewrite_preset_dialogue_name">口语自然</string>
     <string name="ai_rewrite_preset_dialogue_instruction">把所选文字改写得更像自然叙述或对话，保持角色意图、人物关系和剧情事实不变。</string>
+    <string name="ai_rewrite_preset_action_name">战斗场面强化</string>
+    <string name="ai_rewrite_preset_action_instruction">将战斗与动作场景改写得更具张力、画面感与打击感。用连贯动作描写取代生硬招式罗列，保留招式名称与战斗结局。</string>
+    <string name="ai_rewrite_preset_concise_name">精简段落</string>
+    <string name="ai_rewrite_preset_concise_instruction">保持关键信息和剧情不变，删去重复和拖沓表达，让文字更简洁清楚。</string>
     <string name="content_processes">正文处理</string>
     <string name="content_process_empty">当前章节没有正文处理。</string>
     <string name="content_process_delete_confirm">删除这条正文处理？\n\n%1$s</string>

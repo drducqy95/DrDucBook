@@ -36,6 +36,12 @@ interface AiMemoryDao {
     @Query("SELECT * FROM ai_memory WHERE scope = :scope AND scopeId = :scopeId ORDER BY pinned DESC, updatedAt DESC")
     suspend fun getByScope(scope: String, scopeId: String): List<AiMemory>
 
+    @Query("SELECT * FROM ai_memory WHERE scope = :scope AND scopeId IN (:scopeIds) ORDER BY pinned DESC, updatedAt DESC")
+    suspend fun getByScopeIds(scope: String, scopeIds: List<String>): List<AiMemory>
+
+    @Query("SELECT * FROM ai_memory WHERE scope = :scope AND scopeId IN (:scopeIds) ORDER BY pinned DESC, updatedAt DESC")
+    fun observeByScopeIds(scope: String, scopeIds: List<String>): Flow<List<AiMemory>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(memory: AiMemory)
 

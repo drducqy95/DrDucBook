@@ -8,6 +8,8 @@ import io.legado.app.ui.config.translation.TranslationConfig
 import org.koin.core.context.GlobalContext
 
 object WebServiceUiTranslationController {
+    private const val TAG = "WebServiceUiTrans"
+
     suspend fun translate(request: WebServiceUiTranslationRequest): WebServiceUiTranslationResponse {
         val language = request.targetLanguage.trim().lowercase().ifBlank { "vi" }
         val values = request.texts.take(100).map { it.take(500) }
@@ -33,15 +35,40 @@ object WebServiceUiTranslationController {
         }
         val translator = GlobalContext.get().get<TranslateChapterUseCase>()
         val configuredProvider = TranslationConfig.llmProvider
-        val provider = configuredProvider.takeIf {
+        val primaryProvider = configuredProvider.takeIf {
             TranslationConstants.supportsTargetLanguage(it, requestedLanguage)
-        } ?: TranslationConstants.PROVIDER_GOOGLE
+        }
+        val providerChain = listOfNotNull(
+            primaryProvider,
+            TranslationConstants.PROVIDER_GOOGLE,
+            TranslationConstants.PROVIDER_ML_KIT.takeIf {
+                TranslationConstants.supportsTargetLanguage(it, requestedLanguage)
+            },
+        ).distinct()
+
         val translated = values.map { text ->
-            if (text.isBlank()) text else translator.executeSuggestion(
-                text = text,
-                provider = provider,
-                targetLanguage = requestedLanguage,
-            ).getOrElse { text }
+            if (text.isBlank()) text
+            else {
+                var translatedText: String? = null
+                var lastException: Throwable? = null
+                for (provider in providerChain) {
+                    val attempt = translator.executeSuggestion(
+                        text = text,
+                        provider = provider,
+                        targetLanguage = requestedLanguage,
+                    )
+                    if (attempt.isSuccess) {
+                        val candidate = attempt.getOrNull()?.trim().orEmpty()
+                        if (candidate.isNotBlank() && candidate != text) {
+                            translatedText = candidate
+                            break
+                        }
+                    } else {
+                        lastException = attempt.exceptionOrNull()
+                    }
+                }
+                translatedText ?: throw (lastException ?: IllegalStateException("TRANSLATION_FAILED_ALL_PROVIDERS"))
+            }
         }
         return WebServiceUiTranslationResponse(language, translated)
     }

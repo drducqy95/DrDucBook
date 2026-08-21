@@ -126,6 +126,24 @@ object AiPromptCatalog {
                 <dinh_dang>Thoại xuống dòng trong ngoặc kép; chỉ xuất bản dịch.</dinh_dang>
             """.trimIndent(),
         ),
+        translationStyle(
+            id = "context_convert_reform_v3",
+            name = "Chuyển đổi văn phong Convert",
+            description = "Chuyển văn convert (dịch máy QT/NMT) sang văn phong tiếng Việt tự nhiên, mượt mà.",
+            style = """
+                <vai_tro>Biên tập viên chuyển ngữ cao cấp, chuyên cải tạo văn phong convert sang tiếng Việt văn học tự nhiên.</vai_tro>
+                <muc_tieu>Xóa bỏ hoàn toàn dấu vết dịch thô máy móc, câu văn uyển chuyển, giữ nguyên 100% dữ kiện và tính liên tục.</muc_tieu>
+                <quy_tac_chuyen_doi>
+                - Đảo cấu trúc câu Hán-Việt về thuận tiếng Việt (ví dụ: "A đối với B nói" → "A nói với B"; "bị hắn đánh bại" thay cho các thể bị động dịch máy gượng gạo).
+                - Xóa bỏ lặp đại từ cơ học ("hắn nhìn hắn, hắn cười" → "nhìn đối phương, hắn mỉm cười"); dùng đại từ ẩn khi ngữ cảnh đã rõ chủ thể.
+                - Chuyển ngữ thành ngữ Hán-Việt dịch sát sang cách diễn đạt tương đương giàu hình ảnh trong tiếng Việt.
+                - Đại từ xưng hô linh hoạt, ăn khớp với bối cảnh, vai vế, tính cách và cảm xúc nhân vật.
+                - Câu văn nhịp nhàng, có độ dài ngắn đan xen, tránh câu ghép dài lê thê theo cú pháp Hán văn.
+                </quy_tac_chuyen_doi>
+                <tinh_lien_tuc>Mọi Name, VietPhrase và Luật Nhân đã có là khóa liên chương; chỉ người dùng được sửa trong từ điển.</tinh_lien_tuc>
+                <dinh_dang>Mỗi lượt thoại xuống dòng trong ngoặc kép; chỉ xuất bản dịch.</dinh_dang>
+            """.trimIndent(),
+        ),
         AiPromptCatalogTemplate(
             id = "summary_chapter_v1",
             taskType = AiTaskType.SUMMARIZE_CHAPTER,
@@ -184,12 +202,82 @@ object AiPromptCatalog {
         AiPromptCatalogTemplate(
             id = "rewrite_text_v1",
             taskType = AiTaskType.REWRITE_TEXT,
-            name = "Viết lại văn bản",
+            name = "Viết lại văn bản · Cơ bản",
             description = "Hiệu đính theo yêu cầu nhưng giữ nguyên dữ kiện và tính liên tục.",
             prompt = """
                 Viết lại văn bản theo yêu cầu của người dùng trong khi giữ nguyên sự kiện,
                 quan hệ nhân quả, tên riêng, số liệu và các thuật ngữ đã khóa. Không tự thêm
                 tình tiết. Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
+            """.trimIndent(),
+        ),
+        AiPromptCatalogTemplate(
+            id = "rewrite_convert_to_natural_v1",
+            taskType = AiTaskType.REWRITE_TEXT,
+            name = "Chuyển convert → Tự nhiên",
+            description = "Biến đổi văn phong convert/dịch thô máy sang tiếng Việt tự nhiên, thuần Việt.",
+            prompt = """
+                Viết lại đoạn văn từ văn phong convert (dịch máy QT/NMT) sang tiếng Việt tự nhiên.
+                
+                Quy tắc bắt buộc:
+                1. Đảo cấu trúc câu Hán-Việt về thuận tiếng Việt (ví dụ: "A đối với B nói" → "A nói với B").
+                2. Rút gọn chủ ngữ lặp, dùng đại từ ẩn khi ngữ cảnh đã rõ ràng.
+                3. Thay thành ngữ dịch sát bằng cách diễn đạt thuần Việt tương đương.
+                4. Điều chỉnh xưng hô theo quan hệ nhân vật, vai vế và mức độ thân mật.
+                5. Thêm liên từ, biến tấu nhịp điệu câu, tránh câu ghép dài lê thê kiểu Hán văn.
+                6. Giữ nguyên 100% sự kiện, quan hệ nhân quả, tên riêng, số liệu và thuật ngữ đã khóa.
+                7. Không tự thêm tình tiết mới, không lược bỏ thông tin quan trọng.
+                Chỉ trả về đoạn văn hoàn chỉnh sau khi viết lại.
+            """.trimIndent(),
+        ),
+        AiPromptCatalogTemplate(
+            id = "rewrite_polish_dialogue_v1",
+            taskType = AiTaskType.REWRITE_TEXT,
+            name = "Trau chuốt hội thoại",
+            description = "Lời thoại tự nhiên, ngữ khí sống động, phân biệt giọng điệu từng nhân vật.",
+            prompt = """
+                Viết lại phần hội thoại và lời dẫn thoại cho tự nhiên và giàu cảm xúc hơn.
+                
+                Quy tắc bắt buộc:
+                1. Mỗi nhân vật phải có giọng điệu riêng phù hợp tính cách, tuổi tác, địa vị và tâm trạng.
+                2. Thêm ngữ khí từ tự nhiên trong khẩu ngữ tiếng Việt (à, ừ, nhỉ, chứ, thôi, đi, cơ chứ...).
+                3. Xưng hô đúng quan hệ: sư đồ, phụ tử, huynh đệ, bằng hữu, kẻ thù...
+                4. Giữ nguyên nội dung và ý định của lời nói, chỉ làm mượt mà cách phát ngôn.
+                5. Câu thoại gãy gọn, tự nhiên; giữ đúng tên nhân vật và thuật ngữ đã khóa.
+                Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
+            """.trimIndent(),
+        ),
+        AiPromptCatalogTemplate(
+            id = "rewrite_action_scenes_v1",
+            taskType = AiTaskType.REWRITE_TEXT,
+            name = "Nâng cấp cảnh chiến đấu",
+            description = "Miêu tả hành động liên hoàn, dồn dập, cảm giác va chạm và nhịp độ cao.",
+            prompt = """
+                Viết lại cảnh chiến đấu/hành động cho sống động, mãnh liệt và giàu hình ảnh hơn.
+                
+                Quy tắc bắt buộc:
+                1. Thay liệt kê chiêu thức khô khan bằng miêu tả chuỗi hành động liên hoàn, uy lực.
+                2. Tạo nhịp điệu dồn dập: câu ngắn cho hành động chớp nhoáng, câu dài cho khoảnh khắc ngưng đọng hoặc nội tâm.
+                3. Tả rõ cảm giác vật lý: luồng gió, chấn động, va chạm, sát khí, sự đau đớn và hao tổn thể lực.
+                4. Giữ chính xác tên chiêu thức, pháp bảo, cấp độ và thuật ngữ đã khóa.
+                5. Tuyệt đối không thay đổi kết quả giao tranh hoặc sức mạnh thực tế của nhân vật.
+                Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
+            """.trimIndent(),
+        ),
+        AiPromptCatalogTemplate(
+            id = "rewrite_ancient_atmosphere_v1",
+            taskType = AiTaskType.REWRITE_TEXT,
+            name = "Văn phong Cổ phong / Tiên hiệp",
+            description = "Trau chuốt văn phong cổ trang, trang nhã, lễ nghi kiếm hiệp và tiên hiệp.",
+            prompt = """
+                Viết lại đoạn văn theo đúng văn phong cổ phong, tiên hiệp, kiếm hiệp trang nhã.
+                
+                Quy tắc bắt buộc:
+                1. Giữ sắc thái cổ trang: dùng từ Hán-Việt tinh tế khi phù hợp (bẩm báo, thiếu hiệp, cô nương, công tử...).
+                2. Xưng hô theo lễ nghi và quan hệ môn phái: vi sư - đồ nhi, sư huynh - sư muội, tiền bối - vãn bối...
+                3. Tuyệt đối không để lọt từ ngữ hiện đại, tiếng lóng đương đại vào bối cảnh cổ đại.
+                4. Lời kể sâu lắng, có chất thơ và nhịp điệu văn học.
+                5. Giữ nguyên 100% cốt truyện, tên riêng, công pháp, cảnh giới và số liệu.
+                Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
         AiPromptCatalogTemplate(

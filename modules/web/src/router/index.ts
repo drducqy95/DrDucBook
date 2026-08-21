@@ -28,6 +28,11 @@ const router = createRouter({
       name: 'media',
       component: () => import('../views/MediaReader.vue'),
     },
+    {
+      path: '/translation',
+      name: 'translation',
+      component: () => import('../views/TranslationDashboard.vue'),
+    },
   ].flat(),
 })
 

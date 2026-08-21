@@ -640,8 +640,7 @@ class TranslateChapterUseCase(
                     )
                 if (
                     hasUsableCachedContent &&
-                    !forceRetranslate &&
-                    cached.originalContentHash == chunkContentHashes.getValue(chunk.index)
+                    !forceRetranslate
                 ) {
                     translatedChunks[chunk.index] = cachedContent
                 } else {
@@ -1343,7 +1342,13 @@ class TranslateChapterUseCase(
         requestedProvider: String,
         requestedContentHash: String,
     ): PreferredCachedTranslation? {
-        for (identity in TranslationConstants.preferredContentProviders(targetLanguage)) {
+        val candidateIdentities = if (requestedProvider.isNotBlank()) {
+            listOf(TranslationConstants.TranslationProviderIdentity(requestedProvider, targetLanguage))
+                .filter { TranslationConstants.supportsTargetLanguage(it.provider, it.targetLanguage) }
+        } else {
+            TranslationConstants.preferredContentProviders(targetLanguage)
+        }
+        for (identity in candidateIdentities) {
             val identityContentHash = if (identity.provider == requestedProvider) {
                 requestedContentHash
             } else {

@@ -540,6 +540,21 @@ class ReadBookViewModel(
                 }
                 maybeStartAutoTranslationQueue()
             }
+            is ReadBookIntent.SetInheritSeriesMemory -> {
+                ReadBook.book?.let { currentBook ->
+                    currentBook.setInheritSeriesMemory(intent.enabled)
+                    viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                        appDb.bookDao.update(currentBook)
+                    }
+                    _uiState.update {
+                        it.copy(
+                            translationProgress = it.translationProgress.copy(
+                                inheritSeriesMemory = intent.enabled,
+                            )
+                        )
+                    }
+                }
+            }
             is ReadBookIntent.CopyTranslationLog -> {
                 context.sendToClip(_uiState.value.translationProgress.logs.joinToString("\n"))
             }
@@ -4156,14 +4171,24 @@ class ReadBookViewModel(
                 instruction = context.getString(R.string.ai_rewrite_preset_polish_instruction),
             ),
             AiRewritePresetUi(
-                id = "default_concise",
-                name = context.getString(R.string.ai_rewrite_preset_concise_name),
-                instruction = context.getString(R.string.ai_rewrite_preset_concise_instruction),
+                id = "default_convert",
+                name = context.getString(R.string.ai_rewrite_preset_convert_name),
+                instruction = context.getString(R.string.ai_rewrite_preset_convert_instruction),
             ),
             AiRewritePresetUi(
                 id = "default_dialogue",
                 name = context.getString(R.string.ai_rewrite_preset_dialogue_name),
                 instruction = context.getString(R.string.ai_rewrite_preset_dialogue_instruction),
+            ),
+            AiRewritePresetUi(
+                id = "default_action",
+                name = context.getString(R.string.ai_rewrite_preset_action_name),
+                instruction = context.getString(R.string.ai_rewrite_preset_action_instruction),
+            ),
+            AiRewritePresetUi(
+                id = "default_concise",
+                name = context.getString(R.string.ai_rewrite_preset_concise_name),
+                instruction = context.getString(R.string.ai_rewrite_preset_concise_instruction),
             ),
         )
     }
@@ -6866,6 +6891,7 @@ class ReadBookViewModel(
                         autoTranslateTotalChapters = it.translationProgress.autoTranslateTotalChapters,
                         autoTranslateCurrentChapter = it.translationProgress.autoTranslateCurrentChapter,
                         autoTranslateMessage = it.translationProgress.autoTranslateMessage,
+                        inheritSeriesMemory = book.getInheritSeriesMemory(),
                     )
                 )
             }

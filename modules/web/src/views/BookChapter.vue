@@ -23,7 +23,7 @@
           <template #reference>
             <div class="tool-icon" :class="{ 'no-point': false }">
               <div class="iconfont">&#58905;</div>
-              <div class="icon-text">Mục lục</div>
+              <div class="icon-text">{{ t('catalog') }}</div>
             </div>
           </template>
         </el-popover>
@@ -39,20 +39,30 @@
           <template #reference>
             <div class="tool-icon" :class="{ 'no-point': noPoint }">
               <div class="iconfont">&#58971;</div>
-              <div class="icon-text">Cài đặt</div>
+              <div class="icon-text">{{ t('readerSettings') }}</div>
             </div>
           </template>
         </el-popover>
         <el-popover
           placement="right"
-          :width="300"
+          :width="320"
           trigger="click"
           :show-arrow="false"
           v-model:visible="translationPanelVisible"
           popper-class="translation-provider-popover"
         >
           <div class="translation-provider-panel" @click.stop>
-            <strong>{{ t('translationReader') }}</strong>
+            <div class="translation-panel-header">
+              <strong>{{ t('translationReader') }}</strong>
+              <el-tag
+                v-if="currentChapterCacheBadge"
+                :type="currentChapterCacheBadge.type"
+                size="small"
+                effect="light"
+              >
+                {{ currentChapterCacheBadge.text }}
+              </el-tag>
+            </div>
             <label>{{ t('provider') }}</label>
             <el-select
               v-model="selectedTranslationProvider"
@@ -64,7 +74,19 @@
                 :key="provider.id"
                 :label="provider.name"
                 :value="provider.id"
-              />
+              >
+                <div class="provider-option-row">
+                  <span>{{ provider.name }}</span>
+                  <el-tag
+                    v-if="getProviderCacheBadge(provider.id)"
+                    :type="getProviderCacheBadge(provider.id)!.type"
+                    size="small"
+                    effect="plain"
+                  >
+                    {{ getProviderCacheBadge(provider.id)!.text }}
+                  </el-tag>
+                </div>
+              </el-option>
             </el-select>
             <label>{{ t('targetLanguage') }}</label>
             <el-select
@@ -79,6 +101,20 @@
                 :value="language"
               />
             </el-select>
+
+            <div v-if="!currentChapterCache?.content && translationReadingEnabled" class="no-cache-alert">
+              <span>{{ t('noTranslationForProvider') }}</span>
+              <el-button
+                type="primary"
+                size="small"
+                :loading="translationLoading"
+                :disabled="noPoint || !canUseWebTranslation"
+                @click="startTranslateChapter(false)"
+              >
+                {{ t('translateNow') }}
+              </el-button>
+            </div>
+
             <el-button
               type="primary"
               :loading="translationLoading"
@@ -87,6 +123,18 @@
             >
               {{ translationToolText }}
             </el-button>
+
+            <el-button
+              v-if="translationReadingEnabled && currentChapterCache?.content"
+              plain
+              size="small"
+              :loading="translationLoading"
+              :disabled="noPoint || !canUseWebTranslation"
+              @click="startTranslateChapter(true)"
+            >
+              {{ t('retranslateChapter') }}
+            </el-button>
+
             <div class="pretranslate-controls">
               <el-input-number
                 v-model="pretranslateCount"
@@ -130,17 +178,17 @@
               @click.stop
             >
               <div class="iconfont">T</div>
-              <div class="icon-text">Dịch</div>
+              <div class="icon-text">{{ t('translate') }}</div>
             </div>
           </template>
         </el-popover>
         <div class="tool-icon" @click="toShelf">
           <div class="iconfont">&#58892;</div>
-          <div class="icon-text">Kệ sách</div>
+          <div class="icon-text">{{ t('bookshelf') }}</div>
         </div>
         <div class="tool-icon" :class="{ 'no-point': noPoint }" @click="toTop">
           <div class="iconfont">&#58914;</div>
-          <div class="icon-text">Đầu trang</div>
+          <div class="icon-text">{{ t('toTop') }}</div>
         </div>
         <div
           class="tool-icon"
@@ -148,7 +196,7 @@
           @click="toBottom"
         >
           <div class="iconfont">&#58915;</div>
-          <div class="icon-text">Cuối trang</div>
+          <div class="icon-text">{{ t('toBottom') }}</div>
         </div>
       </div>
     </div>
@@ -160,14 +208,14 @@
           @click="readMode === 'paged' ? turnHorizontalPage(-1) : toPreChapter()"
         >
           <div class="iconfont">&#58920;</div>
-          <span v-if="miniInterface">{{ readMode === 'paged' ? 'Trang trước' : 'Chương trước' }}</span>
+          <span v-if="miniInterface">{{ readMode === 'paged' ? t('prevPage') : t('prevChapter') }}</span>
         </div>
         <div
           class="tool-icon"
           :class="{ 'no-point': noPoint }"
           @click="readMode === 'paged' ? turnHorizontalPage(1) : toNextChapter()"
         >
-          <span v-if="miniInterface">{{ readMode === 'paged' ? 'Trang sau' : 'Chương sau' }}</span>
+          <span v-if="miniInterface">{{ readMode === 'paged' ? t('nextPage') : t('nextChapter') }}</span>
           <div class="iconfont">&#58913;</div>
         </div>
       </div>
@@ -214,9 +262,9 @@
           class="reader-state"
           @click.stop
         >
-          <p>{{ isLoading ? 'Đang tải nội dung chương…' : readerError }}</p>
+          <p>{{ isLoading ? t('loadingChapter') : readerError }}</p>
           <el-button v-if="readerError && !isLoading" type="primary" @click="reloadReader">
-            Thử lại
+            {{ t('retry') }}
           </el-button>
         </div>
         <div
@@ -229,7 +277,7 @@
             ref="chapterRef"
             :chapterIndex="data.index"
             :contents="translatedChapters[data.index] ?? data.content"
-            :title="data.title"
+            :title="dynamicText('catalog', data.title)"
             :spacing="store.config.spacing"
             :fontSize="fontSize"
             :fontFamily="fontFamily"
@@ -258,12 +306,15 @@ import {
   getWebServiceTranslationContent,
   getWebServiceTranslationJob,
   getWebServiceTranslationProviders,
+  getWebServiceProviderCaches,
   pretranslateWebServiceChapters,
   resolveWebServiceUrl,
   synthesizeWebServiceTts,
   type WebServiceTtsSynthesisResponse,
   type WebServiceTranslationProvider,
   type WebServiceTranslationJobResponse,
+  type WebServiceProviderCacheInfo,
+  type WebServiceTranslationContentResponse,
 } from '@/api/webService'
 import { useLoading } from '@/hooks/loading'
 import { useThrottleFn } from '@vueuse/shared'
@@ -271,7 +322,7 @@ import { isNullOrBlank } from '@/utils/utils'
 import { initXboxGamepad } from '@/utils/xboxGamepad'
 import { getReaderPreferences } from '@/utils/clientPreferences'
 import { withWebSession } from '@/api/webSession'
-import { t } from '@/i18n'
+import { dynamicText, t, translateDynamicTexts, webLocale } from '@/i18n'
 
 const content = ref()
 // loading spinner
@@ -300,7 +351,8 @@ const ttsProgress = computed(() => {
   return Math.min(100, Math.round(((ttsActiveParagraph.value + 1) / ttsActiveParagraphCount.value) * 100))
 })
 const ttsProgressLabel = computed(() => {
-  const title = catalog.value[ttsActiveChapter.value ?? chapterIndex.value]?.title || t('listenCurrent')
+  const rawTitle = catalog.value[ttsActiveChapter.value ?? chapterIndex.value]?.title
+  const title = rawTitle ? dynamicText('catalog', rawTitle) : t('listenCurrent')
   if (ttsActiveParagraphCount.value <= 0 || ttsActiveParagraph.value < 0) return title
   return `${title} · ${ttsActiveParagraph.value + 1}/${ttsActiveParagraphCount.value}`
 })
@@ -315,6 +367,17 @@ const {
   theme,
   isNight,
 } = storeToRefs(store)
+
+watch(
+  [catalog, webLocale],
+  () => {
+    if (catalog.value && catalog.value.length > 0) {
+      translateDynamicTexts('catalog', catalog.value.map(c => c.title))
+    }
+  },
+  { immediate: true },
+)
+
 const readMode = computed(() => store.config.readMode || 'vertical')
 
 const saveBlob = (blob: Blob, fileName: string) => {
@@ -535,6 +598,8 @@ const translatedChapters = ref<Record<number, string[]>>({})
 const translationJob = ref<WebServiceTranslationJobResponse | null>(null)
 const translationLoading = ref(false)
 const translationPanelVisible = ref(false)
+const currentChapterProviderCaches = ref<WebServiceProviderCacheInfo[]>([])
+const currentChapterCache = ref<WebServiceTranslationContentResponse | null>(null)
 const TRANSLATION_READING_KEY = 'webTranslationReadingEnabled'
 const TRANSLATION_PROVIDER_KEY = 'webTranslationProvider'
 const TRANSLATION_LANGUAGE_KEY = 'webTranslationTargetLanguage'
@@ -554,6 +619,23 @@ const selectedProviderLanguages = computed(
       provider => provider.id === selectedTranslationProvider.value,
     )?.targetLanguages ?? [],
 )
+
+const getProviderCacheBadge = (providerId: string) => {
+  const cache = currentChapterProviderCaches.value.find(c => c.provider === providerId)
+  if (!cache) return null
+  if (cache.hasUserEdits) return { text: t('userEdited'), type: 'success' as const }
+  if (cache.isStale) return { text: t('staleTranslation'), type: 'warning' as const }
+  return { text: t('cachedTranslation'), type: 'info' as const }
+}
+
+const currentChapterCacheBadge = computed(() => {
+  const cache = currentChapterCache.value
+  if (!cache?.content) return null
+  if (cache.hasUserEdits) return { text: t('userEdited'), type: 'success' as const }
+  if (cache.isStale) return { text: t('staleTranslation'), type: 'warning' as const }
+  return { text: t('cachedTranslation'), type: 'info' as const }
+})
+
 const translationLanguageNames: Record<string, string> = {
     zh: '简体中文',
     en: 'English',
@@ -578,8 +660,8 @@ const canUseWebTranslation = computed(
   () => webServiceStore.policy?.autoTranslationEnabled ?? false,
 )
 const translationToolText = computed(() => {
-  if (isTranslationRunning.value) return 'Hủy dịch'
-  return translationReadingEnabled.value ? 'Bản gốc' : 'Bản dịch'
+  if (isTranslationRunning.value) return t('cancelTranslation')
+  return translationReadingEnabled.value ? t('originalText') : t('translatedText')
 })
 
 type WebTtsChapter = {
@@ -627,7 +709,7 @@ const toggleWebTtsPause = () => {
     ttsAudio.play().then(() => {
       ttsPaused.value = false
     }).catch(() => {
-      ElMessage.error('Không thể tiếp tục phát TTS')
+      ElMessage.error(t('cannotResumeTts'))
     })
   } else {
     ttsAudio.pause()
@@ -898,7 +980,7 @@ const skipWebTtsChapter = async (direction: number) => {
   const current = ttsActiveChapter.value ?? chapterIndex.value
   const target = current + direction
   if (target < 0 || target >= catalog.value.length) {
-    ElMessage.info(direction < 0 ? 'Đây là chương đầu' : 'Đây là chương cuối')
+    ElMessage.info(direction < 0 ? t('firstChapter') : t('lastChapter'))
     return
   }
   const shouldResume = ttsPlaying.value || ttsPaused.value || ttsLoading.value
@@ -954,12 +1036,12 @@ const speakCurrentChapter = async () => {
         ttsLoading.value = false
       }
     }
-    if (token === ttsPlaybackToken) ElMessage.success('Đã đọc hết sách')
+    if (token === ttsPlaybackToken) ElMessage.success(t('finishedReadingBook'))
   } catch (error: any) {
     if (token !== ttsPlaybackToken) return
     const serverError = error?.response?.data?.error || error?.response?.data?.message
     const code = typeof serverError === 'string' ? serverError : error instanceof Error ? error.message : ''
-    ElMessage.error(code ? `Không thể phát TTS từ ứng dụng: ${code}` : 'Không thể phát TTS từ ứng dụng')
+    ElMessage.error(code ? `${t('cannotPlayTts')}: ${code}` : t('cannotPlayTts'))
   } finally {
     if (token === ttsPlaybackToken) {
       ttsLoading.value = false
@@ -978,11 +1060,11 @@ const translationStatusText = computed(() => {
   if (!job) return ''
   if (job.status === 'translating' || job.status === 'idle') {
     const total = job.totalChunks > 0 ? job.totalChunks : '?'
-    return `Đang dịch ${job.currentChunk}/${total}`
+    return `${t('translating')} ${job.currentChunk}/${total}`
   }
-  if (job.status === 'translated') return 'Đang đọc bản dịch'
-  if (job.status === 'cancelled') return 'Đã hủy dịch'
-  if (job.status === 'failed') return job.error || 'Dịch lỗi'
+  if (job.status === 'translated') return t('readingTranslation')
+  if (job.status === 'cancelled') return t('translationCancelled')
+  if (job.status === 'failed') return job.error || t('translationError')
   return ''
 })
 
@@ -1004,7 +1086,7 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
   const bookUrl = store.readingBook.bookUrl
   const chapter = catalog.value[index]
   if (!chapter) {
-    readerError.value = 'Không tìm thấy chương cần đọc. Hãy tải lại mục lục.'
+    readerError.value = t('chapterNotFound')
     store.setShowContent(true)
     return
   }
@@ -1016,7 +1098,7 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
         if (res.data.isSuccess) {
           const data = res.data.data?.trim()
           if (!data) {
-            readerError.value = 'Nội dung chương đang trống. Hãy thử tải lại.'
+            readerError.value = t('emptyChapterContent')
             store.setShowContent(true)
             return
           }
@@ -1033,14 +1115,14 @@ const getContent = (index: number, reloadChapter = true, chapterPos = 0) => {
             void translateChapterForReading(index)
           }
         } else {
-          readerError.value = res.data.errorMsg || 'Không tải được nội dung chương.'
+          readerError.value = res.data.errorMsg || t('cannotLoadChapterContent')
         }
         store.setContentLoading(true)
         noPoint.value = false
         store.setShowContent(true)
       },
       () => {
-        readerError.value = 'Không tải được nội dung chương. Hãy kiểm tra kết nối và thử lại.'
+        readerError.value = t('cannotLoadChapterConnection')
         store.setShowContent(true)
       },
     ),
@@ -1068,10 +1150,23 @@ const applyTranslationJob = (
       ...translatedChapters.value,
       [displayIndex]: splitChapterContent(job.content),
     }
-    ElMessage.success('Đã dịch chương')
+    loadChapterProviderCaches(displayIndex).catch(() => undefined)
+    const chapter = catalog.value[displayIndex]
+    const bookUrl = store.readingBook.bookUrl
+    if (bookUrl && chapter) {
+      getWebServiceTranslationContent(
+        bookUrl,
+        chapter.index,
+        selectedTranslationProvider.value,
+        selectedTargetLanguage.value,
+      ).then(res => {
+        currentChapterCache.value = res
+      }).catch(() => undefined)
+    }
+    ElMessage.success(t('chapterTranslated'))
   }
   if (job.status === 'failed') {
-    ElMessage.error(job.error || 'Không thể dịch chương')
+    ElMessage.error(job.error || t('cannotTranslateChapter'))
   }
 }
 
@@ -1085,7 +1180,7 @@ const pollTranslationJob = (jobId: string, displayIndex: number) => {
         pollTranslationJob(jobId, displayIndex)
       }
     } catch {
-      ElMessage.error('Không thể cập nhật trạng thái dịch')
+      ElMessage.error(t('cannotUpdateTranslationStatus'))
     }
   }, 1000)
 }
@@ -1108,6 +1203,22 @@ const ensureSelectedTranslationLanguage = () => {
   )
 }
 
+const loadChapterProviderCaches = async (displayIndex: number = chapterIndex.value) => {
+  const chapter = catalog.value[displayIndex]
+  const bookUrl = store.readingBook.bookUrl
+  if (!bookUrl || !chapter) return
+  try {
+    const res = await getWebServiceProviderCaches(
+      bookUrl,
+      chapter.index,
+      selectedTargetLanguage.value || undefined,
+    )
+    currentChapterProviderCaches.value = res.caches || []
+  } catch {
+    currentChapterProviderCaches.value = []
+  }
+}
+
 const reloadTranslationForSelection = async () => {
   translatedChapters.value = {}
   clearTranslationTimer()
@@ -1117,6 +1228,7 @@ const reloadTranslationForSelection = async () => {
     )
   }
   translationJob.value = null
+  await loadChapterProviderCaches()
   if (translationReadingEnabled.value) {
     await translateChapterForReading(chapterIndex.value)
   }
@@ -1156,12 +1268,14 @@ const translateChapterForReading = async (displayIndex: number) => {
   }
   translationLoading.value = true
   try {
+    loadChapterProviderCaches(displayIndex).catch(() => undefined)
     const cached = await getWebServiceTranslationContent(
       bookUrl,
       chapter.index,
       selectedTranslationProvider.value,
       selectedTargetLanguage.value,
     )
+    currentChapterCache.value = cached
     if (cached.content) {
       translatedChapters.value = {
         ...translatedChapters.value,
@@ -1170,11 +1284,12 @@ const translateChapterForReading = async (displayIndex: number) => {
       translationJob.value = null
       return
     }
+    // No cache exists for this provider
     if (!webServiceStore.policy) {
       await webServiceStore.loadPolicy().catch(() => undefined)
     }
     if (!canUseWebTranslation.value) {
-      ElMessage.warning('Chương chưa có bản dịch; Dịch tự động đang tắt trong WebService')
+      ElMessage.warning(t('noTranslationAutoOff'))
       return
     }
     const job = await createWebServiceTranslationJob({
@@ -1188,7 +1303,44 @@ const translateChapterForReading = async (displayIndex: number) => {
       pollTranslationJob(job.jobId, displayIndex)
     }
   } catch {
-    ElMessage.error('Không thể đọc hoặc tạo bản dịch cho chương')
+    ElMessage.error(t('cannotReadOrCreateTranslation'))
+  } finally {
+    translationLoading.value = false
+  }
+}
+
+const startTranslateChapter = async (forceRetranslate: boolean = false) => {
+  const displayIndex = chapterIndex.value
+  const chapter = catalog.value[displayIndex]
+  const bookUrl = store.readingBook.bookUrl
+  if (!bookUrl || !chapter) return
+  if (!selectedTranslationProvider.value || !selectedTargetLanguage.value) {
+    ElMessage.warning(t('selectProviderAndTargetLangFirst'))
+    return
+  }
+  if (!webServiceStore.policy) {
+    await webServiceStore.loadPolicy().catch(() => undefined)
+  }
+  if (!canUseWebTranslation.value) {
+    ElMessage.warning(t('noTranslationAutoOff'))
+    return
+  }
+  setTranslationReadingEnabled(true)
+  translationLoading.value = true
+  try {
+    const job = await createWebServiceTranslationJob({
+      bookUrl,
+      chapterIndex: chapter.index,
+      provider: selectedTranslationProvider.value,
+      targetLanguage: selectedTargetLanguage.value,
+      forceRetranslate,
+    })
+    applyTranslationJob(job, displayIndex)
+    if (job.status === 'idle' || job.status === 'translating') {
+      pollTranslationJob(job.jobId, displayIndex)
+    }
+  } catch {
+    ElMessage.error(t('cannotReadOrCreateTranslation'))
   } finally {
     translationLoading.value = false
   }
@@ -1198,7 +1350,7 @@ const pretranslateChapters = async () => {
   const bookUrl = store.readingBook.bookUrl
   if (!bookUrl) return
   if (!selectedTranslationProvider.value || !selectedTargetLanguage.value) {
-    ElMessage.warning('Hãy chọn provider và ngôn ngữ đích trước')
+    ElMessage.warning(t('selectProviderAndTargetLangFirst'))
     translationPanelVisible.value = true
     return
   }
@@ -1206,7 +1358,7 @@ const pretranslateChapters = async () => {
     await webServiceStore.loadPolicy().catch(() => undefined)
   }
   if (!canUseWebTranslation.value) {
-    ElMessage.warning('Dịch tự động đang tắt trong WebService')
+    ElMessage.warning(t('noTranslationAutoOff'))
     return
   }
   pretranslateLoading.value = true
@@ -1219,9 +1371,9 @@ const pretranslateChapters = async () => {
       targetLanguage: selectedTargetLanguage.value,
     }) as { jobs?: Array<unknown> }
     const count = result.jobs?.length || pretranslateCount.value
-    ElMessage.success(`Đã bắt đầu dịch trước ${count} chương`)
+    ElMessage.success(t('pretranslateStarted').replace('{count}', String(count)))
   } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Không thể dịch trước chương')
+    ElMessage.error(error instanceof Error ? error.message : t('cannotPretranslateChapters'))
   } finally {
     pretranslateLoading.value = false
   }
@@ -1246,9 +1398,9 @@ const toggleTranslationJob = async () => {
       const job = await cancelWebServiceTranslationJob(translationJob.value.jobId)
       clearTranslationTimer()
       translationJob.value = job
-      ElMessage.info('Đã hủy dịch chương')
+      ElMessage.info(t('translationCancelled'))
     } catch {
-      ElMessage.error('Không thể hủy dịch chương')
+      ElMessage.error(t('cannotCancelTranslation'))
     } finally {
       translationLoading.value = false
     }
@@ -1258,6 +1410,12 @@ const toggleTranslationJob = async () => {
   setTranslationReadingEnabled(true)
   await translateChapterForReading(displayIndex)
 }
+
+watch(translationPanelVisible, async visible => {
+  if (visible) {
+    await loadChapterProviderCaches()
+  }
+})
 
 const chapter = ref()
 const chapterRef = ref()
@@ -1281,7 +1439,9 @@ const onReadedLengthChange = (index: number, pos: number) => {
 
 // 文档标题
 watchEffect(() => {
-  document.title = catalog.value[chapterIndex.value]?.title || document.title
+  const currentChapter = catalog.value[chapterIndex.value]
+  const currentTitle = currentChapter?.title ? dynamicText('catalog', currentChapter.title) : ''
+  document.title = currentTitle || document.title
 })
 
 // 阅读记录Lưu浏览器
@@ -1313,14 +1473,14 @@ const toNextChapter = () => {
   const index = chapterIndex.value + 1
   if (typeof catalog.value[index] !== 'undefined') {
     ElMessage({
-      message: 'Chương sau',
+      message: t('nextChapter'),
       type: 'info',
     })
     getContent(index)
     store.saveBookProgress()
   } else {
     ElMessage({
-      message: 'Đây là chương cuối',
+      message: t('lastChapter'),
       type: 'error',
     })
   }
@@ -1330,14 +1490,14 @@ const toPreChapter = () => {
   const index = chapterIndex.value - 1
   if (typeof catalog.value[index] !== 'undefined') {
     ElMessage({
-      message: 'Chương trước',
+      message: t('prevChapter'),
       type: 'info',
     })
     getContent(index)
     store.saveBookProgress()
   } else {
     ElMessage({
-      message: 'Đây là chương đầu',
+      message: t('firstChapter'),
       type: 'error',
     })
   }
@@ -1419,7 +1579,7 @@ const handleKeyPress = (event: KeyboardEvent) => {
         break
       }
       if (document.documentElement.scrollTop === 0) {
-        ElMessage.warning('Đã ở đầu trang')
+        ElMessage.warning(t('alreadyAtTop'))
       } else {
         canJump = false
         jump(0 - document.documentElement.clientHeight + 100, {
@@ -1440,7 +1600,7 @@ const handleKeyPress = (event: KeyboardEvent) => {
           document.documentElement.scrollTop ===
         document.documentElement.scrollHeight
       ) {
-        ElMessage.warning('Đã ở cuối trang')
+        ElMessage.warning(t('alreadyAtBottom'))
       } else {
         canJump = false
         jump(document.documentElement.clientHeight - 100, {
@@ -1498,7 +1658,7 @@ onMounted(async () => {
   const chapterPos = Number(sessionStorage.getItem('chapterPos') || 0)
   const isSeachBook = sessionStorage.getItem('isSeachBook') === 'true'
   if (isNullOrBlank(bookUrl) || isNullOrBlank(name) || author === null) {
-    ElMessage.warning('Thông tin sách trống, sắp tự quay về kệ sách...')
+    ElMessage.warning(t('bookInfoEmpty'))
     return setTimeout(toShelf, 500)
   }
   const book: typeof store.readingBook = {
@@ -1537,7 +1697,9 @@ onMounted(async () => {
       if (infiniteLoading.value === true) scrollObserver.observe(loading.value)
       //第二次点击同一本书 页面标题不会变化
       document.title = '...'
-      document.title = (name as string) + ' | ' + chapters[safeChapterIndex].title
+      const currentChapter = chapters[safeChapterIndex]
+      const chapterTitle = currentChapter?.title ? dynamicText('catalog', currentChapter.title) : ''
+      document.title = (name as string) + (chapterTitle ? ' | ' + chapterTitle : '')
     }).catch(error => {
       readerError.value = error instanceof Error && error.message
         ? error.message
@@ -1566,17 +1728,21 @@ const addToBookShelfConfirm = async () => {
   const book = store.readingBook
   // 阅读的是Tìm kiếm的书籍 并未在Kệ sách
   if (book.isSeachBook === true) {
-    await ElMessageBox.confirm(`Có thêm “${book.name}” vào kệ sách không?`, 'Thêm vào kệ sách', {
-      confirmButtonText: 'Xác nhận',
-      cancelButtonText: 'Không',
-      type: 'info',
-      /*
-        ElMessageBox.confirmMặc định在触发hashChange事件时自动Tắt
-        按下物理返回键时触发hashChange事件
-        使用router.push("/")则不会触发hashChange事件
-        */
-      closeOnHashChange: false,
-    })
+    await ElMessageBox.confirm(
+      t('addToShelfPrompt').replace('{name}', book.name),
+      t('addToShelf'),
+      {
+        confirmButtonText: t('confirm'),
+        cancelButtonText: t('cancel'),
+        type: 'info',
+        /*
+          ElMessageBox.confirmMặc định在触发hashChange事件时自动Tắt
+          按下物理返回键时触发hashChange事件
+          使用router.push("/")则不会触发hashChange事件
+          */
+        closeOnHashChange: false,
+      },
+    )
       .then(() => {
         //选择是，无动作
         isSeachBook.value = false
@@ -1749,6 +1915,38 @@ onBeforeRouteLeave(async (to, from, next) => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+
+  .translation-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .provider-option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .no-cache-alert {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(230, 162, 60, 0.12);
+    border: 1px dashed rgba(230, 162, 60, 0.4);
+    font-size: 12px;
+    color: #e6a23c;
+
+    .el-button {
+      align-self: flex-start;
+      margin-top: 2px;
+    }
+  }
 
   label {
     color: #666;

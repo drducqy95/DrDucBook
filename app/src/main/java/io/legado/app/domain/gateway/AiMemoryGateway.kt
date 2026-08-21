@@ -14,6 +14,8 @@ interface AiMemoryGateway {
     suspend fun getByConversation(conversationId: String): List<AiMemory>
     suspend fun getGlobal(): List<AiMemory>
     suspend fun getByScope(scope: String, scopeId: String): List<AiMemory>
+    suspend fun getByScopeIds(scope: String, scopeIds: List<String>): List<AiMemory>
+    fun observeByScopeIds(scope: String, scopeIds: List<String>): Flow<List<AiMemory>>
     suspend fun getForPrompt(conversationId: String): List<AiMemory>
     suspend fun search(
         query: String,

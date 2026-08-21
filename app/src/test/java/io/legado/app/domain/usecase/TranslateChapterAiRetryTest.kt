@@ -1159,6 +1159,20 @@ private class RecordingTranslationCacheGateway : TranslationCacheGateway {
         currentRawContentHash: String?,
     ): TranslationRevision? = null
 
+    override suspend fun readCacheIgnoringHash(
+        book: Book,
+        bookChapter: BookChapter,
+        targetLanguage: String,
+        provider: String,
+        expectedContentHash: String?,
+    ): TranslationRevision? = null
+
+    override suspend fun listProviderCaches(
+        book: Book,
+        bookChapter: BookChapter,
+        targetLanguage: String,
+    ): List<TranslationRevision> = emptyList()
+
     override suspend fun getRevisionHistory(
         book: Book,
         bookChapter: BookChapter,

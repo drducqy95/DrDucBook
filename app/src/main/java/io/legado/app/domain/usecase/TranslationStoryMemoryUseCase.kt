@@ -2,6 +2,7 @@ package io.legado.app.domain.usecase
 
 import androidx.annotation.Keep
 import com.google.gson.JsonParser
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.AiMemory
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -74,7 +75,11 @@ class TranslationStoryMemoryUseCase(
         val lock = bookLocks.getOrPut(book.bookUrl) { Mutex() }
         return lock.withLock {
             AiTranslationStoryMemoryPipeline.selectContext(
-                snapshot = loadSnapshot(book.bookUrl),
+                snapshot = if (book.getInheritSeriesMemory() && book.group != 0L) {
+                    loadSnapshotWithSeriesInheritance(book)
+                } else {
+                    loadSnapshot(book.bookUrl)
+                },
                 chapterIndex = currentChapter.index,
                 source = currentContent,
             )
@@ -196,6 +201,59 @@ class TranslationStoryMemoryUseCase(
     suspend fun loadSnapshot(bookUrl: String): AiTranslationStoryMemorySnapshot {
         val memories = aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
         return memories.toStorySnapshot()
+    }
+
+    suspend fun loadSnapshotWithSeriesInheritance(
+        book: Book,
+    ): AiTranslationStoryMemorySnapshot {
+        val ownSnapshot = loadSnapshot(book.bookUrl)
+        if (!book.getInheritSeriesMemory() || book.group == 0L) {
+            return ownSnapshot
+        }
+        val siblingBooks = appDb.bookDao.getBooksByGroup(book.group)
+            .filter { it.bookUrl != book.bookUrl }
+        if (siblingBooks.isEmpty()) return ownSnapshot
+
+        val siblingUrls = siblingBooks.map { it.bookUrl }
+        val siblingMemories = aiMemoryGateway.getByScopeIds(AiMemory.SCOPE_BOOK, siblingUrls)
+        val siblingSnapshot = siblingMemories.toStorySnapshot()
+
+        return mergeSnapshots(primary = ownSnapshot, inherited = siblingSnapshot)
+    }
+
+    suspend fun loadSnapshotForGroup(groupId: Long): AiTranslationStoryMemorySnapshot {
+        val books = if (groupId <= 0L) appDb.bookDao.all else appDb.bookDao.getBooksByGroup(groupId)
+        val bookUrls = books.map { it.bookUrl }
+        val memories = aiMemoryGateway.getByScopeIds(AiMemory.SCOPE_BOOK, bookUrls)
+        return memories.toStorySnapshot()
+    }
+
+    private fun mergeSnapshots(
+        primary: AiTranslationStoryMemorySnapshot,
+        inherited: AiTranslationStoryMemorySnapshot,
+    ): AiTranslationStoryMemorySnapshot {
+        val ownEntityKeys = primary.entities.map { it.raw.lowercase() }.toSet()
+        val inheritedEntities = inherited.entities.filter {
+            it.raw.lowercase() !in ownEntityKeys
+        }
+        val ownRelKeys = primary.relationships.map {
+            "${it.source.lowercase()}|${it.target.lowercase()}|${it.relationship.lowercase()}"
+        }.toSet()
+        val inheritedRels = inherited.relationships.filter {
+            "${it.source.lowercase()}|${it.target.lowercase()}|${it.relationship.lowercase()}" !in ownRelKeys
+        }
+        val ownWorldKeys = primary.worldBuilding.map {
+            "${it.category.lowercase()}|${it.raw.lowercase()}"
+        }.toSet()
+        val inheritedWorld = inherited.worldBuilding.filter {
+            "${it.category.lowercase()}|${it.raw.lowercase()}" !in ownWorldKeys
+        }
+
+        return primary.copy(
+            entities = primary.entities + inheritedEntities,
+            relationships = primary.relationships + inheritedRels,
+            worldBuilding = primary.worldBuilding + inheritedWorld,
+        )
     }
 
     /** Marks a chapter complete only after its full translated payload has been committed. */

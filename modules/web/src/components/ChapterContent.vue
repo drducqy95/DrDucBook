@@ -1,5 +1,5 @@
 <template>
-  <div class="title" :class="{ 'tts-active-title': activeParagraphIndex === -2 }" data-chapterpos="0" ref="titleRef">{{ title }}</div>
+  <div class="title" :class="{ 'tts-active-title': activeParagraphIndex === -2 }" data-chapterpos="0" ref="titleRef">{{ dynamicText('catalog', title) }}</div>
   <div
     v-for="(para, index) in contents"
     :key="index"
@@ -22,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import { dynamicText } from '@/i18n'
 import { isLegadoUrl } from '@/utils/utils'
 import API from '@api'
 import jump from '@/plugins/jump'

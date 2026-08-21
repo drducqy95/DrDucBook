@@ -18,10 +18,26 @@ import io.legado.app.model.translation.TranslationChapterState
 import io.legado.app.model.translation.TranslationChapterStatus
 import io.legado.app.model.translation.TranslationManager
 import io.legado.app.ui.config.translation.TranslationConfig
+import io.legado.app.domain.webservice.WebServiceTranslationMemoryStatsResponse
+import io.legado.app.domain.webservice.WebServiceGlossaryTermResponse
+import io.legado.app.domain.webservice.WebServiceGlossaryListResponse
+import io.legado.app.domain.webservice.WebServiceStoryEntityResponse
+import io.legado.app.domain.webservice.WebServiceStoryRelationshipResponse
+import io.legado.app.domain.webservice.WebServiceStoryMemorySummaryResponse
+import io.legado.app.domain.webservice.WebServiceBookGroupItem
+import io.legado.app.domain.gateway.DictionaryGateway
+import io.legado.app.domain.gateway.QuickTranslationGateway
+import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-object WebServiceTranslationJobController {
+object WebServiceTranslationJobController : KoinComponent {
+
+    private val quickTranslationGateway: QuickTranslationGateway by inject()
+    private val storyMemoryUseCase: TranslationStoryMemoryUseCase by inject()
+    private val dictionaryGateway: DictionaryGateway by inject()
 
     private val jobsById = ConcurrentHashMap<String, JobRecord>()
     private val jobIdsByKey = ConcurrentHashMap<TranslationChapterKey, String>()
@@ -65,27 +81,207 @@ object WebServiceTranslationJobController {
                 provider = provider,
                 targetLanguage = targetLanguage,
             )
+            val revision = TranslationManager.getCurrentRevision(
+                book = book,
+                chapter = chapter,
+                provider = provider,
+                targetLanguage = targetLanguage,
+            )
             content?.let {
                 TranslationManager.ResolvedTranslationContent(
                     content = it,
                     provider = provider,
                     targetLanguage = targetLanguage,
-                    revision = TranslationManager.getCurrentRevision(
-                        book = book,
-                        chapter = chapter,
-                        provider = provider,
-                        targetLanguage = targetLanguage,
-                    ),
+                    revision = revision,
+                    isStale = revision?.status == io.legado.app.domain.model.RevisionStatus.STALE,
                 )
             }
         }
+        val revision = resolved?.revision
+        val isStale = resolved?.isStale ?: (revision?.status == io.legado.app.domain.model.RevisionStatus.STALE)
+        val hasUserEdits = revision?.sourceStatus == io.legado.app.domain.model.RevisionStatus.USER_EDITED ||
+            revision?.sourceStatus == io.legado.app.domain.model.RevisionStatus.FINAL
         return WebServiceTranslationContentResponse(
             bookUrl = bookUrl,
             chapterIndex = chapterIndex,
             content = resolved?.content,
             provider = resolved?.provider,
             targetLanguage = resolved?.targetLanguage ?: targetLanguage,
-            updatedAt = resolved?.revision?.updatedAt ?: 0L,
+            updatedAt = revision?.updatedAt ?: 0L,
+            isStale = isStale,
+            hasUserEdits = hasUserEdits,
+            revisionStatus = revision?.sourceStatus?.name,
+        )
+    }
+
+    suspend fun getProviderCaches(
+        bookUrlValue: String?,
+        chapterIndexValue: String?,
+        targetLanguageValue: String?,
+    ): io.legado.app.domain.webservice.WebServiceProviderCacheListResponse {
+        val bookUrl = WebServiceTranslationJobs.normalizedOptionalText(bookUrlValue)
+            ?: throw IllegalArgumentException("BOOK_URL_REQUIRED")
+        val chapterIndex = WebServiceTranslationJobs.normalizedChapterIndex(chapterIndexValue)
+            ?: throw IllegalArgumentException("CHAPTER_INDEX_REQUIRED")
+        val targetLanguage = WebServiceTranslationJobs.normalizedOptionalText(targetLanguageValue)
+            ?: TranslationConfig.llmTargetLanguage
+        val book = appDb.bookDao.getBook(bookUrl)
+            ?: throw IllegalArgumentException("BOOK_NOT_FOUND")
+        val chapter = findChapter(bookUrl, chapterIndex)
+            ?: throw IllegalArgumentException("CHAPTER_NOT_FOUND")
+        if (io.legado.app.help.book.BookHelp.getContent(book, chapter) == null) {
+            ensureChapterContent(bookUrl, chapterIndex)
+        }
+        val caches = TranslationManager.listProviderCachesForChapter(
+            book = book,
+            chapter = chapter,
+            targetLanguage = targetLanguage,
+        ).map { info ->
+            val providerIndex = TranslationConstants.providerValues.indexOf(info.provider)
+            val providerName = if (providerIndex >= 0) {
+                TranslationConstants.providerDisplayNames.getOrElse(providerIndex) { info.provider }
+            } else {
+                info.provider
+            }
+            io.legado.app.domain.webservice.WebServiceProviderCacheInfo(
+                provider = info.provider,
+                providerName = providerName,
+                targetLanguage = info.targetLanguage,
+                status = info.status,
+                isStale = info.isStale,
+                hasUserEdits = info.hasUserEdits,
+                updatedAt = info.updatedAt,
+                charCount = info.charCount,
+            )
+        }
+        return io.legado.app.domain.webservice.WebServiceProviderCacheListResponse(
+            bookUrl = bookUrl,
+            chapterIndex = chapterIndex,
+            caches = caches,
+        )
+    }
+
+    suspend fun getMemoryStats(): WebServiceTranslationMemoryStatsResponse {
+        val globalDictCount = runCatching {
+            quickTranslationGateway.searchBuiltInEntries(
+                io.legado.app.domain.model.QuickDictionaryType.VIETPHRASE,
+                limit = 100000,
+            ).size
+        }.getOrDefault(0)
+
+        var characterProfiles = 0
+        var factions = 0
+        var storyEvents = 0
+        var worldEntries = 0
+        var projectTerms = 0
+
+        runCatching {
+            val books = appDb.bookDao.all
+            for (book in books) {
+                val snapshot = storyMemoryUseCase.loadSnapshot(book.bookUrl)
+                characterProfiles += snapshot.entities.count { it.type == "character" || it.type == "person" }
+                factions += snapshot.entities.count { it.type == "faction" || it.type == "sect" || it.type == "organization" }
+                worldEntries += snapshot.worldBuilding.size
+                storyEvents += snapshot.timelines.sumOf { it.events.size }
+
+                val bookDict = dictionaryGateway.getBookDictionaries(book)
+                projectTerms += bookDict.pairs.size
+            }
+        }
+
+        return WebServiceTranslationMemoryStatsResponse(
+            globalDictTerms = globalDictCount,
+            projectGlossaryTerms = projectTerms,
+            characterProfiles = characterProfiles,
+            factions = factions,
+            storyEvents = storyEvents,
+            worldEntries = worldEntries,
+        )
+    }
+
+    suspend fun getGlossary(bookUrlValue: String?): WebServiceGlossaryListResponse {
+        val bookUrl = WebServiceTranslationJobs.normalizedOptionalText(bookUrlValue)
+            ?: throw IllegalArgumentException("BOOK_URL_REQUIRED")
+        val book = appDb.bookDao.getBook(bookUrl)
+            ?: throw IllegalArgumentException("BOOK_NOT_FOUND")
+
+        val bookDict = dictionaryGateway.getBookDictionaries(book)
+        val terms = bookDict.pairs.map { pair ->
+            WebServiceGlossaryTermResponse(
+                source = pair.original,
+                target = pair.translation,
+                category = pair.type.name,
+                isProjectSpecific = true,
+            )
+        }
+
+        return WebServiceGlossaryListResponse(
+            bookUrl = bookUrl,
+            terms = terms,
+        )
+    }
+
+    suspend fun getBookGroups(): List<WebServiceBookGroupItem> {
+        val groups = appDb.bookGroupDao.all
+        return groups.map {
+            WebServiceBookGroupItem(
+                groupId = it.groupId,
+                groupName = it.groupName,
+                order = it.order,
+                isCustom = it.groupId > 0,
+            )
+        }
+    }
+
+    suspend fun getStoryMemory(
+        bookUrlValue: String?,
+        groupIdValue: String? = null,
+    ): WebServiceStoryMemorySummaryResponse {
+        val groupId = WebServiceTranslationJobs.normalizedOptionalText(groupIdValue)?.toLongOrNull()
+        val bookUrl = WebServiceTranslationJobs.normalizedOptionalText(bookUrlValue)
+
+        val (resolvedScopeId, snapshot) = if (groupId != null) {
+            val groupSnapshot = storyMemoryUseCase.loadSnapshotForGroup(groupId)
+            "group:$groupId" to groupSnapshot
+        } else {
+            val url = bookUrl ?: throw IllegalArgumentException("BOOK_URL_OR_GROUP_ID_REQUIRED")
+            val book = appDb.bookDao.getBook(url)
+                ?: throw IllegalArgumentException("BOOK_NOT_FOUND")
+            val bookSnapshot = if (book.getInheritSeriesMemory() && book.group != 0L) {
+                storyMemoryUseCase.loadSnapshotWithSeriesInheritance(book)
+            } else {
+                storyMemoryUseCase.loadSnapshot(url)
+            }
+            url to bookSnapshot
+        }
+
+        val entities = snapshot.entities.map { entity ->
+            WebServiceStoryEntityResponse(
+                raw = entity.raw,
+                target = entity.target,
+                type = entity.type,
+                description = entity.description,
+                aliases = entity.aliases,
+                firstChapterIndex = entity.firstChapterIndex,
+            )
+        }
+
+        val relationships = snapshot.relationships.map { rel ->
+            WebServiceStoryRelationshipResponse(
+                source = rel.source,
+                target = rel.target,
+                relationship = rel.relationship,
+                description = rel.description,
+                chapterIndex = rel.chapterIndex,
+            )
+        }
+
+        return WebServiceStoryMemorySummaryResponse(
+            bookUrl = resolvedScopeId,
+            entities = entities,
+            relationships = relationships,
+            worldEntriesCount = snapshot.worldBuilding.size,
+            timelineEventsCount = snapshot.timelines.sumOf { it.events.size },
         )
     }
 

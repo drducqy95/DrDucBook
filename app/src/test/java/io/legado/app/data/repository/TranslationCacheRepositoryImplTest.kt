@@ -4,6 +4,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.TranslationCache
 import io.legado.app.data.entities.TranslationRevisionStatus
+import io.legado.app.domain.model.isStale
 import io.legado.app.domain.model.protectsMachineTranslation
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -410,4 +411,57 @@ class TranslationCacheRepositoryImplTest {
             repository.readCurrentTranslation(book, chapter, "vi", "source-hash", "google"),
         )
     }
+
+    @Test
+    fun readCacheIgnoringHash_and_listProviderCaches_workCorrectly() = runBlocking {
+        repository.writeTranslation(
+            book = book,
+            bookChapter = chapter,
+            targetLanguage = "vi",
+            content = "Bản dịch Google",
+            originalContentHash = "old-hash-1",
+            provider = "google",
+        )
+        repository.writeTranslation(
+            book = book,
+            bookChapter = chapter,
+            targetLanguage = "vi",
+            content = "Bản dịch AI",
+            originalContentHash = "old-hash-2",
+            provider = "app_ai",
+        )
+
+        // Read cache ignoring hash for different current content hash
+        val googleRev = repository.readCacheIgnoringHash(
+            book = book,
+            bookChapter = chapter,
+            targetLanguage = "vi",
+            provider = "google",
+            expectedContentHash = "new-hash-3",
+        )
+        assertEquals("Bản dịch Google", googleRev?.content)
+        assertEquals(true, googleRev?.isStale)
+
+        val aiRev = repository.readCacheIgnoringHash(
+            book = book,
+            bookChapter = chapter,
+            targetLanguage = "vi",
+            provider = "app_ai",
+            expectedContentHash = "old-hash-2",
+        )
+        assertEquals("Bản dịch AI", aiRev?.content)
+        assertEquals(false, aiRev?.isStale)
+
+        // List provider caches
+        val list = repository.listProviderCaches(
+            book = book,
+            bookChapter = chapter,
+            targetLanguage = "vi",
+        )
+        assertEquals(2, list.size)
+        val providers = list.map { it.provider }.toSet()
+        assertTrue(providers.contains("google"))
+        assertTrue(providers.contains("app_ai"))
+    }
 }
+

@@ -9,6 +9,8 @@ import java.nio.ByteOrder
 import java.security.MessageDigest
 import kotlin.math.absoluteValue
 
+import io.legado.app.ui.config.readConfig.ReadConfig
+
 /** Shared, serialized local-model synthesis for reader and WebService requests. */
 object LocalTtsSynthesis {
     private const val WAV_HEADER_SIZE = 44
@@ -18,6 +20,7 @@ object LocalTtsSynthesis {
         context: Context,
         engineReference: String,
         text: String,
+        speed: Float = (ReadConfig.speechRatePlay + 5) / 10f,
     ): File = mutex.withLock {
         val reference = parseLocalTtsEngine(engineReference)
             ?: error("LOCAL_TTS_ENGINE_INVALID")
@@ -34,7 +37,7 @@ object LocalTtsSynthesis {
             ?: error("TTS_TEXT_REQUIRED")
         val root = File(context.externalCacheDir ?: context.cacheDir, "local_tts_audio").apply { mkdirs() }
         val digest = MessageDigest.getInstance("SHA-256")
-            .digest("${model.id}\u0000$voiceId\u0000$cleanText".toByteArray())
+            .digest("${model.id}\u0000$voiceId\u0000$speed\u0000$cleanText".toByteArray())
             .joinToString("") { "%02x".format(it) }
         val target = File(root, "$digest.wav")
         if (!target.isFile || target.length() <= WAV_HEADER_SIZE.toLong()) {
@@ -44,7 +47,7 @@ object LocalTtsSynthesis {
                 else -> error("LOCAL_TTS_ENGINE_UNSUPPORTED")
             }
             try {
-                writeWaveAtomically(target, engine.synthesize(cleanText, voiceId), model.sampleRate)
+                writeWaveAtomically(target, engine.synthesize(cleanText, voiceId, speed), model.sampleRate)
             } finally {
                 engine.close()
             }

@@ -26,7 +26,7 @@ class PiperOnnxTtsEngine(
     private var runtime: OfflineTts? = null
     private var idleUnloadJob: Job? = null
 
-    override suspend fun synthesize(text: String, voiceId: Int): FloatArray =
+    override suspend fun synthesize(text: String, voiceId: Int, speed: Float): FloatArray =
         withContext(Dispatchers.Default) {
             require(text.isNotBlank()) { "Văn bản TTS đang trống" }
             mutex.withLock {
@@ -35,7 +35,7 @@ class PiperOnnxTtsEngine(
                 require(voiceId in 0 until tts.numSpeakers()) {
                     "Voice Piper không hợp lệ: $voiceId"
                 }
-                val audio = tts.generate(text.trim(), sid = voiceId, speed = 1f)
+                val audio = tts.generate(text.trim(), sid = voiceId, speed = speed.coerceIn(0.25f, 4.0f))
                 check(audio.sampleRate == model.sampleRate) {
                     "Sample rate Piper không khớp: ${audio.sampleRate}"
                 }

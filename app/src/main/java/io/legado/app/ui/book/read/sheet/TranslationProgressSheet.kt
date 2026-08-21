@@ -133,6 +133,11 @@ fun TranslationProgressSheet(
                 enabled = state.autoTranslateEnabled,
                 onCheckedChange = { onIntent(ReadBookIntent.SetAutoTranslateWifiOnly(it)) },
             )
+            TranslationSwitchRow(
+                title = stringResource(R.string.inherit_series_memory),
+                checked = state.inheritSeriesMemory,
+                onCheckedChange = { onIntent(ReadBookIntent.SetInheritSeriesMemory(it)) },
+            )
             if (state.autoTranslateEnabled) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

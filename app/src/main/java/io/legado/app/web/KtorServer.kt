@@ -54,6 +54,7 @@ import io.legado.app.domain.webservice.WebServiceUiTranslationRequest
 import io.legado.app.domain.webservice.WebServiceTtsSynthesisRequest
 import io.legado.app.domain.webservice.WebServiceTtsCapabilitiesResponse
 import io.legado.app.domain.webservice.WebServiceTtsSynthesisResponse
+import io.legado.app.domain.webservice.WebServiceTtsModelSelectRequest
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.service.WebService
 import io.legado.app.service.CloudflareTunnelManager
@@ -522,6 +523,27 @@ class KtorServer(
             call.respond(WebServiceTtsCapabilitiesResponse(true, engine, language))
         }
 
+        get("/api/v2/tts/models") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            call.respond(WebServiceTtsController.models())
+        }
+
+        post("/api/v2/tts/models/select") {
+            WebService.serve()
+            if (!requireWebAccess()) return@post
+            try {
+                val request = receiveOrDefault(WebServiceTtsModelSelectRequest())
+                WebServiceTtsController.selectModel(request)
+                call.respond(HttpStatusCode.OK, mapOf("status" to "OK"))
+            } catch (error: IllegalArgumentException) {
+                call.respond(HttpStatusCode.BadRequest, WebServiceErrorResponse(error.message ?: "TTS_MODEL_INVALID"))
+            } catch (error: Exception) {
+                LogUtils.e(TAG, error.stackTraceStr)
+                call.respond(HttpStatusCode.ServiceUnavailable, WebServiceErrorResponse(error.message ?: "TTS_SELECT_FAILED"))
+            }
+        }
+
         post("/api/v2/tts/synthesize") {
             WebService.serve()
             if (!requireWebAccess()) return@post
@@ -924,14 +946,69 @@ class KtorServer(
             call.respond(WebServiceTranslationJobController.providers())
         }
 
+        get("/api/v2/translation/memory/providers") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            respondTranslationJob {
+                WebServiceTranslationJobController.getProviderCaches(
+                    bookUrlValue = call.request.queryParameters["bookUrl"],
+                    chapterIndexValue = call.request.queryParameters["chapterIndex"],
+                    targetLanguageValue = call.request.queryParameters["targetLanguage"],
+                )
+            }
+        }
+
+        get("/api/v2/translation/memory/stats") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            respondTranslationJob {
+                WebServiceTranslationJobController.getMemoryStats()
+            }
+        }
+
+        get("/api/v2/translation/memory/glossary") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            respondTranslationJob {
+                WebServiceTranslationJobController.getGlossary(
+                    bookUrlValue = call.request.queryParameters["bookUrl"]
+                )
+            }
+        }
+
+        get("/api/v2/translation/memory/story") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            respondTranslationJob {
+                WebServiceTranslationJobController.getStoryMemory(
+                    bookUrlValue = call.request.queryParameters["bookUrl"],
+                    groupIdValue = call.request.queryParameters["groupId"],
+                )
+            }
+        }
+
+        get("/api/v2/bookshelf/groups") {
+            WebService.serve()
+            if (!requireWebAccess()) return@get
+            call.respond(WebServiceTranslationJobController.getBookGroups())
+        }
+
         post("/api/v2/translation/ui") {
             WebService.serve()
             if (!requireWebAccess()) return@post
-            call.respond(
-                WebServiceUiTranslationController.translate(
-                    receiveOrDefault(WebServiceUiTranslationRequest())
+            try {
+                call.respond(
+                    WebServiceUiTranslationController.translate(
+                        receiveOrDefault(WebServiceUiTranslationRequest())
+                    )
                 )
-            )
+            } catch (error: Exception) {
+                LogUtils.e("WebService", error.stackTraceStr)
+                call.respond(
+                    HttpStatusCode.ServiceUnavailable,
+                    WebServiceErrorResponse(error.message ?: "TRANSLATION_FAILED")
+                )
+            }
         }
 
         post("/api/v2/translation/jobs") {

@@ -184,6 +184,26 @@ export type WebServiceTranslationContentResponse = {
   provider: string | null
   targetLanguage: string
   updatedAt: number
+  isStale?: boolean
+  hasUserEdits?: boolean
+  revisionStatus?: string | null
+}
+
+export type WebServiceProviderCacheInfo = {
+  provider: string
+  providerName: string
+  targetLanguage: string
+  status: string
+  isStale: boolean
+  hasUserEdits: boolean
+  updatedAt: number
+  charCount: number
+}
+
+export type WebServiceProviderCacheListResponse = {
+  bookUrl: string
+  chapterIndex: number
+  caches: WebServiceProviderCacheInfo[]
 }
 
 export type WebServiceTranslationJobResponse = {
@@ -204,6 +224,59 @@ export type WebServiceTranslationJobResponse = {
 
 export type WebServiceTranslationJobListResponse = {
   jobs: WebServiceTranslationJobResponse[]
+}
+
+export type WebServiceTranslationMemoryStatsResponse = {
+  globalDictTerms: number
+  projectGlossaryTerms: number
+  characterProfiles: number
+  factions: number
+  storyEvents: number
+  worldEntries: number
+}
+
+export type WebServiceGlossaryTermResponse = {
+  source: String
+  target: String
+  category: string
+  isProjectSpecific: boolean
+}
+
+export type WebServiceGlossaryListResponse = {
+  bookUrl: string
+  terms: WebServiceGlossaryTermResponse[]
+}
+
+export type WebServiceStoryEntityResponse = {
+  raw: string
+  target: string
+  type: string
+  description: string
+  aliases: string[]
+  firstChapterIndex: number
+}
+
+export type WebServiceStoryRelationshipResponse = {
+  source: string
+  target: string
+  relationship: string
+  description: string
+  chapterIndex: number
+}
+
+export type WebServiceStoryMemorySummaryResponse = {
+  bookUrl: string
+  entities: WebServiceStoryEntityResponse[]
+  relationships: WebServiceStoryRelationshipResponse[]
+  worldEntriesCount: number
+  timelineEventsCount: number
+}
+
+export type WebServiceBookGroupItem = {
+  groupId: number
+  groupName: string
+  order: number
+  isCustom: boolean
 }
 
 export type WebServiceDownload = {
@@ -255,6 +328,34 @@ export type WebServiceTtsCapabilities = {
   enabled: boolean
   engine: string
   language: string
+}
+
+export type WebServiceTtsVoice = {
+  id: number
+  name: string
+}
+
+export type WebServiceTtsModel = {
+  id: string
+  name: string
+  engine: 'system' | 'local' | 'http' | string
+  language: string
+  sampleRate: number
+  voices: WebServiceTtsVoice[]
+  defaultVoiceId: number
+  selectedVoiceId?: number | null
+  isDefault: boolean
+  runtimeReady: boolean
+  sizeBytes: number
+  checksum: string
+}
+
+export type WebServiceTtsModelsResponse = {
+  models: WebServiceTtsModel[]
+  catalog: any[]
+  selectedEngine: string
+  speechRate?: number
+  ttsFollowSys?: boolean
 }
 
 export type WebServiceTtsSynthesisResponse = {
@@ -412,6 +513,25 @@ export const getWebServiceTtsCapabilities = async (bookUrl?: string) => {
     baseURL: baseURL(),
     params: bookUrl ? { bookUrl } : undefined,
   })
+  return response.data
+}
+
+export const getWebServiceTtsModels = async () => {
+  const response = await v2.get<WebServiceTtsModelsResponse>('api/v2/tts/models', { baseURL: baseURL() })
+  return response.data
+}
+
+export const selectWebServiceTtsModel = async (
+  modelId: string,
+  voiceId?: number | null,
+  speechRate?: number,
+  ttsFollowSys?: boolean,
+) => {
+  const response = await v2.post<{ status: string }>(
+    'api/v2/tts/models/select',
+    { modelId, voiceId, speechRate, ttsFollowSys },
+    { baseURL: baseURL() },
+  )
   return response.data
 }
 
@@ -607,6 +727,21 @@ export const getWebServiceTranslationProviders = async () => {
   return response.data
 }
 
+export const getWebServiceProviderCaches = async (
+  bookUrl: string,
+  chapterIndex: number,
+  targetLanguage?: string,
+) => {
+  const response = await v2.get<WebServiceProviderCacheListResponse>(
+    'api/v2/translation/memory/providers',
+    {
+      baseURL: baseURL(),
+      params: { bookUrl, chapterIndex, targetLanguage },
+    },
+  )
+  return response.data
+}
+
 export const listWebServiceTranslationJobs = async () => {
   const response = await v2.get<WebServiceTranslationJobListResponse>(
     'api/v2/translation/jobs',
@@ -632,6 +767,49 @@ export const cancelWebServiceTranslationJob = async (jobId: string) => {
     `api/v2/translation/jobs/${encodeURIComponent(jobId)}`,
     {
       baseURL: baseURL(),
+    },
+  )
+  return response.data
+}
+
+export const getWebServiceTranslationMemoryStats = async () => {
+  const response = await v2.get<WebServiceTranslationMemoryStatsResponse>(
+    'api/v2/translation/memory/stats',
+    {
+      baseURL: baseURL(),
+    },
+  )
+  return response.data
+}
+
+export const getWebServiceBookGroups = async () => {
+  const response = await v2.get<WebServiceBookGroupItem[]>(
+    'api/v2/bookshelf/groups',
+    {
+      baseURL: baseURL(),
+    },
+  )
+  return response.data
+}
+
+export const getWebServiceGlossary = async (bookUrl: string) => {
+  const response = await v2.get<WebServiceGlossaryListResponse>(
+    'api/v2/translation/memory/glossary',
+    {
+      baseURL: baseURL(),
+      params: { bookUrl },
+    },
+  )
+  return response.data
+}
+
+export const getWebServiceStoryMemory = async (params: { bookUrl?: string; groupId?: number } | string) => {
+  const queryParams = typeof params === 'string' ? { bookUrl: params } : params
+  const response = await v2.get<WebServiceStoryMemorySummaryResponse>(
+    'api/v2/translation/memory/story',
+    {
+      baseURL: baseURL(),
+      params: queryParams,
     },
   )
   return response.data

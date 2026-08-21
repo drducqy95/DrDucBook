@@ -331,6 +331,14 @@ data class Book(
             ?: if (config.translationMode) fallback else ReaderContentMode.RAW
     }
 
+    fun setInheritSeriesMemory(enabled: Boolean) {
+        config.inheritSeriesMemory = enabled
+    }
+
+    fun getInheritSeriesMemory(): Boolean {
+        return config.inheritSeriesMemory
+    }
+
     // dailyChapters 的 setter 和 getter
     fun setDailyChapters(dailyChapters: Int) {
         config.dailyChapters = dailyChapters
@@ -468,6 +476,7 @@ data class Book(
 
         var translationMode: Boolean = false, // 是否启用翻译阅读模式
         var readerContentMode: String? = null,
+        var inheritSeriesMemory: Boolean = false, // Kế thừa bộ nhớ bộ truyện từ các sách cùng nhóm
 
     ) : Parcelable
 

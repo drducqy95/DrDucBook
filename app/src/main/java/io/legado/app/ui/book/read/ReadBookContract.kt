@@ -156,6 +156,7 @@ data class TranslationProgressUiState(
     val autoTranslateTotalChapters: Int = 0,
     val autoTranslateCurrentChapter: String = "",
     val autoTranslateMessage: String? = null,
+    val inheritSeriesMemory: Boolean = false,
 )
 
 @Stable
@@ -479,6 +480,7 @@ sealed interface ReadBookIntent {
     data class SetAutoTranslateEnabled(val enabled: Boolean) : ReadBookIntent
     data class SetAutoTranslateWifiOnly(val enabled: Boolean) : ReadBookIntent
     data class SetAutoTranslateNextChapters(val count: Int) : ReadBookIntent
+    data class SetInheritSeriesMemory(val enabled: Boolean) : ReadBookIntent
     data object CopyTranslationLog : ReadBookIntent
     data object OpenTranslationRevision : ReadBookIntent
     data class OpenQuickDictionary(

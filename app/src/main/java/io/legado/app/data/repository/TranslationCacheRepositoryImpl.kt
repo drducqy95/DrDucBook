@@ -86,6 +86,51 @@ class TranslationCacheRepositoryImpl(
         )
     }
 
+    override suspend fun readCacheIgnoringHash(
+        book: Book,
+        bookChapter: BookChapter,
+        targetLanguage: String,
+        provider: String,
+        expectedContentHash: String?,
+    ): TranslationRevision? = withContext(Dispatchers.IO) {
+        revisionMutex.withLock {
+            val payload = getCacheFile(book, bookChapter, targetLanguage, provider)
+            if (!payload.exists()) return@withLock null
+            val metadata = readMetadata(metadataFile(payload)) ?: return@withLock null
+            val content = runCatching { payload.readText() }.getOrNull()?.ifEmpty { null }
+                ?: return@withLock null
+            val revision = metadata.toRevision(content)
+            if (expectedContentHash != null && revision.cacheContentHash != expectedContentHash) {
+                revision.copy(status = RevisionStatus.STALE)
+            } else {
+                revision
+            }
+        }
+    }
+
+    override suspend fun listProviderCaches(
+        book: Book,
+        bookChapter: BookChapter,
+        targetLanguage: String,
+    ): List<TranslationRevision> = withContext(Dispatchers.IO) {
+        revisionMutex.withLock {
+            val bookFolder = File(cacheDir, book.getFolderName())
+            if (!bookFolder.exists()) return@withLock emptyList()
+            val chapterPrefix = bookChapter.getFileName().removeSuffix(".nb")
+            val metaFiles = bookFolder.listFiles()?.filter { file ->
+                file.name.startsWith("$chapterPrefix.$targetLanguage") && file.name.endsWith(".nb.meta.json")
+            }.orEmpty()
+            metaFiles.mapNotNull { metaFile ->
+                val payloadFile = File(metaFile.path.removeSuffix(".meta.json"))
+                if (!payloadFile.exists()) return@mapNotNull null
+                val metadata = readMetadata(metaFile) ?: return@mapNotNull null
+                val content = runCatching { payloadFile.readText() }.getOrNull()?.ifEmpty { null }
+                    ?: return@mapNotNull null
+                metadata.toRevision(content)
+            }.sortedByDescending { it.updatedAt }
+        }
+    }
+
     override suspend fun readTranslation(
         book: Book,
         bookChapter: BookChapter,

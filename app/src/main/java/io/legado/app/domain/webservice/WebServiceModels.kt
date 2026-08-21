@@ -526,6 +526,26 @@ data class WebServiceTranslationContentResponse(
     val provider: String? = null,
     val targetLanguage: String,
     val updatedAt: Long = 0L,
+    val isStale: Boolean = false,
+    val hasUserEdits: Boolean = false,
+    val revisionStatus: String? = null,
+)
+
+data class WebServiceProviderCacheInfo(
+    val provider: String,
+    val providerName: String,
+    val targetLanguage: String,
+    val status: String,
+    val isStale: Boolean,
+    val hasUserEdits: Boolean,
+    val updatedAt: Long,
+    val charCount: Int = 0,
+)
+
+data class WebServiceProviderCacheListResponse(
+    val bookUrl: String,
+    val chapterIndex: Int,
+    val caches: List<WebServiceProviderCacheInfo>,
 )
 
 data class WebServiceTranslationJobResponse(
@@ -546,6 +566,59 @@ data class WebServiceTranslationJobResponse(
 
 data class WebServiceTranslationJobListResponse(
     val jobs: List<WebServiceTranslationJobResponse>,
+)
+
+data class WebServiceTranslationMemoryStatsResponse(
+    val globalDictTerms: Int = 0,
+    val projectGlossaryTerms: Int = 0,
+    val characterProfiles: Int = 0,
+    val factions: Int = 0,
+    val storyEvents: Int = 0,
+    val worldEntries: Int = 0,
+)
+
+data class WebServiceGlossaryTermResponse(
+    val source: String,
+    val target: String,
+    val category: String = "term",
+    val isProjectSpecific: Boolean = false,
+)
+
+data class WebServiceGlossaryListResponse(
+    val bookUrl: String,
+    val terms: List<WebServiceGlossaryTermResponse> = emptyList(),
+)
+
+data class WebServiceStoryEntityResponse(
+    val raw: String,
+    val target: String,
+    val type: String = "character",
+    val description: String = "",
+    val aliases: List<String> = emptyList(),
+    val firstChapterIndex: Int = -1,
+)
+
+data class WebServiceStoryRelationshipResponse(
+    val source: String,
+    val target: String,
+    val relationship: String = "",
+    val description: String = "",
+    val chapterIndex: Int = -1,
+)
+
+data class WebServiceStoryMemorySummaryResponse(
+    val bookUrl: String,
+    val entities: List<WebServiceStoryEntityResponse> = emptyList(),
+    val relationships: List<WebServiceStoryRelationshipResponse> = emptyList(),
+    val worldEntriesCount: Int = 0,
+    val timelineEventsCount: Int = 0,
+)
+
+data class WebServiceBookGroupItem(
+    val groupId: Long,
+    val groupName: String,
+    val order: Int = 0,
+    val isCustom: Boolean = false,
 )
 
 data class WebServiceTtsSynthesisRequest(
@@ -602,11 +675,15 @@ data class WebServiceTtsModelsResponse(
     val models: List<WebServiceTtsModelResponse>,
     val catalog: List<WebServiceTtsCatalogItemResponse>,
     val selectedEngine: String,
+    val speechRate: Int = 5,
+    val ttsFollowSys: Boolean = true,
 )
 
 data class WebServiceTtsModelSelectRequest(
     val modelId: String = "",
     val voiceId: Int? = null,
+    val speechRate: Int? = null,
+    val ttsFollowSys: Boolean? = null,
 )
 
 object WebServiceExportRequests {

@@ -40,17 +40,17 @@ class AiPromptCatalogTest {
     fun mandatoryPolicyMatchesTheActualLegadoTranslationPayload() {
         val prompt = TranslationConstants.DEFAULT_PROMPT
 
-        assertTrue("The standard translation prompt regressed in size", prompt.length < 1_600)
-        assertTrue(prompt.contains("previous_context"))
-        assertTrue(prompt.contains("next_context"))
-        assertTrue(prompt.contains("locked_dictionary"))
-        assertTrue(prompt.contains("raw_segments"))
-        assertTrue(prompt.contains("QT"))
-        assertTrue(prompt.contains("refined_segments"))
-        assertTrue(prompt.contains("new_entities"))
-        assertTrue(prompt.contains("No Markdown", ignoreCase = true))
-        assertTrue(prompt.contains("no [result]/[dictionary]", ignoreCase = true))
-        assertTrue(TranslationConstants.OUTPUT_FORMAT.length < 280)
-        assertTrue(TranslationConstants.OUTPUT_FORMAT.contains("refined_segments"))
+        assertTrue("Prompt size ${prompt.length} >= 1600", prompt.length < 1_600)
+        assertTrue("Missing previous_context", prompt.contains("previous_context"))
+        assertTrue("Missing next_context", prompt.contains("next_context"))
+        assertTrue("Missing locked_dictionary", prompt.contains("locked_dictionary"))
+        assertTrue("Missing raw_segments", prompt.contains("raw_segments"))
+        assertTrue("Missing QT", prompt.contains("QT"))
+        assertTrue("Missing refined_segments", prompt.contains("refined_segments"))
+        assertTrue("Missing new_entities", prompt.contains("new_entities"))
+        assertTrue("Missing No Markdown", prompt.contains("No Markdown", ignoreCase = true))
+        assertTrue("Missing no [result]/[dictionary]", prompt.contains("no [result]/[dictionary]", ignoreCase = true))
+        assertTrue("OUTPUT_FORMAT length ${TranslationConstants.OUTPUT_FORMAT.length} >= 280", TranslationConstants.OUTPUT_FORMAT.length < 280)
+        assertTrue("OUTPUT_FORMAT missing refined_segments", TranslationConstants.OUTPUT_FORMAT.contains("refined_segments"))
     }
 }

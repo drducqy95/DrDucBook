@@ -1937,6 +1937,8 @@
     <string name="translation_display_result">Display translated content</string>
     <string name="translation_auto_mode">Automatically translate following chapters</string>
     <string name="translation_auto_wifi_only">Run cloud translation on Wi-Fi only</string>
+    <string name="inherit_series_memory">Inherit series memory</string>
+    <string name="inherit_series_memory_summary">Inherit entities and glossary from other books in the same group</string>
     <string name="translation_auto_next_chapters">Following chapters</string>
     <string name="translation_auto_progress">Automatic queue: %1$d/%2$d chapters</string>
     <string name="translation_auto_current_chapter">Processing: %1$s</string>
@@ -2105,10 +2107,14 @@
     <string name="ai_rewrite_preset_delete_confirm">Delete “%1$s”?</string>
     <string name="ai_rewrite_preset_polish_name">Polish prose</string>
     <string name="ai_rewrite_preset_polish_instruction">Keep the plot, names, relationships, and facts unchanged. Polish awkward sentences and make the paragraph smoother while preserving the original meaning.</string>
-    <string name="ai_rewrite_preset_concise_name">Make concise</string>
-    <string name="ai_rewrite_preset_concise_instruction">Keep the key plot and information unchanged. Remove redundancy and make the text more concise and clear.</string>
+    <string name="ai_rewrite_preset_convert_name">Transform convert style</string>
+    <string name="ai_rewrite_preset_convert_instruction">Rewrite machine-translated/convert text into natural, fluent Vietnamese. Restructure Sino-Vietnamese sentence patterns, eliminate repetitive pronouns, translate idioms into natural equivalents, and adjust forms of address according to context while preserving 100% of facts, names, and numbers.</string>
     <string name="ai_rewrite_preset_dialogue_name">Natural dialogue</string>
     <string name="ai_rewrite_preset_dialogue_instruction">Rewrite the selected text into more natural spoken narration or dialogue while preserving character intent, relationships, and plot facts.</string>
+    <string name="ai_rewrite_preset_action_name">Enhance action scenes</string>
+    <string name="ai_rewrite_preset_action_instruction">Rewrite combat and action scenes to make them vivid, intense, and physically descriptive. Replace mechanical skill lists with seamless action sequences while keeping exact move names and combat outcomes.</string>
+    <string name="ai_rewrite_preset_concise_name">Make concise</string>
+    <string name="ai_rewrite_preset_concise_instruction">Keep the key plot and information unchanged. Remove redundancy and make the text more concise and clear.</string>
     <string name="content_processes">Content edits</string>
     <string name="content_process_empty">No content edits for this chapter.</string>
     <string name="content_process_delete_confirm">Delete this content edit?\n\n%1$s</string>

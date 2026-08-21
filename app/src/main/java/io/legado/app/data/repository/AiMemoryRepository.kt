@@ -21,6 +21,9 @@ class AiMemoryRepository(
     override fun observeByScope(scope: String, scopeId: String): Flow<List<AiMemory>> =
         aiMemoryDao.observeByScope(scope, scopeId)
 
+    override fun observeByScopeIds(scope: String, scopeIds: List<String>): Flow<List<AiMemory>> =
+        if (scopeIds.isEmpty()) kotlinx.coroutines.flow.flowOf(emptyList()) else aiMemoryDao.observeByScopeIds(scope, scopeIds)
+
     override fun observeAllByScope(scope: String): Flow<List<AiMemory>> =
         aiMemoryDao.observeAllByScope(scope)
 
@@ -32,6 +35,11 @@ class AiMemoryRepository(
 
     override suspend fun getByScope(scope: String, scopeId: String): List<AiMemory> =
         withContext(Dispatchers.IO) { aiMemoryDao.getByScope(scope, scopeId) }
+
+    override suspend fun getByScopeIds(scope: String, scopeIds: List<String>): List<AiMemory> =
+        withContext(Dispatchers.IO) {
+            if (scopeIds.isEmpty()) emptyList() else aiMemoryDao.getByScopeIds(scope, scopeIds)
+        }
 
     override suspend fun getForPrompt(conversationId: String): List<AiMemory> =
         withContext(Dispatchers.IO) {

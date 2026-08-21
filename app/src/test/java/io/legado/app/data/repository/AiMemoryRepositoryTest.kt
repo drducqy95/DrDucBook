@@ -143,6 +143,9 @@ class AiMemoryRepositoryTest {
         override fun observeByScope(scope: String, scopeId: String): Flow<List<AiMemory>> =
             flowOf(getByScopeNow(scope, scopeId))
 
+        override fun observeByScopeIds(scope: String, scopeIds: List<String>): Flow<List<AiMemory>> =
+            flowOf(getByScopeIdsNow(scope, scopeIds))
+
         override fun observeAllByScope(scope: String): Flow<List<AiMemory>> =
             flowOf(memories.filter { it.scope == scope }.sortedByDescending { it.updatedAt })
 
@@ -153,6 +156,9 @@ class AiMemoryRepositoryTest {
 
         override suspend fun getByScope(scope: String, scopeId: String): List<AiMemory> =
             getByScopeNow(scope, scopeId)
+
+        override suspend fun getByScopeIds(scope: String, scopeIds: List<String>): List<AiMemory> =
+            getByScopeIdsNow(scope, scopeIds)
 
         override suspend fun upsert(memory: AiMemory) {
             memories.removeAll { it.conversationId == memory.conversationId && it.key == memory.key }
@@ -242,6 +248,10 @@ class AiMemoryRepositoryTest {
 
         private fun getByScopeNow(scope: String, scopeId: String): List<AiMemory> =
             memories.filter { it.scope == scope && it.scopeId == scopeId }
+                .sortedWith(compareByDescending<AiMemory> { it.pinned }.thenByDescending { it.updatedAt })
+
+        private fun getByScopeIdsNow(scope: String, scopeIds: List<String>): List<AiMemory> =
+            memories.filter { it.scope == scope && it.scopeId in scopeIds }
                 .sortedWith(compareByDescending<AiMemory> { it.pinned }.thenByDescending { it.updatedAt })
     }
 }

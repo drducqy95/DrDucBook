@@ -7,11 +7,12 @@
       :class="{ selected: isSelected(cata.index) }"
       @click="gotoChapter(cata)"
     >
-      {{ cata.title }}
+      {{ dynamicText('catalog', cata.title) }}
     </div>
   </div>
 </template>
 <script setup lang="ts">
+import { dynamicText } from '@/i18n'
 import type { BookChapter } from '@/book'
 
 const props = defineProps<{

@@ -480,9 +480,11 @@ class AiChatGenerationUseCaseTest {
         override fun observeGlobal(): Flow<List<AiMemory>> = flowOf(emptyList())
         override fun observeRecent(limit: Int): Flow<List<AiMemory>> = flowOf(emptyList())
         override fun observeByScope(scope: String, scopeId: String): Flow<List<AiMemory>> = flowOf(emptyList())
+        override fun observeByScopeIds(scope: String, scopeIds: List<String>): Flow<List<AiMemory>> = flowOf(emptyList())
         override suspend fun getByConversation(conversationId: String): List<AiMemory> = emptyList()
         override suspend fun getGlobal(): List<AiMemory> = emptyList()
         override suspend fun getByScope(scope: String, scopeId: String): List<AiMemory> = emptyList()
+        override suspend fun getByScopeIds(scope: String, scopeIds: List<String>): List<AiMemory> = emptyList()
         override suspend fun getForPrompt(conversationId: String): List<AiMemory> = emptyList()
         override suspend fun search(
             query: String,

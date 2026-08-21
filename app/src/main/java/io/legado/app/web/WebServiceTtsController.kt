@@ -27,12 +27,123 @@ import java.io.File
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import io.legado.app.domain.webservice.WebServiceTtsCatalogItemResponse
+import io.legado.app.domain.webservice.WebServiceTtsModelResponse
+import io.legado.app.domain.webservice.WebServiceTtsModelSelectRequest
+import io.legado.app.domain.webservice.WebServiceTtsModelsResponse
+import io.legado.app.domain.webservice.WebServiceTtsVoiceResponse
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 object WebServiceTtsController {
     private const val TTL_MILLIS = 30 * 60 * 1000L
     private val files = ConcurrentHashMap<String, TtsFile>()
+
+    fun models(): WebServiceTtsModelsResponse {
+        val selected = ReadConfig.ttsEngine.orEmpty()
+        val localSelected = parseLocalTtsEngine(selected)
+
+        val localModels = LocalTtsModelRegistry(appCtx).list().map { model ->
+            WebServiceTtsModelResponse(
+                id = model.id,
+                name = model.name,
+                engine = "local",
+                language = model.language,
+                sampleRate = model.sampleRate,
+                voices = model.voices.map { WebServiceTtsVoiceResponse(it.id, it.name) },
+                defaultVoiceId = model.defaultVoiceId,
+                selectedVoiceId = if (localSelected?.modelId == model.id) localSelected.voiceId else null,
+                isDefault = localSelected?.modelId == model.id,
+                runtimeReady = true,
+                sizeBytes = model.sizeBytes,
+                checksum = model.checksum,
+            )
+        }
+
+        val httpModels = appDb.httpTTSDao.all.map { http ->
+            WebServiceTtsModelResponse(
+                id = "http:${http.id}",
+                name = http.name,
+                engine = "http",
+                language = "vi",
+                sampleRate = 22050,
+                voices = emptyList(),
+                defaultVoiceId = 0,
+                selectedVoiceId = null,
+                isDefault = selected == http.id.toString(),
+                runtimeReady = true,
+                sizeBytes = 0L,
+                checksum = "",
+            )
+        }
+
+        val systemModels = mutableListOf<WebServiceTtsModelResponse>()
+        systemModels.add(
+            WebServiceTtsModelResponse(
+                id = "system:default",
+                name = "Android System TTS (Mặc định)",
+                engine = "system",
+                language = Locale.getDefault().toLanguageTag(),
+                sampleRate = 22050,
+                voices = emptyList(),
+                defaultVoiceId = 0,
+                selectedVoiceId = null,
+                isDefault = selected.isBlank() || selected == "system:default",
+                runtimeReady = true,
+                sizeBytes = 0L,
+                checksum = "",
+            )
+        )
+
+        val catalog = emptyList<WebServiceTtsCatalogItemResponse>()
+        val selectedEngineStr = when {
+            selected.isBlank() -> "system:default"
+            localSelected != null -> localSelected.modelId
+            selected.toLongOrNull() != null -> "http:$selected"
+            else -> selected
+        }
+
+        return WebServiceTtsModelsResponse(
+            models = systemModels + localModels + httpModels,
+            catalog = catalog,
+            selectedEngine = selectedEngineStr,
+            speechRate = ReadConfig.ttsSpeechRate,
+            ttsFollowSys = ReadConfig.ttsFollowSys,
+        )
+    }
+
+    suspend fun selectModel(request: WebServiceTtsModelSelectRequest) {
+        if (request.speechRate != null) {
+            ReadConfig.ttsSpeechRate = request.speechRate
+        }
+        if (request.ttsFollowSys != null) {
+            ReadConfig.ttsFollowSys = request.ttsFollowSys
+        }
+        val modelId = request.modelId.trim()
+        if (modelId.isNotBlank()) {
+            when {
+                modelId == "system:default" || modelId == "system" -> {
+                    ReadConfig.ttsEngine = null
+                }
+                modelId.startsWith("http:") -> {
+                    val httpId = modelId.removePrefix("http:").trim()
+                    ReadConfig.ttsEngine = httpId
+                }
+                modelId.startsWith("system:") -> {
+                    val pkgName = modelId.removePrefix("system:").trim()
+                    ReadConfig.ttsEngine = pkgName
+                }
+                else -> {
+                    val registry = LocalTtsModelRegistry(appCtx)
+                    val model = registry.get(modelId)
+                        ?: throw IllegalArgumentException("TTS_MODEL_NOT_FOUND: $modelId")
+                    val voiceId = request.voiceId ?: model.defaultVoiceId
+                    ReadConfig.ttsEngine = model.engineValue(voiceId)
+                }
+            }
+        }
+        ReadAloud.upReadAloudClass()
+    }
 
     fun capabilities(bookUrl: String? = null): Pair<String, String> {
         val configured = normalizedEngine(resolveEngine(bookUrl))
@@ -65,10 +176,8 @@ object WebServiceTtsController {
         if (localEngine != null) {
             val localText = localSpeechText(cleanText, configuredEngine)
                 ?: throw IllegalArgumentException("TTS_TEXT_UNSUPPORTED_LOCAL")
-            // Do not hide a local model/runtime failure behind a second attempt
-            // with Android system TTS. On devices without a system provider
-            // that fallback only produces the misleading TTS_INIT_FAILED.
-            val localFile = LocalTtsSynthesis.synthesizeToWav(appCtx, configuredEngine, localText)
+            val speed = (ReadConfig.speechRatePlay + 5) / 10f
+            val localFile = LocalTtsSynthesis.synthesizeToWav(appCtx, configuredEngine, localText, speed)
             if (hasUsableDuration(localFile, localText)) {
                 val expiresAt = System.currentTimeMillis() + TTL_MILLIS
                 files[id] = TtsFile(id, localFile, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
@@ -109,6 +218,7 @@ object WebServiceTtsController {
                         finish(Result.failure(IllegalStateException("TTS_LANGUAGE_UNAVAILABLE")))
                         return@TextToSpeech
                     }
+                    tts.setSpeechRate((ReadConfig.speechRatePlay + 5) / 10f)
                     tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(id: String?) = Unit
                         override fun onDone(id: String?) = finish(Result.success(Unit))

@@ -41,8 +41,13 @@ class ValtecOnnxTtsEngine(private val model: LocalTtsModel) : LocalTtsSynthesisE
         }
     }
 
-    override suspend fun synthesize(text: String, voiceId: Int): FloatArray =
-        synthesize(text, voiceId, noiseScale = 0.667f, lengthScale = 1f)
+    override suspend fun synthesize(text: String, voiceId: Int, speed: Float): FloatArray =
+        synthesize(
+            text = text,
+            voiceId = voiceId,
+            noiseScale = 0.667f,
+            lengthScale = 1f / speed.coerceIn(0.25f, 4.0f),
+        )
 
     private suspend fun synthesize(
         text: String,

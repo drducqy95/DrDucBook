@@ -106,6 +106,9 @@ private class InMemoryAiMemoryGateway : AiMemoryGateway {
     override fun observeByScope(scope: String, scopeId: String): Flow<List<AiMemory>> =
         flowOf(memories.filter { it.scope == scope && it.scopeId == scopeId })
 
+    override fun observeByScopeIds(scope: String, scopeIds: List<String>): Flow<List<AiMemory>> =
+        flowOf(memories.filter { it.scope == scope && it.scopeId in scopeIds })
+
     override fun observeAllByScope(scope: String): Flow<List<AiMemory>> =
         flowOf(memories.filter { it.scope == scope })
 
@@ -117,6 +120,9 @@ private class InMemoryAiMemoryGateway : AiMemoryGateway {
 
     override suspend fun getByScope(scope: String, scopeId: String): List<AiMemory> =
         memories.filter { it.scope == scope && it.scopeId == scopeId }
+
+    override suspend fun getByScopeIds(scope: String, scopeIds: List<String>): List<AiMemory> =
+        memories.filter { it.scope == scope && it.scopeId in scopeIds }
 
     override suspend fun getForPrompt(conversationId: String): List<AiMemory> =
         memories.filter { it.conversationId.isBlank() || it.conversationId == conversationId }

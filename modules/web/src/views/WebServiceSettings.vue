@@ -41,6 +41,93 @@
         </div>
       </section>
 
+      <section class="settings-panel tts-panel">
+        <div class="panel-heading">
+          <h2>{{ t('ttsVoice') }}</h2>
+          <el-tag :type="selectedModel ? 'success' : 'info'">
+            {{ activeEngineLabel }}
+          </el-tag>
+        </div>
+        <p class="settings-note">{{ t('ttsVoiceDescription') }}</p>
+
+        <div class="tts-controls">
+          <div class="tts-form-row">
+            <label>{{ t('ttsEngine') }}</label>
+            <el-select
+              v-model="selectedModelId"
+              class="tts-select"
+              filterable
+              :loading="loadingTts"
+              :placeholder="t('ttsEngine')"
+              @change="onModelChange"
+            >
+              <el-option-group
+                v-for="group in groupedTtsModels"
+                :key="group.label"
+                :label="group.label"
+              >
+                <el-option
+                  v-for="model in group.options"
+                  :key="model.id"
+                  :label="model.name"
+                  :value="model.id"
+                >
+                  <span class="model-opt-name">{{ model.name }}</span>
+                  <span class="model-opt-lang">{{ model.language }}</span>
+                </el-option>
+              </el-option-group>
+            </el-select>
+          </div>
+
+          <div v-if="selectedModel && selectedModel.voices.length > 1" class="tts-form-row">
+            <label>{{ t('selectVoice') }}</label>
+            <el-select
+              v-model="selectedVoiceId"
+              class="tts-select"
+              :placeholder="t('selectVoice')"
+              @change="onVoiceChange"
+            >
+              <el-option
+                v-for="voice in selectedModel.voices"
+                :key="voice.id"
+                :label="voice.name"
+                :value="voice.id"
+              />
+            </el-select>
+          </div>
+
+          <div class="tts-form-row">
+            <div class="tts-rate-header">
+              <label>{{ t('speechRate') }} ({{ currentSpeedMultiplier }}x)</label>
+              <el-switch
+                v-model="ttsFollowSys"
+                :active-text="t('followSystemSpeed')"
+                @change="onSpeedChange"
+              />
+            </div>
+            <div v-if="!ttsFollowSys" class="tts-slider-wrap">
+              <el-slider
+                v-model="ttsSpeechRate"
+                :min="0"
+                :max="15"
+                :step="1"
+                :marks="{ 0: '0.5x', 5: '1.0x', 10: '1.5x', 15: '2.0x' }"
+                @change="onSpeedChange"
+              />
+            </div>
+          </div>
+
+          <div class="tts-actions">
+            <el-button
+              :loading="previewingTts"
+              @click="previewVoice"
+            >
+              {{ t('previewVoice') }}
+            </el-button>
+          </div>
+        </div>
+      </section>
+
       <section class="settings-panel">
         <div class="panel-heading">
           <h2>{{ t('serviceName') }}</h2>
@@ -156,8 +243,12 @@ import {
 import { useRouter } from 'vue-router'
 import {
   getWebServiceBackgroundBlob,
+  getWebServiceTtsModels,
+  selectWebServiceTtsModel,
+  synthesizeWebServiceTts,
   type WebServicePolicy,
   type WebServicePolicyPatch,
+  type WebServiceTtsModel,
 } from '@/api/webService'
 import { useWebServiceStore } from '@/store'
 import { t } from '@/i18n'
@@ -173,6 +264,42 @@ const loading = ref(false)
 const saving = ref('')
 const previewObjectUrl = ref('')
 let activePreviewUrl = ''
+
+const ttsModels = ref<WebServiceTtsModel[]>([])
+const selectedModelId = ref('')
+const selectedVoiceId = ref<number | undefined>(undefined)
+const ttsSpeechRate = ref(5)
+const ttsFollowSys = ref(true)
+const loadingTts = ref(false)
+const previewingTts = ref(false)
+let previewAudio: HTMLAudioElement | null = null
+
+const selectedModel = computed(() =>
+  ttsModels.value.find(m => m.id === selectedModelId.value)
+)
+
+const currentSpeedMultiplier = computed(() => {
+  const rate = ttsFollowSys.value ? 5 : ttsSpeechRate.value
+  return ((rate + 5) / 10).toFixed(1)
+})
+
+const activeEngineLabel = computed(() => {
+  if (selectedModel.value) return selectedModel.value.name
+  return t('default')
+})
+
+const groupedTtsModels = computed(() => {
+  const groups: Array<{ label: string; options: WebServiceTtsModel[] }> = []
+  const system = ttsModels.value.filter(m => m.engine === 'system')
+  const local = ttsModels.value.filter(m => m.engine === 'local')
+  const http = ttsModels.value.filter(m => m.engine === 'http')
+
+  if (system.length > 0) groups.push({ label: t('systemTts'), options: system })
+  if (local.length > 0) groups.push({ label: t('localModel'), options: local })
+  if (http.length > 0) groups.push({ label: t('httpTts'), options: http })
+
+  return groups
+})
 
 const policy = computed(() => webServiceStore.policy)
 const serviceName = computed(() => {
@@ -238,11 +365,100 @@ const loadPreview = async (assetId?: string | null) => {
   }
 }
 
+const loadTtsModels = async () => {
+  loadingTts.value = true
+  try {
+    const res = await getWebServiceTtsModels()
+    ttsModels.value = res.models || []
+    selectedModelId.value = res.selectedEngine || 'system:default'
+    if (typeof res.speechRate === 'number') {
+      ttsSpeechRate.value = res.speechRate
+    }
+    if (typeof res.ttsFollowSys === 'boolean') {
+      ttsFollowSys.value = res.ttsFollowSys
+    }
+    const current = ttsModels.value.find(m => m.id === selectedModelId.value)
+    if (current) {
+      selectedVoiceId.value = current.selectedVoiceId ?? current.defaultVoiceId ?? undefined
+    }
+  } catch {
+    // Non-blocking
+  } finally {
+    loadingTts.value = false
+  }
+}
+
+const onModelChange = async (modelId: string) => {
+  const model = ttsModels.value.find(m => m.id === modelId)
+  selectedVoiceId.value = model?.defaultVoiceId ?? undefined
+  try {
+    await selectWebServiceTtsModel(
+      modelId,
+      selectedVoiceId.value,
+      ttsSpeechRate.value,
+      ttsFollowSys.value,
+    )
+    ElMessage.success(t('ttsModelSaved'))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
+  }
+}
+
+const onVoiceChange = async (voiceId: number) => {
+  try {
+    await selectWebServiceTtsModel(
+      selectedModelId.value,
+      voiceId,
+      ttsSpeechRate.value,
+      ttsFollowSys.value,
+    )
+    ElMessage.success(t('ttsModelSaved'))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
+  }
+}
+
+const onSpeedChange = async () => {
+  try {
+    await selectWebServiceTtsModel(
+      selectedModelId.value,
+      selectedVoiceId.value,
+      ttsSpeechRate.value,
+      ttsFollowSys.value,
+    )
+    ElMessage.success(t('speechRateSaved'))
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : String(error))
+  }
+}
+
+const previewVoice = async () => {
+  if (previewingTts.value) return
+  previewingTts.value = true
+  try {
+    const text = t('previewText')
+    const res = await synthesizeWebServiceTts(text)
+    if (previewAudio) {
+      previewAudio.pause()
+      previewAudio = null
+    }
+    previewAudio = new Audio(res.audioUrl)
+    await previewAudio.play()
+  } catch {
+    ElMessage.error(t('ttsPreviewFailed'))
+  } finally {
+    previewingTts.value = false
+  }
+}
+
 const refresh = async () => {
   loading.value = true
   try {
-    await webServiceStore.loadInstance()
-    await webServiceStore.loadPolicy()
+    await Promise.allSettled([
+      webServiceStore.loadInstance(),
+      webServiceStore.loadPolicy(),
+      loadTtsModels(),
+    ])
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : String(error))
   } finally {
@@ -360,7 +576,13 @@ watch(
 )
 
 onMounted(refresh)
-onBeforeUnmount(clearPreviewObjectUrl)
+onBeforeUnmount(() => {
+  clearPreviewObjectUrl()
+  if (previewAudio) {
+    previewAudio.pause()
+    previewAudio = null
+  }
+})
 </script>
 
 <style lang="scss" scoped>
@@ -393,17 +615,22 @@ onBeforeUnmount(clearPreviewObjectUrl)
 
 .settings-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 380px) minmax(320px, 1fr);
-  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
   max-width: 1120px;
   margin: 0 auto;
 }
 
 .settings-panel {
-  border: 1px solid rgba(42, 64, 54, 0.14);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 20px;
+  border-radius: 12px;
+  background: #f4f7f5;
+  border: 1px solid rgba(42, 64, 54, 0.08);
+  padding: 24px;
+  box-shadow: 0 10px 24px rgba(22, 39, 31, 0.05);
+}
+
+.background-panel {
+  grid-column: 1 / -1;
 }
 
 .panel-heading,
@@ -444,6 +671,60 @@ onBeforeUnmount(clearPreviewObjectUrl)
   border-top: 1px solid rgba(42, 64, 54, 0.12);
   padding-top: 16px;
   margin-top: 16px;
+}
+
+.tts-panel {
+  grid-column: 1 / -1;
+}
+
+.tts-controls {
+  display: grid;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.tts-form-row {
+  display: grid;
+  gap: 8px;
+
+  label {
+    font-weight: 600;
+    font-size: 14px;
+    color: #47564f;
+  }
+
+  .tts-select {
+    width: 100%;
+  }
+}
+
+.model-opt-name {
+  float: left;
+}
+
+.model-opt-lang {
+  float: right;
+  color: #8492a6;
+  font-size: 12px;
+  margin-left: 12px;
+}
+
+.tts-rate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tts-slider-wrap {
+  padding: 0 12px 18px;
+}
+
+.tts-actions {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  margin-top: 4px;
 }
 
 .background-preview {

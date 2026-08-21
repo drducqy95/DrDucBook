@@ -158,8 +158,8 @@ class TranslationPromptConfigViewModel(
             TranslationPromptStage.PREPARE to "Read the complete supplied excerpt before translating. Preserve paragraph order, dialogue boundaries, names, numbers, and markup tokens.",
             TranslationPromptStage.FILTER to "Treat navigation labels, advertisements, duplicated headers, and unrelated boilerplate as noise; never invent replacements for removed noise.",
             TranslationPromptStage.DICTIONARY to "Use the supplied terminology exactly. Extract only recurring names, places, titles, or setting terms that are useful in later chunks.",
-            TranslationPromptStage.TRANSLATE to "Produce complete literary prose in the target language without summaries, commentary, censorship, or omitted sentences.",
-            TranslationPromptStage.RETRANSLATE to "Correct the specific failure reported for the previous attempt while retaining all valid terminology and paragraph structure.",
+            TranslationPromptStage.TRANSLATE to "Produce complete literary prose in the target language without summaries, commentary, censorship, or omitted sentences. When translating from machine/convert text, convert awkward Sino-Vietnamese sentence patterns into fluent, natural Vietnamese.",
+            TranslationPromptStage.RETRANSLATE to "Correct the specific failure reported for the previous attempt while retaining all valid terminology and paragraph structure. Restructure awkward convert patterns, stiff repeated pronouns, and mechanical idioms into smooth Vietnamese prose.",
         )
         return defaults.mapIndexed { index, (stage, instruction) ->
             AiPromptPreset(

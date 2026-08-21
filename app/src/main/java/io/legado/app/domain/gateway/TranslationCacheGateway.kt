@@ -23,6 +23,20 @@ interface TranslationCacheGateway {
         provider: String,
     ): String?
 
+    suspend fun readCacheIgnoringHash(
+        book: Book,
+        bookChapter: BookChapter,
+        targetLanguage: String,
+        provider: String,
+        expectedContentHash: String? = null,
+    ): TranslationRevision?
+
+    suspend fun listProviderCaches(
+        book: Book,
+        bookChapter: BookChapter,
+        targetLanguage: String,
+    ): List<TranslationRevision>
+
     suspend fun readTranslation(
         book: Book,
         bookChapter: BookChapter,

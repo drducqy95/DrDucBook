@@ -3,7 +3,7 @@
     :class="{ 'cata-wrapper': true, visible: popCataVisible }"
     :style="popupTheme"
   >
-    <div class="title">Mục lục</div>
+    <div class="title">{{ t('catalog') }}</div>
     <virtual-list
       style="height: 300px; overflow: auto"
       :class="{ night: isNight, day: !isNight }"
@@ -21,6 +21,7 @@
 
 <script setup lang="ts">
 import VirtualList from 'vue3-virtual-scroll-list'
+import { t, translateDynamicTexts, webLocale } from '@/i18n'
 import settings from '../config/themeConfig'
 import '../assets/fonts/popfont.css'
 import CatalogItem from './CatalogItem.vue'
@@ -29,6 +30,16 @@ import type { BookChapter } from '@/book'
 const store = useBookStore()
 
 const { catalog, popCataVisible, miniInterface } = storeToRefs(store)
+
+watch(
+  [catalog, webLocale],
+  () => {
+    if (catalog.value && catalog.value.length > 0) {
+      translateDynamicTexts('catalog', catalog.value.map(c => c.title))
+    }
+  },
+  { immediate: true },
+)
 
 //主题
 const isNight = computed(() => store.theme)

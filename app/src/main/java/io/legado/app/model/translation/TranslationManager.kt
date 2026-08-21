@@ -44,6 +44,18 @@ object TranslationManager : KoinComponent {
         val provider: String,
         val targetLanguage: String,
         val revision: TranslationRevision? = null,
+        val isStale: Boolean = false,
+    )
+
+    data class ProviderCacheInfo(
+        val provider: String,
+        val targetLanguage: String,
+        val status: String,
+        val isStale: Boolean,
+        val hasUserEdits: Boolean,
+        val updatedAt: Long,
+        val charCount: Int,
+        val revisionId: String? = null,
     )
 
     private fun getChapterKey(
@@ -89,13 +101,6 @@ object TranslationManager : KoinComponent {
         provider: String = TranslationConfig.llmProvider,
         targetLanguage: String = currentTargetLanguage(),
     ): Boolean {
-        if (provider == TranslationConfig.llmProvider) {
-            return getPreferredCachedTranslation(
-                book = book,
-                chapter = chapter,
-                targetLanguage = targetLanguage,
-            ) != null
-        }
         return getCachedTranslation(book, chapter, provider, targetLanguage) != null
     }
 
@@ -133,13 +138,66 @@ object TranslationManager : KoinComponent {
                 translateChapterUseCase.currentProviderConfigurationRevision(provider),
             computeHash = translationCacheGateway::computeContentHash,
         )
-        return translationCacheGateway.readCurrentTranslation(
+        val validatedContent = translationCacheGateway.readCurrentTranslation(
             book = book,
             bookChapter = chapter,
             targetLanguage = targetLanguage,
             originalContentHash = contentHash,
             provider = provider,
         )
+        if (!validatedContent.isNullOrBlank()) {
+            return validatedContent
+        }
+        // Fallback: Read any existing translation file on disk for this provider (relaxed lookup)
+        return translationCacheGateway.readTranslation(
+            book = book,
+            bookChapter = chapter,
+            targetLanguage = targetLanguage,
+            provider = provider,
+        )
+    }
+
+    suspend fun listProviderCachesForChapter(
+        book: Book,
+        chapter: BookChapter,
+        targetLanguage: String = currentTargetLanguage(),
+    ): List<ProviderCacheInfo> {
+        val originalContent = BookHelp.getContent(book, chapter) ?: return emptyList()
+        val rawContentHash = translationCacheGateway.computeContentHash(originalContent)
+        val dictionaryRevision = quickDictionaryGateway.getEffectiveRevision(book, originalContent)
+        val revisions = translationCacheGateway.listProviderCaches(book, chapter, targetLanguage)
+        return revisions.map { revision ->
+            val provider = revision.provider
+            val dictionaryContentHash = dictionaryAwareContentHash(
+                originalContentHash = rawContentHash,
+                provider = provider,
+                dictionaryRevision = dictionaryRevision,
+                quickTranslationPackVersion = quickTranslationGateway.packVersionFor(
+                    book.getQuickTranslationPronounModeOverride(),
+                ),
+            )
+            val expectedContentHash = io.legado.app.domain.usecase.applyProviderConfigurationRevision(
+                contentHash = dictionaryContentHash,
+                providerConfigurationRevision =
+                    translateChapterUseCase.currentProviderConfigurationRevision(provider),
+                computeHash = translationCacheGateway::computeContentHash,
+            )
+            val isStale = revision.rawContentHash != rawContentHash ||
+                revision.cacheContentHash != expectedContentHash ||
+                revision.status == RevisionStatus.STALE
+            val hasUserEdits = revision.sourceStatus == RevisionStatus.USER_EDITED ||
+                revision.sourceStatus == RevisionStatus.FINAL
+            ProviderCacheInfo(
+                provider = revision.provider,
+                targetLanguage = revision.targetLanguage,
+                status = revision.sourceStatus.name,
+                isStale = isStale,
+                hasUserEdits = hasUserEdits,
+                updatedAt = revision.updatedAt,
+                charCount = revision.content.length,
+                revisionId = revision.revisionId,
+            )
+        }
     }
 
     suspend fun getPreferredCachedTranslation(
@@ -179,31 +237,50 @@ object TranslationManager : KoinComponent {
                 provider = identity.provider,
                 targetLanguage = identity.targetLanguage,
                 revision = revision,
+                isStale = revision.rawContentHash != rawContentHash || revision.status == RevisionStatus.STALE,
             )
         }
+        val dictionaryRevision = quickDictionaryGateway.getEffectiveRevision(book, originalContent)
         identities.forEach { identity ->
-            // Legacy QT payloads have no dictionary-pack version. Do not surface them after a
-            // pack update; the caller should retranslate with the current dictionary instead.
+            val revision = getCurrentRevision(
+                book = book,
+                chapter = chapter,
+                provider = identity.provider,
+                targetLanguage = identity.targetLanguage,
+                rawContentHash = rawContentHash,
+            )
+            val dictionaryContentHash = dictionaryAwareContentHash(
+                originalContentHash = rawContentHash,
+                provider = identity.provider,
+                dictionaryRevision = dictionaryRevision,
+                quickTranslationPackVersion = quickTranslationGateway.packVersionFor(
+                    book.getQuickTranslationPronounModeOverride(),
+                ),
+            )
+            val expectedContentHash = io.legado.app.domain.usecase.applyProviderConfigurationRevision(
+                contentHash = dictionaryContentHash,
+                providerConfigurationRevision =
+                    translateChapterUseCase.currentProviderConfigurationRevision(identity.provider),
+                computeHash = translationCacheGateway::computeContentHash,
+            )
             val content = getCachedTranslation(
                 book = book,
                 chapter = chapter,
                 provider = identity.provider,
                 targetLanguage = identity.targetLanguage,
-            ) ?: if (identity.provider == TranslationConstants.PROVIDER_QUICK_TRANSLATOR) {
-                null
-            } else {
-                translationCacheGateway.readTranslation(
-                    book,
-                    chapter,
-                    identity.targetLanguage,
-                    identity.provider,
-                )
-            }
+            )
             if (!content.isNullOrBlank()) {
+                val isStale = revision?.let {
+                    it.rawContentHash != rawContentHash ||
+                        it.cacheContentHash != expectedContentHash ||
+                        it.status == RevisionStatus.STALE
+                } ?: false
                 return ResolvedTranslationContent(
                     content = content,
                     provider = identity.provider,
                     targetLanguage = identity.targetLanguage,
+                    revision = revision,
+                    isStale = isStale,
                 )
             }
         }
