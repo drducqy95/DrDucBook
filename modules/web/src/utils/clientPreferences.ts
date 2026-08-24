@@ -24,12 +24,23 @@ export type BackgroundPreset = {
   position?: BackgroundPosition
 }
 
+const resolveAssetUrl = (url: string) => {
+  if (!url) return ''
+  if (url.startsWith('blob:') || url.startsWith('data:') || /^https?:\/\//i.test(url)) return url
+  try {
+    const base = typeof document !== 'undefined' && document.baseURI ? document.baseURI : (typeof location !== 'undefined' ? location.origin : '')
+    return new URL(url, base).href
+  } catch {
+    return url
+  }
+}
+
 export const backgroundPresets: BackgroundPreset[] = [
-  { id: 'misty-journey', name: 'Mưa hoa', image: mistyJourney, position: 'center' },
-  { id: 'koi-water', name: 'Cá chép bên hồ', image: koiWater, position: 'center' },
-  { id: 'mountain-dawn', name: 'Sơn hà bình minh', image: mountainDawn, position: 'center' },
-  { id: 'floating-isles', name: 'Tiên cảnh', image: floatingIsles, position: 'center' },
-  { id: 'silver-duo', name: 'Song hành', image: silverDuo, position: 'center' },
+  { id: 'misty-journey', name: 'Mưa hoa', image: resolveAssetUrl(mistyJourney), position: 'center' },
+  { id: 'koi-water', name: 'Cá chép bên hồ', image: resolveAssetUrl(koiWater), position: 'center' },
+  { id: 'mountain-dawn', name: 'Sơn hà bình minh', image: resolveAssetUrl(mountainDawn), position: 'center' },
+  { id: 'floating-isles', name: 'Tiên cảnh', image: resolveAssetUrl(floatingIsles), position: 'center' },
+  { id: 'silver-duo', name: 'Song hành', image: resolveAssetUrl(silverDuo), position: 'center' },
 ]
 
 export type ClientBackgroundPreference = {

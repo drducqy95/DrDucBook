@@ -152,6 +152,7 @@
     <string name="web_service_desc">Chỉnh sửa nguồn hoặc đọc sách qua web</string>
     <string name="web_service_start_failed">Không thể khởi động dịch vụ web: %1$s</string>
     <string name="web_service_no_network">Không tìm thấy địa chỉ mạng nội bộ để khởi động dịch vụ web</string>
+    <string name="web_service_required_for_tunnel">Cần bật Dịch vụ Web trước khi khởi tạo Tunnel</string>
     <string name="cloudflare_tunnel_title">Truy cập online bằng Cloudflare Tunnel</string>
     <string name="cloudflare_tunnel_desc">Mở dịch vụ web an toàn từ thiết bị không cùng mạng.</string>
     <string name="cloudflare_quick_tunnel">Tunnel nhanh</string>

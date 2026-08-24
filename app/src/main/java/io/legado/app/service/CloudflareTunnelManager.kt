@@ -144,14 +144,16 @@ object CloudflareTunnelManager {
             detail = "Connecting to Cloudflare…",
         )
         scope.launch {
+            val diagnosticLines = mutableListOf<String>()
             val started = runCatching {
                 ProcessBuilder(command(binary))
                     .redirectErrorStream(true)
+                    .directory(context.cacheDir)
                     .apply {
                         environment()["SSL_CERT_DIR"] = "/system/etc/security/cacerts"
-                        androidDnsServer(context)?.let { dns ->
-                            environment()["CLOUDFLARED_ANDROID_DNS"] = dns
-                        }
+                        environment()["TMPDIR"] = context.cacheDir.absolutePath
+                        environment()["HOME"] = context.noBackupFilesDir.absolutePath
+                        environment()["CLOUDFLARED_ANDROID_DNS"] = androidDnsServer(context)
                     }
                     .start()
             }.getOrElse { error ->
@@ -161,20 +163,30 @@ object CloudflareTunnelManager {
             synchronized(lock) { process = started }
             runCatching {
                 started.inputStream.bufferedReader().useLines { lines ->
-                    lines.forEach { line -> handleOutput(started, line) }
+                    lines.forEach { line ->
+                        synchronized(lock) {
+                            if (diagnosticLines.size >= 8) diagnosticLines.removeAt(0)
+                            diagnosticLines.add(line.trim())
+                        }
+                        handleOutput(started, line)
+                    }
                 }
                 val exitCode = started.waitFor()
                 synchronized(lock) {
                     if (process === started) {
                         process = null
-                        fail("Cloudflare Tunnel stopped (code $exitCode).")
+                        val contextMsg = diagnosticLines.takeLast(3).joinToString(" | ")
+                        val suffix = if (contextMsg.isNotBlank()) ": $contextMsg" else ""
+                        fail("Cloudflare Tunnel stopped (code $exitCode)$suffix")
                     }
                 }
             }.onFailure { error ->
                 synchronized(lock) {
                     if (process === started) {
                         process = null
-                        fail(error.localizedMessage ?: "Cloudflare Tunnel stopped.")
+                        val contextMsg = diagnosticLines.takeLast(3).joinToString(" | ")
+                        val suffix = if (contextMsg.isNotBlank()) ": $contextMsg" else ""
+                        fail((error.localizedMessage ?: "Cloudflare Tunnel stopped") + suffix)
                     }
                 }
             }
@@ -210,15 +222,43 @@ object CloudflareTunnelManager {
         )
     }
 
-    private fun androidDnsServer(context: Context): String? {
+    private fun androidDnsServer(context: Context): String {
         val connectivity = context.getSystemService(ConnectivityManager::class.java)
-        val network = connectivity.activeNetwork ?: return null
-        val address = connectivity.getLinkProperties(network)
-            ?.dnsServers
-            ?.firstOrNull()
-            ?.hostAddress
-            ?: return null
-        return if (address.contains(':')) "[$address]:53" else "$address:53"
+        val network = connectivity.activeNetwork
+        val dnsServers = network?.let {
+            connectivity.getLinkProperties(it)?.dnsServers
+        }.orEmpty()
+
+        // Filter out link-local, loopback, or invalid addresses (e.g. fe80::1 which causes EINVAL on UDP connect)
+        val validServers = dnsServers.filter { addr ->
+            !addr.isLinkLocalAddress &&
+            !addr.isLoopbackAddress &&
+            !addr.isAnyLocalAddress &&
+            !(addr.hostAddress?.substringBefore('%')?.startsWith("fe80", ignoreCase = true) ?: false)
+        }
+
+        // Prefer IPv4 DNS (e.g. 192.168.1.1, 8.8.8.8)
+        val ipv4Dns = validServers.firstOrNull { addr ->
+            val host = addr.hostAddress?.substringBefore('%').orEmpty()
+            host.isNotEmpty() && !host.contains(':')
+        }
+        if (ipv4Dns != null) {
+            val clean = ipv4Dns.hostAddress?.substringBefore('%') ?: return "1.1.1.1:53"
+            return "$clean:53"
+        }
+
+        // Fallback to valid global IPv6 DNS if present
+        val ipv6Dns = validServers.firstOrNull { addr ->
+            val host = addr.hostAddress?.substringBefore('%').orEmpty()
+            host.isNotEmpty() && host.contains(':')
+        }
+        if (ipv6Dns != null) {
+            val clean = ipv6Dns.hostAddress?.substringBefore('%') ?: return "1.1.1.1:53"
+            return "[$clean]:53"
+        }
+
+        // Default fallback: Cloudflare Public DNS
+        return "1.1.1.1:53"
     }
 
     private fun Context.readPairingEnabled(): Boolean =

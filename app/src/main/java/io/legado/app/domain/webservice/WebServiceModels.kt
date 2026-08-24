@@ -606,10 +606,36 @@ data class WebServiceStoryRelationshipResponse(
     val chapterIndex: Int = -1,
 )
 
+data class WebServiceStoryWorldEntryResponse(
+    val raw: String,
+    val target: String,
+    val category: String = "other",
+    val description: String = "",
+    val entityRefs: List<String> = emptyList(),
+    val chapterIndex: Int = -1,
+)
+
+data class WebServiceTimelineCharacterResponse(
+    val raw: String,
+    val target: String = "",
+    val status: String = "existing",
+    val role: String = "",
+)
+
+data class WebServiceStoryTimelineResponse(
+    val chapterIndex: Int,
+    val chapterTitle: String = "",
+    val summary: String = "",
+    val events: List<String> = emptyList(),
+    val characters: List<WebServiceTimelineCharacterResponse> = emptyList(),
+)
+
 data class WebServiceStoryMemorySummaryResponse(
     val bookUrl: String,
     val entities: List<WebServiceStoryEntityResponse> = emptyList(),
     val relationships: List<WebServiceStoryRelationshipResponse> = emptyList(),
+    val worldBuilding: List<WebServiceStoryWorldEntryResponse> = emptyList(),
+    val timelines: List<WebServiceStoryTimelineResponse> = emptyList(),
     val worldEntriesCount: Int = 0,
     val timelineEventsCount: Int = 0,
 )

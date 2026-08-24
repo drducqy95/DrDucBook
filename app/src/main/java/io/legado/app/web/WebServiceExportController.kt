@@ -122,7 +122,7 @@ object WebServiceExportController {
                 selectedChapters.forEach { chapter ->
                     writer.appendLine(chapter.title)
                     writer.appendLine()
-                    writer.appendLine(chapterContent(bookUrl, chapter.index))
+                    writer.appendLine(chapterContent(book, chapter))
                     writer.appendLine()
                     writer.flush()
                 }
@@ -155,7 +155,7 @@ object WebServiceExportController {
             identifier = "urn:drducbook:book:${book.bookUrl.hashCode().toUInt().toString(16)}",
             cover = resolveCover(book),
             chapters = selectedChapters.map { chapter ->
-                val original = chapterContent(bookUrl, chapter.index)
+                val original = chapterContent(book, chapter)
                 val translated = if (contentSource.includesTranslation) {
                     TranslationManager.getPreferredCachedTranslation(book, chapter, targetLanguage)?.content
                 } else null
@@ -282,20 +282,20 @@ object WebServiceExportController {
     }
 
     private suspend fun chapterContent(
-        bookUrl: String,
-        chapterIndex: Int,
+        book: Book,
+        chapter: BookChapter,
     ): String {
-        val returnData = BookController.getBookContentAwait(
-            mapOf(
-                "url" to listOf(bookUrl),
-                "index" to listOf(chapterIndex.toString()),
+        val local = BookHelp.getContent(book, chapter)
+        if (!local.isNullOrBlank()) return local
+        return runCatching {
+            val returnData = BookController.getBookContentAwait(
+                mapOf(
+                    "url" to listOf(book.bookUrl),
+                    "index" to listOf(chapter.index.toString()),
+                )
             )
-        )
-        if (!returnData.isSuccess) {
-            throw IllegalArgumentException(returnData.errorMsg)
-        }
-        return returnData.data as? String
-            ?: throw IllegalArgumentException("CHAPTER_CONTENT_EMPTY")
+            returnData.data as? String
+        }.getOrNull().orEmpty()
     }
 
     private fun OutputStream.writeUtf8(text: String) {

@@ -5,11 +5,20 @@ import { getWebSessionToken } from './webSession'
 export const baseURL_localStorage_key = 'remoteUrl'
 const SECOND = 1000
 
+const getInitialBaseUrl = () => {
+  if (import.meta.env.VITE_API) return import.meta.env.VITE_API
+  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(baseURL_localStorage_key) : null
+  if (saved) {
+    if (typeof location !== 'undefined' && location.protocol === 'https:' && saved.startsWith('http:')) {
+      return location.origin
+    }
+    return saved
+  }
+  return typeof location !== 'undefined' ? location.origin : ''
+}
+
 const ajax = axios.create({
-  baseURL:
-    import.meta.env.VITE_API ||
-    localStorage.getItem(baseURL_localStorage_key) ||
-    location.origin,
+  baseURL: getInitialBaseUrl(),
   timeout: 120 * SECOND,
 })
 

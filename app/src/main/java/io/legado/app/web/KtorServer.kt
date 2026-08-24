@@ -107,19 +107,21 @@ class KtorServer(
                 }
             }
             install(WebSockets)
-            if (BuildConfig.DEBUG) {
-                install(CORS) {
-                    allowHost("localhost:5173", schemes = listOf("http"))
-                    allowHost("127.0.0.1:5173", schemes = listOf("http"))
-                    allowHeader(HttpHeaders.ContentType)
-                    allowHeader(HttpHeaders.Authorization)
-                    allowHeader(HttpHeaders.IfMatch)
-                    allowMethod(HttpMethod.Options)
-                    allowMethod(HttpMethod.Post)
-                    allowMethod(HttpMethod.Get)
-                    allowMethod(HttpMethod.Patch)
-                    allowMethod(HttpMethod.Delete)
-                }
+            install(CORS) {
+                anyHost()
+                allowHeader(HttpHeaders.ContentType)
+                allowHeader(HttpHeaders.Authorization)
+                allowHeader(HttpHeaders.IfMatch)
+                allowHeader(HttpHeaders.Accept)
+                allowHeader(HttpHeaders.Origin)
+                allowMethod(HttpMethod.Options)
+                allowMethod(HttpMethod.Post)
+                allowMethod(HttpMethod.Get)
+                allowMethod(HttpMethod.Patch)
+                allowMethod(HttpMethod.Delete)
+                allowMethod(HttpMethod.Put)
+                allowNonSimpleContentTypes = true
+                allowCredentials = true
             }
 
             routing {
@@ -210,43 +212,34 @@ class KtorServer(
                         WebService.serve()
                         try {
                             var uri = call.request.path()
-                            if (uri == "/" || uri.isBlank()) {
-                                // Do not let an external browser reuse an old
-                                // index.html after the bundled Vue app changes.
-                                // Hashed JS/CSS assets remain cacheable, while
-                                // this entry point is always revalidated.
-                                call.response.header(HttpHeaders.CacheControl, "no-store, no-cache, must-revalidate")
-                                call.respondRedirect(
-                                    "/vue/index.html?v=${BuildConfig.VERSION_CODE}-${System.currentTimeMillis()}#/",
-                                    permanent = false,
-                                )
-                                return@get
+                            if (uri == "/" || uri.isBlank() || uri == "/index.html" || uri == "/vue" || uri == "/vue/") {
+                                uri = "/vue/index.html"
                             }
                             if (uri.split('/').any { it == ".." }) {
-                            call.respond(HttpStatusCode.BadRequest)
-                            return@get
-                        }
-                        if (uri.endsWith("/")) uri += "index.html"
-                        val assetBytes = withContext(Dispatchers.IO) {
-                            assetsWeb.getBytes(uri)
-                        }
-                        if (assetBytes != null) {
-                            if (uri.endsWith("/index.html", ignoreCase = true)) {
-                                call.response.header(HttpHeaders.CacheControl, "no-store, no-cache, must-revalidate")
-                            } else {
-                                call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
+                                call.respond(HttpStatusCode.BadRequest)
+                                return@get
                             }
-                            call.respondBytes(assetBytes, ContentType.parse(assetsWeb.getMimeType(uri)))
-                        } else {
-                            call.respond(HttpStatusCode.NotFound)
-                        }
-                    } catch (error: Throwable) {
-                        LogUtils.e(TAG, error.stackTraceStr)
-                        if (!call.response.isCommitted) {
-                            call.respond(HttpStatusCode.InternalServerError)
+                            if (uri.endsWith("/")) uri += "index.html"
+                            val assetBytes = withContext(Dispatchers.IO) {
+                                assetsWeb.getBytes(uri)
+                            }
+                            if (assetBytes != null) {
+                                if (uri.endsWith("/index.html", ignoreCase = true)) {
+                                    call.response.header(HttpHeaders.CacheControl, "no-store, no-cache, must-revalidate")
+                                } else {
+                                    call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
+                                }
+                                call.respondBytes(assetBytes, ContentType.parse(assetsWeb.getMimeType(uri)))
+                            } else {
+                                call.respond(HttpStatusCode.NotFound)
+                            }
+                        } catch (error: Throwable) {
+                            LogUtils.e(TAG, error.stackTraceStr)
+                            if (!call.response.isCommitted) {
+                                call.respond(HttpStatusCode.InternalServerError)
+                            }
                         }
                     }
-                }
             }
         }
         server = createdServer
@@ -971,7 +964,8 @@ class KtorServer(
             if (!requireWebAccess()) return@get
             respondTranslationJob {
                 WebServiceTranslationJobController.getGlossary(
-                    bookUrlValue = call.request.queryParameters["bookUrl"]
+                    bookUrlValue = call.request.queryParameters["bookUrl"],
+                    scopeFilter = call.request.queryParameters["scope"],
                 )
             }
         }

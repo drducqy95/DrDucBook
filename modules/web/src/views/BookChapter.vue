@@ -159,16 +159,8 @@
             <el-button plain :loading="ttsLoading" :disabled="noPoint || chapterData.length === 0" @click="ttsPlaying ? stopWebTts() : speakCurrentChapter()">
               {{ ttsPlaying ? t('stopReading') : t('listenCurrent') }}
             </el-button>
-            <el-select v-model="exportFormat" size="small" :disabled="exportLoading || noPoint" aria-label="Định dạng ebook">
-              <el-option label="EPUB 3" value="epub3" />
-              <el-option label="EPUB 2" value="epub2" />
-              <el-option label="PDF" value="pdf" />
-              <el-option label="HTML" value="html" />
-              <el-option label="TXT" value="txt" />
-              <el-option label="CBZ" value="cbz" />
-            </el-select>
-            <el-button plain :loading="exportLoading" :disabled="noPoint" @click="exportCurrentBook">
-              {{ t('exportEbook') }}
+            <el-button plain :disabled="noPoint" @click="showExportDialog = true">
+              {{ t('exportBook') }}
             </el-button>
           </div>
           <template #reference>
@@ -291,6 +283,11 @@
         <div class="bottom-bar" ref="bottom"></div>
       </div>
     </div>
+
+    <ExportBookDialog
+      v-model="showExportDialog"
+      :book="currentExportBook"
+    />
   </div>
 </template>
 
@@ -323,12 +320,25 @@ import { initXboxGamepad } from '@/utils/xboxGamepad'
 import { getReaderPreferences } from '@/utils/clientPreferences'
 import { withWebSession } from '@/api/webSession'
 import { dynamicText, t, translateDynamicTexts, webLocale } from '@/i18n'
+import ExportBookDialog, { type ExportBookTarget } from '@/components/ExportBookDialog.vue'
 
 const content = ref()
 // loading spinner
 const { isLoading, loadingWrapper } = useLoading(content, 'Đang tải thông tin')
 const store = useBookStore()
 const webServiceStore = useWebServiceStore()
+const showExportDialog = ref(false)
+const currentExportBook = computed<ExportBookTarget | null>(() => {
+  if (!store.readingBook) return null
+  const shelfBook = store.shelf?.find(b => b.bookUrl === store.readingBook.bookUrl) as any
+  return {
+    name: store.readingBook.name,
+    author: store.readingBook.author,
+    bookUrl: store.readingBook.bookUrl,
+    totalChapterNum: shelfBook?.totalChapterNum || (chapterData.value?.length || 0),
+    coverUrl: shelfBook?.coverUrl || shelfBook?.customCoverUrl || '',
+  }
+})
 const ttsLoading = ref(false)
 const ttsPlaying = ref(false)
 const ttsPaused = ref(false)
@@ -336,10 +346,8 @@ const ttsAudioReady = ref(false)
 const ttsActiveChapter = ref<number | null>(null)
 const ttsActiveParagraph = ref(-1)
 const ttsActiveParagraphCount = ref(0)
-const exportLoading = ref(false)
 const pretranslateLoading = ref(false)
 const pretranslateCount = ref(10)
-const exportFormat = ref<'epub2' | 'epub3' | 'pdf' | 'txt' | 'html' | 'cbz'>('epub3')
 let ttsAudio: HTMLAudioElement | null = null
 let ttsPlaybackToken = 0
 
@@ -379,40 +387,6 @@ watch(
 )
 
 const readMode = computed(() => store.config.readMode || 'vertical')
-
-const saveBlob = (blob: Blob, fileName: string) => {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = fileName
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-const exportCurrentBook = async () => {
-  if (!webServiceStore.policy?.exportEnabled) {
-    ElMessage.warning('Export đang tắt trong WebService')
-    return
-  }
-  const bookUrl = store.readingBook.bookUrl
-  if (!bookUrl) return
-  exportLoading.value = true
-  try {
-    const download = await downloadWebServiceExportEbook({
-      bookUrl,
-      format: exportFormat.value,
-      scope: 'all',
-      contentSource: 'original',
-      imageOptimization: 'balanced',
-    })
-    saveBlob(download.blob, download.fileName || `book.${exportFormat.value}`)
-    ElMessage.success('Đã tạo ebook và tải xuống')
-  } catch (error) {
-    ElMessage.error(error instanceof Error ? error.message : 'Không thể xuất ebook')
-  } finally {
-    exportLoading.value = false
-  }
-}
 
 const chapterPos = computed({
   get: () => store.readingBook.chapterPos,

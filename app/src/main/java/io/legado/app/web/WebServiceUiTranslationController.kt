@@ -67,7 +67,7 @@ object WebServiceUiTranslationController {
                         lastException = attempt.exceptionOrNull()
                     }
                 }
-                translatedText ?: throw (lastException ?: IllegalStateException("TRANSLATION_FAILED_ALL_PROVIDERS"))
+                translatedText ?: text
             }
         }
         return WebServiceUiTranslationResponse(language, translated)

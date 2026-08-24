@@ -1,7 +1,6 @@
 <template>
-  <WebAppShell>
-    <div class="translation-dashboard">
-      <div class="dashboard-header">
+  <div class="translation-dashboard">
+    <div class="dashboard-header">
         <div>
           <h1>{{ t('translationDashboard') }}</h1>
           <p class="dashboard-subtitle">{{ t('memoryStats') }}</p>
@@ -83,8 +82,8 @@
                 <div v-for="job in jobs" :key="job.jobId" class="job-item">
                   <div class="job-header">
                     <div class="job-title-row">
-                      <span class="job-book-name">{{ getBookName(job.bookUrl) }}</span>
-                      <span class="job-chapter-idx">Chương {{ job.chapterIndex + 1 }}</span>
+                      <span class="job-book-name">{{ dynamicText('td-books', getBookName(job.bookUrl)) }}</span>
+                      <span class="job-chapter-idx">{{ t('chapterPrefix') }} {{ job.chapterIndex + 1 }}</span>
                     </div>
                     <div class="job-status-tags">
                       <el-tag :type="getJobStatusTagType(job.status)" size="small">
@@ -100,7 +99,7 @@
                       :status="job.status === 'failed' ? 'exception' : (job.status === 'translated' ? 'success' : '')"
                     />
                     <div class="job-chunks-text" v-if="job.totalChunks > 0">
-                      {{ job.currentChunk }} / {{ job.totalChunks }} đoạn
+                      {{ job.currentChunk }} / {{ job.totalChunks }} {{ t('chunks') }}
                     </div>
                   </div>
 
@@ -140,8 +139,8 @@
                       :label="b.name"
                       :value="b.bookUrl"
                     >
-                      <span class="book-opt-title">{{ b.name }}</span>
-                      <span class="book-opt-author">{{ b.author }}</span>
+                      <span class="book-opt-title">{{ dynamicText('td-books', b.name) }}</span>
+                      <span class="book-opt-author">{{ dynamicText('td-authors', b.author) }}</span>
                     </el-option>
                   </el-select>
                 </el-form-item>
@@ -182,7 +181,7 @@
 
                 <el-form-item>
                   <el-checkbox v-model="pretranslateForm.forceRetranslate">
-                    {{ t('retranslateChapter') }} (Ghi đè cache cũ)
+                    {{ t('retranslateChapter') }} {{ t('retranslateOverwrite') }}
                   </el-checkbox>
                 </el-form-item>
 
@@ -220,15 +219,15 @@
                     :label="b.name"
                     :value="b.bookUrl"
                   >
-                    <span>{{ b.name }}</span>
-                    <small class="book-author-meta"> — {{ b.author }}</small>
+                    <span>{{ dynamicText('td-books', b.name) }}</span>
+                    <small class="book-author-meta"> — {{ dynamicText('td-authors', b.author) }}</small>
                   </el-option>
                 </el-select>
 
                 <el-input
                   v-model="chapterSearchQuery"
                   clearable
-                  placeholder="Tìm kiếm chương..."
+                  :placeholder="t('searchChapters')"
                   class="chapter-search-input"
                 >
                   <template #prefix>⌕</template>
@@ -251,7 +250,11 @@
                     {{ row.index + 1 }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="title" label="Tiêu đề chương" min-width="220" />
+                <el-table-column prop="title" :label="t('chapterTitle')" min-width="220">
+                  <template #default="{ row }">
+                    {{ dynamicText('td-chapters', row.title) }}
+                  </template>
+                </el-table-column>
                 <el-table-column :label="t('providerCaches')" min-width="260">
                   <template #default="{ row }">
                     <div class="cache-badge-group">
@@ -263,14 +266,14 @@
                           :type="c.isStale ? 'warning' : 'success'"
                           class="cache-item-badge"
                         >
-                          {{ c.providerName }} ✓ {{ c.isStale ? '(cũ)' : '' }}
+                          {{ c.providerName }} ✓ {{ c.isStale ? t('staleCacheBadge') : '' }}
                         </el-tag>
                       </template>
-                      <el-tag v-else size="small" type="info">Chưa có cache</el-tag>
+                      <el-tag v-else size="small" type="info">{{ t('noCacheBadge') }}</el-tag>
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column label="Thao tác" width="160" align="right">
+                <el-table-column :label="t('action')" width="160" align="right">
                   <template #default="{ row }">
                     <el-button
                       size="small"
@@ -320,8 +323,8 @@
                     :label="b.name"
                     :value="b.bookUrl"
                   >
-                    <span>{{ b.name }}</span>
-                    <small class="book-author-meta"> — {{ b.author }}</small>
+                    <span>{{ dynamicText('td-books', b.name) }}</span>
+                    <small class="book-author-meta"> — {{ dynamicText('td-authors', b.author) }}</small>
                   </el-option>
                 </el-select>
 
@@ -344,15 +347,25 @@
 
             <div v-else class="memory-details-container">
               <el-tabs v-model="memorySubTab">
-                <!-- SubTab: Glossary Terms -->
+                <!-- SubTab 1: Glossary Terms -->
                 <el-tab-pane :label="`${t('projectTerms')} (${glossaryTerms.length})`" name="glossary">
+                  <div class="glossary-toolbar" v-if="!viewSeriesAggregated">
+                    <el-radio-group v-model="glossaryScopeFilter" size="small" @change="onGlossaryScopeChange">
+                      <el-radio-button label="effective">{{ t('allScope') }}</el-radio-button>
+                      <el-radio-button label="project">{{ t('projectScopeOnly') }}</el-radio-button>
+                    </el-radio-group>
+                  </div>
                   <div v-if="glossaryTerms.length === 0" class="empty-state">
                     <el-empty :description="t('noGlossaryTerms')" />
                   </div>
                   <el-table v-else :data="glossaryTerms" stripe max-height="500">
-                    <el-table-column prop="source" label="Từ gốc (Trung)" min-width="160" />
-                    <el-table-column prop="target" label="Bản dịch (Việt)" min-width="180" />
-                    <el-table-column prop="category" label="Phân loại" width="130">
+                    <el-table-column prop="source" :label="t('sourceTermLabel')" min-width="160" />
+                    <el-table-column prop="target" :label="t('targetTermLabel')" min-width="180">
+                      <template #default="{ row }">
+                        {{ dynamicText('td-glossary', row.target) }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="category" :label="t('categoryLabel')" width="130">
                       <template #default="{ row }">
                         <el-tag size="small">{{ row.category }}</el-tag>
                       </template>
@@ -360,7 +373,7 @@
                   </el-table>
                 </el-tab-pane>
 
-                <!-- SubTab: Characters & Factions -->
+                <!-- SubTab 2: Characters & Factions -->
                 <el-tab-pane :label="`${t('characterProfiles')} & ${t('factions')} (${storyEntities.length})`" name="entities">
                   <div v-if="storyEntities.length === 0" class="empty-state">
                     <el-empty :description="t('noStoryMemory')" />
@@ -369,14 +382,14 @@
                     <div v-for="ent in storyEntities" :key="ent.raw" class="entity-card">
                       <div class="entity-header">
                         <div>
-                          <strong class="entity-target">{{ ent.target || ent.raw }}</strong>
+                          <strong class="entity-target">{{ dynamicText('td-entities', ent.target || ent.raw) }}</strong>
                           <small class="entity-raw" v-if="ent.target && ent.target !== ent.raw"> ({{ ent.raw }})</small>
                         </div>
                         <el-tag size="small" :type="getEntityTagType(ent.type)">{{ ent.type }}</el-tag>
                       </div>
                       <p v-if="ent.description" class="entity-desc">{{ ent.description }}</p>
                       <div v-if="ent.aliases && ent.aliases.length > 0" class="entity-aliases">
-                        <small>Bí danh: </small>
+                        <small>{{ t('aliases') }}: </small>
                         <el-tag v-for="alias in ent.aliases" :key="alias" size="small" type="info" class="alias-tag">
                           {{ alias }}
                         </el-tag>
@@ -385,21 +398,92 @@
                   </div>
                 </el-tab-pane>
 
-                <!-- SubTab: Relationships -->
+                <!-- SubTab 3: Relationships -->
                 <el-tab-pane :label="`${t('relationships')} (${storyRelationships.length})`" name="relationships">
                   <div v-if="storyRelationships.length === 0" class="empty-state">
                     <el-empty :description="t('noStoryMemory')" />
                   </div>
                   <el-table v-else :data="storyRelationships" stripe max-height="500">
-                    <el-table-column prop="source" label="Đối tượng 1" min-width="140" />
-                    <el-table-column prop="relationship" label="Quan hệ" min-width="160">
+                    <el-table-column prop="source" :label="t('subject1')" min-width="140">
+                      <template #default="{ row }">
+                        {{ dynamicText('td-entities', row.source) }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="relationship" :label="t('relationship')" min-width="160">
                       <template #default="{ row }">
                         <el-tag size="small" type="warning">{{ row.relationship }}</el-tag>
                       </template>
                     </el-table-column>
-                    <el-table-column prop="target" label="Đối tượng 2" min-width="140" />
-                    <el-table-column prop="description" label="Ghi chú" min-width="200" />
+                    <el-table-column prop="target" :label="t('subject2')" min-width="140">
+                      <template #default="{ row }">
+                        {{ dynamicText('td-entities', row.target) }}
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="description" :label="t('notes')" min-width="200" />
                   </el-table>
+                </el-tab-pane>
+
+                <!-- SubTab 4: World Building & Lore -->
+                <el-tab-pane :label="`${t('worldEntries')} (${storyWorldBuilding.length})`" name="worldBuilding">
+                  <div v-if="storyWorldBuilding.length === 0" class="empty-state">
+                    <el-empty :description="t('noWorldEntries')" />
+                  </div>
+                  <div v-else class="entities-grid">
+                    <div v-for="entry in storyWorldBuilding" :key="entry.raw" class="entity-card">
+                      <div class="entity-header">
+                        <div>
+                          <strong class="entity-target">{{ dynamicText('td-world', entry.target || entry.raw) }}</strong>
+                          <small class="entity-raw" v-if="entry.target && entry.target !== entry.raw"> ({{ entry.raw }})</small>
+                        </div>
+                        <el-tag size="small" :type="getWorldCategoryTagType(entry.category)">{{ entry.category }}</el-tag>
+                      </div>
+                      <p v-if="entry.description" class="entity-desc">{{ entry.description }}</p>
+                      <div v-if="entry.entityRefs && entry.entityRefs.length > 0" class="entity-aliases">
+                        <small>{{ t('relatedEntities') }}: </small>
+                        <el-tag v-for="ref in entry.entityRefs" :key="ref" size="small" type="info" class="alias-tag">
+                          {{ ref }}
+                        </el-tag>
+                      </div>
+                    </div>
+                  </div>
+                </el-tab-pane>
+
+                <!-- SubTab 5: Timeline -->
+                <el-tab-pane :label="`${t('timeline')} (${storyTimelines.length})`" name="timeline">
+                  <div v-if="storyTimelines.length === 0" class="empty-state">
+                    <el-empty :description="t('noTimeline')" />
+                  </div>
+                  <el-timeline v-else class="timeline-container">
+                    <el-timeline-item
+                      v-for="tl in storyTimelines"
+                      :key="tl.chapterIndex"
+                      :timestamp="`${t('chapterPrefix')} ${tl.chapterIndex + 1}: ${dynamicText('td-chapters', tl.chapterTitle)}`"
+                      placement="top"
+                    >
+                      <el-card shadow="hover" class="timeline-card">
+                        <p class="timeline-summary">{{ tl.summary }}</p>
+                        <div v-if="tl.events && tl.events.length > 0" class="timeline-events">
+                          <strong>{{ t('events') }}:</strong>
+                          <ul>
+                            <li v-for="(evt, i) in tl.events" :key="i">{{ evt }}</li>
+                          </ul>
+                        </div>
+                        <div v-if="tl.characters && tl.characters.length > 0" class="timeline-characters">
+                          <strong>{{ t('characters') }}:</strong>
+                          <el-tag
+                            v-for="ch in tl.characters"
+                            :key="ch.raw"
+                            size="small"
+                            :type="ch.status === 'new' ? 'success' : 'info'"
+                            class="char-tag"
+                          >
+                            {{ dynamicText('td-chars', ch.target || ch.raw) }}
+                            <small v-if="ch.role"> — {{ ch.role }}</small>
+                          </el-tag>
+                        </div>
+                      </el-card>
+                    </el-timeline-item>
+                  </el-timeline>
                 </el-tab-pane>
               </el-tabs>
             </div>
@@ -407,14 +491,12 @@
         </el-tab-pane>
       </el-tabs>
     </div>
-  </WebAppShell>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import WebAppShell from '../components/WebAppShell.vue'
-import { t } from '../i18n'
+import { t, dynamicText, translateDynamicTexts, webLocale } from '../i18n'
 import API from '../api/api'
 import type { Book } from '../book.d'
 import {
@@ -436,6 +518,8 @@ import {
   type WebServiceGlossaryTermResponse,
   type WebServiceStoryEntityResponse,
   type WebServiceStoryRelationshipResponse,
+  type WebServiceStoryWorldEntryResponse,
+  type WebServiceStoryTimelineResponse,
 } from '../api/webService'
 
 const activeTab = ref('jobs')
@@ -494,9 +578,12 @@ const selectedMemoryGroupId = ref<number | undefined>(undefined)
 const viewSeriesAggregated = ref(false)
 const selectedMemoryBookUrl = ref('')
 const loadingMemory = ref(false)
+const glossaryScopeFilter = ref<'effective' | 'project'>('effective')
 const glossaryTerms = ref<WebServiceGlossaryTermResponse[]>([])
 const storyEntities = ref<WebServiceStoryEntityResponse[]>([])
 const storyRelationships = ref<WebServiceStoryRelationshipResponse[]>([])
+const storyWorldBuilding = ref<WebServiceStoryWorldEntryResponse[]>([])
+const storyTimelines = ref<WebServiceStoryTimelineResponse[]>([])
 
 const customBookGroups = computed(() => {
   return bookGroups.value.filter(g => g.groupId > 0)
@@ -505,7 +592,7 @@ const customBookGroups = computed(() => {
 const filteredBookshelfForMemory = computed(() => {
   if (!selectedMemoryGroupId.value) return bookshelf.value
   const gid = selectedMemoryGroupId.value
-  return bookshelf.value.filter(b => ((b.group || 0) & gid) > 0)
+  return bookshelf.value.filter(b => ((b.group || 0) & gid) !== 0)
 })
 
 const getBookName = (bookUrl: string) => {
@@ -530,10 +617,10 @@ const getJobStatusTagType = (status: string) => {
 
 const getJobStatusLabel = (status: string) => {
   switch (status) {
-    case 'translated': return 'Hoàn thành'
-    case 'translating': return 'Đang dịch'
-    case 'failed': return 'Thất bại'
-    case 'cancelled': return 'Đã hủy'
+    case 'translated': return t('statusTranslated')
+    case 'translating': return t('statusTranslating')
+    case 'failed': return t('statusFailed')
+    case 'cancelled': return t('statusCancelled')
     default: return status
   }
 }
@@ -552,6 +639,37 @@ const getEntityTagType = (type: string) => {
       return 'success'
     default:
       return 'info'
+  }
+}
+
+const getWorldCategoryTagType = (category: string) => {
+  switch (category.toLowerCase()) {
+    case 'weapon':
+    case 'equipment':
+    case 'item':
+      return 'danger'
+    case 'technique':
+    case 'skill':
+      return 'warning'
+    case 'location':
+    case 'world':
+      return 'success'
+    case 'faction':
+    case 'sect':
+      return 'primary'
+    default:
+      return 'info'
+  }
+}
+
+const onGlossaryScopeChange = async () => {
+  if (selectedMemoryBookUrl.value && !viewSeriesAggregated.value) {
+    try {
+      const glossary = await getWebServiceGlossary(selectedMemoryBookUrl.value, glossaryScopeFilter.value)
+      glossaryTerms.value = glossary.terms
+    } catch (error) {
+      console.error('Failed to load glossary with scope', error)
+    }
   }
 }
 
@@ -605,10 +723,10 @@ const loadJobs = async () => {
 const cancelJob = async (jobId: string) => {
   try {
     await cancelWebServiceTranslationJob(jobId)
-    ElMessage.success('Đã hủy tiến trình dịch')
+    ElMessage.success(t('cancelJobSuccess'))
     await loadJobs()
   } catch (error) {
-    ElMessage.error('Không thể hủy tiến trình')
+    ElMessage.error(t('cancelJobFailed'))
   }
 }
 
@@ -675,7 +793,7 @@ const triggerChapterTranslate = async (chapterIndex: number) => {
       forceRetranslate: true,
       provider: pretranslateForm.provider,
     })
-    ElMessage.success('Đã gửi yêu cầu dịch chương ' + (chapterIndex + 1))
+    ElMessage.success(`${t('chapterPrefix')} ${chapterIndex + 1}: ${t('statusTranslating')}`)
     await loadJobs()
   } catch (error) {
     ElMessage.error(t('cannotTranslateChapter'))
@@ -717,10 +835,14 @@ const loadAggregatedSeriesMemory = async (groupId: number) => {
   glossaryTerms.value = []
   storyEntities.value = []
   storyRelationships.value = []
+  storyWorldBuilding.value = []
+  storyTimelines.value = []
   try {
     const story = await getWebServiceStoryMemory({ groupId })
     storyEntities.value = story.entities
     storyRelationships.value = story.relationships
+    storyWorldBuilding.value = story.worldBuilding ?? []
+    storyTimelines.value = story.timelines ?? []
   } catch (error) {
     console.error('Failed to load series memory', error)
   } finally {
@@ -737,20 +859,55 @@ const onMemoryBookChange = async (bookUrl: string) => {
   glossaryTerms.value = []
   storyEntities.value = []
   storyRelationships.value = []
+  storyWorldBuilding.value = []
+  storyTimelines.value = []
   try {
     const [glossary, story] = await Promise.all([
-      getWebServiceGlossary(bookUrl),
+      getWebServiceGlossary(bookUrl, glossaryScopeFilter.value),
       getWebServiceStoryMemory({ bookUrl }),
     ])
     glossaryTerms.value = glossary.terms
     storyEntities.value = story.entities
     storyRelationships.value = story.relationships
+    storyWorldBuilding.value = story.worldBuilding ?? []
+    storyTimelines.value = story.timelines ?? []
   } catch (error) {
     console.error('Failed to load memory', error)
   } finally {
     loadingMemory.value = false
   }
 }
+
+watch([bookshelf, webLocale], async ([books]) => {
+  if (books.length > 0) {
+    await translateDynamicTexts('td-books', books.map(b => b.name))
+    await translateDynamicTexts('td-authors', books.map(b => b.author))
+  }
+}, { immediate: true })
+
+watch([chapterList, webLocale], async ([chapters]) => {
+  if (chapters.length > 0) {
+    await translateDynamicTexts('td-chapters', chapters.map(c => c.title))
+  }
+})
+
+watch([glossaryTerms, webLocale], async ([terms]) => {
+  if (terms.length > 0) {
+    await translateDynamicTexts('td-glossary', terms.map(t => t.target))
+  }
+})
+
+watch([storyEntities, webLocale], async ([entities]) => {
+  if (entities.length > 0) {
+    await translateDynamicTexts('td-entities', entities.map(e => e.target || e.raw))
+  }
+})
+
+watch([storyWorldBuilding, webLocale], async ([entries]) => {
+  if (entries.length > 0) {
+    await translateDynamicTexts('td-world', entries.map(w => w.target || w.raw))
+  }
+})
 
 const refreshAll = async () => {
   await Promise.all([
@@ -1065,5 +1222,47 @@ onUnmounted(() => {
 
 .alias-tag {
   font-size: 11px;
+}
+
+.glossary-toolbar {
+  margin-bottom: 14px;
+}
+
+.timeline-container {
+  padding: 16px 8px;
+}
+
+.timeline-card {
+  border-radius: 10px;
+}
+
+.timeline-summary {
+  font-size: 14px;
+  margin: 0 0 8px;
+  line-height: 1.5;
+  color: var(--el-text-color-primary);
+}
+
+.timeline-events {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.timeline-events ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+}
+
+.timeline-characters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.char-tag {
+  font-size: 12px;
 }
 </style>

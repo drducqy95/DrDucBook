@@ -152,6 +152,7 @@
     <string name="web_service_desc">Editing Sources or Reading Books via Web</string>
     <string name="web_service_start_failed">Unable to start Web Service: %1$s</string>
     <string name="web_service_no_network">Web Service could not find a local network address</string>
+    <string name="web_service_required_for_tunnel">Web Service must be started before launching Tunnel</string>
     <string name="cloudflare_tunnel_title">Online access with Cloudflare Tunnel</string>
     <string name="cloudflare_tunnel_desc">Open the Web Service securely from devices outside your local network.</string>
     <string name="cloudflare_quick_tunnel">Quick Tunnel</string>

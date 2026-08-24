@@ -24,10 +24,16 @@ import io.legado.app.domain.webservice.WebServiceGlossaryListResponse
 import io.legado.app.domain.webservice.WebServiceStoryEntityResponse
 import io.legado.app.domain.webservice.WebServiceStoryRelationshipResponse
 import io.legado.app.domain.webservice.WebServiceStoryMemorySummaryResponse
+import io.legado.app.domain.webservice.WebServiceStoryWorldEntryResponse
+import io.legado.app.domain.webservice.WebServiceStoryTimelineResponse
+import io.legado.app.domain.webservice.WebServiceTimelineCharacterResponse
 import io.legado.app.domain.webservice.WebServiceBookGroupItem
 import io.legado.app.domain.gateway.DictionaryGateway
+import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
+import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
+import kotlinx.coroutines.flow.first
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.util.UUID
@@ -36,6 +42,7 @@ import java.util.concurrent.ConcurrentHashMap
 object WebServiceTranslationJobController : KoinComponent {
 
     private val quickTranslationGateway: QuickTranslationGateway by inject()
+    private val quickDictionaryGateway: QuickDictionaryGateway by inject()
     private val storyMemoryUseCase: TranslationStoryMemoryUseCase by inject()
     private val dictionaryGateway: DictionaryGateway by inject()
 
@@ -162,12 +169,16 @@ object WebServiceTranslationJobController : KoinComponent {
     }
 
     suspend fun getMemoryStats(): WebServiceTranslationMemoryStatsResponse {
-        val globalDictCount = runCatching {
-            quickTranslationGateway.searchBuiltInEntries(
-                io.legado.app.domain.model.QuickDictionaryType.VIETPHRASE,
-                limit = 100000,
-            ).size
+        val globalBuiltIn = runCatching {
+            quickTranslationGateway.getBuiltInCatalogs().sumOf { it.entryCount }
         }.getOrDefault(0)
+
+        val allQuickEntries = runCatching {
+            quickDictionaryGateway.observeEntries().first()
+        }.getOrDefault(emptyList())
+
+        val globalCustom = allQuickEntries.count { it.scope == QuickDictionaryScope.GLOBAL }
+        val globalDictCount = globalBuiltIn + globalCustom
 
         var characterProfiles = 0
         var factions = 0
@@ -185,7 +196,10 @@ object WebServiceTranslationJobController : KoinComponent {
                 storyEvents += snapshot.timelines.sumOf { it.events.size }
 
                 val bookDict = dictionaryGateway.getBookDictionaries(book)
-                projectTerms += bookDict.pairs.size
+                val projectQuickEntries = allQuickEntries.count {
+                    it.scope == QuickDictionaryScope.PROJECT && it.scopeKey == book.bookUrl
+                }
+                projectTerms += bookDict.pairs.size + projectQuickEntries
             }
         }
 
@@ -199,20 +213,69 @@ object WebServiceTranslationJobController : KoinComponent {
         )
     }
 
-    suspend fun getGlossary(bookUrlValue: String?): WebServiceGlossaryListResponse {
+    suspend fun getGlossary(
+        bookUrlValue: String?,
+        scopeFilter: String? = null,
+    ): WebServiceGlossaryListResponse {
         val bookUrl = WebServiceTranslationJobs.normalizedOptionalText(bookUrlValue)
             ?: throw IllegalArgumentException("BOOK_URL_REQUIRED")
         val book = appDb.bookDao.getBook(bookUrl)
             ?: throw IllegalArgumentException("BOOK_NOT_FOUND")
 
+        val terms = mutableListOf<WebServiceGlossaryTermResponse>()
+        val seen = mutableSetOf<String>()
+
+        // 1. Quick Dictionary entries (Room DB & Packs)
+        val quickEntries = if (scopeFilter == "project") {
+            runCatching {
+                quickDictionaryGateway.observeEntries().first()
+                    .filter { it.scope == QuickDictionaryScope.PROJECT && it.scopeKey == bookUrl }
+            }.getOrDefault(emptyList())
+        } else {
+            runCatching {
+                quickDictionaryGateway.getEffectiveEntries(book)
+            }.getOrDefault(emptyList())
+        }
+        for (entry in quickEntries) {
+            val key = entry.raw.trim().lowercase()
+            if (key.isNotBlank() && seen.add(key)) {
+                terms += WebServiceGlossaryTermResponse(
+                    source = entry.raw,
+                    target = entry.target.ifBlank { entry.hanViet },
+                    category = entry.type.name,
+                    isProjectSpecific = entry.scope == QuickDictionaryScope.PROJECT,
+                )
+            }
+        }
+
+        // 2. File-based dictionary (legacy cache)
         val bookDict = dictionaryGateway.getBookDictionaries(book)
-        val terms = bookDict.pairs.map { pair ->
-            WebServiceGlossaryTermResponse(
-                source = pair.original,
-                target = pair.translation,
-                category = pair.type.name,
-                isProjectSpecific = true,
-            )
+        for (pair in bookDict.pairs) {
+            val key = pair.original.trim().lowercase()
+            if (key.isNotBlank() && seen.add(key)) {
+                terms += WebServiceGlossaryTermResponse(
+                    source = pair.original,
+                    target = pair.translation,
+                    category = pair.type.name,
+                    isProjectSpecific = true,
+                )
+            }
+        }
+
+        // 3. Story memory entities
+        val snapshot = runCatching { storyMemoryUseCase.loadSnapshot(bookUrl) }.getOrNull()
+        if (snapshot != null) {
+            for (entity in snapshot.entities) {
+                val key = entity.raw.trim().lowercase()
+                if (entity.target.isNotBlank() && seen.add(key)) {
+                    terms += WebServiceGlossaryTermResponse(
+                        source = entity.raw,
+                        target = entity.target,
+                        category = entity.type,
+                        isProjectSpecific = true,
+                    )
+                }
+            }
         }
 
         return WebServiceGlossaryListResponse(
@@ -276,10 +339,40 @@ object WebServiceTranslationJobController : KoinComponent {
             )
         }
 
+        val worldBuilding = snapshot.worldBuilding.map { world ->
+            WebServiceStoryWorldEntryResponse(
+                raw = world.raw,
+                target = world.target,
+                category = world.category,
+                description = world.description,
+                entityRefs = world.entityRefs,
+                chapterIndex = world.chapterIndex,
+            )
+        }
+
+        val timelines = snapshot.timelines.map { timeline ->
+            WebServiceStoryTimelineResponse(
+                chapterIndex = timeline.chapterIndex,
+                chapterTitle = timeline.chapterTitle,
+                summary = timeline.summary,
+                events = timeline.events,
+                characters = timeline.characters.map { ch ->
+                    WebServiceTimelineCharacterResponse(
+                        raw = ch.raw,
+                        target = ch.target,
+                        status = ch.status,
+                        role = ch.role,
+                    )
+                },
+            )
+        }
+
         return WebServiceStoryMemorySummaryResponse(
             bookUrl = resolvedScopeId,
             entities = entities,
             relationships = relationships,
+            worldBuilding = worldBuilding,
+            timelines = timelines,
             worldEntriesCount = snapshot.worldBuilding.size,
             timelineEventsCount = snapshot.timelines.sumOf { it.events.size },
         )

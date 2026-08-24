@@ -140,17 +140,20 @@
       <section class="settings-panel background-panel">
         <div class="panel-heading">
           <h2>{{ t('background') }}</h2>
-          <el-tag :type="policy?.backgroundAssetId ? 'success' : 'info'">
-            {{ policy?.backgroundAssetId ? t('customBackground') : t('default') }}
+          <el-tag :type="activeBackgroundTagType">
+            {{ activeBackgroundLabel }}
           </el-tag>
         </div>
 
-        <div class="background-preview" :class="{ empty: !previewObjectUrl }">
+        <div class="background-preview" :class="{ empty: !effectivePreviewUrl }">
           <div class="background-preview-image" :style="previewImageStyle"></div>
-          <span v-if="!previewObjectUrl">{{ t('noBackground') }}</span>
+          <span v-if="!effectivePreviewUrl">{{ t('noBackground') }}</span>
         </div>
 
         <div class="background-actions">
+          <el-button type="primary" @click="openClientDisplaySettings">
+            {{ t('backgroundText') || 'Đổi hình nền' }}
+          </el-button>
           <input
             ref="fileInput"
             class="hidden-file"
@@ -252,6 +255,7 @@ import {
 } from '@/api/webService'
 import { useWebServiceStore } from '@/store'
 import { t } from '@/i18n'
+import { backgroundPresets, clientBackground } from '@/utils/clientPreferences'
 
 const MAX_CLIENT_BACKGROUND_BYTES = 5 * 1024 * 1024
 type BackgroundFit = WebServicePolicy['backgroundFit']
@@ -338,13 +342,38 @@ const positionOptions = computed<Array<{
   { label: `${t('right')} ${t('bottom')}`, value: 'right bottom' },
 ])
 
+const openClientDisplaySettings = () => {
+  document.dispatchEvent(new CustomEvent('open-display-settings'))
+}
+
+const activeBackgroundTagType = computed(() => {
+  if (policy.value?.backgroundAssetId) return 'success'
+  if (clientBackground.imageUrl) return 'warning'
+  return 'info'
+})
+
+const activeBackgroundLabel = computed(() => {
+  if (policy.value?.backgroundAssetId) return t('customBackground')
+  if (clientBackground.imageUrl) {
+    const preset = backgroundPresets.find(p => p.id === clientBackground.preference.presetId)
+    return preset ? preset.name : t('default')
+  }
+  return t('default')
+})
+
+const effectivePreviewUrl = computed(() => {
+  if (previewObjectUrl.value) return previewObjectUrl.value
+  if (clientBackground.imageUrl) return clientBackground.imageUrl
+  return ''
+})
+
 const previewImageStyle = computed<CSSProperties>(() => ({
-  backgroundImage: previewObjectUrl.value
-    ? `linear-gradient(rgba(0, 0, 0, ${policy.value?.backgroundDim ?? 0.22}), rgba(0, 0, 0, ${policy.value?.backgroundDim ?? 0.22})), url("${previewObjectUrl.value}")`
+  backgroundImage: effectivePreviewUrl.value
+    ? `linear-gradient(rgba(0, 0, 0, ${policy.value?.backgroundDim ?? clientBackground.preference.dim ?? 0.22}), rgba(0, 0, 0, ${policy.value?.backgroundDim ?? clientBackground.preference.dim ?? 0.22})), url("${effectivePreviewUrl.value}")`
     : undefined,
-  backgroundSize: policy.value?.backgroundFit ?? 'cover',
-  backgroundPosition: policy.value?.backgroundPosition ?? 'center',
-  filter: `blur(${policy.value?.backgroundBlur ?? 0}px)`,
+  backgroundSize: policy.value?.backgroundFit ?? clientBackground.preference.fit ?? 'cover',
+  backgroundPosition: policy.value?.backgroundPosition ?? clientBackground.preference.position ?? 'center',
+  filter: `blur(${policy.value?.backgroundBlur ?? clientBackground.preference.blur ?? 0}px)`,
 }))
 
 const clearPreviewObjectUrl = () => {

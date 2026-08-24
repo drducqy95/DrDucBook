@@ -236,8 +236,8 @@ export type WebServiceTranslationMemoryStatsResponse = {
 }
 
 export type WebServiceGlossaryTermResponse = {
-  source: String
-  target: String
+  source: string
+  target: string
   category: string
   isProjectSpecific: boolean
 }
@@ -264,10 +264,36 @@ export type WebServiceStoryRelationshipResponse = {
   chapterIndex: number
 }
 
+export type WebServiceStoryWorldEntryResponse = {
+  raw: string
+  target: string
+  category: string
+  description: string
+  entityRefs: string[]
+  chapterIndex: number
+}
+
+export type WebServiceTimelineCharacterResponse = {
+  raw: string
+  target: string
+  status: string
+  role: string
+}
+
+export type WebServiceStoryTimelineResponse = {
+  chapterIndex: number
+  chapterTitle: string
+  summary: string
+  events: string[]
+  characters: WebServiceTimelineCharacterResponse[]
+}
+
 export type WebServiceStoryMemorySummaryResponse = {
   bookUrl: string
   entities: WebServiceStoryEntityResponse[]
   relationships: WebServiceStoryRelationshipResponse[]
+  worldBuilding?: WebServiceStoryWorldEntryResponse[]
+  timelines?: WebServiceStoryTimelineResponse[]
   worldEntriesCount: number
   timelineEventsCount: number
 }
@@ -792,12 +818,12 @@ export const getWebServiceBookGroups = async () => {
   return response.data
 }
 
-export const getWebServiceGlossary = async (bookUrl: string) => {
+export const getWebServiceGlossary = async (bookUrl: string, scope?: string) => {
   const response = await v2.get<WebServiceGlossaryListResponse>(
     'api/v2/translation/memory/glossary',
     {
       baseURL: baseURL(),
-      params: { bookUrl },
+      params: { bookUrl, scope },
     },
   )
   return response.data

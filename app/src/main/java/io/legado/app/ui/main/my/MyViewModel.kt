@@ -8,9 +8,11 @@ import io.legado.app.constant.EventBus
 import io.legado.app.domain.usecase.WebServiceAccessUseCase
 import io.legado.app.domain.webservice.CloudflareTunnelMode
 import io.legado.app.domain.webservice.CloudflareTunnelPhase
+import com.drducbook.app.R
 import io.legado.app.service.CloudflareTunnelManager
 import io.legado.app.service.WebService
 import io.legado.app.utils.eventBus.FlowEventBus
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -132,6 +134,8 @@ class MyViewModel(
             PrefClickEvent.StartQuickTunnel -> {
                 if (_uiState.value.isWebServiceRun) {
                     CloudflareTunnelManager.startQuick(context, WebService.activeHttpPort)
+                } else {
+                    context.toastOnUi(R.string.web_service_required_for_tunnel)
                 }
             }
             PrefClickEvent.OpenNamedTunnelDialog -> _uiState.update {
@@ -157,6 +161,8 @@ class MyViewModel(
                     _uiState.update {
                         it.copy(showNamedTunnelDialog = false, namedTunnelToken = "")
                     }
+                } else {
+                    context.toastOnUi(R.string.web_service_required_for_tunnel)
                 }
             }
             PrefClickEvent.StopCloudflareTunnel -> CloudflareTunnelManager.stop()

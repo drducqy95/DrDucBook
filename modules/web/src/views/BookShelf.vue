@@ -24,7 +24,13 @@
     </div>
 
     <section v-if="recentBook" class="section-block">
-      <div class="section-heading"><div><span class="eyebrow">{{ t('continueLabel') }}</span><h2>{{ t('recentReading') }}</h2></div><button class="text-link" @click="openBook(recentBook)">{{ t('openBook') }}</button></div>
+      <div class="section-heading">
+        <div><span class="eyebrow">{{ t('continueLabel') }}</span><h2>{{ t('recentReading') }}</h2></div>
+        <div class="heading-actions">
+          <el-button size="small" plain @click.stop="openExportDialog(recentBook)">{{ t('exportBook') }}</el-button>
+          <button class="text-link" @click="openBook(recentBook)">{{ t('openBook') }}</button>
+        </div>
+      </div>
       <article class="continue-card glass-panel" @click="openBook(recentBook)">
         <img :src="coverUrl(recentBook)" alt="" @error="onCoverError" />
         <div><h3>{{ displayDynamic(recentBook.name) }}</h3><p>{{ displayDynamic(recentBook.author) }}</p><p class="muted">{{ recentBook.durChapterTitle ? displayDynamic(recentBook.durChapterTitle) : t('startReading') }}</p></div>
@@ -51,7 +57,18 @@
       <div v-else class="book-grid">
         <article v-for="book in filteredBooks" :key="book.bookUrl" class="book-card glass-panel" @click="openBook(book)">
           <img class="book-cover" :src="coverUrl(book)" alt="" loading="lazy" @error="onCoverError" />
-          <div class="book-info"><div class="book-title">{{ displayDynamic(book.name) }}</div><div class="book-author">{{ book.author ? displayDynamic(book.author) : t('unknownAuthor') }}</div><div class="book-meta"><span>{{ typeLabel(book.type) }}</span><span>{{ 'totalChapterNum' in book ? book.totalChapterNum || 0 : 0 }} {{ t('chapters') }}</span></div><p class="latest">{{ book.latestChapterTitle ? displayDynamic(book.latestChapterTitle) : t('noLatestChapter') }}</p></div>
+          <div class="book-info">
+            <div class="book-title">{{ displayDynamic(book.name) }}</div>
+            <div class="book-author">{{ book.author ? displayDynamic(book.author) : t('unknownAuthor') }}</div>
+            <div class="book-meta">
+              <span>{{ typeLabel(book.type) }}</span>
+              <span>{{ 'totalChapterNum' in book ? book.totalChapterNum || 0 : 0 }} {{ t('chapters') }}</span>
+              <button class="card-export-btn" :title="t('exportBook')" @click.stop="openExportDialog(book)">
+                ⬇ {{ t('export') }}
+              </button>
+            </div>
+            <p class="latest">{{ book.latestChapterTitle ? displayDynamic(book.latestChapterTitle) : t('noLatestChapter') }}</p>
+          </div>
         </article>
       </div>
     </section>
@@ -64,6 +81,11 @@
     </section>
 
     <aside class="home-footer glass-panel"><div><strong>{{ t('notFoundBook') }}</strong><span>{{ t('onlineSearchHint') }}</span></div><el-button @click="router.push({ name: 'book-home' })">{{ t('manageSources') }}</el-button></aside>
+
+    <ExportBookDialog
+      v-model="showExportDialog"
+      :book="selectedExportBook"
+    />
   </div>
 </template>
 
@@ -77,6 +99,7 @@ import { isLegadoUrl } from '@/utils/utils'
 import { useBookStore } from '@/store'
 import { getChineseSearchEnabled, getReaderPreferences } from '@/utils/clientPreferences'
 import { dynamicText, t, translateDynamicTexts, webLocale } from '@/i18n'
+import ExportBookDialog, { type ExportBookTarget } from '@/components/ExportBookDialog.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -90,7 +113,20 @@ const translatedSearchWord = ref('')
 const translatingSearchWord = ref(false)
 const discovery = ref<SeachBook[]>([])
 const recentBook = ref<Book | undefined>()
-const readerPreferences = getReaderPreferences()
+const showExportDialog = ref(false)
+const selectedExportBook = ref<ExportBookTarget | null>(null)
+const openExportDialog = (book?: Book | SeachBook | null) => {
+  if (!book) return
+  const anyBook = book as any
+  selectedExportBook.value = {
+    name: book.name,
+    author: book.author,
+    bookUrl: book.bookUrl,
+    totalChapterNum: 'totalChapterNum' in anyBook ? (anyBook.totalChapterNum || 0) : 0,
+    coverUrl: anyBook.coverUrl || anyBook.customCoverUrl || '',
+  }
+  showExportDialog.value = true
+}
 const bookType = { video: 4, text: 8, audio: 32, image: 64 }
 const shelf = computed(() => store.shelf)
 const dynamicValues = computed(() => [
@@ -236,6 +272,9 @@ onMounted(() => { void loadShelf(); void loadDiscovery(false); if (searchWord.va
 
 <style scoped>
 .home-page { width: min(1320px, calc(100% - 36px)); margin: 0 auto; padding: 30px 0 54px; }.glass-panel { border: 1px solid rgba(255,255,255,.55); background: rgba(249,252,250,.84); box-shadow: 0 14px 34px rgba(18,51,50,.1); backdrop-filter: blur(12px); }.hero-panel { display: flex; align-items: end; justify-content: space-between; gap: 28px; padding: 34px 38px; border-radius: 22px; background: linear-gradient(115deg, rgba(20,74,75,.92), rgba(42,108,100,.76)); color: white; }.hero-panel h1 { max-width: 650px; margin: 8px 0; font: 600 clamp(28px, 5vw, 48px)/1.08 Georgia, serif; }.hero-copy { max-width: 600px; margin: 0; color: rgba(255,255,255,.78); }.eyebrow { color: #c28245; font-size: 11px; font-weight: 800; letter-spacing: .13em; }.hero-panel .eyebrow { color: #f1d49b; }.hero-actions { display: flex; flex-wrap: wrap; gap: 9px; }.hero-actions .el-button { margin: 0; }.home-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 20px; padding: 14px 20px; border-radius: 14px; }.toolbar-title strong { display: block; margin-top: 4px; color: #204b49; }.toolbar-actions { display: flex; gap: 6px; }.section-block { margin-top: 34px; }.section-heading { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin-bottom: 14px; }.section-heading h2 { margin: 4px 0 0; color: #173e3d; font: 600 25px Georgia, serif; }.search-key-hint { margin: 8px 0 0; color: #778681; font-size: 12px; }.text-link { border: 0; background: transparent; color: #a96f2f; cursor: pointer; }.count-label,.error-label { color: #6d7b7a; font-size: 13px; }.error-label { color: #bd6d43; }.continue-card { display: grid; grid-template-columns: 70px minmax(0,1fr) 220px; align-items: center; gap: 16px; padding: 15px; border-radius: 14px; cursor: pointer; }.continue-card img { width: 70px; height: 94px; object-fit: cover; border-radius: 7px; }.continue-card h3 { margin: 0 0 4px; color: #183e3c; }.continue-card p { margin: 3px 0; }.muted { color: #788b88; font-size: 13px; }.continue-progress { color: #70817e; font-size: 12px; }.book-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }.book-card { display: flex; gap: 14px; min-height: 148px; padding: 13px; border-radius: 12px; cursor: pointer; transition: transform .18s ease, box-shadow .18s ease; }.book-card:hover,.discovery-card:hover,.continue-card:hover { transform: translateY(-2px); box-shadow: 0 17px 35px rgba(18,51,50,.18); }.book-cover { flex: 0 0 82px; width: 82px; height: 116px; object-fit: cover; border-radius: 6px; background: #dde5e1; }.book-info { min-width: 0; }.book-title { overflow: hidden; color: #1b4441; font-size: 16px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }.book-author { margin-top: 5px; color: #788683; font-size: 13px; }.book-meta { display: flex; gap: 7px; margin-top: 10px; color: #aa7435; font-size: 11px; }.latest { display: -webkit-box; overflow: hidden; margin: 10px 0 0; color: #667875; font-size: 12px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }.empty-panel { padding: 38px 18px; border-radius: 13px; color: #6d7b7a; text-align: center; }.discovery-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }.discovery-card { display: grid; grid-template-columns: 62px minmax(0,1fr); gap: 11px; padding: 11px; border-radius: 12px; cursor: pointer; }.discovery-card img { width: 62px; height: 86px; object-fit: cover; border-radius: 5px; }.discovery-card h3 { overflow: hidden; margin: 2px 0 4px; color: #1b4441; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }.discovery-card p { overflow: hidden; margin: 0 0 8px; color: #788683; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }.discovery-card span { color: #aa7435; font-size: 11px; }.home-footer { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-top: 34px; padding: 17px 20px; border-radius: 12px; }.home-footer strong,.home-footer span { display: block; }.home-footer span { margin-top: 4px; color: #71827e; font-size: 13px; }
+.heading-actions { display: flex; align-items: center; gap: 8px; }
+.card-export-btn { border: 0; background: rgba(22,83,81,.08); color: #175351; padding: 2px 7px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600; margin-left: auto; transition: background .15s; }
+.card-export-btn:hover { background: rgba(22,83,81,.18); color: #0d3836; }
 @media (max-width: 1050px) { .book-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }.discovery-grid { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 @media (max-width: 720px) { .home-page { width: min(100% - 22px, 600px); padding-top: 18px; }.hero-panel { display: block; padding: 24px 20px; }.hero-actions { margin-top: 18px; }.home-toolbar,.section-heading,.home-footer { align-items: flex-start; flex-direction: column; }.book-grid { grid-template-columns: 1fr; }.discovery-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }.continue-card { grid-template-columns: 60px minmax(0,1fr); }.continue-card img { width: 60px; height: 80px; }.continue-progress { grid-column: 1 / -1; }.home-footer { padding: 16px; } }
 </style>

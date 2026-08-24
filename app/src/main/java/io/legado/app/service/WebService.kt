@@ -201,6 +201,7 @@ class WebService : BaseService() {
 
     private fun authorizeAndStart(intent: Intent?) {
         if (!accessCheckRunning.compareAndSet(false, true)) return
+        startForegroundNotification()
         lifecycleScope.launch {
             try {
                 val access = GlobalContext.get().get<WebServiceAccessUseCase>()

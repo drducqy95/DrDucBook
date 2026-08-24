@@ -88,13 +88,13 @@
       <button @click="goShelf({ status: 'updating' })">{{ t('updating') }}</button>
       <button @click="goShelf({ status: 'completed' })">{{ t('completed') }}</button>
       <button v-for="item in typeItems" :key="item.value" @click="goShelf({ type: item.value })">{{ item.label }}</button>
-      <button @click="showDisplaySettings = true">{{ t('display') }}</button>
-      <button @click="router.push({ name: 'book-home' })">{{ t('sources') }}</button>
-      <button @click="router.push({ name: 'discovery' })">{{ t('discovery') }}</button>
-      <button @click="router.push({ name: 'upload' })">{{ t('upload') }}</button>
-      <button @click="router.push({ name: 'translation' })">{{ t('translationDashboard') }}</button>
-      <button @click="router.push({ name: 'rss-home' })">{{ t('rss') }}</button>
-      <button @click="router.push({ name: 'web-service' })">{{ t('webServiceSettings') }}</button>
+      <button @click="openDisplayModal">{{ t('display') }}</button>
+      <button @click="navigateTo('book-home')">{{ t('sources') }}</button>
+      <button @click="navigateTo('discovery')">{{ t('discovery') }}</button>
+      <button @click="navigateTo('upload')">{{ t('upload') }}</button>
+      <button @click="navigateTo('translation')">{{ t('translationDashboard') }}</button>
+      <button @click="navigateTo('rss-home')">{{ t('rss') }}</button>
+      <button @click="navigateTo('web-service')">{{ t('webServiceSettings') }}</button>
     </div>
 
     <main class="app-main"><slot /></main>
@@ -190,6 +190,14 @@ const typeItems = [
 ]
 
 const goHome = () => router.push({ name: 'shelf' })
+const navigateTo = (name: string) => {
+  showMobileMenu.value = false
+  router.push({ name })
+}
+const openDisplayModal = () => {
+  showMobileMenu.value = false
+  showDisplaySettings.value = true
+}
 const goShelf = (query: Record<string, string>) => {
   showMobileMenu.value = false
   const nextQuery: Record<string, string> = {}

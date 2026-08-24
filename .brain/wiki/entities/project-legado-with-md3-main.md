@@ -4,25 +4,25 @@ type: entity
 slug: project-legado-with-md3-main
 category: entities
 created: 2026-08-22T00:23:57
-updated: 2026-08-22T00:23:57
+updated: 2026-08-25T01:28:10
 status: active
 source: /save-brain
-tags: ["project", "overview", "legado-with-MD3-main"]
+tags: ["overview", "legado-with-MD3-main", "project"]
 project: legado-with-MD3-main
-links: ["session-2026-08-22-00-23-57"]
+links: ["session-2026-08-22-00-23-57", "session-2026-08-25-01-28-10"]
 ---
 
 ## Snapshot
 - Project: legado-with-MD3-main
-- Feature: WebService and Translation Engine Enhancement
-- Phase: Phase 09 Complete
+- Feature: WebService Book Export & Web UI Fixes
+- Phase: Completed & Installed
 - Progress: 100%
 
 ## Pending Tasks
 - No pending tasks recorded.
 
 ## Latest Notes
-Completed Phases 01-09: UI translation, single-source dropdown, search translation, TTS voice/speed selection, per-provider cache isolation, memory API and dashboard, AI cache hierarchy, story memory per-book with series toggle, AI rewrite convert prompt templates and tests passed
+Hoan thien chuc nang Export sach tren WebService chuan Native (EPUB3, EPUB2, PDF, TXT, HTML, CBZ, nguon dich, pham vi chuong, toi uu anh). Sua loi menu mobile, sua loi lap header Translation Dashboard, sua loi anh nen WebService. Da build Release APK va cai dat len Huawei Pura 70 Pro.
 
 ## Latest Checkpoint
-- [[session-2026-08-22-00-23-57]]
+- [[session-2026-08-25-01-28-10]]

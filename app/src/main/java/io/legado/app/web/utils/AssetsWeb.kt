@@ -27,12 +27,18 @@ class AssetsWeb(rootPath: String) {
     }
 
     fun getInputStream(path: String): InputStream? {
-        val path1 = (rootPath + path).replace("/+".toRegex(), File.separator)
-        return try {
-            assetManager.open(path1)
-        } catch (e: Exception) {
-            null
+        val cleanPath = path.replace("/+".toRegex(), File.separator).trimStart(File.separatorChar)
+        val candidates = listOf(
+            (rootPath + File.separator + cleanPath).replace("/+".toRegex(), File.separator),
+            (rootPath + File.separator + "vue" + File.separator + cleanPath).replace("/+".toRegex(), File.separator),
+        )
+        for (target in candidates) {
+            try {
+                return assetManager.open(target)
+            } catch (_: Exception) {
+            }
         }
+        return null
     }
 
     fun getBytes(path: String): ByteArray? {
