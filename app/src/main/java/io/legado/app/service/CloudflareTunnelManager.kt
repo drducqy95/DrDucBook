@@ -20,12 +20,22 @@ import java.io.File
 object CloudflareTunnelManager {
     private const val PREF_PAIRING_ENABLED = "cloudflare_tunnel_pairing_enabled"
     private const val BINARY_NAME = "libcloudflared.so"
+    private const val MAX_RETRIES = 5
+    private val RETRY_DELAYS = longArrayOf(2000L, 4000L, 8000L, 16000L, 32000L)
     private val quickUrlPattern = Regex("https://[a-z0-9-]+\\.trycloudflare\\.com")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lock = Any()
     private val _state = MutableStateFlow(CloudflareTunnelState())
     private var process: Process? = null
     private var tokenFile: File? = null
+
+    private var lastLocalPort: Int? = null
+    private var lastToken: String = ""
+    private var lastPublicUrl: String = ""
+    private var lastContext: Context? = null
+    private var retryCount = 0
+    private var userStopped = false
+    private var reconnectJob: kotlinx.coroutines.Job? = null
 
     val state = _state.asStateFlow()
     val requiresPairing: Boolean
@@ -48,7 +58,12 @@ object CloudflareTunnelManager {
     }
 
     fun startQuick(context: Context, localPort: Int) {
-        stop()
+        userStopped = false
+        lastContext = context.applicationContext
+        lastLocalPort = localPort
+        reconnectJob?.cancel()
+        reconnectJob = null
+        stopInternal()
         start(
             context = context,
             mode = CloudflareTunnelMode.QUICK,
@@ -66,7 +81,13 @@ object CloudflareTunnelManager {
             )
             return
         }
-        stop()
+        userStopped = false
+        lastContext = context.applicationContext
+        lastToken = token
+        lastPublicUrl = normalizedUrl
+        reconnectJob?.cancel()
+        reconnectJob = null
+        stopInternal()
         val privateTokenFile = File(context.noBackupFilesDir, "cloudflared-tunnel-token")
         runCatching {
             privateTokenFile.writeText(token.trim())
@@ -105,7 +126,35 @@ object CloudflareTunnelManager {
         _state.value = _state.value.copy(pairingCode = "", pairingExpiresAt = 0L)
     }
 
+    fun retryIfFailed(context: Context) {
+        val current = _state.value
+        if (current.phase != CloudflareTunnelPhase.ERROR || current.mode == CloudflareTunnelMode.OFF) return
+        retryCount = 0
+        reconnectJob?.cancel()
+        reconnectJob = null
+        when (current.mode) {
+            CloudflareTunnelMode.QUICK -> {
+                lastLocalPort?.let { port -> startQuick(context, port) }
+            }
+            CloudflareTunnelMode.NAMED -> {
+                if (lastToken.isNotBlank() && lastPublicUrl.isNotBlank()) {
+                    startNamed(context, lastToken, lastPublicUrl)
+                }
+            }
+            CloudflareTunnelMode.OFF -> Unit
+        }
+    }
+
     fun stop() {
+        userStopped = true
+        retryCount = 0
+        reconnectJob?.cancel()
+        reconnectJob = null
+        stopInternal()
+        _state.value = CloudflareTunnelState(pairingEnabled = _state.value.pairingEnabled)
+    }
+
+    private fun stopInternal() {
         val stopped = synchronized(lock) {
             process.also { process = null }
         }
@@ -113,7 +162,6 @@ object CloudflareTunnelManager {
         tokenFile?.delete()
         tokenFile = null
         WebServicePairingCenter.revokeAll()
-        _state.value = CloudflareTunnelState(pairingEnabled = _state.value.pairingEnabled)
     }
 
     private fun start(
@@ -172,23 +220,9 @@ object CloudflareTunnelManager {
                     }
                 }
                 val exitCode = started.waitFor()
-                synchronized(lock) {
-                    if (process === started) {
-                        process = null
-                        val contextMsg = diagnosticLines.takeLast(3).joinToString(" | ")
-                        val suffix = if (contextMsg.isNotBlank()) ": $contextMsg" else ""
-                        fail("Cloudflare Tunnel stopped (code $exitCode)$suffix")
-                    }
-                }
+                handleProcessExit(started, exitCode, diagnosticLines)
             }.onFailure { error ->
-                synchronized(lock) {
-                    if (process === started) {
-                        process = null
-                        val contextMsg = diagnosticLines.takeLast(3).joinToString(" | ")
-                        val suffix = if (contextMsg.isNotBlank()) ": $contextMsg" else ""
-                        fail((error.localizedMessage ?: "Cloudflare Tunnel stopped") + suffix)
-                    }
-                }
+                handleProcessExit(started, -1, diagnosticLines, error.localizedMessage)
             }
         }
     }
@@ -201,12 +235,60 @@ object CloudflareTunnelManager {
         val connected = quickUrl != null ||
             line.contains("Registered tunnel connection", ignoreCase = true)
         if (connected) {
+            retryCount = 0
             _state.value = _state.value.copy(
                 phase = CloudflareTunnelPhase.CONNECTED,
                 publicUrl = quickUrl ?: _state.value.publicUrl,
                 detail = "Connected through Cloudflare.",
             )
         }
+    }
+
+    private fun handleProcessExit(
+        started: Process,
+        exitCode: Int,
+        diagnosticLines: List<String>,
+        errorMessage: String? = null,
+    ) {
+        synchronized(lock) {
+            if (process !== started) return
+            process = null
+        }
+        if (userStopped) return
+
+        val currentMode = _state.value.mode
+        val ctx = lastContext
+        if (currentMode != CloudflareTunnelMode.OFF && ctx != null && retryCount < MAX_RETRIES) {
+            retryCount++
+            val delayMs = RETRY_DELAYS.getOrElse(retryCount - 1) { 32000L }
+            _state.value = _state.value.copy(
+                phase = CloudflareTunnelPhase.RECONNECTING,
+                detail = "Reconnecting in ${delayMs / 1000}s (attempt $retryCount/$MAX_RETRIES)…",
+            )
+            reconnectJob?.cancel()
+            reconnectJob = scope.launch {
+                kotlinx.coroutines.delay(delayMs)
+                if (!userStopped) {
+                    when (currentMode) {
+                        CloudflareTunnelMode.QUICK -> {
+                            lastLocalPort?.let { port -> startQuick(ctx, port) }
+                        }
+                        CloudflareTunnelMode.NAMED -> {
+                            if (lastToken.isNotBlank() && lastPublicUrl.isNotBlank()) {
+                                startNamed(ctx, lastToken, lastPublicUrl)
+                            }
+                        }
+                        CloudflareTunnelMode.OFF -> Unit
+                    }
+                }
+            }
+            return
+        }
+
+        val contextMsg = diagnosticLines.takeLast(3).joinToString(" | ")
+        val detailPrefix = errorMessage ?: "Cloudflare Tunnel stopped (code $exitCode)"
+        val suffix = if (contextMsg.isNotBlank()) ": $contextMsg" else ""
+        fail(detailPrefix + suffix)
     }
 
     private fun fail(detail: String) {

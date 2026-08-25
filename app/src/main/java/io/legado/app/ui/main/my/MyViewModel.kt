@@ -97,7 +97,9 @@ class MyViewModel(
         viewModelScope.launch {
             FlowEventBus.with<String>(EventBus.WEB_SERVICE)
                 .collect { address ->
-                    if (address.isEmpty()) CloudflareTunnelManager.stop()
+                    if (address.isNotEmpty()) {
+                        CloudflareTunnelManager.retryIfFailed(context)
+                    }
                     _uiState.update { state ->
                         state.copy(
                             isWebServiceRun = address.isNotEmpty(),

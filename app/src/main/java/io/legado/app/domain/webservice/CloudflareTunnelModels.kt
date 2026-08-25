@@ -9,6 +9,7 @@ enum class CloudflareTunnelMode {
 enum class CloudflareTunnelPhase {
     STOPPED,
     STARTING,
+    RECONNECTING,
     CONNECTED,
     ERROR,
 }
@@ -26,7 +27,8 @@ data class CloudflareTunnelState(
         get() = mode != CloudflareTunnelMode.OFF &&
             pairingEnabled &&
             phase != CloudflareTunnelPhase.STOPPED &&
-            phase != CloudflareTunnelPhase.ERROR
+            phase != CloudflareTunnelPhase.ERROR &&
+            phase != CloudflareTunnelPhase.RECONNECTING
 }
 
 object CloudflareTunnelCommand {

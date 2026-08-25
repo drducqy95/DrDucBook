@@ -664,6 +664,7 @@ data class WebServiceTtsSynthesisResponse(
     val engine: String,
     val language: String,
     val expiresAt: Long,
+    val silent: Boolean = false,
 )
 
 data class WebServiceTtsVoiceResponse(

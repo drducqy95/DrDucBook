@@ -653,10 +653,25 @@ type WebTtsChunk = {
 // Valtec ONNX currently accepts at most 420 characters per synthesis call.
 // Keep a margin for punctuation and engine-specific tokenization.
 const WEB_TTS_CHUNK_LIMIT = 360
-const WEB_TTS_PREFETCH_AHEAD = 2
-const WEB_TTS_PREFETCH_CACHE_LIMIT = 6
+const WEB_TTS_PREFETCH_AHEAD = 3
+const WEB_TTS_PREFETCH_CACHE_LIMIT = 12
 const webTtsPrefetchCache = new Map<string, Promise<WebServiceTtsSynthesisResponse | null>>()
+const webTtsAudioCache = new Map<string, HTMLAudioElement>()
 const webTtsChapterCache = new Map<string, Promise<WebTtsChapter>>()
+
+const preloadWebTtsAudio = (url: string, key: string) => {
+  if (webTtsAudioCache.has(key)) return
+  try {
+    const fullUrl = withWebSession(new URL(resolveWebServiceUrl(url)))
+    const audio = new Audio(fullUrl.toString())
+    audio.preload = 'auto'
+    audio.setAttribute('playsinline', 'true')
+    audio.load()
+    webTtsAudioCache.set(key, audio)
+  } catch {
+    // Ignore preload error
+  }
+}
 
 const stopWebTts = () => {
   ttsPlaybackToken += 1
@@ -673,6 +688,12 @@ const stopWebTts = () => {
   ttsActiveChapter.value = null
   ttsActiveParagraph.value = -1
   ttsActiveParagraphCount.value = 0
+  webTtsAudioCache.forEach(audio => {
+    audio.pause()
+    audio.removeAttribute('src')
+    audio.load()
+  })
+  webTtsAudioCache.clear()
   webTtsPrefetchCache.clear()
   webTtsChapterCache.clear()
 }
@@ -762,27 +783,31 @@ const trimWebTtsPrefetchCache = () => {
     const oldest = webTtsPrefetchCache.keys().next().value
     if (!oldest) break
     webTtsPrefetchCache.delete(oldest)
+    const audio = webTtsAudioCache.get(oldest)
+    if (audio) {
+      audio.pause()
+      audio.removeAttribute('src')
+      audio.load()
+      webTtsAudioCache.delete(oldest)
+    }
   }
 }
 
 const prefetchWebTtsChunks = (chunks: WebTtsChunk[], token: number) => {
-  let previousTask: Promise<WebServiceTtsSynthesisResponse | null> = Promise.resolve(null)
   chunks.forEach(chunk => {
     if (token !== ttsPlaybackToken) return
     const key = webTtsChunkCacheKey(chunk)
     const existingTask = webTtsPrefetchCache.get(key)
-    if (existingTask) {
-      previousTask = existingTask.catch(() => null)
-      return
-    }
-    const task = previousTask
-      .catch(() => null)
-      .then(() => {
-        if (token !== ttsPlaybackToken) return null
-        return synthesizeWebTtsChunk(chunk).catch(() => null)
-      })
+    if (existingTask) return
+    const task = (async () => {
+      if (token !== ttsPlaybackToken) return null
+      const res = await synthesizeWebTtsChunk(chunk).catch(() => null)
+      if (res && res.audioUrl && !res.silent && token === ttsPlaybackToken) {
+        preloadWebTtsAudio(res.audioUrl, key)
+      }
+      return res
+    })()
     webTtsPrefetchCache.set(key, task)
-    previousTask = task
   })
   trimWebTtsPrefetchCache()
 }
@@ -894,18 +919,36 @@ const playWebTtsChunk = async (
   if (!result || !result.audioUrl) {
     // If this chunk has no audible content or synthesis failed temporarily,
     // briefly advance smoothly without breaking the entire TTS session.
-    await new Promise(resolve => window.setTimeout(resolve, 200))
+    await new Promise(resolve => window.setTimeout(resolve, 80))
     return
   }
   if (token !== ttsPlaybackToken) return
+
+  // Skip silent / whitespace chunks without network roundtrip or audio decoding
+  if (result.silent) {
+    await updateWebTtsPosition(displayIndex, chunk.startParagraph, paragraphCount, token)
+    prefetchWebTtsChunks(prefetchChunks, token)
+    afterCurrentReady?.()
+    await new Promise(resolve => window.setTimeout(resolve, 80))
+    return
+  }
+
   prefetchWebTtsChunks(prefetchChunks, token)
   afterCurrentReady?.()
   ttsAudio?.pause()
-  const audioUrl = withWebSession(new URL(resolveWebServiceUrl(result.audioUrl)))
-  audioUrl.searchParams.set('t', String(Date.now()))
-  const audio = new Audio(audioUrl.toString())
-  audio.preload = 'auto'
-  audio.setAttribute('playsinline', 'true')
+
+  // Use pre-buffered audio element if available (Double Buffering)
+  const key = webTtsChunkCacheKey(chunk)
+  let audio = webTtsAudioCache.get(key)
+  if (audio) {
+    webTtsAudioCache.delete(key)
+  } else {
+    const audioUrl = withWebSession(new URL(resolveWebServiceUrl(result.audioUrl)))
+    audio = new Audio(audioUrl.toString())
+    audio.preload = 'auto'
+    audio.setAttribute('playsinline', 'true')
+  }
+
   ttsAudio = audio
   ttsAudioReady.value = true
   ttsPaused.value = false

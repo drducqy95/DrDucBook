@@ -549,6 +549,7 @@ class KtorServer(
                         engine = WebServiceTtsController.capabilities(request.bookUrl).first,
                         language = file.language,
                         expiresAt = file.expiresAt,
+                        silent = file.silent,
                     )
                 )
             } catch (error: IllegalArgumentException) {

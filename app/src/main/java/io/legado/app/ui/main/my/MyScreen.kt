@@ -394,6 +394,7 @@ fun WebServiceSettingBlock(
                         text = stringResource(R.string.cloudflare_named_tunnel),
                     )
                     if (uiState.cloudflarePhase == CloudflareTunnelPhase.STARTING ||
+                        uiState.cloudflarePhase == CloudflareTunnelPhase.RECONNECTING ||
                         uiState.cloudflarePhase == CloudflareTunnelPhase.CONNECTED
                     ) {
                         SmallPlainButton(

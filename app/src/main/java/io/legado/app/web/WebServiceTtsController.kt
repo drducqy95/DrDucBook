@@ -198,7 +198,7 @@ object WebServiceTtsController {
         if (cleanText.isBlank() || cleanText.matches(Regex("^[\\s\\p{P}\\p{S}]+$"))) {
             writeSilentWav(file)
             val expiresAt = System.currentTimeMillis() + TTL_MILLIS
-            files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+            files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav", silent = true)
             trimExpired()
             return files[id]!!
         }
@@ -210,7 +210,7 @@ object WebServiceTtsController {
             if (localText == null) {
                 writeSilentWav(file)
                 val expiresAt = System.currentTimeMillis() + TTL_MILLIS
-                files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+                files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav", silent = true)
                 trimExpired()
                 return files[id]!!
             }
@@ -218,13 +218,13 @@ object WebServiceTtsController {
             val localFile = LocalTtsSynthesis.synthesizeToWav(appCtx, configuredEngine, localText, speed)
             if (hasUsableDuration(localFile, localText)) {
                 val expiresAt = System.currentTimeMillis() + TTL_MILLIS
-                files[id] = TtsFile(id, localFile, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+                files[id] = TtsFile(id, localFile, requestedLocale.toLanguageTag(), expiresAt, "audio/wav", silent = false)
                 trimExpired()
                 return files[id]!!
             }
             writeSilentWav(file)
             val expiresAt = System.currentTimeMillis() + TTL_MILLIS
-            files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+            files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav", silent = true)
             trimExpired()
             return files[id]!!
         }
@@ -458,5 +458,6 @@ object WebServiceTtsController {
         val language: String,
         val expiresAt: Long,
         val contentType: String,
+        val silent: Boolean = false,
     )
 }

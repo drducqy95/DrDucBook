@@ -1,7 +1,7 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-08-25T23:49:49.329250",
+    "last_active": "2026-08-26T01:30:28.047073",
     "saved_at": "2026-08-25T23:49:49.329218",
     "resumed_at": "2026-08-22T08:09:11.064021"
   },
@@ -13,7 +13,38 @@
   "recent_changes": [
     "Fixed Cloudflare Tunnel DNS fallback, TMPDIR, and diagnostics for EMUI/Android 12",
     "Integrated native Room DB QuickDictionary into WebService glossary & stats with scope filter",
-    "Enhanced Translation Dashboard with dynamicText, i18n, and World Building & Timeline sub-tabs"
+    "Enhanced Translation Dashboard with dynamicText, i18n, and World Building & Timeline sub-tabs",
+    {
+      "type": "bugfix",
+      "description": "Local AI GGUF Import: Can't open drducbook-asset://catalog/local-ai-hy-mt2 caused by ActivityNotFoundException",
+      "files": [
+        "AiRouterScreen.kt"
+      ],
+      "error_id": "ERR_0001"
+    },
+    {
+      "type": "bugfix",
+      "description": "Cloudflare Tunnel: Error 1033 and unexpected tunnel stop on network flapping without auto-reconnect",
+      "files": [
+        "CloudflareTunnelModels.kt",
+        "CloudflareTunnelManager.kt",
+        "MyViewModel.kt",
+        "MyScreen.kt"
+      ],
+      "error_id": "ERR_0002"
+    },
+    {
+      "type": "bugfix",
+      "description": "WebService TTS: Audible pause and stutter between chunk transitions in WebService reader",
+      "files": [
+        "WebServiceModels.kt",
+        "KtorServer.kt",
+        "WebServiceTtsController.kt",
+        "webService.ts",
+        "BookChapter.vue"
+      ],
+      "error_id": "ERR_0003"
+    }
   ],
   "context_notes": [
     "Huawei EMUI 12 device tested - DNS fallback 1.1.1.1:53 active when Private DNS returns empty linkProperties"

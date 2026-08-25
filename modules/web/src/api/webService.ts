@@ -389,6 +389,7 @@ export type WebServiceTtsSynthesisResponse = {
   engine: string
   language: string
   expiresAt: number
+  silent?: boolean
 }
 
 const v2 = axios.create({
