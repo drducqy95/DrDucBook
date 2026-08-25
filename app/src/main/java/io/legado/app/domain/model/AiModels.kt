@@ -121,6 +121,15 @@ object AiProviderPresets {
             modelId = "Hy-MT2-1.8B-1.25Bit.gguf"
         ),
         AiProviderPreset(
+            id = "opencode_free",
+            name = "OpenCode Free",
+            protocol = AiProtocol.OPENAI_CHAT_COMPLETIONS,
+            baseUrl = "https://opencode.ai/zen/v1",
+            modelsUrl = "https://opencode.ai/zen/v1/models",
+            modelName = "Big Pickle",
+            modelId = "big-pickle"
+        ),
+        AiProviderPreset(
             id = "openai_chat",
             name = "OpenAI",
             protocol = AiProtocol.OPENAI_CHAT_COMPLETIONS,
@@ -137,6 +146,15 @@ object AiProviderPresets {
             modelsUrl = "https://api.openai.com/v1/models",
             modelName = "GPT-4.1 mini",
             modelId = "gpt-4.1-mini"
+        ),
+        AiProviderPreset(
+            id = "nvidia",
+            name = "NVIDIA NIM",
+            protocol = AiProtocol.OPENAI_CHAT_COMPLETIONS,
+            baseUrl = "https://integrate.api.nvidia.com/v1",
+            modelsUrl = "https://integrate.api.nvidia.com/v1/models",
+            modelName = "Llama 3.3 70B Instruct",
+            modelId = "meta/llama-3.3-70b-instruct"
         ),
         AiProviderPreset(
             id = "deepseek",

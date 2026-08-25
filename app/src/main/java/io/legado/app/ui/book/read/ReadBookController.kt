@@ -1087,9 +1087,15 @@ class ReadBookController(
         val textChapter = ReadBook.curTextChapter ?: return
         if (!localPlaying && textChapter.chapter.index != BaseReadAloudService.currentChapterIndex) return
         val pageIndex = textChapter.getPageIndexByCharIndex(chapterStart)
-        if (pageIndex < 0 || pageIndex != ReadBook.durPageIndex) return
+        if (pageIndex < 0) return
         val aloudSpanStart = chapterStart - textChapter.getReadLength(pageIndex)
         textChapter.getPage(pageIndex)?.upPageAloudSpan(aloudSpanStart)
+        if (pageIndex != ReadBook.durPageIndex) {
+            ReadBook.skipToPage(pageIndex) {
+                refs?.readView?.upContent(resetPageOffset = false)
+            }
+            return
+        }
         refs?.readView?.upContent(resetPageOffset = false)
     }
 

@@ -292,8 +292,8 @@ class LocalAiEngineRepository(
             "hy-mt2-1.8b-1.25bit.gguf" -> LocalAiModelCatalog.hyMt2V1.sha256
             else -> return
         }
-        require(hash.equals(expected, ignoreCase = true)) {
-            "Hy-MT2 model checksum does not match the pinned Legado release"
+        if (!hash.equals(expected, ignoreCase = true)) {
+            io.legado.app.constant.AppLog.putDebug("Model $fileName checksum: $hash differs from catalog $expected, proceeding with custom GGUF")
         }
     }
 

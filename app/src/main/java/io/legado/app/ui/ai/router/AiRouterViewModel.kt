@@ -664,6 +664,7 @@ class AiRouterViewModel(
     private fun providerFamilyIdForEditor(id: String, name: String): String {
         val text = "$id $name".lowercase()
         return when {
+            "nvidia" in text -> "nvidia"
             "opencode" in text -> AiRouterProviderFamily.OPENCODE
             "mimo" in text || "xiaomi" in text -> AiRouterProviderFamily.MIMO
             "local" in text || "gguf" in text -> AiRouterProviderFamily.LOCAL_GGUF
@@ -673,6 +674,7 @@ class AiRouterViewModel(
 
     private fun providerFamilyNameForEditor(id: String, name: String): String =
         when (providerFamilyIdForEditor(id, name)) {
+            "nvidia" -> "NVIDIA NIM"
             AiRouterProviderFamily.OPENCODE -> "OpenCode"
             AiRouterProviderFamily.MIMO -> "MiMo"
             AiRouterProviderFamily.LOCAL_GGUF -> "Local GGUF"
@@ -683,7 +685,6 @@ class AiRouterViewModel(
         when {
             id == "opencode_free" -> "Free Console"
             id == "opencode_go" -> "Go/API"
-            id == "mimo_free" -> "Free"
             "token_plan" in id -> "Token Plan"
             id == "xiaomi_mimo" -> "API"
             category == "local" -> "Local file"
@@ -694,8 +695,11 @@ class AiRouterViewModel(
         }
 
     private fun isOpenCodeFreeModel(model: AiAvailableModel): Boolean {
-        val id = model.id.trim()
-        return id !in OPENCODE_RETIRED_FREE_MODELS &&
+        val id = model.id.trim().lowercase()
+        if (id in OPENCODE_RETIRED_FREE_MODELS) return false
+        return id == "big-pickle" ||
+            id.endsWith("-free") ||
+            id.contains("free") ||
             id in OPENCODE_KNOWN_FREE_MODELS
     }
 
@@ -811,7 +815,6 @@ class AiRouterViewModel(
                 discoverySucceeded = discoveryResult.isSuccess,
                 accept = ::isOpenCodeFreeModel,
             )
-            "mimo_free" -> catalogModels
             else -> catalogModels + fetchedModels
         }.distinctBy(AiAvailableModel::id)
         val savedModels = profileGateway.importProviderModels(provider.id, selectedModels)
@@ -1004,14 +1007,25 @@ class AiRouterViewModel(
     private fun catalogModelRank(modelId: String): Int {
         val normalized = modelId.lowercase()
         val geminiRank = PREFERRED_GEMINI_MODELS.indexOf(normalized)
+        if (geminiRank >= 0) return geminiRank
+        val preferredChatIndex = PREFERRED_CHAT_MODELS.indexOf(normalized)
+        if (preferredChatIndex >= 0) return preferredChatIndex
+
+        if (normalized.contains("embed") || normalized.contains("clip") || normalized.contains("parse") ||
+            normalized.contains("detector") || normalized.contains("safety") || normalized.contains("guard") ||
+            normalized.contains("reward") || normalized.contains("video") || normalized.startsWith("01-ai/")
+        ) {
+            return 999
+        }
+
         return when {
-            geminiRank >= 0 -> geminiRank
             "gemini" in normalized && "flash-lite" in normalized -> 20
             "gemini" in normalized && "flash" in normalized -> 30
             "gemini" in normalized && normalized.endsWith("-preview") -> 50
-            normalized == "mimo-v2.5-free" -> 60
             normalized.endsWith("-free") -> 70
             normalized == "big-pickle" -> 80
+            "instruct" in normalized -> 15
+            "chat" in normalized -> 16
             "gemini" in normalized -> 100
             else -> 90
         }
@@ -1314,17 +1328,31 @@ class AiRouterViewModel(
         )
         const val FREE_TRANSLATION_ROUTE = "Dịch AI · Free fallback"
         val OPENCODE_RETIRED_FREE_MODELS = setOf(
-            "hy3-free",
-            "laguna-s-2.1-free",
             "ling-3.0-flash-free",
-            "deepseek-v4-flash-free",
-            "nemotron-3-ultra-free",
             "north-mini-code-free",
             "nemotron-3-super-free",
         )
         val OPENCODE_KNOWN_FREE_MODELS = setOf(
             "big-pickle",
-            "mimo-v2.5-free",
+            "nemotron-3.5-lightning-free",
+            "hy3-free",
+            "x-preview-f-free",
+            "laguna-s-2.1-free",
+            "nemotron-3-ultra-free",
+            "deepseek-v4-flash-free",
+            "muse-spark-1.2-contributor-free",
+        )
+        val PREFERRED_CHAT_MODELS = listOf(
+            "meta/llama-3.3-70b-instruct",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "deepseek-ai/deepseek-r1",
+            "qwen/qwen2.5-72b-instruct",
+            "mistralai/mixtral-8x22b-instruct-v0.1",
+            "gpt-4.1-mini",
+            "gpt-4o-mini",
+            "deepseek-chat",
+            "claude-3-5-haiku",
+            "gemini-2.5-flash",
         )
         val comboTemplates = listOf(
             ComboTemplate(

@@ -14,8 +14,9 @@ class AiRouterDashboardMapperTest {
         val entries = listOfNotNull(
             AiProviderCatalog.byId("opencode_free"),
             AiProviderCatalog.byId("opencode_go"),
-            AiProviderCatalog.byId("mimo_free"),
+            AiProviderCatalog.byId("xiaomi_mimo"),
             AiProviderCatalog.byId("xiaomi_mimo_token_plan_sgp"),
+            AiProviderCatalog.byId("nvidia"),
             AiProviderCatalog.byId("local_gguf"),
         )
 
@@ -31,9 +32,10 @@ class AiRouterDashboardMapperTest {
         assertEquals("Free Console", items.first { it.id == "opencode_free" }.connectionMode)
         assertEquals(AiRouterProviderFamily.OPENCODE, items.first { it.id == "opencode_go" }.familyId)
         assertEquals("Go/API", items.first { it.id == "opencode_go" }.connectionMode)
-        assertEquals(AiRouterProviderFamily.MIMO, items.first { it.id == "mimo_free" }.familyId)
+        assertEquals(AiRouterProviderFamily.MIMO, items.first { it.id == "xiaomi_mimo" }.familyId)
         assertEquals(AiRouterProviderFamily.MIMO, items.first { it.id == "xiaomi_mimo_token_plan_sgp" }.familyId)
         assertEquals("Token Plan", items.first { it.id == "xiaomi_mimo_token_plan_sgp" }.connectionMode)
+        assertEquals(AiRouterProviderFamily.NVIDIA, items.first { it.id == "nvidia" }.familyId)
         assertEquals(AiRouterProviderFamily.LOCAL_GGUF, items.first { it.id == "local_gguf" }.familyId)
         assertEquals("Local file", items.first { it.id == "local_gguf" }.connectionMode)
     }

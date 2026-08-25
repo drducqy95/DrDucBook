@@ -157,12 +157,25 @@ class TestAiProviderDraftUseCase(
         discoveredModels.firstOrNull { model ->
             model.id.equals(PREFERRED_GATEWAY_PROBE_MODEL, ignoreCase = true)
         } ?: discoveredModels.firstOrNull { model ->
+            PREFERRED_CHAT_MODELS.any { pref -> model.id.equals(pref, ignoreCase = true) }
+        } ?: discoveredModels.firstOrNull { model ->
             model.id.startsWith("oc/", ignoreCase = true) && model.isFreeModel()
         } ?: discoveredModels.firstOrNull { model -> model.isFreeModel() }
-            ?: discoveredModels.firstOrNull()
+        ?: discoveredModels.firstOrNull { model ->
+            (model.id.contains("instruct", ignoreCase = true) || model.id.contains("chat", ignoreCase = true)) &&
+                !model.isNonChatModel()
+        } ?: discoveredModels.firstOrNull { !it.isNonChatModel() }
+        ?: discoveredModels.firstOrNull()
 
     private fun AiAvailableModel.isFreeModel(): Boolean =
         id.contains("free", ignoreCase = true) || name.contains("free", ignoreCase = true)
+
+    private fun AiAvailableModel.isNonChatModel(): Boolean {
+        val norm = id.lowercase()
+        return norm.contains("embed") || norm.contains("clip") || norm.contains("parse") ||
+            norm.contains("detector") || norm.contains("safety") || norm.contains("guard") ||
+            norm.contains("reward") || norm.contains("video") || norm.startsWith("01-ai/")
+    }
 
     private fun AiProviderConnectionDraft.toProviderConfig(): AiProviderConfig =
         AiProviderConfig(
@@ -185,6 +198,18 @@ class TestAiProviderDraftUseCase(
         const val STANDARD_PROBE_OUTPUT_TOKENS = 64
         const val GATEWAY_PROBE_OUTPUT_TOKENS = 256
         const val REASONING_PROBE_OUTPUT_TOKENS = 1_024
-        const val PREFERRED_GATEWAY_PROBE_MODEL = "oc/mimo-v2.5-free"
+        const val PREFERRED_GATEWAY_PROBE_MODEL = "big-pickle"
+        val PREFERRED_CHAT_MODELS = listOf(
+            "meta/llama-3.3-70b-instruct",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "deepseek-ai/deepseek-r1",
+            "qwen/qwen2.5-72b-instruct",
+            "mistralai/mixtral-8x22b-instruct-v0.1",
+            "gpt-4.1-mini",
+            "gpt-4o-mini",
+            "deepseek-chat",
+            "claude-3-5-haiku",
+            "gemini-2.5-flash",
+        )
     }
 }

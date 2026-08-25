@@ -161,21 +161,59 @@ object WebServiceTtsController {
         return engine to language
     }
 
+    private fun writeSilentWav(file: File) {
+        val sampleRate = 22050
+        val channels = 1
+        val byteRate = sampleRate * channels * 2
+        val numSamples = (sampleRate * 0.1).toInt() // 100ms
+        val dataSize = numSamples * 2
+        val totalSize = 36 + dataSize
+        file.outputStream().use { out ->
+            out.write("RIFF".toByteArray())
+            out.write(java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(totalSize).array())
+            out.write("WAVEfmt ".toByteArray())
+            out.write(java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(16).array())
+            out.write(java.nio.ByteBuffer.allocate(2).order(java.nio.ByteOrder.LITTLE_ENDIAN).putShort(1).array())
+            out.write(java.nio.ByteBuffer.allocate(2).order(java.nio.ByteOrder.LITTLE_ENDIAN).putShort(channels.toShort()).array())
+            out.write(java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(sampleRate).array())
+            out.write(java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(byteRate).array())
+            out.write(java.nio.ByteBuffer.allocate(2).order(java.nio.ByteOrder.LITTLE_ENDIAN).putShort((channels * 2).toShort()).array())
+            out.write(java.nio.ByteBuffer.allocate(2).order(java.nio.ByteOrder.LITTLE_ENDIAN).putShort(16).array())
+            out.write("data".toByteArray())
+            out.write(java.nio.ByteBuffer.allocate(4).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(dataSize).array())
+            out.write(ByteArray(dataSize))
+        }
+    }
+
     suspend fun synthesize(text: String, language: String?, bookUrl: String? = null): TtsFile {
-        val cleanText = normalizeSpeechText(text).take(20_000).takeIf(String::isNotBlank)
-            ?: throw IllegalArgumentException("TTS_TEXT_REQUIRED")
+        val cleanText = normalizeSpeechText(text).take(20_000)
+        val id = UUID.randomUUID().toString()
+        val file = File(appCtx.cacheDir, "web_tts_$id.wav")
         val requestedLanguage = language?.trim()?.takeIf(String::isNotBlank)
         val requestedLocale = requestedLanguage
             ?.let(Locale::forLanguageTag)
             ?.takeIf { it.language.isNotBlank() }
             ?: inferLocale(cleanText)
-        val id = UUID.randomUUID().toString()
-        val file = File(appCtx.cacheDir, "web_tts_$id.wav")
+
+        if (cleanText.isBlank() || cleanText.matches(Regex("^[\\s\\p{P}\\p{S}]+$"))) {
+            writeSilentWav(file)
+            val expiresAt = System.currentTimeMillis() + TTL_MILLIS
+            files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+            trimExpired()
+            return files[id]!!
+        }
+
         val configuredEngine = normalizedEngine(resolveEngine(bookUrl))
         val localEngine = parseLocalTtsEngine(configuredEngine)
         if (localEngine != null) {
             val localText = localSpeechText(cleanText, configuredEngine)
-                ?: throw IllegalArgumentException("TTS_TEXT_UNSUPPORTED_LOCAL")
+            if (localText == null) {
+                writeSilentWav(file)
+                val expiresAt = System.currentTimeMillis() + TTL_MILLIS
+                files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+                trimExpired()
+                return files[id]!!
+            }
             val speed = (ReadConfig.speechRatePlay + 5) / 10f
             val localFile = LocalTtsSynthesis.synthesizeToWav(appCtx, configuredEngine, localText, speed)
             if (hasUsableDuration(localFile, localText)) {
@@ -184,7 +222,11 @@ object WebServiceTtsController {
                 trimExpired()
                 return files[id]!!
             }
-            throw IllegalStateException("TTS_LOCAL_AUDIO_INVALID")
+            writeSilentWav(file)
+            val expiresAt = System.currentTimeMillis() + TTL_MILLIS
+            files[id] = TtsFile(id, file, requestedLocale.toLanguageTag(), expiresAt, "audio/wav")
+            trimExpired()
+            return files[id]!!
         }
         val engineForSystemTts = configuredEngine.takeUnless { parseLocalTtsEngine(it) != null }
         val httpTts = configuredEngine.toLongOrNull()?.let(appDb.httpTTSDao::get)

@@ -709,15 +709,28 @@ class AiProviderEditViewModel(
 
     private fun preferredModelRank(modelId: String): Int {
         val normalized = modelId.lowercase()
+        val geminiIndex = PREFERRED_GEMINI_MODELS.indexOf(normalized)
+        if (geminiIndex >= 0) return geminiIndex
+        val preferredChatIndex = PREFERRED_CHAT_MODELS.indexOf(normalized)
+        if (preferredChatIndex >= 0) return preferredChatIndex
+
+        if (normalized.contains("embed") || normalized.contains("clip") || normalized.contains("parse") ||
+            normalized.contains("detector") || normalized.contains("safety") || normalized.contains("guard") ||
+            normalized.contains("reward") || normalized.contains("video") || normalized.startsWith("01-ai/")
+        ) {
+            return 999
+        }
+
         return when {
-            normalized in PREFERRED_GEMINI_MODELS -> PREFERRED_GEMINI_MODELS.indexOf(normalized)
             "gemini" in normalized && normalized.endsWith("-preview") -> 50
             "gemini" in normalized && "flash-lite" in normalized -> 20
             "gemini" in normalized && "flash" in normalized -> 30
             normalized.endsWith("-free") -> 60
+            "instruct" in normalized -> 15
+            "chat" in normalized -> 16
             "flash" in normalized -> 70
             "gemini" in normalized -> 100
-            else -> 10
+            else -> 100
         }
     }
 
@@ -756,6 +769,18 @@ class AiProviderEditViewModel(
             "gemini-3.1-flash-lite",
             "gemini-3.1-flash",
             "gemini-2.5-flash-lite",
+            "gemini-2.5-flash",
+        )
+        val PREFERRED_CHAT_MODELS = listOf(
+            "meta/llama-3.3-70b-instruct",
+            "nvidia/llama-3.1-nemotron-70b-instruct",
+            "deepseek-ai/deepseek-r1",
+            "qwen/qwen2.5-72b-instruct",
+            "mistralai/mixtral-8x22b-instruct-v0.1",
+            "gpt-4.1-mini",
+            "gpt-4o-mini",
+            "deepseek-chat",
+            "claude-3-5-haiku",
             "gemini-2.5-flash",
         )
         const val MAX_AUTOMATIC_FALLBACK_MODELS = 6

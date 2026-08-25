@@ -312,6 +312,7 @@ private fun providerStatus(
 private fun providerFamilyId(id: String, name: String): String {
     val text = "$id $name".lowercase(Locale.ROOT)
     return when {
+        "nvidia" in text -> "nvidia"
         "opencode" in text -> AiRouterProviderFamily.OPENCODE
         "mimo" in text || "xiaomi" in text -> AiRouterProviderFamily.MIMO
         "local" in text || "gguf" in text -> AiRouterProviderFamily.LOCAL_GGUF
@@ -321,6 +322,7 @@ private fun providerFamilyId(id: String, name: String): String {
 
 private fun providerFamilyName(id: String, name: String): String =
     when (providerFamilyId(id, name)) {
+        "nvidia" -> "NVIDIA NIM"
         AiRouterProviderFamily.OPENCODE -> "OpenCode"
         AiRouterProviderFamily.MIMO -> "MiMo"
         AiRouterProviderFamily.LOCAL_GGUF -> "Local GGUF"
@@ -331,7 +333,6 @@ private fun providerConnectionMode(id: String, category: String): String =
     when {
         id == "opencode_free" -> "Free Console"
         id == "opencode_go" -> "Go/API"
-        id == "mimo_free" -> "Free"
         "token_plan" in id -> "Token Plan"
         id == "xiaomi_mimo" -> "API"
         category == AiProviderCategory.LOCAL -> "Local file"

@@ -95,11 +95,15 @@ const scrollToReadedLength = (length: number) => {
     }
   })
 }
-const scrollToParagraph = (index: number, behavior: ScrollBehavior = 'auto') => {
+const scrollToParagraph = (index: number, behavior: ScrollBehavior = 'smooth') => {
   nextTick(() => {
-    const paragraph = paragraphRef.value?.[index]
-    if (!paragraph) return
-    paragraph.scrollIntoView({ behavior, block: 'center', inline: 'start' })
+    const target = index === -2 ? titleRef.value : paragraphRef.value?.[index]
+    if (!target) return
+    if (props.readMode === 'paged') {
+      target.scrollIntoView({ behavior, block: 'nearest', inline: 'start' })
+    } else {
+      target.scrollIntoView({ behavior, block: 'center', inline: 'nearest' })
+    }
   })
 }
 defineExpose({

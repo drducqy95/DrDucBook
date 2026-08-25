@@ -85,6 +85,7 @@ object AiRouterProviderFilter {
 object AiRouterProviderFamily {
     const val OPENCODE = "opencode"
     const val MIMO = "mimo"
+    const val NVIDIA = "nvidia"
     const val LOCAL_GGUF = "local_gguf"
 }
 

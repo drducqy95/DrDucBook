@@ -870,15 +870,10 @@ const updateWebTtsPosition = async (
     : Math.round(startParagraph / Math.max(1, paragraphCount) * 20_000))
   saveReadingBookProgressToBrowser(displayIndex, position)
   await nextTick()
-  if (readMode.value === 'paged' && content.value) {
-    const maxScroll = Math.max(0, content.value.scrollWidth - content.value.clientWidth)
-    const ratio = startParagraph / Math.max(1, paragraphCount)
-    content.value.scrollTo({ left: maxScroll * ratio, behavior: 'smooth' })
-  } else {
-    const renderedIndex = chapterData.value.findIndex(item => item.index === displayIndex)
-    const renderedChapter = chapterRef.value?.[renderedIndex]
-    renderedChapter?.scrollToReadedLength(position)
-  }
+  const renderedIndex = chapterData.value.findIndex(item => item.index === displayIndex)
+  const renderedChapter = chapterRef.value?.[renderedIndex]
+  const pIdx = startParagraph === 0 ? -2 : startParagraph - 1
+  renderedChapter?.scrollToParagraph(pIdx, 'smooth')
 }
 
 const playWebTtsChunk = async (
@@ -890,8 +885,18 @@ const playWebTtsChunk = async (
   afterCurrentReady?: () => void,
 ) => {
   if (token !== ttsPlaybackToken) return
-  const result = await getWebTtsChunkSynthesis(chunk)
-  if (!result) return
+  let result: WebServiceTtsSynthesisResponse | null = null
+  try {
+    result = await getWebTtsChunkSynthesis(chunk)
+  } catch {
+    result = null
+  }
+  if (!result || !result.audioUrl) {
+    // If this chunk has no audible content or synthesis failed temporarily,
+    // briefly advance smoothly without breaking the entire TTS session.
+    await new Promise(resolve => window.setTimeout(resolve, 200))
+    return
+  }
   if (token !== ttsPlaybackToken) return
   prefetchWebTtsChunks(prefetchChunks, token)
   afterCurrentReady?.()
@@ -924,14 +929,14 @@ const playWebTtsChunk = async (
     void nextTick(() => {
       const renderedIndex = chapterData.value.findIndex(item => item.index === displayIndex)
       const renderedChapter = chapterRef.value?.[renderedIndex]
-      if (paragraphIndex > 0) renderedChapter?.scrollToParagraph(paragraphIndex - 1)
+      renderedChapter?.scrollToParagraph(paragraphIndex === 0 ? -2 : paragraphIndex - 1, 'smooth')
     })
   }
   audio.addEventListener('loadedmetadata', syncActiveParagraph)
   audio.addEventListener('timeupdate', syncActiveParagraph)
   await updateWebTtsPosition(displayIndex, chunk.startParagraph, paragraphCount, token)
   if (token !== ttsPlaybackToken) return
-  await new Promise<void>((resolve, reject) => {
+  await new Promise<void>(resolve => {
     audio.onended = () => {
       audio.removeEventListener('loadedmetadata', syncActiveParagraph)
       audio.removeEventListener('timeupdate', syncActiveParagraph)
@@ -940,13 +945,16 @@ const playWebTtsChunk = async (
     audio.onerror = () => {
       audio.removeEventListener('loadedmetadata', syncActiveParagraph)
       audio.removeEventListener('timeupdate', syncActiveParagraph)
-      reject(new Error('TTS_AUDIO_PLAYBACK_FAILED'))
+      // Resolve safely so audio error in single chunk does not crash entire TTS
+      resolve()
     }
     audio.play()
       .then(() => {
         if (token === ttsPlaybackToken) ttsLoading.value = false
       })
-      .catch(reject)
+      .catch(() => {
+        resolve()
+      })
   })
 }
 

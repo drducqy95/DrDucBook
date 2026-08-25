@@ -1,13 +1,13 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-08-25T01:28:09.961446",
-    "saved_at": "2026-08-25T01:28:09.961401",
+    "last_active": "2026-08-25T23:49:49.329250",
+    "saved_at": "2026-08-25T23:49:49.329218",
     "resumed_at": "2026-08-22T08:09:11.064021"
   },
   "working_on": {
-    "feature": "WebService Book Export & Web UI Fixes",
-    "current_phase": "Completed & Installed"
+    "feature": "NVIDIA NIM API & OpenCode Free Provider Full Fix",
+    "current_phase": "Execution / Release Verified"
   },
   "pending_tasks": [],
   "recent_changes": [

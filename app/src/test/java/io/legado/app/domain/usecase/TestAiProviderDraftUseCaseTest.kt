@@ -112,8 +112,8 @@ class TestAiProviderDraftUseCaseTest {
         )
 
         assertEquals(AiConnectionStatus.READY, result.status)
-        assertEquals("oc/mimo-v2.5-free", result.selectedModel?.id)
-        assertEquals("oc/mimo-v2.5-free", gateway.lastRequest?.model?.modelId)
+        assertEquals("oc/deepseek-v4-flash-free", result.selectedModel?.id)
+        assertEquals("oc/deepseek-v4-flash-free", gateway.lastRequest?.model?.modelId)
         assertEquals(1_024, gateway.lastRequest?.params?.maxOutputTokens)
     }
 
@@ -151,6 +151,34 @@ class TestAiProviderDraftUseCaseTest {
         assertEquals(AiConnectionStatus.READY, result.status)
         assertEquals(1_024, gateway.lastRequest?.params?.maxOutputTokens)
         assertTrue(AiCapability.REASONING in gateway.lastRequest!!.model.capabilities)
+    }
+
+    @Test
+    fun nvidiaDraftPrefersValidChatModelOverNonChatOr404Models() = runBlocking {
+        val gateway = RecordingAiTextGateway(
+            fetchedModels = listOf(
+                AiAvailableModel("01-ai/yi-large", "Yi Large", 0, 0),
+                AiAvailableModel("adept/fuyu-8b", "Fuyu 8B", 0, 0),
+                AiAvailableModel("nvidia/embed-qa-4", "Embed QA 4", 0, 0),
+                AiAvailableModel("nvidia/ai-synthetic-video-detector", "Synthetic Video Detector", 0, 0),
+                AiAvailableModel("meta/llama-3.3-70b-instruct", "Llama 3.3 70B Instruct", 128_000, 4_096),
+                AiAvailableModel("nvidia/llama-3.1-nemotron-70b-instruct", "Llama 3.1 Nemotron 70B", 128_000, 4_096),
+            )
+        )
+        val useCase = TestAiProviderDraftUseCase(gateway, fixedClock())
+
+        val result = useCase(
+            draft(
+                baseUrl = "https://integrate.api.nvidia.com/v1",
+                modelsUrl = "https://integrate.api.nvidia.com/v1/models",
+                apiKey = "nvapi-test",
+                modelId = "",
+            )
+        )
+
+        assertEquals(AiConnectionStatus.READY, result.status)
+        assertEquals("meta/llama-3.3-70b-instruct", result.selectedModel?.id)
+        assertEquals("meta/llama-3.3-70b-instruct", gateway.lastRequest?.model?.modelId)
     }
 
     private fun draft(

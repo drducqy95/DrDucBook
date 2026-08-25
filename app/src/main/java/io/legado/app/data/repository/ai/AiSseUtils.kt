@@ -59,8 +59,16 @@ internal fun JsonObject.getString(name: String): String? {
 }
 
 internal fun JsonObject.extractApiErrorMessage(): String? {
-    val error = get("error")?.asJsonObjectOrNull() ?: return null
-    return error.getString("message") ?: error.getString("code") ?: "AI provider returned an error"
+    val error = get("error")?.asJsonObjectOrNull()
+    if (error != null) {
+        return error.getString("message") ?: error.getString("code") ?: "AI provider returned an error"
+    }
+    val detail = getString("detail")
+    val title = getString("title")
+    if (detail != null || title != null) {
+        return listOfNotNull(title, detail).joinToString(": ")
+    }
+    return null
 }
 
 internal fun JsonElement.asJsonObjectOrNull(): JsonObject? {
