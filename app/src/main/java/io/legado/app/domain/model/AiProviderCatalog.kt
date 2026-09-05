@@ -8,6 +8,7 @@ object AiProviderCategory {
     const val FREE_TIER = "free_tier"
     const val SUBSCRIPTION_KEY = "subscription_key"
     const val LOCAL = "local"
+    const val WEB = "web"
 }
 
 @Keep
@@ -41,23 +42,6 @@ data class AiProviderCatalogEntry(
 /** Text providers that have a protocol adapter usable by chat and translation today. */
 object AiProviderCatalog {
     private val curatedEntries: List<AiProviderCatalogEntry> = listOf(
-        AiProviderCatalogEntry(
-            id = "local_gguf",
-            name = "Local GGUF",
-            category = AiProviderCategory.LOCAL,
-            protocol = AiProtocol.LOCAL_GGUF,
-            baseUrl = "",
-            authType = AiProviderAuthType.NONE,
-            models = LocalAiModelCatalog.all.map { model ->
-                AiCatalogModel(
-                    model.fileName,
-                    model.fileName,
-                    model.contextWindow,
-                    model.defaultParams.maxOutputTokens ?: model.contextWindow,
-                )
-            },
-            notice = "Chạy model GGUF cục bộ; cần chọn file model và test sinh thử trước khi dùng.",
-        ),
         AiProviderCatalogEntry(
             id = "opencode_free",
             name = "OpenCode Free",
@@ -214,6 +198,38 @@ object AiProviderCatalog {
                 AiCatalogModel("gemini-3.1-flash", "Gemini 3.1 Flash", 1_000_000, 64_000),
                 AiCatalogModel("gemini-3.1-pro", "Gemini 3.1 Pro", 1_000_000, 64_000),
             ),
+        ),
+        AiProviderCatalogEntry(
+            id = "gemini_web",
+            name = "Gemini Web (Miễn phí / Cookie)",
+            category = AiProviderCategory.WEB,
+            protocol = AiProtocol.GEMINI_WEB,
+            baseUrl = "https://gemini.google.com",
+            authType = AiProviderAuthType.NONE,
+            models = listOf(
+                AiCatalogModel("gemini-web-default", "Gemini Web (Default)", 32_000, 8_192),
+                AiCatalogModel("gemini-web-flash", "Gemini Web (Flash)", 1_000_000, 8_192),
+                AiCatalogModel("gemini-web-pro", "Gemini Web (Advanced)", 2_000_000, 8_192),
+                AiCatalogModel("gemini-web-thinking", "Gemini Web (Thinking)", 1_000_000, 8_192),
+            ),
+            notice = "Miễn phí 100% không cần đăng nhập Google! Có thể dán thêm Cookie nếu muốn đồng bộ tài khoản cá nhân.",
+        ),
+        AiProviderCatalogEntry(
+            id = "chatgpt_web",
+            name = "ChatGPT Web (Cookie / Token)",
+            category = AiProviderCategory.WEB,
+            protocol = AiProtocol.CHATGPT_WEB,
+            baseUrl = "https://chatgpt.com",
+            authType = AiProviderAuthType.BEARER,
+            chatPath = "/backend-api/conversation",
+            models = listOf(
+                AiCatalogModel("gpt-4o", "GPT-4o (Web)", 128_000, 4_096),
+                AiCatalogModel("gpt-4o-mini", "GPT-4o mini (Web)", 128_000, 4_096),
+                AiCatalogModel("o1-preview", "o1 Preview (Web)", 128_000, 4_096),
+                AiCatalogModel("o1-mini", "o1 Mini (Web)", 128_000, 4_096),
+                AiCatalogModel("auto", "Auto (Web)", 128_000, 4_096),
+            ),
+            notice = "Sử dụng Access Token hoặc Cookie phiên ChatGPT Web (chatgpt.com/backend-api/conversation).",
         ),
     )
 

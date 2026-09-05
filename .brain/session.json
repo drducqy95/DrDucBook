@@ -1,12 +1,12 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-08-26T01:30:28.047073",
-    "saved_at": "2026-08-25T23:49:49.329218",
-    "resumed_at": "2026-08-22T08:09:11.064021"
+    "last_active": "2026-09-05T00:06:43.841589",
+    "saved_at": "2026-09-05T00:06:43.841551",
+    "resumed_at": "2026-08-26T10:02:26.310280"
   },
   "working_on": {
-    "feature": "NVIDIA NIM API & OpenCode Free Provider Full Fix",
+    "feature": "AI Web Providers & WebView Auth Resolution",
     "current_phase": "Execution / Release Verified"
   },
   "pending_tasks": [],
@@ -44,6 +44,103 @@
         "BookChapter.vue"
       ],
       "error_id": "ERR_0003"
+    },
+    {
+      "type": "bugfix",
+      "description": "LocalAI GGUF Loading: Downloaded GGUF models fail to load: native bridge unavailable, backend DL missing, GGUF integrity unchecked, memory pressure unguarded, and Local AI architecture coupled to AI Cloud Router prevents independent use",
+      "files": [
+        "LocalAiEngineRepository.kt",
+        "local_ai.cpp",
+        "LocalGgufHandler.kt",
+        "AiTextRepositoryImpl.kt",
+        "TranslateChapterUseCase.kt",
+        "TranslationConstants.kt",
+        "AiProviderCatalog.kt"
+      ],
+      "error_id": "ERR_0004"
+    },
+    {
+      "type": "bugfix",
+      "description": "LocalAI Model Import & Path Auto-Detection: Asset Delivery model download reported imported package but localAiModelPath was not updated and UI remained empty, causing test translation failure",
+      "files": [
+        "AssetDeliveryImportRepository.kt",
+        "LocalAiTranslationRepository.kt",
+        "TranslationConfigScreen.kt"
+      ],
+      "error_id": "ERR_0005"
+    },
+    {
+      "type": "bugfix",
+      "description": "LocalAI Native Bridge R8 Proguard Obfuscation: App crash with SIGABRT / AssertNoPendingExceptionForNewException in Java_io_legado_app_data_repository_LocalAiNativeBridge_generate during test translation in release build",
+      "files": [
+        "proguard-rules.pro",
+        "local_ai.cpp"
+      ],
+      "error_id": "ERR_0006"
+    },
+    {
+      "type": "bugfix",
+      "description": "LocalAI MT Prompt Language Mapping & Jinja Chat Roles: Test translation returned raw Chinese source text instead of translated Vietnamese",
+      "files": [
+        "LocalAiTranslationPrompt.kt",
+        "LocalAiTranslationRepository.kt"
+      ],
+      "error_id": "ERR_0007"
+    },
+    {
+      "type": "bugfix",
+      "description": "AI Router / Antigravity: Stream interrupted: Cấu hình AI chưa hợp lệ on Antigravity models",
+      "files": [
+        "AiRouterRepository.kt",
+        "AntigravityHandler.kt"
+      ],
+      "error_id": "ERR_0008"
+    },
+    {
+      "type": "bugfix",
+      "description": "AI Router / WebLoginSheet: WebView black screen and cramped height during ChatGPT / Gemini web login",
+      "files": [
+        "WebLoginSheet.kt"
+      ],
+      "error_id": "ERR_0009"
+    },
+    {
+      "type": "bugfix",
+      "description": "AI Router / Antigravity: Google Antigravity HTTP 429 RESOURCE_EXHAUSTED on high-reasoning models in aicode-consumers",
+      "files": [
+        "AntigravityHandler.kt",
+        "AiProviderFailure.kt"
+      ],
+      "error_id": "ERR_0010"
+    },
+    {
+      "type": "bugfix",
+      "description": "AI Router / Antigravity: Antigravity all models 429 RESOURCE_EXHAUSTED due to custom systemInstruction",
+      "files": [
+        "AntigravityHandler.kt",
+        "AntigravityProjectResolver.kt"
+      ],
+      "error_id": "ERR_0011"
+    },
+    {
+      "type": "bugfix",
+      "description": "AI Router / WebLoginSheet: Gemini Web Google sign-in blocked on WebView and UI button layout overflow",
+      "files": [
+        "WebLoginSheet.kt"
+      ],
+      "error_id": "ERR_0015"
+    },
+    {
+      "type": "bugfix",
+      "description": "AI Router / Web Providers: ChatGPT Web 403 and WebView insecure browser blocks resolved",
+      "files": [
+        "ChatGptWebSessionManager.kt",
+        "ChatGptWebHandler.kt",
+        "GeminiWebSessionManager.kt",
+        "WebLoginSheet.kt",
+        "AiProviderFailure.kt"
+      ],
+      "error_id": "ERR_0016"
     }
   ],
   "context_notes": [

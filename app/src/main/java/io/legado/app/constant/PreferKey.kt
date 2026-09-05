@@ -406,6 +406,8 @@ object PreferKey {
     const val translationAutoEnabled = "translationAutoEnabled"
     const val translationAutoWifiOnly = "translationAutoWifiOnly"
     const val translationAutoNextChapters = "translationAutoNextChapters"
+    const val rewriteAutoEnabled = "rewriteAutoEnabled"
+    const val rewriteAutoNextChapters = "rewriteAutoNextChapters"
     const val translationDynamicUiEnabled = "translationDynamicUiEnabled"
     const val quickTranslationPronounMode = "quickTranslationPronounMode"
     const val translationPromptPipelineInitialized = "translationPromptPipelineInitialized"
@@ -417,6 +419,13 @@ object PreferKey {
     const val nmtRepetitionPenalty = "nmtRepetitionPenalty"
     const val nmtNoRepeatBigram = "nmtNoRepeatBigram"
     const val nmtRetryMissingTerms = "nmtRetryMissingTerms"
+    const val localAiModelPath = "localAiModelPath"
+    const val localAiTemperature = "localAiTemperature"
+    const val localAiTopP = "localAiTopP"
+    const val localAiTopK = "localAiTopK"
+    const val localAiRepetitionPenalty = "localAiRepetitionPenalty"
+    const val localAiMaxCharsPerChunk = "localAiMaxCharsPerChunk"
+    const val localAiPrompt = "localAiPrompt"
     const val aiRewritePresets = "aiRewritePresets"
     const val aiChatBubbleEnabled = "aiChatBubbleEnabled"
     const val aiChatBubblePortraitX = "aiChatBubblePortraitX"
@@ -466,6 +475,9 @@ object PreferKey {
     const val eyeProtectionSchedule = "eyeProtectionSchedule"
     const val eyeProtectionStartTime = "eyeProtectionStartTime"
     const val eyeProtectionEndTime = "eyeProtectionEndTime"
+
+    // AI Model Discovery
+    const val modelDiscoveryIntervalHours = "modelDiscoveryIntervalHours"
 }
 
 object ReadMenuBlurMode {

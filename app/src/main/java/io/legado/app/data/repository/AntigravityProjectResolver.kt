@@ -4,10 +4,16 @@ import com.google.gson.JsonObject
 import java.util.UUID
 
 internal const val ANTIGRAVITY_PRODUCTION_BASE_URL = "https://cloudcode-pa.googleapis.com"
-/** Managed IDE transport host; project discovery/onboarding deliberately stays on production. */
+/** Managed IDE transport host; falls back to production for general availability. */
 internal const val ANTIGRAVITY_IDE_BASE_URL = "https://daily-cloudcode-pa.googleapis.com"
-internal const val ANTIGRAVITY_IDE_USER_AGENT = "antigravity/ide/2.1.1 darwin/arm64"
+internal const val ANTIGRAVITY_IDE_USER_AGENT = "antigravity/ide/2.9.1 darwin/arm64"
 internal const val ANTIGRAVITY_OAUTH_USES_PKCE = false
+
+internal const val ANTIGRAVITY_DEFAULT_SYSTEM =
+    "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.\n" +
+    "You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.\n" +
+    "**Absolute paths only**\n" +
+    "**Proactiveness**"
 
 internal fun antigravityCodeAssistHeaders(accessToken: String): Map<String, String> = mapOf(
     "Authorization" to "Bearer $accessToken",
@@ -77,3 +83,33 @@ private fun JsonObject.antigravityProjectId(): String? {
 
 private fun JsonObject.stringValue(name: String): String? =
     get(name)?.takeIf { it.isJsonPrimitive }?.asString
+
+val ANTIGRAVITY_SUPPORTED_MODELS: List<io.legado.app.domain.model.AiAvailableModel> = listOf(
+    // Gemini 3.8 Flash (released 2026-09-02)
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.8-flash-high", "Gemini 3.8 (High)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.8-flash-medium", "Gemini 3.8 (Medium)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.8-flash-low", "Gemini 3.8 (Low)", 1_000_000, 64_000),
+
+    // Gemini 3.7 Flash
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-high", "Gemini 3.7 Flash (High)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-tiered", "Gemini 3.7 Flash (Tiered)", 1_000_000, 64_000),
+
+    // Gemini 3.6 Flash
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.6-flash-high", "Gemini 3.6 Flash (High)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.6-flash-medium", "Gemini 3.6 Flash (Medium)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.6-flash-low", "Gemini 3.6 Flash (Low)", 1_000_000, 64_000),
+
+    // Gemini 3.1 Pro
+    io.legado.app.domain.model.AiAvailableModel("gemini-pro-agent", "Gemini 3.1 Pro (High)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.1-pro-low", "Gemini 3.1 Pro (Low)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite", 1_000_000, 64_000),
+
+    // Claude (via Antigravity backend)
+    io.legado.app.domain.model.AiAvailableModel("claude-opus-4-6-thinking", "Claude Opus 4.6 (Thinking)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("claude-sonnet-4-6", "Claude Sonnet 4.6 (Thinking)", 1_000_000, 64_000),
+
+    // GPT-OSS
+    io.legado.app.domain.model.AiAvailableModel("gpt-oss-120b-medium", "GPT-OSS 120B Medium", 128_000, 64_000),
+)

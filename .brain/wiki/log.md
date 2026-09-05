@@ -17,3 +17,26 @@ _Append-only operation history._
 - `2026-08-26T01:30:15` — UPDATE [entity] project-legado-with-md3-main
 - `2026-08-26T01:30:28` — CREATE [pattern] WebService TTS - AudioPlaybackLatency Pattern → .brain\wiki\patterns\webservice-tts-audioplaybacklatency-pattern.md
 - `2026-08-26T01:30:28` — UPDATE [entity] project-legado-with-md3-main
+- `2026-08-26T10:19:28` — CREATE [pattern] LocalAI GGUF Loading - ARCHITECTURE_AND_RUNTIME Pattern → .brain\wiki\patterns\localai-gguf-loading-architecture-and-runtime-pattern.md
+- `2026-08-26T10:19:28` — UPDATE [entity] project-legado-with-md3-main
+- `2026-08-26T18:58:29` — CREATE [pattern] LocalAI Model Import & Path Auto-Detection - CONFIG_AND_UI_STATE_DESYNC Pattern → .brain\wiki\patterns\localai-model-import-path-auto-detection-config-and-ui-state-desync-pattern.md
+- `2026-08-26T18:58:29` — UPDATE [entity] project-legado-with-md3-main
+- `2026-08-26T19:22:40` — CREATE [pattern] LocalAI Native Bridge R8 Proguard Obfuscation - PROGUARD_OBFUSCATION_CRASH Pattern → .brain\wiki\patterns\localai-native-bridge-r8-proguard-obfuscation-proguard-obfuscation-crash-pattern.md
+- `2026-08-26T19:22:40` — UPDATE [entity] project-legado-with-md3-main
+- `2026-08-26T19:55:35` — CREATE [pattern] LocalAI MT Prompt Language Mapping & Jinja Chat Roles - PROMPT_AND_CHAT_ROLE_FORMATTING Pattern → .brain\wiki\patterns\localai-mt-prompt-language-mapping-jinja-chat-roles-prompt-and-chat-role-formatting-pattern.md
+- `2026-08-26T19:55:35` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-04T16:38:13` — CREATE [pattern] AI Router / Antigravity - CONFIGURATION Pattern → .brain\wiki\patterns\ai-router-antigravity-configuration-pattern.md
+- `2026-09-04T16:38:13` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-04T16:38:23` — CREATE [pattern] AI Router / WebLoginSheet - UI_RENDERING Pattern → .brain\wiki\patterns\ai-router-webloginsheet-ui-rendering-pattern.md
+- `2026-09-04T16:38:23` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-04T20:59:00` — CREATE [pattern] AI Router / Antigravity - RATE_LIMIT Pattern → .brain\wiki\patterns\ai-router-antigravity-rate-limit-pattern.md
+- `2026-09-04T20:59:00` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-04T21:11:28` — CREATE [pattern] AI Router / Antigravity - PROTOCOL_PAYLOAD Pattern → .brain\wiki\patterns\ai-router-antigravity-protocol-payload-pattern.md
+- `2026-09-04T21:11:28` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-04T23:13:42` — CREATE [pattern] AI Router / WebLoginSheet - UI_AND_AUTHENTICATION Pattern → .brain\wiki\patterns\ai-router-webloginsheet-ui-and-authentication-pattern.md
+- `2026-09-04T23:13:42` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-05T00:06:37` — CREATE [pattern] AI Router / Web Providers - AUTHENTICATION_AND_WEB_AUTH Pattern → .brain\wiki\patterns\ai-router-web-providers-authentication-and-web-auth-pattern.md
+- `2026-09-05T00:06:37` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-05T00:06:43` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-05T00:06:43` — CREATE [insight] Session 2026-09-05 00-06-43 → .brain\wiki\insights\session-2026-09-05-00-06-43.md
+- `2026-09-05T00:06:43` — UPDATE [entity] project-legado-with-md3-main

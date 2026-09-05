@@ -206,8 +206,9 @@ object AiPromptCatalog {
             description = "Hiệu đính theo yêu cầu nhưng giữ nguyên dữ kiện và tính liên tục.",
             prompt = """
                 Viết lại văn bản theo yêu cầu của người dùng trong khi giữ nguyên sự kiện,
-                quan hệ nhân quả, tên riêng, số liệu và các thuật ngữ đã khóa. Không tự thêm
-                tình tiết. Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
+                quan hệ nhân quả, tên riêng, số liệu và các thuật ngữ đã khóa. BẮT BUỘC giữ nguyên
+                chính xác số lượng đoạn văn, dấu xuống dòng và khoảng trắng chuẩn sau dấu câu.
+                Không tự thêm tình tiết. Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
         AiPromptCatalogTemplate(
@@ -216,7 +217,7 @@ object AiPromptCatalog {
             name = "Chuyển convert → Tự nhiên",
             description = "Biến đổi văn phong convert/dịch thô máy sang tiếng Việt tự nhiên, thuần Việt.",
             prompt = """
-                Viết lại đoạn văn từ văn phong convert (dịch máy QT/NMT) sang tiếng Việt tự nhiên.
+                Viết lại văn bản từ văn phong convert (dịch máy QT/NMT) sang tiếng Việt tự nhiên.
                 
                 Quy tắc bắt buộc:
                 1. Đảo cấu trúc câu Hán-Việt về thuận tiếng Việt (ví dụ: "A đối với B nói" → "A nói với B").
@@ -226,7 +227,8 @@ object AiPromptCatalog {
                 5. Thêm liên từ, biến tấu nhịp điệu câu, tránh câu ghép dài lê thê kiểu Hán văn.
                 6. Giữ nguyên 100% sự kiện, quan hệ nhân quả, tên riêng, số liệu và thuật ngữ đã khóa.
                 7. Không tự thêm tình tiết mới, không lược bỏ thông tin quan trọng.
-                Chỉ trả về đoạn văn hoàn chỉnh sau khi viết lại.
+                8. BẮT BUỘC giữ nguyên cấu trúc dòng, bố cục phân đoạn và các câu thoại của bản gốc (mỗi đoạn cách nhau bằng dấu xuống dòng rõ ràng). Tuyệt đối KHÔNG gộp các đoạn thành một khối văn bản duy nhất. Đảm bảo có khoảng trắng đúng chuẩn sau các dấu câu (chấm, phẩy, hỏi, than, ngoặc kép).
+                Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
         AiPromptCatalogTemplate(
@@ -243,6 +245,7 @@ object AiPromptCatalog {
                 3. Xưng hô đúng quan hệ: sư đồ, phụ tử, huynh đệ, bằng hữu, kẻ thù...
                 4. Giữ nguyên nội dung và ý định của lời nói, chỉ làm mượt mà cách phát ngôn.
                 5. Câu thoại gãy gọn, tự nhiên; giữ đúng tên nhân vật và thuật ngữ đã khóa.
+                6. BẮT BUỘC giữ nguyên các dấu xuống dòng và bố cục thoại của từng đoạn. Đảm bảo có khoảng trắng đúng chuẩn sau các dấu câu.
                 Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
@@ -260,6 +263,7 @@ object AiPromptCatalog {
                 3. Tả rõ cảm giác vật lý: luồng gió, chấn động, va chạm, sát khí, sự đau đớn và hao tổn thể lực.
                 4. Giữ chính xác tên chiêu thức, pháp bảo, cấp độ và thuật ngữ đã khóa.
                 5. Tuyệt đối không thay đổi kết quả giao tranh hoặc sức mạnh thực tế của nhân vật.
+                6. BẮT BUỘC giữ nguyên cấu trúc phân đoạn và các dòng hành động. Đảm bảo có khoảng trắng chuẩn sau các dấu câu.
                 Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
@@ -277,6 +281,7 @@ object AiPromptCatalog {
                 3. Tuyệt đối không để lọt từ ngữ hiện đại, tiếng lóng đương đại vào bối cảnh cổ đại.
                 4. Lời kể sâu lắng, có chất thơ và nhịp điệu văn học.
                 5. Giữ nguyên 100% cốt truyện, tên riêng, công pháp, cảnh giới và số liệu.
+                6. BẮT BUỘC giữ nguyên cấu trúc phân đoạn và bố cục dòng. Đảm bảo có khoảng trắng chuẩn sau các dấu câu.
                 Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),

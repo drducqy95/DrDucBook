@@ -50,7 +50,6 @@ class AiProviderEditViewModel(
     private val aiProfileGateway: AiProfileGateway,
     private val aiRouterGateway: AiRouterGateway,
     private val aiTextGateway: AiTextGateway,
-    private val localAiEngineGateway: LocalAiEngineGateway,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -187,13 +186,6 @@ class AiProviderEditViewModel(
             AiProviderEditIntent.TestConnection -> testConnection()
             AiProviderEditIntent.SaveProvider -> saveProvider()
             AiProviderEditIntent.SyncModels -> syncModels()
-            AiProviderEditIntent.ChooseLocalModel -> {
-                _effects.tryEmit(AiProviderEditEffect.OpenLocalModelPicker)
-            }
-            AiProviderEditIntent.OpenLocalModelCatalog -> {
-                _effects.tryEmit(AiProviderEditEffect.OpenUrl(ExternalAssetCatalog.ggufFolderUrl))
-            }
-            is AiProviderEditIntent.LocalModelSelected -> importLocalModel(intent.uri)
             AiProviderEditIntent.DeleteProvider -> deleteProvider()
             is AiProviderEditIntent.DeleteModel -> deleteModel(intent.modelProfileId)
         }
@@ -442,87 +434,6 @@ class AiProviderEditViewModel(
                 )
             }
             _uiState.update { it.copy(isSaving = false, isFetchingModels = false) }
-        }
-    }
-
-    private var importJob: Job? = null
-
-    private fun importLocalModel(uri: String) {
-        importJob?.cancel()
-        importJob = viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isSaving = true) }
-            runCatching {
-                val metadata = localAiEngineGateway.importModel(uri).getOrThrow()
-                val provider = aiProfileGateway.saveProvider(
-                    AiProviderDraft(
-                        providerId = _uiState.value.providerId,
-                        providerName = "Local AI · ${metadata.name}",
-                        protocol = AiProtocol.LOCAL_GGUF,
-                        baseUrl = metadata.path,
-                        modelsUrl = null,
-                        apiKey = "",
-                    )
-                )
-                val model = aiProfileGateway.saveModel(
-                    AiModelDraft(
-                        providerId = provider.id,
-                        modelName = metadata.name,
-                        modelId = metadata.path,
-                        contextWindow = metadata.contextWindow,
-                        maxOutputTokens = metadata.contextWindow,
-                        temperature = 0.7f,
-                    )
-                )
-                aiProfileGateway.saveTaskPreset(
-                    AiTaskPresetDraft(
-                        taskType = AiTaskType.TRANSLATE_CHAPTER,
-                        name = "Dịch local · ${metadata.name}",
-                        modelProfileId = model.id,
-                        promptTemplate = TranslationConstants.DEFAULT_PROMPT,
-                        params = AiGenerationParams(
-                            temperature = 0.7f,
-                            maxOutputTokens = metadata.contextWindow,
-                            topP = 0.6f,
-                            topK = 20,
-                            repetitionPenalty = 1.05f,
-                        ),
-                        runtimeOptions = AiTaskRuntimeOptions(
-                            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
-                            maxInputChars = metadata.runtimeProfile.preferredChunkChars,
-                            concurrentRequests = 1,
-                            retryCount = 2,
-                        ),
-                        enabled = true,
-                        makeDefault = true,
-                    )
-                )
-                metadata to provider
-            }.onSuccess { (metadata, provider) ->
-                _uiState.update {
-                    it.copy(
-                        providerId = provider.id,
-                        providerName = provider.name,
-                        protocol = AiProtocol.LOCAL_GGUF,
-                        baseUrl = metadata.path,
-                        modelsUrl = "",
-                        apiKey = "",
-                        selectedProviderPresetId = "local_hy_mt2",
-                    )
-                }
-                _effects.tryEmit(
-                    AiProviderEditEffect.ShowMessage(appCtx.getString(R.string.ai_local_model_imported))
-                )
-            }.onFailure { error ->
-                _effects.tryEmit(
-                    AiProviderEditEffect.ShowMessage(
-                        appCtx.getString(
-                            R.string.ai_local_model_import_failed,
-                            error.message ?: "Unknown error",
-                        )
-                    )
-                )
-            }
-            _uiState.update { it.copy(isSaving = false) }
         }
     }
 

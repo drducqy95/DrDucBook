@@ -8,7 +8,9 @@ import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DashboardCustomize
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FilterList
@@ -134,6 +136,12 @@ object AppIcons {
                 if (selected) MiuixIcons.Regular.Album else MiuixIcons.Regular.Album
             } else {
                 if (selected) Icons.Default.Explore else Icons.Outlined.Explore
+            }
+
+            MainDestination.Downloads -> if (isMiuix) {
+                MiuixIcons.Regular.Notes
+            } else {
+                if (selected) Icons.Default.Download else Icons.Outlined.Download
             }
 
             MainDestination.Workspace -> if (isMiuix) {

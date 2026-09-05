@@ -66,17 +66,9 @@ fun AiProviderEditRouteScreen(
     )
 ) {
     val context = LocalContext.current
-    val modelPicker = rememberLauncherForActivityResult(
-        contract = FilteredOpenDocumentContract("application/octet-stream"),
-    ) { uri ->
-        uri?.let { viewModel.onIntent(AiProviderEditIntent.LocalModelSelected(it.toString())) }
-    }
     LaunchedEffect(Unit) {
         viewModel.effects.collectLatest { effect ->
             when (effect) {
-                AiProviderEditEffect.OpenLocalModelPicker -> {
-                    modelPicker.launch(arrayOf("application/octet-stream", "application/x-gguf"))
-                }
                 is AiProviderEditEffect.OpenUrl -> {
                     context.openUrl(effect.url)
                 }
@@ -170,7 +162,6 @@ fun AiProviderEditScreen(
                 is AiProviderEditEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
                 AiProviderEditEffect.NavigateBack -> onBackClick()
                 AiProviderEditEffect.NavigateBackAfterDelete -> onBackClick()
-                AiProviderEditEffect.OpenLocalModelPicker -> Unit
                 is AiProviderEditEffect.OpenUrl -> Unit
             }
         }
@@ -218,14 +209,16 @@ fun AiProviderEditScreen(
                             "OpenAI Responses",
                             "Anthropic Messages",
                             "Google Gemini",
-                            "Local GGUF",
+                            "Google Gemini (Web)",
+                            "ChatGPT (Web)",
                         ),
                         entryValues = arrayOf(
                             AiProtocol.OPENAI_CHAT_COMPLETIONS,
                             AiProtocol.OPENAI_RESPONSES,
                             AiProtocol.ANTHROPIC_MESSAGES,
                             AiProtocol.GEMINI_GENERATE_CONTENT,
-                            AiProtocol.LOCAL_GGUF,
+                            AiProtocol.GEMINI_WEB,
+                            AiProtocol.CHATGPT_WEB,
                         ),
                         onValueChange = { onIntent(AiProviderEditIntent.UpdateProtocol(it)) }
                     )
@@ -236,34 +229,19 @@ fun AiProviderEditScreen(
                         entryValues = providerPresetValues,
                         onValueChange = { onIntent(AiProviderEditIntent.ApplyProviderPreset(it)) }
                     )
-                    if (state.protocol == AiProtocol.LOCAL_GGUF) {
-                        ClickableSettingItem(
-                            title = stringResource(R.string.ai_local_choose_model),
-                            description = state.baseUrl.ifBlank {
-                                stringResource(R.string.ai_local_choose_model_summary)
-                            },
-                            onClick = { onIntent(AiProviderEditIntent.ChooseLocalModel) },
-                        )
-                        ClickableSettingItem(
-                            title = stringResource(R.string.ai_local_download_model_catalog),
-                            description = stringResource(R.string.ai_local_download_model_catalog_summary),
-                            onClick = { onIntent(AiProviderEditIntent.OpenLocalModelCatalog) },
-                        )
-                    } else {
-                        InputSettingItem(
-                            title = stringResource(R.string.ai_base_url),
-                            value = state.baseUrl,
-                            onConfirm = { onIntent(AiProviderEditIntent.UpdateBaseUrl(it)) }
-                        )
-                        ClickableSettingItem(
-                            title = stringResource(R.string.ai_api_key),
-                            description = stringResource(R.string.ai_api_key_summary),
-                            onClick = {
-                                apiKeyDraft = state.apiKey
-                                showApiKeyDialog = true
-                            }
-                        )
-                    }
+                    InputSettingItem(
+                        title = stringResource(R.string.ai_base_url),
+                        value = state.baseUrl,
+                        onConfirm = { onIntent(AiProviderEditIntent.UpdateBaseUrl(it)) }
+                    )
+                    ClickableSettingItem(
+                        title = stringResource(R.string.ai_api_key),
+                        description = stringResource(R.string.ai_api_key_summary),
+                        onClick = {
+                            apiKeyDraft = state.apiKey
+                            showApiKeyDialog = true
+                        }
+                    )
                     ClickableSettingItem(
                         title = if (state.isTesting) "${stringResource(R.string.ai_test_connection)}..." else stringResource(R.string.ai_test_connection),
                         onClick = {
@@ -291,13 +269,11 @@ fun AiProviderEditScreen(
                         title = stringResource(R.string.ai_add_model_manually),
                         onClick = { onIntent(AiProviderEditIntent.AddModel) }
                     )
-                    if (state.protocol != AiProtocol.LOCAL_GGUF) {
-                        ClickableSettingItem(
-                            title = stringResource(R.string.ai_import_models_from_api_key),
-                            description = stringResource(R.string.ai_import_models_from_api_key_summary),
-                            onClick = { onIntent(AiProviderEditIntent.SyncModels) }
-                        )
-                    }
+                    ClickableSettingItem(
+                        title = stringResource(R.string.ai_import_models_from_api_key),
+                        description = stringResource(R.string.ai_import_models_from_api_key_summary),
+                        onClick = { onIntent(AiProviderEditIntent.SyncModels) }
+                    )
                 }
             }
 

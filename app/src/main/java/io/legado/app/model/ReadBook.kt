@@ -853,6 +853,9 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 val book = book!!
                 val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index)!!
                 val originalContent = BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
+                if (book.config.detectedSourceLanguage == null && !originalContent.isNullOrBlank()) {
+                    book.detectAndCacheSourceLanguage(originalContent.take(500))
+                }
                 val content = resolveReaderContent(book, chapter, originalContent) ?: originalContent
                 contentLoadFinishAwait(book, chapter, content, upContent, resetPageOffset)
                 success?.invoke()
@@ -1008,6 +1011,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             TranslationConstants.PROVIDER_GOOGLE -> ReaderContentMode.GOOGLE
             TranslationConstants.PROVIDER_ML_KIT -> ReaderContentMode.ML_KIT
             TranslationConstants.PROVIDER_QUICK_TRANSLATOR -> ReaderContentMode.QUICK_TRANSLATOR
+            TranslationConstants.PROVIDER_LOCAL_AI -> ReaderContentMode.LOCAL_AI
             TranslationConstants.PROVIDER_NMT -> ReaderContentMode.NMT
             else -> ReaderContentMode.AI
         }
@@ -1023,10 +1027,14 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         originalContentOverride: String? = null,
     ): String? {
         val originalContent = originalContentOverride ?: BookHelp.getContent(book, chapter) ?: return null
+        if (book.config.detectedSourceLanguage == null && originalContent.isNotBlank()) {
+            book.detectAndCacheSourceLanguage(originalContent.take(500))
+        }
         val fallbackMode = when (TranslationConfig.llmProvider) {
             TranslationConstants.PROVIDER_GOOGLE -> ReaderContentMode.GOOGLE
             TranslationConstants.PROVIDER_ML_KIT -> ReaderContentMode.ML_KIT
             TranslationConstants.PROVIDER_QUICK_TRANSLATOR -> ReaderContentMode.QUICK_TRANSLATOR
+            TranslationConstants.PROVIDER_LOCAL_AI -> ReaderContentMode.LOCAL_AI
             TranslationConstants.PROVIDER_NMT -> ReaderContentMode.NMT
             else -> ReaderContentMode.AI
         }
@@ -1076,22 +1084,40 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             ReaderContentMode.GOOGLE,
             ReaderContentMode.ML_KIT,
             ReaderContentMode.AI,
-            ReaderContentMode.NMT -> {
+            ReaderContentMode.LOCAL_AI,
+            ReaderContentMode.NMT,
+            ReaderContentMode.REWRITE -> {
                 val provider = when (mode) {
                     ReaderContentMode.GOOGLE -> TranslationConstants.PROVIDER_GOOGLE
                     ReaderContentMode.ML_KIT -> TranslationConstants.PROVIDER_ML_KIT
                     ReaderContentMode.AI -> TranslationConstants.PROVIDER_APP_AI
+                    ReaderContentMode.LOCAL_AI -> TranslationConstants.PROVIDER_LOCAL_AI
                     ReaderContentMode.NMT -> TranslationConstants.PROVIDER_NMT
-                    else -> error("Unsupported provider mode: $mode")
+                    ReaderContentMode.REWRITE -> TranslationConstants.PROVIDER_REWRITE
+                    ReaderContentMode.RAW,
+                    ReaderContentMode.TRANSLATION,
+                    ReaderContentMode.HAN_VIET,
+                    ReaderContentMode.QUICK_TRANSLATOR -> error("Unsupported provider mode: $mode")
+                }
+                val targetLang = if (mode == ReaderContentMode.REWRITE) {
+                    TranslationConstants.TARGET_VIETNAMESE
+                } else {
+                    TranslationConfig.llmTargetLanguage
                 }
                 TranslationManager.getCachedTranslation(
                     book,
                     chapter,
                     provider,
-                    TranslationConfig.llmTargetLanguage,
+                    targetLang,
                 ) ?: run {
-                    if (provider == TranslationConfig.llmProvider) {
-                        TranslationManager.startTranslation(book, chapter)?.let { taskFlow ->
+                    if (provider == TranslationConfig.llmProvider || mode == ReaderContentMode.REWRITE) {
+                        TranslationManager.startTranslation(
+                            book,
+                            chapter,
+                            forceRetranslate = false,
+                            provider = provider,
+                            targetLanguage = targetLang,
+                        )?.let { taskFlow ->
                             startTranslationObserver(taskFlow, book, chapter)
                         }
                     }

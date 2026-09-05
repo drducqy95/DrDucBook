@@ -123,6 +123,96 @@ fun AiTextRewriteSheet(
                             expanded = originalTextExpanded,
                             onToggleExpand = { originalTextExpanded = !originalTextExpanded },
                         )
+
+                        if (state.isWholeChapterMode) {
+                            Spacer(Modifier.height(16.dp))
+                            RewriteSwitchRow(
+                                title = stringResource(R.string.auto_rewrite_ahead),
+                                checked = state.autoRewriteEnabled,
+                                onCheckedChange = { onIntent(ReadBookIntent.SetAutoRewriteEnabled(it)) },
+                            )
+                            if (state.autoRewriteEnabled) {
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    AppText(stringResource(R.string.auto_rewrite_chapter_count))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        androidx.compose.material3.TextButton(
+                                            onClick = {
+                                                onIntent(
+                                                    ReadBookIntent.SetAutoRewriteNextChapters(
+                                                        (state.autoRewriteNextChapters - 1).coerceAtLeast(0)
+                                                    )
+                                                )
+                                            },
+                                        ) { AppText("-") }
+                                        AppText(state.autoRewriteNextChapters.toString())
+                                        androidx.compose.material3.TextButton(
+                                            onClick = {
+                                                onIntent(
+                                                    ReadBookIntent.SetAutoRewriteNextChapters(
+                                                        (state.autoRewriteNextChapters + 1).coerceAtMost(20)
+                                                    )
+                                                )
+                                            },
+                                        ) { AppText("+") }
+                                    }
+                                }
+                                if (state.autoRewriteTotalChapters > 0 || state.autoRewriteMessage != null) {
+                                    Spacer(Modifier.height(8.dp))
+                                    NormalCard(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        containerColor = LegadoTheme.colorScheme.surfaceContainerHigh,
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                                        ) {
+                                            AppText(
+                                                text = stringResource(
+                                                    R.string.auto_rewrite_progress,
+                                                    state.autoRewriteCompletedChapters,
+                                                    state.autoRewriteTotalChapters,
+                                                ),
+                                                style = LegadoTheme.typography.titleSmall,
+                                            )
+                                            if (state.autoRewriteTotalChapters > 0) {
+                                                androidx.compose.material3.LinearProgressIndicator(
+                                                    progress = {
+                                                        (state.autoRewriteCompletedChapters.toFloat() /
+                                                            state.autoRewriteTotalChapters.toFloat())
+                                                            .coerceIn(0f, 1f)
+                                                    },
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                )
+                                            }
+                                            if (state.autoRewriteCurrentChapter.isNotBlank()) {
+                                                AppText(
+                                                    text = stringResource(
+                                                        R.string.auto_rewrite_current_chapter,
+                                                        state.autoRewriteCurrentChapter,
+                                                    ),
+                                                    style = LegadoTheme.typography.bodySmall,
+                                                )
+                                            }
+                                            state.autoRewriteMessage?.let { message ->
+                                                AppText(
+                                                    text = message,
+                                                    style = LegadoTheme.typography.bodySmall,
+                                                    color = LegadoTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            androidx.compose.material3.HorizontalDivider()
+                        }
+
                         Spacer(Modifier.height(16.dp))
 
                         Row(
@@ -453,3 +543,32 @@ private fun CollapsibleTextPreview(
         }
     }
 }
+
+@Composable
+private fun RewriteSwitchRow(
+    title: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppText(
+            text = title,
+            color = if (enabled) {
+                LegadoTheme.colorScheme.onSurface
+            } else {
+                LegadoTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            },
+        )
+        androidx.compose.material3.Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange,
+        )
+    }
+}
+

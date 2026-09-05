@@ -140,6 +140,16 @@ object MainIntent {
         }
     }
 
+    fun createMediaDownloadsIntent(context: Context): Intent {
+        return createLauncherIntent(context).apply {
+            putExtra(EXTRA_START_ROUTE, MainRouteConst.ROUTE_MEDIA_DOWNLOADS)
+        }
+    }
+
+    fun createDownloadCacheConfigIntent(context: Context): Intent {
+        return createIntent(context, ConfigTag.DOWNLOAD_CACHE_CONFIG)
+    }
+
     fun createSearchIntent(
         context: Context,
         key: String? = null,

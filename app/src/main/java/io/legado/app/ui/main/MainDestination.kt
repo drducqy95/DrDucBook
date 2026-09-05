@@ -24,6 +24,11 @@ sealed class MainDestination(
         labelId = R.string.discovery
     )
 
+    object Downloads : MainDestination(
+        route = "downloads",
+        labelId = R.string.download
+    )
+
     object Workspace : MainDestination(
         route = "workspace",
         labelId = R.string.workspace_title
@@ -47,6 +52,7 @@ sealed class MainDestination(
             Home,
             Bookshelf,
             Explore,
+            Downloads,
             Workspace,
             My
         )
@@ -72,6 +78,7 @@ val MainDestination.customIconPath: String
         MainDestination.Home -> ThemeConfig.navIconHome
         MainDestination.Bookshelf -> ThemeConfig.navIconBookshelf
         MainDestination.Explore -> ThemeConfig.navIconExplore
+        MainDestination.Downloads -> ""
         MainDestination.Workspace -> ThemeConfig.navIconWorkspace
         MainDestination.My -> ThemeConfig.navIconMy
     }

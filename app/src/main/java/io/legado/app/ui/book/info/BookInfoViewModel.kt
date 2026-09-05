@@ -29,6 +29,7 @@ import io.legado.app.domain.usecase.ChangeSourceMigrationOptions
 import io.legado.app.domain.usecase.ClearBookCacheUseCase
 import io.legado.app.domain.usecase.TranslateChapterUseCase
 import io.legado.app.domain.usecase.TranslateDynamicBookUiUseCase
+import io.legado.app.domain.usecase.TranslateDynamicUiTextUseCase
 import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
@@ -99,6 +100,7 @@ class BookInfoViewModel(
     private val imageLoader: ImageLoader,
     private val translateChapterUseCase: TranslateChapterUseCase,
     private val translateDynamicBookUiUseCase: TranslateDynamicBookUiUseCase,
+    private val translateDynamicUiTextUseCase: TranslateDynamicUiTextUseCase,
 ) : BaseViewModel(application) {
 
     val allGroups = bookGroupRepository.flowAll()
@@ -1550,13 +1552,47 @@ class BookInfoViewModel(
             }
 
             val rawUi = bookSnapshot.toBookInfoBookUi()
+            val translatedAuthor = bookSnapshot.author.takeIf(String::isNotBlank)?.let { author ->
+                translateDynamicUiTextUseCase.executeAuthorName(
+                    scopeKey = scopeKey,
+                    originalText = author,
+                    book = bookSnapshot,
+                ).getOrElse { translated(bookSnapshot.author).orEmpty() }
+            } ?: translated(bookSnapshot.author).orEmpty()
+
+            val translatedRealAuthor = bookSnapshot.getRealAuthor().takeIf(String::isNotBlank)?.let { realAuthor ->
+                translateDynamicUiTextUseCase.executeAuthorName(
+                    scopeKey = scopeKey,
+                    originalText = realAuthor,
+                    book = bookSnapshot,
+                ).getOrElse { translated(bookSnapshot.getRealAuthor()).orEmpty() }
+            } ?: translated(bookSnapshot.getRealAuthor()).orEmpty()
+
+            val translatedDurChapter = bookSnapshot.durChapterTitle?.takeIf(String::isNotBlank)?.let { title ->
+                translateDynamicUiTextUseCase.executeChapterTitle(
+                    scopeKey = scopeKey,
+                    originalText = title,
+                    book = bookSnapshot,
+                    contextText = contextText,
+                ).getOrElse { translated(bookSnapshot.durChapterTitle) }
+            } ?: translated(bookSnapshot.durChapterTitle)
+
+            val translatedLatestChapter = bookSnapshot.latestChapterTitle?.takeIf(String::isNotBlank)?.let { title ->
+                translateDynamicUiTextUseCase.executeChapterTitle(
+                    scopeKey = scopeKey,
+                    originalText = title,
+                    book = bookSnapshot,
+                    contextText = contextText,
+                ).getOrElse { translated(bookSnapshot.latestChapterTitle) }
+            } ?: translated(bookSnapshot.latestChapterTitle)
+
             val translatedUi = rawUi.copy(
                 name = translated(bookSnapshot.name).orEmpty(),
-                author = translated(bookSnapshot.author).orEmpty(),
-                realAuthor = translated(bookSnapshot.getRealAuthor()).orEmpty(),
+                author = translatedAuthor,
+                realAuthor = translatedRealAuthor,
                 originName = translated(bookSnapshot.originName).orEmpty(),
-                durChapterTitle = translated(bookSnapshot.durChapterTitle),
-                latestChapterTitle = translated(bookSnapshot.latestChapterTitle),
+                durChapterTitle = translatedDurChapter,
+                latestChapterTitle = translatedLatestChapter,
                 displayIntro = if (bookSnapshot.customIntro.isNullOrBlank()) {
                     translated(bookSnapshot.intro)
                 } else {

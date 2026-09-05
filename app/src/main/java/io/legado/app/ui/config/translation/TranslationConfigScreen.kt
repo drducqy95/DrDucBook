@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -97,12 +99,53 @@ fun TranslationConfigScreen(
     val quickTranslationGateway: QuickTranslationGateway = koinInject()
     val aiProfileGateway: AiProfileGateway = koinInject()
     val aiRouterGateway: AiRouterGateway = koinInject()
+    val localAiEngineGateway: io.legado.app.domain.gateway.LocalAiEngineGateway = koinInject()
+    val localAiTranslationGateway: io.legado.app.domain.gateway.LocalAiTranslationGateway = koinInject()
     val aiPresets by aiProfileGateway.observePresets().collectAsState(initial = emptyList())
     val aiProviders by aiProfileGateway.observeProviders().collectAsState(initial = emptyList())
     val aiModels by aiProfileGateway.observeModels().collectAsState(initial = emptyList())
     val aiRouterSnapshot by aiRouterGateway.observeSnapshot().collectAsState(
         initial = AiRouterSnapshot()
     )
+    var isTestingLocalAi by remember { mutableStateOf(false) }
+    var testLocalAiResult by remember { mutableStateOf("") }
+    var localAiModelPath by remember { mutableStateOf(TranslationConfig.localAiModelPath) }
+    var localAiMetadata by remember { mutableStateOf<io.legado.app.domain.gateway.LocalAiModelMetadata?>(null) }
+    var isImportingLocalAi by remember { mutableStateOf(false) }
+    var localAiMaxCharsPerChunk by remember { mutableIntStateOf(TranslationConfig.localAiMaxCharsPerChunk) }
+    var localAiTemperature by remember { mutableFloatStateOf(TranslationConfig.localAiTemperature) }
+    var localAiTopP by remember { mutableFloatStateOf(TranslationConfig.localAiTopP) }
+    var localAiTopK by remember { mutableIntStateOf(TranslationConfig.localAiTopK) }
+    var localAiRepetitionPenalty by remember { mutableFloatStateOf(TranslationConfig.localAiRepetitionPenalty) }
+
+    LaunchedEffect(localAiModelPath) {
+        val candidatePath = if (localAiModelPath.isNotBlank() && java.io.File(localAiModelPath).exists()) {
+            localAiModelPath
+        } else {
+            val candidateDirs = listOfNotNull(
+                context.getExternalFilesDir(null)?.let { java.io.File(it, "local-ai/models") },
+                java.io.File(context.filesDir, "local-ai/models"),
+                context.getExternalFilesDir(null)?.let { java.io.File(it, "asset_delivery/local_ai") },
+                java.io.File(context.filesDir, "asset_delivery/local_ai"),
+            )
+            candidateDirs.firstNotNullOfOrNull { dir ->
+                dir.takeIf { it.exists() }?.listFiles()?.firstOrNull { it.isFile && it.extension.equals("gguf", ignoreCase = true) }?.absolutePath
+            }.orEmpty()
+        }
+        if (candidatePath.isNotBlank()) {
+            if (TranslationConfig.localAiModelPath != candidatePath) {
+                TranslationConfig.localAiModelPath = candidatePath
+            }
+            if (localAiModelPath != candidatePath) {
+                localAiModelPath = candidatePath
+            }
+            withContext(Dispatchers.IO) {
+                localAiEngineGateway.inspectModel(candidatePath).onSuccess {
+                    localAiMetadata = it
+                }
+            }
+        }
+    }
     val translationAiPresets = aiPresets.filter {
         it.taskType == AiTaskType.TRANSLATE_CHAPTER && it.enabled
     }
@@ -184,6 +227,36 @@ fun TranslationConfigScreen(
                 nmtImportProgress = null
                 nmtImportJob = null
             }
+        }
+    }
+
+    val localGgufModelPicker = rememberLauncherForActivityResult(
+        contract = FilteredOpenDocumentContract(
+            primaryMimeType = "*/*",
+            persistableAccess = true,
+        ),
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        uri.takePersistablePermissionSafely(
+            context,
+            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION,
+        )
+        coroutineScope.launch {
+            isImportingLocalAi = true
+            context.toastOnUi("Đang nhập model GGUF...")
+            val result = localAiEngineGateway.importModel(uri.toString())
+            result.fold(
+                onSuccess = { meta ->
+                    TranslationConfig.localAiModelPath = meta.path
+                    localAiModelPath = meta.path
+                    localAiMetadata = meta
+                    context.toastOnUi("Đã nhập model: ${meta.name}")
+                },
+                onFailure = { err ->
+                    context.toastOnUi("Lỗi nhập model: ${err.message}")
+                }
+            )
+            isImportingLocalAi = false
         }
     }
 
@@ -627,8 +700,138 @@ fun TranslationConfigScreen(
                 }
             }
 
+            if (TranslationConfig.llmProvider == TranslationConfig.PROVIDER_LOCAL_AI) {
+                item {
+                    SplicedColumnGroup(title = "Cấu hình Local AI (Model GGUF)") {
+                        ClickableSettingItem(
+                            title = "Tải model GGUF khuyến nghị",
+                            description = "Mở thư mục chứa các model Hy-MT2 GGUF tối ưu cho dịch thuật.",
+                            onClick = { context.openUrl(ExternalAssetCatalog.ggufFolderUrl) },
+                        )
+                        ClickableSettingItem(
+                            title = "Chọn tệp model GGUF",
+                            description = if (localAiModelPath.isNotBlank()) {
+                                java.io.File(localAiModelPath).name
+                            } else {
+                                "Chưa chọn tệp model .gguf"
+                            },
+                            onClick = {
+                                localGgufModelPicker.launch(
+                                    arrayOf("application/octet-stream", "application/x-gguf", "*/*")
+                                )
+                            },
+                        )
+                        localAiMetadata?.let { meta ->
+                            ClickableSettingItem(
+                                title = "Thông tin Model",
+                                description = "Tên: ${meta.name}\n" +
+                                    "Dung lượng: ${meta.sizeBytes / (1024 * 1024)} MB · GGUF v${meta.ggufVersion}\n" +
+                                    "Ngữ cảnh: ${meta.contextWindow} tokens · RAM: ${meta.totalMemoryMb} MB",
+                                onClick = {},
+                            )
+                        }
+                        InputSettingItem(
+                            title = "Kích thước mỗi đoạn (ký tự)",
+                            value = localAiMaxCharsPerChunk.toString(),
+                            defaultValue = "640",
+                            description = "Độ dài tối đa mỗi đoạn gửi vào model GGUF.",
+                            onConfirm = { input ->
+                                parseTranslationChunkSize(input)?.let {
+                                    TranslationConfig.localAiMaxCharsPerChunk = it
+                                    localAiMaxCharsPerChunk = it
+                                } ?: context.toastOnUi(
+                                    resources.getString(
+                                        R.string.input_value_range,
+                                        TranslationConfig.MIN_CHUNK_CHARS,
+                                        TranslationConfig.MAX_CHUNK_CHARS,
+                                    )
+                                )
+                            },
+                        )
+                        SliderSettingItem(
+                            title = "Nhiệt độ (Temperature)",
+                            value = localAiTemperature,
+                            defaultValue = 0.7f,
+                            valueRange = 0f..2f,
+                            steps = 19,
+                            description = "%.2f".format(localAiTemperature),
+                            onValueChange = {
+                                localAiTemperature = it
+                                TranslationConfig.localAiTemperature = it
+                            },
+                        )
+                        SliderSettingItem(
+                            title = "Top-P (Nucleus Sampling)",
+                            value = localAiTopP,
+                            defaultValue = 0.6f,
+                            valueRange = 0f..1f,
+                            steps = 19,
+                            description = "%.2f".format(localAiTopP),
+                            onValueChange = {
+                                localAiTopP = it
+                                TranslationConfig.localAiTopP = it
+                            },
+                        )
+                        SliderSettingItem(
+                            title = "Top-K",
+                            value = localAiTopK.toFloat(),
+                            defaultValue = 20f,
+                            valueRange = 1f..100f,
+                            steps = 98,
+                            description = localAiTopK.toString(),
+                            onValueChange = {
+                                localAiTopK = it.toInt()
+                                TranslationConfig.localAiTopK = it.toInt()
+                            },
+                        )
+                        SliderSettingItem(
+                            title = "Phạt lặp từ (Repetition Penalty)",
+                            value = localAiRepetitionPenalty,
+                            defaultValue = 1.05f,
+                            valueRange = 1f..2f,
+                            steps = 19,
+                            description = "%.2f".format(localAiRepetitionPenalty),
+                            onValueChange = {
+                                localAiRepetitionPenalty = it
+                                TranslationConfig.localAiRepetitionPenalty = it
+                            },
+                        )
+                        ClickableSettingItem(
+                            title = if (isTestingLocalAi) "Đang thử nghiệm..." else "Kiểm tra / Dịch thử",
+                            description = if (testLocalAiResult.isNotBlank()) "Kết quả: $testLocalAiResult" else "Dịch thử một câu mẫu để xác nhận model hoạt động tốt.",
+                            onClick = {
+                                if (!isTestingLocalAi) {
+                                    isTestingLocalAi = true
+                                    testLocalAiResult = ""
+                                    coroutineScope.launch {
+                                        try {
+                                            testLocalAiResult = "Đang nạp model và chạy thử..."
+                                            val res = localAiTranslationGateway.translate(
+                                                text = "这是一个本地大模型离线翻译测试句子。",
+                                                targetLanguage = "vi",
+                                            )
+                                            if (localAiModelPath != TranslationConfig.localAiModelPath) {
+                                                localAiModelPath = TranslationConfig.localAiModelPath
+                                            }
+                                            testLocalAiResult = res.text
+                                            context.toastOnUi("Thành công: ${res.text}")
+                                        } catch (e: Throwable) {
+                                            testLocalAiResult = "Lỗi: ${e.message}"
+                                            context.toastOnUi("Lỗi dịch thử: ${e.message}")
+                                        } finally {
+                                            isTestingLocalAi = false
+                                        }
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+
             if (TranslationConfig.llmProvider != TranslationConfig.PROVIDER_NMT &&
-                TranslationConfig.llmProvider != TranslationConfig.PROVIDER_APP_AI
+                TranslationConfig.llmProvider != TranslationConfig.PROVIDER_APP_AI &&
+                TranslationConfig.llmProvider != TranslationConfig.PROVIDER_LOCAL_AI
             ) {
                 item {
                     SplicedColumnGroup(

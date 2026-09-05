@@ -297,7 +297,9 @@ fun AiChatScreen(
             }
 
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(LegadoTheme.colorScheme.background)
             ) {
                 val systemBottomPadding = maxOf(
                     WindowInsets.ime.asPaddingValues().calculateBottomPadding(),

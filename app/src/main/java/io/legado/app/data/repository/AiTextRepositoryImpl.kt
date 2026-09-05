@@ -3,8 +3,10 @@ package io.legado.app.data.repository
 import io.legado.app.data.repository.ai.AiProviderRegistry
 import io.legado.app.data.repository.ai.AnthropicHandler
 import io.legado.app.data.repository.ai.AntigravityHandler
+import io.legado.app.data.repository.ai.ChatGptWebHandler
 import io.legado.app.data.repository.ai.CommandCodeHandler
 import io.legado.app.data.repository.ai.GeminiHandler
+import io.legado.app.data.repository.ai.GeminiWebHandler
 import io.legado.app.data.repository.ai.OpenAiChatHandler
 import io.legado.app.data.repository.ai.OpenAiResponsesHandler
 import io.legado.app.domain.gateway.AiStreamEvent
@@ -21,9 +23,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
-class AiTextRepositoryImpl(
-    localAiEngineGateway: io.legado.app.domain.gateway.LocalAiEngineGateway,
-) : AiTextGateway {
+class AiTextRepositoryImpl : AiTextGateway {
 
     private val registry = AiProviderRegistry(
         handlers = listOf(
@@ -31,9 +31,10 @@ class AiTextRepositoryImpl(
             OpenAiResponsesHandler(),
             AnthropicHandler(),
             GeminiHandler(),
+            GeminiWebHandler(),
+            ChatGptWebHandler(),
             AntigravityHandler(),
             CommandCodeHandler(),
-            io.legado.app.data.repository.ai.LocalGgufHandler(localAiEngineGateway),
         )
     )
 

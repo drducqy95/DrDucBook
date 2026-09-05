@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SaveAlt
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +71,7 @@ import java.util.Locale
 fun MediaDownloadsRouteScreen(
     onBack: () -> Unit,
     onImportAudiobook: () -> Unit,
+    onOpenDownloadSettings: (() -> Unit)? = null,
     viewModel: MediaDownloadsViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -108,7 +110,13 @@ fun MediaDownloadsRouteScreen(
             }
         }
     }
-    MediaDownloadsScreen(state, viewModel::onIntent, onBack, onImportAudiobook)
+    MediaDownloadsScreen(
+        state = state,
+        onIntent = viewModel::onIntent,
+        onBack = onBack,
+        onImportAudiobook = onImportAudiobook,
+        onOpenDownloadSettings = onOpenDownloadSettings,
+    )
 }
 
 @Composable
@@ -117,6 +125,7 @@ fun MediaDownloadsScreen(
     onIntent: (MediaDownloadsIntent) -> Unit,
     onBack: () -> Unit,
     onImportAudiobook: () -> Unit,
+    onOpenDownloadSettings: (() -> Unit)? = null,
 ) {
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
     AppScaffold(
@@ -136,6 +145,13 @@ fun MediaDownloadsScreen(
                         contentDescription = stringResource(R.string.audiobook_import_title),
                         onClick = onImportAudiobook,
                     )
+                    onOpenDownloadSettings?.let {
+                        TopBarActionButton(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.download_cache_config),
+                            onClick = it,
+                        )
+                    }
                 },
                 scrollBehavior = scrollBehavior,
             )

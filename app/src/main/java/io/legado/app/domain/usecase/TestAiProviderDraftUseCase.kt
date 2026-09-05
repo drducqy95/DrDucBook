@@ -9,10 +9,11 @@ import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiGenerationParams
 import io.legado.app.domain.model.AiMessage
 import io.legado.app.domain.model.AiModelConfig
+import io.legado.app.domain.model.AiModelRegistry
+import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.model.AiProviderAuthType
 import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiProviderConnectionDraft
-import io.legado.app.domain.model.AiModelRegistry
 import java.time.Clock
 
 class TestAiProviderDraftUseCase(
@@ -24,7 +25,9 @@ class TestAiProviderDraftUseCase(
         validate(draft)?.let { return it }
 
         val provider = draft.toProviderConfig()
-        val discoveredModels = if (draft.modelsUrl.isNullOrBlank()) {
+        val shouldFetchModels = !draft.modelsUrl.isNullOrBlank() ||
+            draft.protocol in setOf(AiProtocol.GEMINI_WEB, AiProtocol.CHATGPT_WEB, AiProtocol.ANTIGRAVITY)
+        val discoveredModels = if (!shouldFetchModels) {
             emptyList()
         } else {
             aiTextGateway.fetchModels(provider).getOrElse { error ->
@@ -123,7 +126,7 @@ class TestAiProviderDraftUseCase(
                 message = "Cần nhập Base URL",
             )
         }
-        val requiresSecret = draft.authType != AiProviderAuthType.NONE
+        val requiresSecret = draft.authType != AiProviderAuthType.NONE && draft.protocol != AiProtocol.GEMINI_WEB
         if (requiresSecret && draft.apiKey.isBlank() && !draft.hasStoredSecret) {
             return AiConnectionTestResult(
                 status = AiConnectionStatus.ERROR,

@@ -30,3 +30,10 @@
 
 ### Notes
 - Khắc phục lỗi 404 connection test của NVIDIA NIM do chọn nhầm model non-chat/404 và thiếu RFC 7807 problem details parser; Mở rộng và khôi phục toàn bộ danh sách 8 free models của OpenCode Zen API (big-pickle, nemotron-3.5-lightning-free, hy3-free, x-preview-f-free, laguna-s-2.1-free, nemotron-3-ultra-free, deepseek-v4-flash-free, muse-spark-1.2-contributor-free); Cập nhật presets và catalog; Passed 1089/1089 unit tests; Build Release APK và cài đặt thành công lên Huawei Pura 70 Pro.
+
+---
+## Session: 2026-09-05 00:06
+
+### Working On
+- Feature: AI Web Providers & WebView Auth Resolution
+- Phase: Execution / Release Verified

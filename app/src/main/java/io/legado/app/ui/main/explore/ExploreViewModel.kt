@@ -29,13 +29,12 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -48,8 +47,7 @@ class ExploreViewModel(
 ) : BaseViewModel(application) {
 
     private val _uiState = MutableStateFlow(ExploreUiState())
-    val uiState: StateFlow<ExploreUiState> = _uiState
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExploreUiState())
+    val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
     private val _effects = MutableSharedFlow<ExploreEffect>(extraBufferCapacity = 8)
     val effects = _effects.asSharedFlow()
 
@@ -112,6 +110,8 @@ class ExploreViewModel(
                         it.bookSourceUrl == previousSourceUrl
                     } ?: items.firstOrNull()
                     val selectionChanged = selectedSource?.bookSourceUrl != previousSourceUrl
+                    val shouldLoadKinds = selectedSource != null &&
+                        (selectionChanged || _uiState.value.exploreKinds.isEmpty())
                     _uiState.update {
                         it.copy(
                             items = items.toImmutableList(),
@@ -120,11 +120,11 @@ class ExploreViewModel(
                             kindDisplayNames = if (selectionChanged) persistentMapOf() else it.kindDisplayNames,
                             kindValues = if (selectionChanged) persistentMapOf() else it.kindValues,
                             sourceBrowserUrl = if (selectionChanged) null else it.sourceBrowserUrl,
-                            loadingKinds = selectionChanged && selectedSource != null,
+                            loadingKinds = shouldLoadKinds,
                         )
                     }
                     translateSourceNames(items)
-                    if (selectionChanged && selectedSource != null) {
+                    if (shouldLoadKinds && selectedSource != null) {
                         localPreferencesRepository.updatePreference(
                             LocalPreferencesKeys.EXPLORE_SELECTED_SOURCE_URL,
                             selectedSource.bookSourceUrl,
@@ -136,7 +136,7 @@ class ExploreViewModel(
     }
 
     fun selectSource(source: BookSourcePart) {
-        if (_uiState.value.expandedId == source.bookSourceUrl) return
+        if (_uiState.value.expandedId == source.bookSourceUrl && _uiState.value.exploreKinds.isNotEmpty()) return
         _uiState.update {
             it.copy(
                 expandedId = source.bookSourceUrl,

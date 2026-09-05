@@ -115,6 +115,87 @@ class TranslateDynamicUiTextUseCase(
         }
     }
 
+    suspend fun executeAuthorName(
+        scopeKey: String,
+        originalText: String,
+        book: Book? = null,
+        forceRetranslate: Boolean = false,
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (originalText.isBlank()) {
+            return@withContext Result.success(originalText)
+        }
+        if (!originalText.containsCjk()) {
+            return@withContext Result.success(originalText.toTitleCase())
+        }
+
+        val provider = TranslationConstants.PROVIDER_HAN_VIET
+        val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val dictionaryRevision = book?.let {
+            quickDictionaryGateway.getEffectiveRevision(it, originalText)
+        } ?: QuickDictionaryRevision(
+            global = quickDictionaryGateway.revisionFor(QuickDictionaryScope.GLOBAL)
+        )
+        val cacheScopeKey = dictionaryAwareScopeKey(
+            scopeKey = "$scopeKey:author",
+            provider = provider,
+            dictionaryRevision = dictionaryRevision,
+            quickTranslationPackVersion = quickTranslationGateway.packVersion,
+        )
+        if (!forceRetranslate) {
+            translationCacheGateway.readDynamicUiTranslation(
+                scopeKey = cacheScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = provider,
+            )?.let { return@withContext Result.success(it) }
+        }
+
+        runCatching {
+            val quickEntries = book
+                ?.let { quickDictionaryGateway.getEffectiveEntries(it, originalText) }
+                .orEmpty()
+            val customPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() }
+            val translated = quickTranslationGateway.hanViet(originalText, customPhonetics)
+                .toTitleCase()
+            translationCacheGateway.writeDynamicUiTranslation(
+                scopeKey = cacheScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = provider,
+                translatedText = translated,
+            )
+            translated
+        }
+    }
+
+    suspend fun executeChapterTitle(
+        scopeKey: String,
+        originalText: String,
+        book: Book? = null,
+        contextText: String = originalText,
+        forceRetranslate: Boolean = false,
+    ): Result<String> = execute(
+        scopeKey = "$scopeKey:title",
+        originalText = originalText,
+        book = book,
+        contextText = contextText,
+        forceRetranslate = forceRetranslate,
+    ).map { it.toTitleCase() }
+
+    suspend fun executeChapterTitles(
+        scopeKey: String,
+        originalLines: List<String>,
+        book: Book? = null,
+        contextText: String = originalLines.joinToString("\n"),
+        forceRetranslate: Boolean = false,
+    ): Result<List<String>> = executeLines(
+        scopeKey = scopeKey,
+        originalLines = originalLines,
+        book = book,
+        contextText = contextText,
+        forceRetranslate = forceRetranslate,
+    ).map { titles -> titles.map { it.toTitleCase() } }
+
     suspend fun clearCache() {
         translationCacheGateway.clearDynamicUiTranslations()
     }
@@ -129,6 +210,12 @@ class TranslateDynamicUiTextUseCase(
             .fold(text) { output, term -> output.replace(term, "") }
     }
 }
+
+fun String.toTitleCase(): String =
+    split(" ").joinToString(" ") { word ->
+        if (word.isBlank()) word
+        else word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+    }
 
 internal fun String.containsCjk(): Boolean = codePoints().anyMatch { codePoint ->
     codePoint in 0x3400..0x4DBF ||

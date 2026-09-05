@@ -4,9 +4,83 @@ package io.legado.app.domain.model
 object LocalAiTranslationPrompt {
 
     const val STANDARD_RULES =
-        "Names: glossary/canon first; for Vietnamese use Chinese=Sino-Vietnamese (not Pinyin), " +
-            "Japanese canon/Hepburn, Korean canon/Revised Romanization, Latin exact. " +
-            "Pronouns/address must fit genre, era, rank, relationship and attitude; if unclear use a neutral name/title."
+        "Rules:\n" +
+            "1. Names: All Chinese person/place names MUST be transliterated into standard Sino-Vietnamese (Hán-Việt, e.g. 崔桂英→Thôi Quế Anh, 李伟汉→Lý Vĩ Hán). NEVER use English Pinyin (Cui Guiying/Li Weihan).\n" +
+            "2. Pronouns: Use natural Vietnamese pronouns suited to context (hắn/gã/nàng/cô ấy/ta/ngươi).\n" +
+            "3. Layout: Keep EXACT paragraph count. Output ONLY translation text without notes."
+
+    fun resolveTargetLanguageName(code: String): String {
+        return when (code.lowercase().trim()) {
+            "vi", "vie", "vietnamese" -> "Vietnamese"
+            "zh", "zho", "chinese" -> "Chinese"
+            "en", "eng", "english" -> "English"
+            "ja", "jpn", "japanese" -> "Japanese"
+            "ko", "kor", "korean" -> "Korean"
+            "fr", "fra", "french" -> "French"
+            "de", "deu", "german" -> "German"
+            "es", "spa", "spanish" -> "Spanish"
+            "ru", "rus", "russian" -> "Russian"
+            else -> code
+        }
+    }
+
+    fun buildSystemPrompt(targetLanguage: String, configuredPrompt: String): String {
+        val targetName = resolveTargetLanguageName(targetLanguage)
+        val customStyle = extractCustomStyle(configuredPrompt)
+        return buildString {
+            append("Expert literary translator into ").append(targetName).append(".\n")
+            append(STANDARD_RULES).append('\n')
+            if (customStyle.isNotEmpty()) {
+                append("Style: ").append(customStyle).append('\n')
+            }
+        }
+    }
+
+    fun buildUserPrompt(
+        text: String,
+        targetLanguage: String,
+        context: AiTranslationChunkContext = AiTranslationChunkContext(),
+        dictionary: List<DictPair> = emptyList(),
+        retryInstruction: String = "",
+    ): String {
+        val targetName = resolveTargetLanguageName(targetLanguage)
+        val paragraphCount = text.split(Regex("[\\t ]*(?:\\r?\\n[\\t ]*)+")).size
+        return buildString {
+            if (context.previous.isNotBlank()) {
+                append("[Prior context, do NOT translate]:\n")
+                append(context.previous.trim()).append("\n\n")
+            }
+            if (dictionary.isNotEmpty()) {
+                append("Glossary:\n")
+                dictionary.forEach { pair ->
+                    append(pair.original).append(" => ").append(pair.translation).append('\n')
+                }
+                append('\n')
+            }
+            if (retryInstruction.isNotBlank()) {
+                append(retryInstruction.trim()).append('\n')
+            }
+            append("Translate into ").append(targetName)
+            if (targetLanguage.equals("vi", ignoreCase = true)) {
+                append(" (翻译为流畅越南语，人名使用标准汉越音，禁止拼音)")
+            }
+            append(". ").append(paragraphCount).append(" paragraphs. Only output translation:\n\n")
+            append(text)
+        }
+    }
+
+    fun buildUserPrompt(
+        text: String,
+        targetLanguage: String,
+        dictionary: List<DictPair>,
+        retryInstruction: String = "",
+    ): String = buildUserPrompt(
+        text = text,
+        targetLanguage = targetLanguage,
+        context = AiTranslationChunkContext(),
+        dictionary = dictionary,
+        retryInstruction = retryInstruction,
+    )
 
     @Suppress("UNUSED_PARAMETER")
     fun build(
@@ -17,29 +91,7 @@ object LocalAiTranslationPrompt {
         configuredPrompt: String,
         retryInstruction: String = "",
     ): String {
-        val paragraphCount = text.split(Regex("[\\t ]*(?:\\r?\\n[\\t ]*)+")).size
-        val customStyle = extractCustomStyle(configuredPrompt)
-        return buildString {
-            if (dictionary.isNotEmpty()) {
-                append("Reference the following translations:\n")
-                dictionary.forEach { pair ->
-                    append(pair.original).append(" translates to ")
-                        .append(pair.translation).append('\n')
-                }
-                append('\n')
-            }
-            append(STANDARD_RULES).append('\n')
-            append("Keep exactly ").append(paragraphCount).append(" paragraphs in source order.\n")
-            if (customStyle.isNotEmpty()) {
-                append("STYLE:\n").append(customStyle).append('\n')
-            }
-            if (retryInstruction.isNotBlank()) {
-                append(retryInstruction.trim()).append('\n')
-            }
-            append("Translate the following text into ").append(targetLanguage)
-            append(". Only output the translated result without any explanation:\n\n")
-            append(text)
-        }
+        return buildUserPrompt(text, targetLanguage, context, dictionary, retryInstruction)
     }
 
     /** Keeps saved v3 presets compact after the mandatory base prompt is upgraded. */

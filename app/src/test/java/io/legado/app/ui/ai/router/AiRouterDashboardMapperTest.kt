@@ -2,6 +2,8 @@ package io.legado.app.ui.ai.router
 
 import io.legado.app.domain.model.AiConnectionStatus
 import io.legado.app.domain.model.AiProviderCatalog
+import io.legado.app.domain.model.AiProviderCatalogEntry
+import io.legado.app.domain.model.AiProviderCategory
 import kotlinx.collections.immutable.persistentListOf
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -17,7 +19,13 @@ class AiRouterDashboardMapperTest {
             AiProviderCatalog.byId("xiaomi_mimo"),
             AiProviderCatalog.byId("xiaomi_mimo_token_plan_sgp"),
             AiProviderCatalog.byId("nvidia"),
-            AiProviderCatalog.byId("local_gguf"),
+            AiProviderCatalogEntry(
+                id = "local_gguf",
+                name = "Local GGUF",
+                category = AiProviderCategory.LOCAL,
+                baseUrl = "local://",
+                authType = io.legado.app.domain.model.AiProviderAuthType.NONE,
+            ),
         )
 
         val items = buildProviderDashboardItems(

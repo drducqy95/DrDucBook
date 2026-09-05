@@ -24,13 +24,9 @@ class ExportBookshelfUseCase(
                     val writer = JsonWriter(OutputStreamWriter(out, "UTF-8"))
                     writer.setIndent("  ")
                     writer.beginArray()
-                    items.forEach {
-                        val bookMap = hashMapOf<String, String?>()
-                        bookMap["name"] = it.book.name
-                        bookMap["author"] = it.book.author
-                        val fullBook = bookRepository.getBook(it.book.bookUrl)
-                        bookMap["intro"] = fullBook?.getDisplayIntro()
-                        GSON.toJson(bookMap, bookMap::class.java, writer)
+                    items.forEach { item ->
+                        val bookMap = buildBookExportMap(item)
+                        GSON.toJson(bookMap, Map::class.java, writer)
                     }
                     writer.endArray()
                     writer.close()
@@ -47,13 +43,9 @@ class ExportBookshelfUseCase(
                 val writer = JsonWriter(OutputStreamWriter(out, "UTF-8"))
                 writer.setIndent("  ")
                 writer.beginArray()
-                items.forEach {
-                    val bookMap = hashMapOf<String, String?>()
-                    bookMap["name"] = it.book.name
-                    bookMap["author"] = it.book.author
-                    val fullBook = bookRepository.getBook(it.book.bookUrl)
-                    bookMap["intro"] = fullBook?.getDisplayIntro()
-                    GSON.toJson(bookMap, bookMap::class.java, writer)
+                items.forEach { item ->
+                    val bookMap = buildBookExportMap(item)
+                    GSON.toJson(bookMap, Map::class.java, writer)
                 }
                 writer.endArray()
                 writer.close()
@@ -65,15 +57,43 @@ class ExportBookshelfUseCase(
     suspend fun exportToJson(items: List<BookUiItem>): Result<String> =
         withContext(Dispatchers.IO) {
             kotlin.runCatching {
-                val list = items.map {
-                    val bookMap = hashMapOf<String, String?>()
-                    bookMap["name"] = it.book.name
-                    bookMap["author"] = it.book.author
-                    val fullBook = bookRepository.getBook(it.book.bookUrl)
-                    bookMap["intro"] = fullBook?.getDisplayIntro()
-                    bookMap
-                }
+                val list = items.map { buildBookExportMap(it) }
                 GSON.toJson(list)
             }
         }
+
+    private suspend fun buildBookExportMap(item: BookUiItem): Map<String, Any?> {
+        val fullBook = bookRepository.getBook(item.book.bookUrl)
+        val map = linkedMapOf<String, Any?>()
+        // Identifiers & Source
+        map["bookUrl"] = item.book.bookUrl
+        map["origin"] = item.book.origin
+        map["originName"] = item.book.originName
+        map["tocUrl"] = fullBook?.tocUrl ?: ""
+        // Display / Translated titles
+        map["name"] = item.displayBook.name
+        map["author"] = item.displayBook.author
+        // Original raw source titles
+        map["originalName"] = item.book.name
+        map["originalAuthor"] = item.book.author
+        // Covers
+        map["coverUrl"] = item.book.coverUrl
+        map["customCoverUrl"] = fullBook?.customCoverUrl
+        // Intros
+        map["intro"] = fullBook?.getDisplayIntro() ?: item.displayBook.intro
+        map["originalIntro"] = fullBook?.intro ?: item.book.intro
+        map["customIntro"] = fullBook?.customIntro
+        // Type and Group
+        map["type"] = item.book.type
+        map["group"] = item.book.group
+        // Reading Progress
+        map["durChapterIndex"] = fullBook?.durChapterIndex ?: item.book.durChapterIndex
+        map["durChapterPos"] = fullBook?.durChapterPos ?: item.book.durChapterPos
+        map["durChapterTitle"] = fullBook?.durChapterTitle ?: item.book.durChapterTitle
+        map["totalChapterNum"] = fullBook?.totalChapterNum ?: item.book.totalChapterNum
+        // Tags & Variables
+        map["customTag"] = fullBook?.customTag ?: item.book.customTag
+        map["variable"] = fullBook?.variable
+        return map
+    }
 }

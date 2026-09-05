@@ -50,13 +50,34 @@ class TranslateDynamicBookUiUseCase(
             }
         }
 
+        // Author uses Hán Việt + Title Case
+        val translatedAuthor = sourceBook.author.takeIf(String::isNotBlank)?.let {
+            translateDynamicUiTextUseCase.executeAuthorName(
+                scopeKey = scopeKey,
+                originalText = it,
+                book = dictionaryBook,
+                forceRetranslate = forceRetranslate,
+            ).getOrElse { displayValues[1].orEmpty() }
+        } ?: displayValues[1].orEmpty()
+
+        // Latest chapter title uses QT + Title Case
+        val translatedLatestChapter = sourceBook.latestChapterTitle?.takeIf(String::isNotBlank)?.let {
+            translateDynamicUiTextUseCase.executeChapterTitle(
+                scopeKey = scopeKey,
+                originalText = it,
+                book = dictionaryBook,
+                contextText = context,
+                forceRetranslate = forceRetranslate,
+            ).getOrElse { displayValues[5].orEmpty() }
+        } ?: displayValues[5]
+
         return sourceBook.copy(
             name = displayValues[0].orEmpty(),
-            author = displayValues[1].orEmpty(),
+            author = translatedAuthor,
             originName = displayValues[2].orEmpty(),
             kind = displayValues[3],
             intro = displayValues[4],
-            latestChapterTitle = displayValues[5],
+            latestChapterTitle = translatedLatestChapter,
             wordCount = displayValues[6],
             chapterWordCountText = displayValues[7],
         ).also { displayCopy ->

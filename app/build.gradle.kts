@@ -150,6 +150,8 @@ android {
         getByName("release") {
             if (project.hasProperty("RELEASE_STORE_FILE")) {
                 signingConfig = signingConfigs.getByName("myConfig")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
             }
             manifestPlaceholders["app_name"] = "@string/app_name"
             isMinifyEnabled = true

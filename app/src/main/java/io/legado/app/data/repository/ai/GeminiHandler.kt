@@ -119,6 +119,59 @@ class GeminiHandler : AiProtocolHandler {
                         )
                     }
                 }
+
+                // Citations and grounding
+                root.getAsJsonArray("candidates")?.firstOrNull()?.asJsonObjectOrNull()?.let { candidate ->
+                    candidate.getAsJsonObject("citationMetadata")
+                        ?.getAsJsonArray("citationSources")
+                        ?.forEach { elem ->
+                            elem.asJsonObjectOrNull()?.let { source ->
+                                val uri = source.getString("uri")
+                                if (!uri.isNullOrBlank()) {
+                                    emitEvent(
+                                        AiStreamEvent.Citation(
+                                            startIndex = source.get("startIndex")?.asInt,
+                                            endIndex = source.get("endIndex")?.asInt,
+                                            uri = uri,
+                                            title = source.getString("title").orEmpty(),
+                                            snippet = source.getString("snippet").orEmpty(),
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    candidate.getAsJsonObject("groundingMetadata")
+                        ?.getAsJsonArray("groundingChunks")
+                        ?.forEach { elem ->
+                            elem.asJsonObjectOrNull()?.getAsJsonObject("web")?.let { web ->
+                                val uri = web.getString("uri")
+                                if (!uri.isNullOrBlank()) {
+                                    emitEvent(
+                                        AiStreamEvent.Citation(
+                                            uri = uri,
+                                            title = web.getString("title").orEmpty(),
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                }
+
+                // Token usage
+                root.getAsJsonObject("usageMetadata")?.let { usage ->
+                    val promptTokens = usage.get("promptTokenCount")?.asInt ?: 0
+                    val completionTokens = usage.get("candidatesTokenCount")?.asInt ?: 0
+                    val totalTokens = usage.get("totalTokenCount")?.asInt ?: (promptTokens + completionTokens)
+                    val reasoningTokens = usage.get("thoughtsTokenCount")?.asInt ?: 0
+                    emitEvent(
+                        AiStreamEvent.Usage(
+                            promptTokens = promptTokens,
+                            completionTokens = completionTokens,
+                            totalTokens = totalTokens,
+                            reasoningTokens = reasoningTokens,
+                        )
+                    )
+                }
             }
         } finally {
             response.close()

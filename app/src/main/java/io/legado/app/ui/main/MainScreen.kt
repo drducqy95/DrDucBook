@@ -147,6 +147,8 @@ fun MainScreen(
     onNavigateToLocalImport: () -> Unit,
     onNavigateToCache: (Long) -> Unit,
     onNavigateToBookCacheManage: () -> Unit,
+    onNavigateToDownloadCacheSettings: () -> Unit = onNavigateToBookCacheManage,
+    onNavigateToAudiobookImport: () -> Unit = {},
     onNavigateToBackupSettings: () -> Unit,
     onNavigateToBookInfo: (name: String, author: String, bookUrl: String, origin: String?, coverPath: String?, sharedCoverKey: String?) -> Unit,
     onNavigateToExploreShow: (title: String?, sourceUrl: String, exploreUrl: String?) -> Unit,
@@ -584,6 +586,7 @@ fun MainScreen(
                                 onNavigateToRemoteImport = onNavigateToRemoteImport,
                                 onNavigateToLocalImport = onNavigateToLocalImport,
                                 onNavigateToCache = onNavigateToCache,
+                                onNavigateToBookCacheManage = onNavigateToBookCacheManage,
                                 onNavigateToAiRouter = onNavigateToAiRouter,
                                 sharedTransitionScope = sharedTransitionScope,
                                 animatedVisibilityScope = animatedVisibilityScope,
@@ -604,6 +607,19 @@ fun MainScreen(
                                 onOpenTranslationSettings = onNavigateToTranslation,
                                 onOpenAiRouter = onNavigateToAiRouter,
                                 onOpenBrowser = onNavigateToBrowser,
+                            )
+
+                            MainDestination.Downloads -> io.legado.app.ui.download.center.DownloadCenterScreen(
+                                onOpenDownloadSettings = onNavigateToDownloadCacheSettings,
+                                onImportAudiobook = onNavigateToAudiobookImport,
+                                onBack = {
+                                    coroutineScope.launch {
+                                        val bookshelfIndex = destinations.indexOf(MainDestination.Bookshelf)
+                                        if (bookshelfIndex >= 0) {
+                                            pagerState.animateScrollToPage(bookshelfIndex)
+                                        }
+                                    }
+                                }
                             )
 
                             MainDestination.Workspace -> WorkspaceRouteScreen(
@@ -816,7 +832,7 @@ private fun NavigationIcon(
     val customIconPath = destination.customIconPath
     val appearanceGateway = koinInject<AppearanceGateway>()
     val appearanceState by appearanceGateway.state.collectAsStateWithLifecycle()
-    val spec = appearanceState.activeProfile.iconSlots[destination.iconSlot().key]
+    val spec = destination.iconSlot()?.let { appearanceState.activeProfile.iconSlots[it.key] }
     val iconModifier = modifier
         .size(40.dp)
         .then(
@@ -854,10 +870,11 @@ private fun NavigationIcon(
     }
 }
 
-private fun MainDestination.iconSlot(): IconSlot = when (this) {
+private fun MainDestination.iconSlot(): IconSlot? = when (this) {
     MainDestination.Home -> IconSlot.NAV_HOME
     MainDestination.Bookshelf -> IconSlot.NAV_BOOKSHELF
     MainDestination.Explore -> IconSlot.NAV_EXPLORE
+    MainDestination.Downloads -> null
     MainDestination.Workspace -> IconSlot.NAV_WORKSPACE
     MainDestination.My -> IconSlot.NAV_MY
 }

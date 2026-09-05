@@ -110,7 +110,11 @@ data class AiProviderFailure(
             append(" · lần thử ").append(attempt.coerceAtLeast(1))
             append(": ").append(kind.vietnameseLabel)
             statusCode?.let { append(" (HTTP ").append(it).append(')') }
-            append(". ").append(kind.vietnameseAction)
+            if (technicalDetail.isNotBlank() && (technicalDetail.contains("👉") || technicalDetail.contains("Vui lòng") || technicalDetail.contains("Access Token") || technicalDetail.contains("SNlM0e"))) {
+                append(".\n").append(technicalDetail)
+            } else {
+                append(". ").append(kind.vietnameseAction)
+            }
         }
 }
 

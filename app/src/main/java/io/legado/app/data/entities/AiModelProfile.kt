@@ -1,5 +1,6 @@
 package io.legado.app.data.entities
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -21,5 +22,9 @@ data class AiModelProfile(
     val enabled: Boolean = true,
     val sortNumber: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "active")
+    val status: String = "active",
+    @ColumnInfo(defaultValue = "0")
+    val lastSeenAt: Long = 0L
 )

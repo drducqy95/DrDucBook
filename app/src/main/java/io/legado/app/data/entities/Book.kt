@@ -339,6 +339,43 @@ data class Book(
         return config.inheritSeriesMemory
     }
 
+    fun setDetectedSourceLanguage(lang: String?) {
+        config.detectedSourceLanguage = lang
+    }
+
+    fun getDetectedSourceLanguage(): String? {
+        return config.detectedSourceLanguage
+    }
+
+    fun setRewritePresetId(presetId: String?) {
+        config.rewritePresetId = presetId
+    }
+
+    fun getRewritePresetId(): String? {
+        return config.rewritePresetId
+    }
+
+    fun isVietnameseSource(): Boolean {
+        val detected = config.detectedSourceLanguage
+        if (detected != null) {
+            return detected.equals("vi", ignoreCase = true)
+        }
+        if (name.hasCjkChars() || author.hasCjkChars()) return false
+        if (name.hasVietnameseDiacritics() || author.hasVietnameseDiacritics()) return true
+        return false
+    }
+
+    fun detectAndCacheSourceLanguage(sampleText: String): String {
+        val lang = when {
+            sampleText.hasCjkChars() -> "zh"
+            sampleText.hasVietnameseDiacritics() -> "vi"
+            else -> "other"
+        }
+        config.detectedSourceLanguage = lang
+        kotlin.runCatching { save() }
+        return lang
+    }
+
     // dailyChapters 的 setter 和 getter
     fun setDailyChapters(dailyChapters: Int) {
         config.dailyChapters = dailyChapters
@@ -477,7 +514,8 @@ data class Book(
         var translationMode: Boolean = false, // 是否启用翻译阅读模式
         var readerContentMode: String? = null,
         var inheritSeriesMemory: Boolean = false, // Kế thừa bộ nhớ bộ truyện từ các sách cùng nhóm
-
+        var detectedSourceLanguage: String? = null, // Ngôn ngữ nguồn tự động nhận diện ("vi", "zh", "en", ...)
+        var rewritePresetId: String? = null, // ID preset viết lại AI đã chọn cho sách
     ) : Parcelable
 
     class Converters {
@@ -488,4 +526,26 @@ data class Book(
         @TypeConverter
         fun stringToReadConfig(json: String?) = GSON.fromJsonObject<ReadConfig>(json).getOrNull()
     }
+}
+
+private fun String.hasCjkChars(): Boolean {
+    for (ch in this) {
+        val code = ch.code
+        if (code in 0x4E00..0x9FFF || code in 0x3400..0x4DBF || code in 0x20000..0x2A6DF ||
+            code in 0xF900..0xFAFF || code in 0x3040..0x309F || code in 0x30A0..0x30FF ||
+            code in 0xAC00..0xD7AF || code in 0x3100..0x312F
+        ) {
+            return true
+        }
+    }
+    return false
+}
+
+private fun String.hasVietnameseDiacritics(): Boolean {
+    val vnChars = "àáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵ"
+    var count = 0
+    for (ch in this) {
+        if (ch.lowercaseChar() in vnChars) count++
+    }
+    return count >= 1
 }

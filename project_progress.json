@@ -1,12 +1,12 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-08-25T23:49:49.341856",
+    "last_updated": "2026-09-05T13:20:00.000000",
     "overall_progress_percent": 100,
     "current_phase": "Execution / Release Verified",
-    "status": "COMPLETED",
+    "status": "DONE",
     "database_version": 105,
-    "debug_device": "LDPlayer (127.0.0.1:5555)"
+    "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9"
   },
   "milestones": [
     {
@@ -130,6 +130,613 @@
         {
           "id": "T10.3",
           "desc": "Translation Dashboard i18n, dynamicText, World Building & Timeline tabs",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P11",
+      "name": "Local AI GGUF Independent Provider & Dedicated Pipeline",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T11.1",
+          "desc": "Phase 01 - Fix GGUF Model Loading, Diagnostics & Validation",
+          "status": "DONE"
+        },
+        {
+          "id": "T11.2",
+          "desc": "Phase 02 - Create Standalone PROVIDER_LOCAL_AI Translation & Rewrite Pipeline",
+          "status": "DONE"
+        },
+        {
+          "id": "T11.3",
+          "desc": "Phase 03 - Decouple Local AI from AI Router UI & Add Translation Settings Config",
+          "status": "DONE"
+        },
+        {
+          "id": "T11.4",
+          "desc": "Phase 04 - Performance Optimization (Threading, JNI Batching, KV Cache Reuse, Prompt Tuning)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P12",
+      "name": "Explore Bug Fix, TTS Chapter Navigation & Rewrite Content Tab",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T12.1",
+          "desc": "Phase 01 - Fix Explore Tab Empty State (load kinds on restored source, asStateFlow, retry logic)",
+          "status": "DONE"
+        },
+        {
+          "id": "T12.2",
+          "desc": "Phase 02 - Fix TTS Chapter Navigation (Service routing, Local TTS delay restart, Web TTS await)",
+          "status": "DONE"
+        },
+        {
+          "id": "T12.3",
+          "desc": "Phase 03 - Rewrite Content Tab & Language Detection (ReaderContentMode.REWRITE, auto-detect vi, RewriteChapterUseCase)",
+          "status": "DONE"
+        },
+        {
+          "id": "T12.4",
+          "desc": "Phase 04 - Batch Rewrite & Auto-cache Integration (CacheBookModel, TranslationManager startRewrite, UI)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P13",
+      "name": "NMT Output, QT Grammar, Bookshelf Crash, Unified Download Center & Rich Metadata Backup Fixes",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T13.1",
+          "desc": "Bug 1 - Fix rogue 'true' boolean literals in NMT tokenizer & QT UI output",
+          "status": "DONE"
+        },
+        {
+          "id": "T13.2",
+          "desc": "Bug 2 - Fix QT Vietnamese grammar and spurious 'của' (adverbial, comparative, locative)",
+          "status": "DONE"
+        },
+        {
+          "id": "T13.3",
+          "desc": "Bug 3 - Fix NoSuchElementException Key -21 on Bookshelf when importing TXT",
+          "status": "DONE"
+        },
+        {
+          "id": "T13.4",
+          "desc": "Bug 4 - Download notifications direct action shortcut to download cache settings",
+          "status": "DONE"
+        },
+        {
+          "id": "T13.5",
+          "desc": "Bug 5 - Unified Download Center tab in main navigation & Bookshelf entrance",
+          "status": "DONE"
+        },
+        {
+          "id": "T13.6",
+          "desc": "Bug 6 - Robust 5-strategy bookshelf import with reverse QT dictionary recovery & rich export metadata",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P14",
+      "name": "QT Grammar Phase 2, Metadata Translation, Content Tabs & Auto-Rewrite",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T14.1",
+          "desc": "Phase 1 - Age Modifier Detection in QT renderAttributiveDe",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.2",
+          "desc": "Phase 1 - Interrogative 有没有/会不会 Template Engine Match",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.3",
+          "desc": "Phase 1 - Expand Descriptive Modifier Detection (locative & direction)",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.4",
+          "desc": "Phase 1 - Add new TSV post-processing rules in qt_clean_rules_v8.tsv",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.5",
+          "desc": "Phase 1 - Fix renderAttributiveDe for relative clause person head (...的人)",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.6",
+          "desc": "Phase 1 - Unit Tests for QT Grammar Phase 2",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.7",
+          "desc": "Phase 1 - Regression Tests for existing QT tests",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.8",
+          "desc": "Phase 2 - Implement executeAuthorName() with hanViet and Title Case in TranslateDynamicUiTextUseCase",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.9",
+          "desc": "Phase 2 - Implement executeChapterTitle() and executeChapterTitles() with Title Case",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.10",
+          "desc": "Phase 2 - Update TranslateDynamicBookUiUseCase to use executeAuthorName",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.11",
+          "desc": "Phase 2 - Update TocViewModel to use executeChapterTitles",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.12",
+          "desc": "Phase 2 - Unit Tests for Metadata Translation",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.13",
+          "desc": "Phase 3 - Call detectAndCacheSourceLanguage() on chapter content in ReadBookViewModel",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.14",
+          "desc": "Phase 3 - Update availableReaderContentModes() tab logic (keep TRANSLATION, show provider dynamically)",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.15",
+          "desc": "Phase 3 - Unit Tests for Content Tabs & Language Detection",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.16",
+          "desc": "Phase 3 - Regression Tests for content mode selection",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.17",
+          "desc": "Phase 4 - Add auto-rewrite settings in TranslationConfig & PreferKey (mobile network allowed)",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.18",
+          "desc": "Phase 4 - Implement startFollowingChapterRewrites() with TranslationManager.startRewrite() in ReadBookViewModel",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.19",
+          "desc": "Phase 4 - Add auto-rewrite UI state & intents in ReadBookContract",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.20",
+          "desc": "Phase 4 - Add auto-rewrite settings UI in ReadBookMenuBar",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.21",
+          "desc": "Phase 4 - Verify Rewrite Cache & Tab Display Integration",
+          "status": "DONE"
+        },
+        {
+          "id": "T14.22",
+          "desc": "Phase 4 - Unit Tests for Auto-Rewrite",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P15",
+      "name": "AI Rewrite Sheet Migration & Metadata Translation Fix",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T15.1",
+          "desc": "Move auto-rewrite state fields from TranslationProgressUiState to AiTextRewriteUiState",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.2",
+          "desc": "Add whole-chapter auto-rewrite UI controls to AiTextRewriteSheet",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.3",
+          "desc": "Clean up auto-rewrite branch from TranslationProgressSheet",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.4",
+          "desc": "Rewire ReadBookViewModel auto-rewrite queue with AiTextRewriteUiState",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.5",
+          "desc": "Add string resources for auto-rewrite controls in values and values-vi",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.6",
+          "desc": "Inject TranslateDynamicUiTextUseCase in BookshelfViewModel & use executeAuthorName / executeChapterTitle",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.7",
+          "desc": "Inject TranslateDynamicUiTextUseCase in BookInfoViewModel & use executeAuthorName / executeChapterTitle",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.8",
+          "desc": "Fix non-CJK author handling in TranslateDynamicUiTextUseCase.executeAuthorName",
+          "status": "DONE"
+        },
+        {
+          "id": "T15.9",
+          "desc": "Compile check, unit test verification, and assembleAppRelease build",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P16",
+      "name": "AI Provider Platform Completion",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T16.1.1",
+          "desc": "Create AiModelStatus constants (ACTIVE, STALE, DEPRECATED)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.1.2",
+          "desc": "Add lifecycle fields status and lastSeenAt to AiModelProfile entity",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.1.3",
+          "desc": "Database migration 110 to 111 in AppDatabase and DatabaseMigrations",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.1.4",
+          "desc": "Add lifecycle queries to AiProfileDao",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.1.5",
+          "desc": "Update AiProfileGateway, Repository, and Model Picker for model lifecycle",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.1.6",
+          "desc": "Phase 1 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.2.1",
+          "desc": "Create ModelDiscoveryWorker (WorkManager, CoroutineWorker, batch sync)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.2.2",
+          "desc": "Add DataStore preference for discovery frequency (0/6/12/24h)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.2.3",
+          "desc": "Trigger one-shot discovery on OAuth login success in AiOAuthRepository",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.2.4",
+          "desc": "Trigger one-shot discovery on MODEL_NOT_FOUND in AiRouterRepository",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.2.5",
+          "desc": "Add discovery frequency and manual refresh settings UI in AiConfigScreen",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.2.6",
+          "desc": "Register ModelDiscoveryWorker on App startup",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.2.7",
+          "desc": "Phase 2 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.3.1",
+          "desc": "Add Citation and Usage data classes to AiStreamEvent sealed interface",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.3.2",
+          "desc": "Parse groundChunk / citationSources in GeminiHandler streaming",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.3.3",
+          "desc": "Parse usage and annotations in OpenAiChatHandler & OpenAiResponsesHandler",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.3.4",
+          "desc": "Parse message_delta usage in AnthropicHandler",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.3.5",
+          "desc": "Phase 3 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.4.1",
+          "desc": "Create ProviderHealthUi and ProviderHealthStatus data classes in AiConfigContract",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.4.2",
+          "desc": "Update AiConfigViewModel to compute provider health, failure stats, and cooldown status",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.4.3",
+          "desc": "Add ProviderHealthSection and ProviderHealthCard composables to AiConfigScreen",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.4.4",
+          "desc": "Add string resources for provider health dashboard in values and values-vi",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.4.5",
+          "desc": "Phase 4 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.5.1",
+          "desc": "Create WebSessionGateway interface and models (WebSessionModels.kt, WebSessionGateway.kt)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.5.2",
+          "desc": "Create GeminiWebSessionManager for cookie extraction and SNlM0e token resolution",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.5.3",
+          "desc": "Add GEMINI_WEB protocol constant to AiProtocol and update registries",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.5.4",
+          "desc": "Implement GeminiWebHandler for batchexecute RPC request and SSE streaming",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.5.5",
+          "desc": "Register GeminiWebHandler in AiTextRepositoryImpl and DI",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.5.6",
+          "desc": "Phase 5 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.6.1",
+          "desc": "Create ChatGptWebSessionManager for session token extraction, access token resolution, and PoW handling",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.6.2",
+          "desc": "Implement ChatGptWebHandler for /backend-api/conversation SSE chunk parsing",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.6.3",
+          "desc": "Register ChatGptWebHandler in AiTextRepositoryImpl and DI",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.6.4",
+          "desc": "Phase 6 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.7.1",
+          "desc": "Configure Proguard/R8 rules for AI providers, web sessions, and entities",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.7.2",
+          "desc": "Run project unit tests suite",
+          "status": "DONE"
+        },
+        {
+          "id": "T16.7.3",
+          "desc": "Final assembleAppDebug verification",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P17",
+      "name": "Web Provider Auth & Antigravity Model Sync",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T17.1.1",
+          "desc": "Update Antigravity model list in AiOAuthRepository with 16 verified models",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.1.2",
+          "desc": "Add syncDiscoveredModels call in saveOAuthAccount to deprecate stale models",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.1.3",
+          "desc": "Update AntigravityHandler.fetchModels to return the 16 models",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.1.4",
+          "desc": "Phase 1 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.2.1",
+          "desc": "Update Gemini Web catalog entry authType to BEARER in AiProviderCatalog",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.2.2",
+          "desc": "Update AiProviderConfigSheet credential labels and notice for web protocols",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.2.3",
+          "desc": "Add OpenWebLogin and WebLoginComplete intents/effects to AiRouterContract",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.2.4",
+          "desc": "Phase 2 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.3.1",
+          "desc": "Create WebLoginSheet composable with WebView and Manual Paste tabs",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.3.2",
+          "desc": "Wire WebLogin intents in AiRouterViewModel",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.3.3",
+          "desc": "Wire WebLoginSheet in AiRouterScreen",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.3.4",
+          "desc": "Phase 3 debug build verification (compileAppDebugKotlin)",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.4.1",
+          "desc": "Add string resources in values/strings.xml and values-vi/strings.xml",
+          "status": "DONE"
+        },
+        {
+          "id": "T17.4.2",
+          "desc": "Final assembleAppDebug verification",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P18",
+      "name": "ChatGPT Web & Gemini Web Provider Fixes",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T18.1",
+          "desc": "Enhance WebLoginSheet with Desktop Chrome UA, suppress X-Requested-With header, and inject LegadoAuthBridge for automatic token/session capture",
+          "status": "DONE"
+        },
+        {
+          "id": "T18.2",
+          "desc": "Update GeminiWebSessionManager to parse bundled JSON credentials and dynamic buildLabel",
+          "status": "DONE"
+        },
+        {
+          "id": "T18.3",
+          "desc": "Update GeminiWebHandler with dynamic buildLabel and delta text streaming accumulator",
+          "status": "DONE"
+        },
+        {
+          "id": "T18.4",
+          "desc": "Update ChatGptWebSessionManager for JSON credentials and ChatGptWebHandler to attach CookieManager cookies",
+          "status": "DONE"
+        },
+        {
+          "id": "T18.5",
+          "desc": "Add GEMINI_WEB and CHATGPT_WEB to protocol dropdowns and enable web connection test without modelsUrl",
+          "status": "DONE"
+        },
+        {
+          "id": "T18.6",
+          "desc": "Unit tests for GeminiWebSessionManager, ChatGptWebSessionManager, and streaming delta calculation",
+          "status": "DONE"
+        },
+        {
+          "id": "T18.7",
+          "desc": "Build verification (compileAppDebugKotlin, test, assembleAppDebug) and LDPlayer install & test",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P19",
+      "name": "Gemini Web Provider Enhancement (ChatGPT Web Parity)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T19.1",
+          "desc": "Enhance GeminiWebSessionManager with flexible JSON key parsing, Google redirect/ServiceLogin detection, and resilient HTML fallback regexes",
+          "status": "DONE"
+        },
+        {
+          "id": "T19.2",
+          "desc": "Enhance GeminiWebHandler with clean single-turn prompt builder, model-specific directives, multi-part candidate parsing, GeminiStreamAccumulator with thought separation, and RPC error checks",
+          "status": "DONE"
+        },
+        {
+          "id": "T19.3",
+          "desc": "Enhance WebLoginSheet with 1-click DevTools Console script copy button, 4-step instructions, and real-time reactive badge detection for Google cookies",
+          "status": "DONE"
+        },
+        {
+          "id": "T19.4",
+          "desc": "Add unit tests in WebSessionManagerTest for WIZ_global_data and cookie parsing",
+          "status": "DONE"
+        },
+        {
+          "id": "T19.5",
+          "desc": "Build verification (compileAppDebugKotlin, testAppDebugUnitTest, assembleAppDebug) and live emulator-5554 UI verification",
           "status": "DONE"
         }
       ]

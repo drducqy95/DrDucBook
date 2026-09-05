@@ -36,6 +36,7 @@ internal data class AiModelPickerOptionUi(
     val contextWindow: Int = 0,
     val maxOutputTokens: Int = 0,
     val isMissing: Boolean = false,
+    val isStale: Boolean = false,
 )
 
 @Composable
@@ -95,10 +96,11 @@ internal fun AiModelPickerSheet(
                             contentType = { "model" },
                         ) { model ->
                             val missingLabel = stringResource(R.string.ai_model_missing_catalog)
-                            val displayTitle = if (model.isMissing) {
-                                "${model.modelName} ($missingLabel)"
-                            } else {
-                                model.modelName
+                            val staleLabel = stringResource(R.string.ai_model_stale_warning)
+                            val displayTitle = when {
+                                model.isStale -> "${model.modelName} ($staleLabel)"
+                                model.isMissing -> "${model.modelName} ($missingLabel)"
+                                else -> model.modelName
                             }
                             ClickableSettingItem(
                                 title = displayTitle,

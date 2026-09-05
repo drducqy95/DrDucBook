@@ -20,6 +20,7 @@ import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.ui.main.MainActivity
+import io.legado.app.ui.main.MainIntent
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.servicePendingIntent
@@ -82,10 +83,18 @@ class CacheBookService : BaseService() {
             .setContentTitle(getString(R.string.offline_cache))
             .setContentIntent(
                 activityPendingIntent(
-                    MainActivity.createCacheIntent(this),
+                    MainIntent.createBookCacheManageIntent(this),
                     "cacheActivity"
                 )
             )
+        builder.addAction(
+            R.drawable.ic_settings,
+            getString(R.string.download_cache_config),
+            activityPendingIntent(
+                MainIntent.createDownloadCacheConfigIntent(this),
+                "downloadConfig"
+            )
+        )
         builder.addAction(
             R.drawable.ic_stop_black_24dp,
             getString(R.string.cancel),

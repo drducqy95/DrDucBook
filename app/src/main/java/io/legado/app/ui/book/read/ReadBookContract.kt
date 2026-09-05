@@ -205,6 +205,14 @@ data class AiTextRewriteUiState(
     val history: ImmutableList<AiRewriteHistoryUi> = persistentListOf(),
     val referenceCount: Int = 0,
     val errorMessage: String? = null,
+    val isWholeChapterMode: Boolean = false,
+    val autoRewriteEnabled: Boolean = false,
+    val autoRewriteNextChapters: Int = 3,
+    val autoRewriteQueueRunning: Boolean = false,
+    val autoRewriteCompletedChapters: Int = 0,
+    val autoRewriteTotalChapters: Int = 0,
+    val autoRewriteCurrentChapter: String = "",
+    val autoRewriteMessage: String? = null,
 )
 
 @Stable
@@ -258,6 +266,8 @@ data class ReadBookUiState(
         ReaderContentMode.TRANSLATION,
         ReaderContentMode.HAN_VIET,
         ReaderContentMode.QUICK_TRANSLATOR,
+        ReaderContentMode.LOCAL_AI,
+        ReaderContentMode.NMT,
     ),
     val translationProgress: TranslationProgressUiState = TranslationProgressUiState(),
     val quickDictionary: QuickDictionaryUiState = QuickDictionaryUiState(),
@@ -480,6 +490,8 @@ sealed interface ReadBookIntent {
     data class SetAutoTranslateEnabled(val enabled: Boolean) : ReadBookIntent
     data class SetAutoTranslateWifiOnly(val enabled: Boolean) : ReadBookIntent
     data class SetAutoTranslateNextChapters(val count: Int) : ReadBookIntent
+    data class SetAutoRewriteEnabled(val enabled: Boolean) : ReadBookIntent
+    data class SetAutoRewriteNextChapters(val count: Int) : ReadBookIntent
     data class SetInheritSeriesMemory(val enabled: Boolean) : ReadBookIntent
     data object CopyTranslationLog : ReadBookIntent
     data object OpenTranslationRevision : ReadBookIntent

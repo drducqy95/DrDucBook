@@ -16,6 +16,7 @@ import io.legado.app.domain.model.AiModelDraft
 import io.legado.app.domain.model.AiPromptCatalog
 import io.legado.app.domain.model.AiProviderCatalog
 import io.legado.app.domain.model.AiProviderRegistry
+import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiProviderAuthType
 import io.legado.app.domain.model.AiProviderConnectionDraft
@@ -45,7 +46,6 @@ class AiRouterViewModel(
     private val oauthGateway: AiOAuthGateway,
     private val aiTextGateway: AiTextGateway,
     private val testProviderDraft: TestAiProviderDraftUseCase,
-    private val localAiEngineGateway: LocalAiEngineGateway,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AiRouterUiState())
@@ -275,68 +275,25 @@ class AiRouterViewModel(
             is AiRouterIntent.UpdateProviderSearch -> updateProviderSearch(intent.query)
             is AiRouterIntent.SelectProviderFilter -> selectProviderFilter(intent.filter)
             is AiRouterIntent.CreateComboTemplate -> createComboTemplate(intent.templateId)
-            AiRouterIntent.OpenLocalGgufCatalog -> {
-                _effects.tryEmit(AiRouterEffect.OpenUrl(ExternalAssetCatalog.ggufFolderUrl))
-            }
-            AiRouterIntent.ChooseLocalGguf -> {
-                _effects.tryEmit(AiRouterEffect.OpenLocalGgufPicker)
-            }
-            is AiRouterIntent.LocalGgufSelected -> importLocalGguf(intent.uri)
+            is AiRouterIntent.OpenWebLogin -> openWebLogin(intent.protocol)
+            is AiRouterIntent.WebLoginComplete -> completeWebLogin(intent.cookieString)
             AiRouterIntent.DismissEditor -> updateEditor(null)
         }
     }
 
-    private fun importLocalGguf(uri: String) {
-        val editor = _uiState.value.editor as? AiRouterEditor.ProviderConfig
-            ?: return
-        if (editor.protocol != io.legado.app.domain.model.AiProtocol.LOCAL_GGUF) return
-        viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(saving = true) }
-            val result = if (!localAiEngineGateway.nativeRuntimeAvailable) {
-                Result.failure(IllegalStateException("Native local AI runtime is unavailable for this device"))
-            } else {
-                localAiEngineGateway.importModel(uri)
-            }
-            result.onSuccess { metadata ->
-                val option = AiRouterModelOptionUi(
-                    id = metadata.path,
-                    name = metadata.name,
-                    contextWindow = metadata.contextWindow,
-                    maxOutputTokens = metadata.contextWindow,
-                )
-                _uiState.update { state ->
-                    val current = state.editor as? AiRouterEditor.ProviderConfig ?: return@update state
-                    state.copy(
-                        saving = false,
-                        editor = current.copy(
-                            baseUrl = metadata.path,
-                            modelId = metadata.path,
-                            modelName = metadata.name,
-                            contextWindow = metadata.contextWindow.toString(),
-                            maxOutputTokens = metadata.contextWindow.toString(),
-                            discoveredModels = listOf(option).toImmutableList(),
-                            localModelSizeBytes = metadata.sizeBytes,
-                            localModelSha256 = metadata.sha256,
-                            localRuntimeProfile = with(metadata.runtimeProfile) {
-                                "${threads} threads · context ${contextWindow} · batch ${batchSize}/${microBatchSize}"
-                            },
-                            localPrimaryAbi = metadata.primaryAbi,
-                            localTotalMemoryMb = metadata.totalMemoryMb,
-                            localRuntimeAvailable = true,
-                            testStatus = AiConnectionStatus.UNVERIFIED,
-                            testMessage = "GGUF đã được kiểm tra; hãy Test rồi Lưu",
-                            testLatencyMs = null,
-                        ),
-                    )
-                }
-                _effects.tryEmit(AiRouterEffect.ShowMessage("Đã nạp model GGUF: ${metadata.name}"))
-            }.onFailure { error ->
-                _uiState.update { it.copy(saving = false) }
-                _effects.tryEmit(
-                    AiRouterEffect.ShowMessage(error.message ?: "Không thể nạp model GGUF")
-                )
-            }
+    private fun openWebLogin(protocol: String) {
+        val url = when (protocol) {
+            AiProtocol.GEMINI_WEB -> "https://gemini.google.com/app"
+            AiProtocol.CHATGPT_WEB -> "https://chatgpt.com"
+            else -> return
         }
+        _effects.tryEmit(AiRouterEffect.LaunchWebLogin(url, protocol))
+    }
+
+    private fun completeWebLogin(cookieString: String) {
+        val currentEditor = (_uiState.value.editor as? AiRouterEditor.ProviderConfig) ?: return
+        updateEditor(currentEditor.copy(apiKey = cookieString, testStatus = AiConnectionStatus.UNVERIFIED))
+        testProviderConfig()
     }
 
     private fun updateProviderSearch(query: String) {
@@ -421,14 +378,7 @@ class AiRouterViewModel(
                     modelsPath = savedProvider?.modelsPath ?: entry.modelsPath.orEmpty(),
                     notice = entry.notice,
                     hasStoredSecret = hasStoredSecret,
-                    localRuntimeAvailable = if (
-                        (savedProvider?.protocol ?: entry.protocol) ==
-                        io.legado.app.domain.model.AiProtocol.LOCAL_GGUF
-                    ) {
-                        localAiEngineGateway.nativeRuntimeAvailable
-                    } else {
-                        null
-                    },
+                    localRuntimeAvailable = null,
                     discoveredModels = modelOptions.toImmutableList(),
                 )
             )
@@ -531,9 +481,6 @@ class AiRouterViewModel(
                     AiRouterEffect.ShowMessage(error.message ?: "Không thể test provider")
                 )
             }
-            if (editor.protocol == io.legado.app.domain.model.AiProtocol.LOCAL_GGUF) {
-                runCatching { localAiEngineGateway.unload() }
-            }
         }
     }
 
@@ -551,7 +498,7 @@ class AiRouterViewModel(
                 credential.oauthProvider == null &&
                 credential.hasSecret
         }
-        if (draft.authType != AiProviderAuthType.NONE) {
+        if (draft.authType != AiProviderAuthType.NONE && draft.protocol != AiProtocol.GEMINI_WEB) {
             require(draft.apiKey.isNotBlank() || draft.hasStoredSecret || hasPoolCredential) {
                 "Cần nhập API key hoặc token"
             }

@@ -42,7 +42,9 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.http.postForm
 import io.legado.app.help.http.postJson
 import io.legado.app.utils.GSON
+import io.legado.app.worker.ModelDiscoveryWorker
 import kotlinx.coroutines.CoroutineScope
+import splitties.init.appCtx
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
@@ -876,6 +878,23 @@ class AiOAuthRepository(
         if (savedModels.isEmpty()) {
             error("OAuth provider không có model để tạo route")
         }
+        runCatching {
+            profileGateway.syncDiscoveredModels(
+                providerId = provider.id,
+                discovered = config.models.map { model ->
+                    io.legado.app.domain.model.AiAvailableModel(
+                        id = model.id,
+                        name = model.name,
+                        contextWindow = model.contextWindow,
+                        maxOutputTokens = model.maxOutputTokens,
+                    )
+                },
+            )
+            if (config.id == AiOAuthProviderId.ANTIGRAVITY) {
+                val legacyModelProfileId = AiProfileRepository.stableModelId(provider.id, "gemini-3-flash-agent")
+                profileGateway.deleteModel(legacyModelProfileId)
+            }
+        }
         val credentialId = stableCredentialId(config.id, account.id)
         val existing = dao.getCredential(credentialId)
         val accessRef = secretStore.put(accessToken, existing?.secretRef)
@@ -958,6 +977,9 @@ class AiOAuthRepository(
             chatRouteId = chatBinding.routeId,
             translationRouteId = translationBinding.routeId,
         )
+        runCatching {
+            ModelDiscoveryWorker.runOnce(appCtx)
+        }
         return OAuthSaveResult(
             providerProfileId = provider.id,
             modelProfileId = usableModel.id,
@@ -1316,10 +1338,9 @@ class AiOAuthRepository(
                     "prompt" to "consent",
                 ),
                 usePkce = ANTIGRAVITY_OAUTH_USES_PKCE,
-                models = listOf(
-                    OAuthModel("gemini-3-flash-agent", "Gemini 3.5 Flash (High)", 1_000_000, 64_000),
-                    OAuthModel("gemini-pro-agent", "Gemini 3.1 Pro (High)", 1_000_000, 64_000),
-                ),
+                models = ANTIGRAVITY_SUPPORTED_MODELS.map {
+                    OAuthModel(it.id, it.name, it.contextWindow, it.maxOutputTokens)
+                },
             ),
             OAuthProvider(
                 id = AiOAuthProviderId.XAI,

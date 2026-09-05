@@ -382,6 +382,22 @@ object TranslationManager : KoinComponent {
         return taskFlow
     }
 
+    fun startRewrite(
+        book: Book,
+        chapter: BookChapter,
+        forceRetranslate: Boolean = false,
+        onTranslateStarted: () -> Unit = {}
+    ): MutableStateFlow<TranslationChapterState>? {
+        return startTranslation(
+            book = book,
+            chapter = chapter,
+            forceRetranslate = forceRetranslate,
+            provider = TranslationConstants.PROVIDER_REWRITE,
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+            onTranslateStarted = onTranslateStarted,
+        )
+    }
+
     private suspend fun translateChapter(
         book: Book,
         bookChapter: BookChapter,

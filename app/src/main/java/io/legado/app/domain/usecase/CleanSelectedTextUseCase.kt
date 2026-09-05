@@ -192,7 +192,9 @@ class CleanSelectedTextUseCase(
                     emit(StreamEvent.Reasoning(event.text))
                 }
 
-                is AiStreamEvent.ToolCallDelta -> Unit
+                is AiStreamEvent.ToolCallDelta,
+                is AiStreamEvent.Citation,
+                is AiStreamEvent.Usage -> Unit
             }
         }
 

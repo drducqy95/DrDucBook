@@ -74,6 +74,12 @@
 # or remove the class before the isolated NMT process unmarshals it.
 -keep class io.legado.app.data.repository.NmtTranslationRepository { *; }
 -keep class io.legado.app.data.repository.NmtTranslationRepository$* { *; }
+# Local AI Native Bridge and JNI callbacks
+-keep class io.legado.app.data.repository.LocalAiNativeBridge { *; }
+-keep class io.legado.app.data.repository.LocalAiNativeBridge$* { *; }
+-keep interface io.legado.app.data.repository.LocalAiNativeBridge$Callback { *; }
+-keep class io.legado.app.domain.gateway.LocalAi* { *; }
+-keep class io.legado.app.data.repository.LocalAi* { *; }
 -keep class io.legado.app.domain.model.TranslationRevision{*;}
 -keep class io.legado.app.domain.model.RevisionStatus{*;}
 -keep class io.legado.app.domain.model.AiTranslationStoryEntity{*;}
@@ -185,3 +191,9 @@ cn.hutool.core.util.**{*;}
 -dontwarn java.lang.management.**
 -dontwarn io.ktor.util.debug.IntellijIdeaDebugDetector
 -keep,allowobfuscation class io.ktor.util.debug.** { *; }
+
+# AI Models, Entities, and Handlers
+-keep class io.legado.app.domain.model.** { *; }
+-keep class io.legado.app.domain.gateway.** { *; }
+-keep class io.legado.app.data.entities.Ai* { *; }
+-keep class io.legado.app.data.repository.ai.** { *; }

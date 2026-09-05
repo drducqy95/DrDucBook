@@ -127,6 +127,8 @@ class AiChatGenerationUseCase(
                     toolTrace.append(event)
                     onToolTraceUpdate()
                 }
+                is AiStreamEvent.Citation,
+                is AiStreamEvent.Usage -> Unit
             }
         }
     }

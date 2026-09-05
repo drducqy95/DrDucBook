@@ -28,6 +28,7 @@ class AntigravityHandlerTest {
         assertEquals("gemini-pro-agent", body["model"])
         assertEquals("agent", body["requestType"])
         assertEquals("antigravity", body["userAgent"])
+        assertEquals(listOf("GOOGLE_ONE_AI"), body["enabledCreditTypes"])
         assertFalse(body.containsKey("sessionId"))
 
         val nestedRequest = body["request"] as Map<*, *>

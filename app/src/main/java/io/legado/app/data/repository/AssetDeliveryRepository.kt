@@ -77,11 +77,19 @@ class AssetDeliveryRepository(
     }
 
     private fun targetFile(artifact: AssetDeliveryArtifact): File {
-        val root = appContext.getExternalFilesDir(ASSET_DIR)
-            ?: File(appContext.filesDir, ASSET_DIR)
+        val externalRoot = appContext.getExternalFilesDir(ASSET_DIR)
+        val root = if (externalRoot != null && (externalRoot.exists() || externalRoot.mkdirs()) && externalRoot.canWrite()) {
+            externalRoot
+        } else {
+            File(appContext.filesDir, ASSET_DIR)
+        }
         val dir = File(root, artifact.kind.name.lowercase())
         if (!dir.exists() && !dir.mkdirs()) {
-            throw IOException("Cannot create asset directory")
+            val fallbackDir = File(File(appContext.filesDir, ASSET_DIR), artifact.kind.name.lowercase())
+            if (!fallbackDir.exists() && !fallbackDir.mkdirs()) {
+                throw IOException("Cannot create asset directory")
+            }
+            return File(fallbackDir, artifact.safeFileName())
         }
         return File(dir, artifact.safeFileName())
     }

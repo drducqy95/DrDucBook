@@ -1012,8 +1012,11 @@ const skipWebTtsChapter = async (direction: number) => {
   stopWebTts()
   getContent(target)
   if (!shouldResume) return
-  await waitForWebTtsChapter(target, ttsPlaybackToken)
-  if (target === chapterIndex.value) void speakCurrentChapter()
+  const currentToken = ttsPlaybackToken
+  await waitForWebTtsChapter(target, currentToken)
+  if (target === chapterIndex.value && currentToken === ttsPlaybackToken) {
+    void speakCurrentChapter()
+  }
 }
 
 const speakCurrentChapter = async () => {

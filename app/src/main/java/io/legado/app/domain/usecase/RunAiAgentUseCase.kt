@@ -71,6 +71,8 @@ class RunAiAgentUseCase(
                         )
 
                         is AiStreamEvent.ToolCallDelta -> toolTrace.append(event)
+                        is AiStreamEvent.Citation,
+                        is AiStreamEvent.Usage -> Unit
                     }
                 }
 

@@ -23,8 +23,19 @@ object DatabaseMigrations {
             migration_82_83, migration_99_100, migration_100_101, migration_101_102,
             migration_102_103, migration_103_104, migration_104_105,
             migration_105_106, migration_106_107, migration_107_108,
-            migration_108_109, migration_109_110,
+            migration_108_109, migration_109_110, migration_110_111,
         )
+    }
+
+    private val migration_110_111 = object : Migration(110, 111) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                "ALTER TABLE `ai_model_profiles` ADD COLUMN `status` TEXT NOT NULL DEFAULT 'active'"
+            )
+            db.execSQL(
+                "ALTER TABLE `ai_model_profiles` ADD COLUMN `lastSeenAt` INTEGER NOT NULL DEFAULT 0"
+            )
+        }
     }
 
     private val migration_109_110 = object : Migration(109, 110) {

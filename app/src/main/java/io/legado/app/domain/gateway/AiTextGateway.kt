@@ -17,6 +17,19 @@ sealed interface AiStreamEvent {
         val rawType: String,
         val metadata: String? = null,
     ) : AiStreamEvent
+    data class Citation(
+        val startIndex: Int? = null,
+        val endIndex: Int? = null,
+        val uri: String,
+        val title: String = "",
+        val snippet: String = ""
+    ) : AiStreamEvent
+    data class Usage(
+        val promptTokens: Int = 0,
+        val completionTokens: Int = 0,
+        val totalTokens: Int = 0,
+        val reasoningTokens: Int = 0
+    ) : AiStreamEvent
 }
 
 interface AiTextGateway {

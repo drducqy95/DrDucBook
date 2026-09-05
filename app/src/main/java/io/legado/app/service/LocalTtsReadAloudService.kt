@@ -224,13 +224,13 @@ class LocalTtsReadAloudService : BaseReadAloudService(), Player.Listener {
     }
 
     override fun nextChapter() {
+        player.stop()
         sendBroadcast(android.content.Intent(IntentAction.localTtsNext).setPackage(packageName))
-        stopSelf()
     }
 
     override fun prevChapter() {
+        player.stop()
         sendBroadcast(android.content.Intent(IntentAction.localTtsPrev).setPackage(packageName))
-        stopSelf()
     }
 
     private fun applySpeechRate() {

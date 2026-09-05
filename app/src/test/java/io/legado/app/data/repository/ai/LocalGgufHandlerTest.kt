@@ -120,7 +120,13 @@ class LocalGgufHandlerTest {
         override suspend fun inspectModel(modelPath: String): Result<LocalAiModelMetadata> =
             error("Not used")
 
-        override suspend fun importModel(sourceUri: String): Result<LocalAiModelMetadata> =
+        override suspend fun validateModel(modelPath: String): Result<LocalAiModelMetadata> =
+            error("Not used")
+
+        override suspend fun importModel(
+            sourceUri: String,
+            onProgress: ((bytesRead: Long, totalBytes: Long) -> Unit)?,
+        ): Result<LocalAiModelMetadata> =
             error("Not used")
 
         override suspend fun unload() = Unit

@@ -225,6 +225,71 @@ object TranslationConfig {
         true,
     )
 
+    var localAiModelPath by prefDelegate(
+        PreferKey.localAiModelPath,
+        "",
+    )
+
+    private var storedLocalAiTemperature by prefDelegate(
+        PreferKey.localAiTemperature,
+        0.7f,
+    )
+    var localAiTemperature: Float
+        get() = storedLocalAiTemperature.coerceIn(MIN_TEMPERATURE, MAX_TEMPERATURE)
+        set(value) {
+            storedLocalAiTemperature = value.coerceIn(MIN_TEMPERATURE, MAX_TEMPERATURE)
+        }
+
+    private var storedLocalAiTopP by prefDelegate(
+        PreferKey.localAiTopP,
+        0.6f,
+    )
+    var localAiTopP: Float
+        get() = storedLocalAiTopP.coerceIn(0f, 1f)
+        set(value) {
+            storedLocalAiTopP = value.coerceIn(0f, 1f)
+        }
+
+    private var storedLocalAiTopK by prefDelegate(
+        PreferKey.localAiTopK,
+        20,
+    )
+    var localAiTopK: Int
+        get() = storedLocalAiTopK.coerceIn(1, 100)
+        set(value) {
+            storedLocalAiTopK = value.coerceIn(1, 100)
+        }
+
+    private var storedLocalAiRepetitionPenalty by prefDelegate(
+        PreferKey.localAiRepetitionPenalty,
+        1.05f,
+    )
+    var localAiRepetitionPenalty: Float
+        get() = storedLocalAiRepetitionPenalty.coerceIn(1f, 2f)
+        set(value) {
+            storedLocalAiRepetitionPenalty = value.coerceIn(1f, 2f)
+        }
+
+    private var storedLocalAiMaxCharsPerChunk by prefDelegate(
+        PreferKey.localAiMaxCharsPerChunk,
+        640,
+    )
+    var localAiMaxCharsPerChunk: Int
+        get() = storedLocalAiMaxCharsPerChunk.coerceIn(MIN_CHUNK_CHARS, MAX_CHUNK_CHARS)
+        set(value) {
+            storedLocalAiMaxCharsPerChunk = value.coerceIn(MIN_CHUNK_CHARS, MAX_CHUNK_CHARS)
+        }
+
+    private var storedLocalAiPrompt by prefDelegate(
+        PreferKey.localAiPrompt,
+        "",
+    )
+    var localAiPrompt: String
+        get() = storedLocalAiPrompt
+        set(value) {
+            storedLocalAiPrompt = value.trim()
+        }
+
     private var storedAutoTranslateNextChapters by prefDelegate(
         PreferKey.translationAutoNextChapters,
         3,
@@ -236,9 +301,26 @@ object TranslationConfig {
             storedAutoTranslateNextChapters = value.coerceIn(0, 20)
         }
 
+    var autoRewriteEnabled by prefDelegate(
+        PreferKey.rewriteAutoEnabled,
+        false,
+    )
+
+    private var storedAutoRewriteNextChapters by prefDelegate(
+        PreferKey.rewriteAutoNextChapters,
+        3,
+    )
+
+    var autoRewriteNextChapters: Int
+        get() = storedAutoRewriteNextChapters.coerceIn(0, 20)
+        set(value) {
+            storedAutoRewriteNextChapters = value.coerceIn(0, 20)
+        }
+
     // Delegate constants to domain layer
     const val PROVIDER_OPENAI = TranslationConstants.PROVIDER_OPENAI
     const val PROVIDER_APP_AI = TranslationConstants.PROVIDER_APP_AI
+    const val PROVIDER_LOCAL_AI = TranslationConstants.PROVIDER_LOCAL_AI
     const val PROVIDER_GOOGLE = TranslationConstants.PROVIDER_GOOGLE
     const val PROVIDER_QUICK_TRANSLATOR = TranslationConstants.PROVIDER_QUICK_TRANSLATOR
     const val PROVIDER_NMT = TranslationConstants.PROVIDER_NMT

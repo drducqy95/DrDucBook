@@ -136,4 +136,41 @@ interface AiProfileDao {
         insertModel(model)
         insertPreset(preset)
     }
+
+    /** Đánh dấu STALE các model không có trong danh sách discovered active. */
+    @Query(
+        """
+        UPDATE ai_model_profiles
+        SET status = 'stale', updatedAt = :now
+        WHERE providerId = :providerId
+          AND modelId NOT IN (:activeModelIds)
+          AND status = 'active'
+        """
+    )
+    suspend fun markModelsStale(providerId: String, activeModelIds: List<String>, now: Long)
+
+    /** Cập nhật lastSeenAt và reset status về ACTIVE cho các model discovered. */
+    @Query(
+        """
+        UPDATE ai_model_profiles
+        SET lastSeenAt = :now, status = 'active', updatedAt = :now
+        WHERE providerId = :providerId AND modelId IN (:modelIds)
+        """
+    )
+    suspend fun updateModelLastSeen(providerId: String, modelIds: List<String>, now: Long)
+
+    /** Chuyển STALE -> DEPRECATED + disable cho models quá hạn retention. */
+    @Query(
+        """
+        UPDATE ai_model_profiles
+        SET status = 'deprecated', enabled = 0, updatedAt = :now
+        WHERE status = 'stale' AND lastSeenAt > 0 AND lastSeenAt < :cutoff
+        """
+    )
+    suspend fun deprecateStaleModels(cutoff: Long, now: Long)
+
+    /** Observe chỉ models chưa deprecated (active hoặc stale) cho Model Picker. */
+    @Query("SELECT * FROM ai_model_profiles WHERE status != 'deprecated' ORDER BY sortNumber, createdAt")
+    fun observeActiveModels(): Flow<List<AiModelProfile>>
 }
+

@@ -23,6 +23,8 @@ object AiProtocol {
     const val ANTIGRAVITY = "antigravity"
     /** Command Code's AI SDK v5 NDJSON streaming endpoint. */
     const val COMMAND_CODE = "commandcode"
+    const val GEMINI_WEB = "gemini_web"
+    const val CHATGPT_WEB = "chatgpt_web"
 }
 
 object AiProviderAuthType {
@@ -111,15 +113,6 @@ object AiMessageRole {
 
 object AiProviderPresets {
     val items = listOf(
-        AiProviderPreset(
-            id = "local_hy_mt2",
-            name = "Local AI · Hy-MT2",
-            protocol = AiProtocol.LOCAL_GGUF,
-            baseUrl = "",
-            modelsUrl = "",
-            modelName = "Hy-MT2 1.8B 1.25-bit",
-            modelId = "Hy-MT2-1.8B-1.25Bit.gguf"
-        ),
         AiProviderPreset(
             id = "opencode_free",
             name = "OpenCode Free",

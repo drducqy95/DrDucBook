@@ -8,7 +8,9 @@ enum class ReaderContentMode {
     GOOGLE,
     ML_KIT,
     AI,
+    LOCAL_AI,
     NMT,
+    REWRITE,
 }
 
 data class ReaderTranslationCacheIdentity(
@@ -41,8 +43,16 @@ fun ReaderContentMode.translationCacheIdentity(
         provider = TranslationConstants.PROVIDER_APP_AI,
         targetLanguage = selectedTargetLanguage,
     )
+    ReaderContentMode.LOCAL_AI -> ReaderTranslationCacheIdentity(
+        provider = TranslationConstants.PROVIDER_LOCAL_AI,
+        targetLanguage = selectedTargetLanguage,
+    )
     ReaderContentMode.NMT -> ReaderTranslationCacheIdentity(
         provider = TranslationConstants.PROVIDER_NMT,
+        targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+    )
+    ReaderContentMode.REWRITE -> ReaderTranslationCacheIdentity(
+        provider = TranslationConstants.PROVIDER_REWRITE,
         targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
     )
 }

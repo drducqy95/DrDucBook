@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
@@ -77,6 +78,7 @@ private data class BookCacheManageListState(
 @Composable
 fun BookCacheManageRouteScreen(
     onBackClick: () -> Unit,
+    onOpenDownloadSettings: (() -> Unit)? = null,
     viewModel: BookCacheManageViewModel = koinViewModel()
 ) {
     LaunchedEffect(Unit) {
@@ -94,6 +96,7 @@ fun BookCacheManageRouteScreen(
     BookCacheManageScreen(
         state = state,
         onBackClick = onBackClick,
+        onOpenDownloadSettings = onOpenDownloadSettings,
         onIntent = viewModel::onIntent
     )
 }
@@ -103,6 +106,7 @@ fun BookCacheManageRouteScreen(
 private fun BookCacheManageScreen(
     state: BookCacheManageUiState,
     onBackClick: () -> Unit,
+    onOpenDownloadSettings: (() -> Unit)? = null,
     onIntent: (BookCacheManageIntent) -> Unit,
 ) {
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
@@ -193,6 +197,13 @@ private fun BookCacheManageScreen(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = stringResource(R.string.refresh)
                     )
+                    onOpenDownloadSettings?.let {
+                        TopBarActionButton(
+                            onClick = it,
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.download_cache_config)
+                        )
+                    }
                 },
                 scrollBehavior = scrollBehavior
             )

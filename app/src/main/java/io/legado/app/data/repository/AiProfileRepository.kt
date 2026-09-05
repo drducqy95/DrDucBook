@@ -6,6 +6,7 @@ import io.legado.app.data.entities.AiProviderProfile
 import io.legado.app.data.entities.AiTaskPreset
 import io.legado.app.domain.gateway.AiProfileGateway
 import io.legado.app.domain.gateway.AiSecretStore
+import io.legado.app.domain.model.AiModelStatus
 import io.legado.app.domain.model.AiAvailableModel
 import io.legado.app.domain.model.AiGenerationParams
 import io.legado.app.domain.model.AiModelDraft
@@ -37,10 +38,16 @@ class AiProfileRepository(
 
     override fun observeModels(): Flow<List<AiModelProfile>> = aiProfileDao.observeModels()
 
+    override fun observeActiveModels(): Flow<List<AiModelProfile>> = aiProfileDao.observeActiveModels()
+
     override fun observePresets(): Flow<List<AiTaskPreset>> = aiProfileDao.observePresets()
 
     override suspend fun getProvider(id: String): AiProviderProfile? = withContext(Dispatchers.IO) {
         aiProfileDao.getProvider(id)
+    }
+
+    override suspend fun getEnabledProviders(): List<AiProviderProfile> = withContext(Dispatchers.IO) {
+        aiProfileDao.observeProviders().firstOrNull()?.filter { it.enabled }.orEmpty()
     }
 
     override suspend fun getModel(id: String): AiModelProfile? = withContext(Dispatchers.IO) {
@@ -51,6 +58,24 @@ class AiProfileRepository(
         val model = aiProfileDao.getModel(id) ?: return@withContext null
         val provider = aiProfileDao.getProvider(model.providerId) ?: return@withContext null
         model.toConfig(provider, resolveApiKey(provider))
+    }
+
+    override suspend fun toProviderConfig(provider: AiProviderProfile): AiProviderConfig = withContext(Dispatchers.IO) {
+        AiProviderConfig(
+            id = provider.id,
+            name = provider.name,
+            protocol = provider.protocol,
+            baseUrl = provider.baseUrl,
+            apiKey = resolveApiKey(provider),
+            authType = provider.authType,
+            modelsUrl = provider.modelsUrl,
+            headers = parseHeaders(provider.headersJson),
+            chatPath = provider.chatPath ?: "/chat/completions",
+            responsesPath = provider.responsesPath ?: "/responses",
+            messagesPath = provider.messagesPath ?: "/v1/messages",
+            modelsPath = provider.modelsPath,
+            customHeaders = parseHeaders(provider.customHeadersJson)
+        )
     }
 
     override suspend fun getTaskPreset(taskType: String): AiTaskPresetConfig? = withContext(Dispatchers.IO) {
@@ -120,7 +145,9 @@ class AiProfileRepository(
             enabled = existingModel?.enabled ?: true,
             sortNumber = draft.sortNumber ?: existingModel?.sortNumber ?: 0,
             createdAt = existingModel?.createdAt ?: now,
-            updatedAt = now
+            updatedAt = now,
+            status = existingModel?.status ?: AiModelStatus.ACTIVE,
+            lastSeenAt = existingModel?.lastSeenAt ?: now
         )
         aiProfileDao.insertModel(model)
         model
@@ -130,9 +157,19 @@ class AiProfileRepository(
         providerId: String,
         models: List<AiAvailableModel>
     ): List<AiModelProfile> = withContext(Dispatchers.IO) {
+        syncDiscoveredModels(providerId, models)
+    }
+
+    override suspend fun syncDiscoveredModels(
+        providerId: String,
+        discovered: List<AiAvailableModel>
+    ): List<AiModelProfile> = withContext(Dispatchers.IO) {
         require(aiProfileDao.getProvider(providerId) != null) { "Provider is required" }
         val now = System.currentTimeMillis()
-        models.distinctBy { it.id }.mapIndexed { index, availableModel ->
+        val discoveredIds = discovered.map { it.id }.toSet()
+
+        // 1. Upsert discovered models (update lastSeenAt, reset status to active)
+        val profiles = discovered.distinctBy { it.id }.mapIndexed { index, availableModel ->
             val modelProfileId = stableModelId(providerId, availableModel.id)
             val existingModel = aiProfileDao.getModel(modelProfileId)
             AiModelProfile(
@@ -148,9 +185,24 @@ class AiProfileRepository(
                 enabled = existingModel?.enabled ?: true,
                 sortNumber = existingModel?.sortNumber ?: index,
                 createdAt = existingModel?.createdAt ?: now,
-                updatedAt = now
+                updatedAt = now,
+                status = AiModelStatus.ACTIVE,
+                lastSeenAt = now
             ).also { aiProfileDao.insertModel(it) }
         }
+
+        // 2. Mark existing models for this provider not in discovered list as STALE
+        if (discoveredIds.isNotEmpty()) {
+            aiProfileDao.markModelsStale(providerId, discoveredIds.toList(), now)
+        }
+
+        profiles
+    }
+
+    override suspend fun deprecateStaleModels() = withContext(Dispatchers.IO) {
+        val now = System.currentTimeMillis()
+        val cutoff = now - AiModelStatus.STALE_RETENTION_MILLIS
+        aiProfileDao.deprecateStaleModels(cutoff, now)
     }
 
     override suspend fun setDefaultModel(modelProfileId: String): AiTaskPresetConfig = withContext(Dispatchers.IO) {
@@ -574,7 +626,7 @@ class AiProfileRepository(
         val legacyValue: String,
     )
 
-    private companion object {
+    companion object {
         const val DEFAULT_TRANSLATE_PRESET_ID = "default_translate_chapter"
         const val DEFAULT_SUMMARY_PRESET_ID = "default_summarize_chapter"
         const val DEFAULT_CHAT_PRESET_ID = "default_chat"

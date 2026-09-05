@@ -21,6 +21,7 @@ import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.media.MediaDownloadTransferPolicy
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.ui.main.MainActivity
+import io.legado.app.ui.main.MainIntent
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.servicePendingIntent
 import kotlinx.coroutines.CancellationException
@@ -644,7 +645,20 @@ class MediaDownloadService : BaseService() {
             .setContentTitle(getString(R.string.media_download_notification_title))
             .setContentText(getString(R.string.media_download_notification_progress, completedItems, totalItems))
             .setProgress(100, progress, totalItems == 0)
-            .setContentIntent(activityPendingIntent<MainActivity>("media-downloads"))
+            .setContentIntent(
+                activityPendingIntent(
+                    MainIntent.createMediaDownloadsIntent(this),
+                    "media-downloads"
+                )
+            )
+            .addAction(
+                R.drawable.ic_settings,
+                getString(R.string.download_cache_config),
+                activityPendingIntent(
+                    MainIntent.createDownloadCacheConfigIntent(this),
+                    "downloadConfig"
+                ),
+            )
             .addAction(
                 R.drawable.ic_pause,
                 getString(R.string.media_download_pause_all),

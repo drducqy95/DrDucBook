@@ -4,11 +4,13 @@ object TranslationConstants {
 
     const val PROVIDER_OPENAI = "openai"
     const val PROVIDER_APP_AI = "app_ai"
+    const val PROVIDER_LOCAL_AI = "local_ai"
     const val PROVIDER_GOOGLE = "google"
     const val PROVIDER_QUICK_TRANSLATOR = "quick_translator"
     const val PROVIDER_NMT = "nmt"
     const val PROVIDER_ML_KIT = "ml_kit"
     const val PROVIDER_HAN_VIET = "han_viet"
+    const val PROVIDER_REWRITE = "rewrite"
     const val TARGET_VIETNAMESE = "vi"
     const val MIN_TEMPERATURE = 0f
     const val MAX_TEMPERATURE = 2f
@@ -25,6 +27,8 @@ object TranslationConstants {
         "Quick Translator",
         "NMT Offline",
         "AI Provider",
+        "Local AI",
+        "AI Rewrite",
     )
     val providerValues = listOf(
         PROVIDER_GOOGLE,
@@ -32,6 +36,8 @@ object TranslationConstants {
         PROVIDER_QUICK_TRANSLATOR,
         PROVIDER_NMT,
         PROVIDER_APP_AI,
+        PROVIDER_LOCAL_AI,
+        PROVIDER_REWRITE,
     )
 
     val targetLanguages = listOf(
@@ -48,7 +54,7 @@ object TranslationConstants {
     )
 
     fun targetLanguagesForProvider(provider: String): List<Pair<String, String>> {
-        return if (provider == PROVIDER_QUICK_TRANSLATOR || provider == PROVIDER_NMT) {
+        return if (provider == PROVIDER_QUICK_TRANSLATOR || provider == PROVIDER_NMT || provider == PROVIDER_REWRITE) {
             targetLanguages.filter { it.first == TARGET_VIETNAMESE }
         } else {
             targetLanguages
@@ -62,6 +68,7 @@ object TranslationConstants {
     fun preferredContentProviders(targetLanguage: String): List<TranslationProviderIdentity> {
         return listOf(
             TranslationProviderIdentity(PROVIDER_APP_AI, targetLanguage),
+            TranslationProviderIdentity(PROVIDER_LOCAL_AI, targetLanguage),
             TranslationProviderIdentity(PROVIDER_NMT, TARGET_VIETNAMESE),
             TranslationProviderIdentity(PROVIDER_QUICK_TRANSLATOR, TARGET_VIETNAMESE),
             TranslationProviderIdentity(PROVIDER_GOOGLE, targetLanguage),
@@ -74,7 +81,8 @@ object TranslationConstants {
     fun requiresNetworkTranslation(provider: String): Boolean {
         return provider != PROVIDER_QUICK_TRANSLATOR &&
             provider != PROVIDER_NMT &&
-            provider != PROVIDER_ML_KIT
+            provider != PROVIDER_ML_KIT &&
+            provider != PROVIDER_LOCAL_AI
     }
 
     /**

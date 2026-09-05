@@ -116,7 +116,15 @@ fun MyScreen(
                             AccountIntent.SubmitGoogleToken(token.idToken, token.nonce)
                         )
                     }.onFailure { error ->
-                        snackbarHostState.showSnackbar(GoogleCredentialBridge.userMessage(error))
+                        if (error !is kotlinx.coroutines.CancellationException) {
+                            GoogleCredentialBridge.openBrowserFallback(context)
+                                .onSuccess {
+                                    snackbarHostState.showSnackbar("Đã chuyển sang trình duyệt để đăng nhập Google")
+                                }
+                                .onFailure {
+                                    snackbarHostState.showSnackbar(GoogleCredentialBridge.userMessage(error))
+                                }
+                        }
                     }
                 }
                 is AccountEffect.RequestGoogleDriveAuthorization,

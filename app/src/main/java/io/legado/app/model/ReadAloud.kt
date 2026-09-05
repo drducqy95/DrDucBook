@@ -184,6 +184,28 @@ object ReadAloud {
         }
     }
 
+    fun prevChapter(context: Context) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
+            val intent = Intent(context, aloudClass)
+            intent.action = IntentAction.prev
+            if (aloudClass == LocalTtsReadAloudService::class.java) {
+                intent.putExtra("localTtsSessionId", localSessionId)
+            }
+            context.startForegroundServiceCompat(intent)
+        }
+    }
+
+    fun nextChapter(context: Context) {
+        if (BaseReadAloudService.isRun || localSessionStarted) {
+            val intent = Intent(context, aloudClass)
+            intent.action = IntentAction.next
+            if (aloudClass == LocalTtsReadAloudService::class.java) {
+                intent.putExtra("localTtsSessionId", localSessionId)
+            }
+            context.startForegroundServiceCompat(intent)
+        }
+    }
+
     fun upTtsSpeechRate(context: Context) {
         if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)

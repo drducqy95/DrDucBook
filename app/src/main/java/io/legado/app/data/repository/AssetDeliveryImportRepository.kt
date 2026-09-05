@@ -41,8 +41,9 @@ class AssetDeliveryImportRepository(
             }
 
             AssetDeliveryArtifactKind.LOCAL_AI -> {
-                localAiEngineGateway.importModel(Uri.fromFile(source).toString())
+                val metadata = localAiEngineGateway.importModel(Uri.fromFile(source).toString())
                     .getOrThrow()
+                io.legado.app.ui.config.translation.TranslationConfig.localAiModelPath = metadata.path
                 "Đã nhập model AI cục bộ: ${artifact.displayName}"
             }
 

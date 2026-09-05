@@ -219,6 +219,12 @@ fun MainActivity.mainEntryProvider(
             onNavigateToBookCacheManage = {
                 onNavigateToRoute(MainRouteBookCacheManage)
             },
+            onNavigateToDownloadCacheSettings = {
+                onNavigateToRoute(MainRouteSettingsDownloadCache)
+            },
+            onNavigateToAudiobookImport = {
+                onNavigateToRoute(MainRouteAudiobookImport)
+            },
             onNavigateToBackupSettings = {
                 onNavigateToRoute(MainRouteSettingsBackup)
             },
@@ -555,9 +561,18 @@ fun MainActivity.mainEntryProvider(
         )
     }
 
+    entry<MainRouteDownloads> {
+        io.legado.app.ui.download.center.DownloadCenterScreen(
+            onOpenDownloadSettings = { onNavigateToRoute(MainRouteSettingsDownloadCache) },
+            onImportAudiobook = { onNavigateToRoute(MainRouteAudiobookImport) },
+            onBack = { onNavigateBack() },
+        )
+    }
+
     entry<MainRouteBookCacheManage> {
         BookCacheManageRouteScreen(
-            onBackClick = { onNavigateBack() }
+            onBackClick = { onNavigateBack() },
+            onOpenDownloadSettings = { onNavigateToRoute(MainRouteSettingsDownloadCache) },
         )
     }
 
@@ -709,6 +724,7 @@ fun MainActivity.mainEntryProvider(
         MediaDownloadsRouteScreen(
             onBack = { onNavigateBack() },
             onImportAudiobook = { onNavigateToRoute(MainRouteAudiobookImport) },
+            onOpenDownloadSettings = { onNavigateToRoute(MainRouteSettingsDownloadCache) },
         )
     }
 

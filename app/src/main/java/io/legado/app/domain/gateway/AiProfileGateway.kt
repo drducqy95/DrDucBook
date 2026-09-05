@@ -7,6 +7,7 @@ import io.legado.app.domain.model.AiAvailableModel
 import io.legado.app.domain.model.AiModelDraft
 import io.legado.app.domain.model.AiModelConfig
 import io.legado.app.domain.model.AiProfileDraft
+import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiProviderDraft
 import io.legado.app.domain.model.AiTaskPresetConfig
 import io.legado.app.domain.model.AiTaskPresetDraft
@@ -15,15 +16,20 @@ import kotlinx.coroutines.flow.Flow
 interface AiProfileGateway {
     fun observeProviders(): Flow<List<AiProviderProfile>>
     fun observeModels(): Flow<List<AiModelProfile>>
+    fun observeActiveModels(): Flow<List<AiModelProfile>>
     fun observePresets(): Flow<List<AiTaskPreset>>
     suspend fun getProvider(id: String): AiProviderProfile?
+    suspend fun getEnabledProviders(): List<AiProviderProfile>
     suspend fun getModel(id: String): AiModelProfile?
     suspend fun getModelConfig(id: String): AiModelConfig?
+    suspend fun toProviderConfig(provider: AiProviderProfile): AiProviderConfig
     suspend fun getTaskPreset(taskType: String): AiTaskPresetConfig?
     suspend fun getProviderApiKey(providerId: String): String
     suspend fun saveProvider(draft: AiProviderDraft): AiProviderProfile
     suspend fun saveModel(draft: AiModelDraft): AiModelProfile
     suspend fun importProviderModels(providerId: String, models: List<AiAvailableModel>): List<AiModelProfile>
+    suspend fun syncDiscoveredModels(providerId: String, discovered: List<AiAvailableModel>): List<AiModelProfile>
+    suspend fun deprecateStaleModels()
     suspend fun setDefaultModel(modelProfileId: String): AiTaskPresetConfig
     suspend fun saveDefaultChatProfile(draft: AiProfileDraft): AiTaskPresetConfig
     suspend fun saveTaskPreset(

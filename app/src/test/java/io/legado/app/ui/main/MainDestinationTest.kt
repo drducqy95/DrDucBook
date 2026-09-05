@@ -6,12 +6,13 @@ import org.junit.Test
 class MainDestinationTest {
 
     @Test
-    fun topLevelNavigationContainsExactlyFiveDestinations() {
+    fun topLevelNavigationContainsExactlySixDestinations() {
         assertEquals(
             listOf(
                 MainDestination.Home,
                 MainDestination.Bookshelf,
                 MainDestination.Explore,
+                MainDestination.Downloads,
                 MainDestination.Workspace,
                 MainDestination.My,
             ),
@@ -22,7 +23,7 @@ class MainDestinationTest {
     @Test
     fun legacyToolDestinationsCollapseIntoOneWorkspacePosition() {
         val migrated = MainDestination.ordered(
-            "home,bookshelf,explore,browser,ai_agent,writing,ebook_editor,rss,my"
+            "home,bookshelf,explore,downloads,browser,ai_agent,writing,ebook_editor,rss,my"
         )
 
         assertEquals(MainDestination.mainDestinations, migrated)

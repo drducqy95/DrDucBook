@@ -93,7 +93,6 @@ class TranslateChapterAiRetryTest {
             1,
             resolveTranslationChunkConcurrency(
                 provider = TranslationConstants.PROVIDER_APP_AI,
-                hasLocalAiBudget = false,
                 storyMemoryEnabled = true,
                 aiConcurrentRequests = 4,
                 standardConcurrentRequests = 3,
@@ -103,7 +102,6 @@ class TranslateChapterAiRetryTest {
             4,
             resolveTranslationChunkConcurrency(
                 provider = TranslationConstants.PROVIDER_APP_AI,
-                hasLocalAiBudget = false,
                 storyMemoryEnabled = false,
                 aiConcurrentRequests = 4,
                 standardConcurrentRequests = 3,
@@ -1394,10 +1392,21 @@ private class SinglePresetGateway(
 ) : AiProfileGateway {
     override fun observeProviders(): Flow<List<AiProviderProfile>> = emptyFlow()
     override fun observeModels(): Flow<List<AiModelProfile>> = emptyFlow()
+    override fun observeActiveModels(): Flow<List<AiModelProfile>> = emptyFlow()
     override fun observePresets(): Flow<List<AiTaskPreset>> = emptyFlow()
     override suspend fun getProvider(id: String): AiProviderProfile? = null
+    override suspend fun getEnabledProviders(): List<AiProviderProfile> = emptyList()
     override suspend fun getModel(id: String): AiModelProfile? = null
     override suspend fun getModelConfig(id: String): AiModelConfig? = null
+    override suspend fun toProviderConfig(provider: AiProviderProfile): AiProviderConfig = AiProviderConfig(
+        id = provider.id,
+        name = provider.name,
+        protocol = provider.protocol,
+        baseUrl = provider.baseUrl,
+        apiKey = provider.apiKey,
+        authType = provider.authType,
+        modelsUrl = provider.modelsUrl,
+    )
     override suspend fun getTaskPreset(taskType: String): AiTaskPresetConfig? = preset
     override suspend fun getProviderApiKey(providerId: String): String = ""
     override suspend fun saveProvider(draft: AiProviderDraft): AiProviderProfile = error("unused")
@@ -1406,6 +1415,11 @@ private class SinglePresetGateway(
         providerId: String,
         models: List<AiAvailableModel>,
     ): List<AiModelProfile> = error("unused")
+    override suspend fun syncDiscoveredModels(
+        providerId: String,
+        discovered: List<AiAvailableModel>,
+    ): List<AiModelProfile> = emptyList()
+    override suspend fun deprecateStaleModels() = Unit
 
     override suspend fun setDefaultModel(modelProfileId: String): AiTaskPresetConfig = error("unused")
     override suspend fun saveDefaultChatProfile(draft: AiProfileDraft): AiTaskPresetConfig = error("unused")

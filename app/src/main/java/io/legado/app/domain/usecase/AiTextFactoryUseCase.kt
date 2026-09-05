@@ -252,10 +252,12 @@ class AiTextFactoryUseCase(
             append("\n\nOutput contract:\n")
             if (outputContract.isNullOrBlank()) {
                 append("- Return only the final text that should replace the original \"Text to process\".\n")
+                append("- CRITICAL LAYOUT REQUIREMENT: Strictly preserve the exact original paragraph breaks, line breaks, dialogue lines, and narrative structure. Do NOT merge multiple paragraphs into one single block.\n")
+                append("- Ensure standard punctuation spacing: Always put proper spaces after periods, commas, colons, semicolons, question marks, exclamation marks, and closing quotation marks (e.g. \". \", \"! \", \"? \", \", \").\n")
                 append("- Do not output the chapter title, book title, headings, subtitles, labels, or section names unless they already appear inside \"Text to process\" and must remain part of the body.\n")
                 append("- Treat \"Chapter title\" and reference excerpts as context metadata, not as content to copy into the result.\n")
                 append("- Do not add Markdown fences, bullet labels, explanations, summaries, notes, or prefaces.\n")
-                append("- Preserve intentional paragraph breaks and ordinary prose formatting. Do not wrap the whole result in quotes.\n\n")
+                append("- Do not wrap the whole result in quotes.\n\n")
             } else {
                 append(outputContract.trim())
                 append("\n\n")
@@ -348,7 +350,9 @@ class AiTextFactoryUseCase(
                     emitEvent(StreamEvent.Reasoning(event.text))
                 }
 
-                is AiStreamEvent.ToolCallDelta -> Unit
+                is AiStreamEvent.ToolCallDelta,
+                is AiStreamEvent.Citation,
+                is AiStreamEvent.Usage -> Unit
             }
         }
     }

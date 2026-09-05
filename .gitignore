@@ -65,3 +65,5 @@ supabase/.temp/
 .secrets/
 **/service-account*.json
 **/*serviceAccountKey*.json
+__pycache__/
+*.py[cod]

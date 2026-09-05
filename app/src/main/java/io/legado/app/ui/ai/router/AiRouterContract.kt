@@ -347,16 +347,15 @@ sealed interface AiRouterIntent {
     data class UpdateProviderSearch(val query: String) : AiRouterIntent
     data class SelectProviderFilter(val filter: String) : AiRouterIntent
     data class CreateComboTemplate(val templateId: String) : AiRouterIntent
-    data object OpenLocalGgufCatalog : AiRouterIntent
-    data object ChooseLocalGguf : AiRouterIntent
-    data class LocalGgufSelected(val uri: String) : AiRouterIntent
+    data class OpenWebLogin(val protocol: String) : AiRouterIntent
+    data class WebLoginComplete(val cookieString: String) : AiRouterIntent
     data object DismissEditor : AiRouterIntent
 }
 
 sealed interface AiRouterEffect {
     data class ShowMessage(val message: String) : AiRouterEffect
     data class OpenUrl(val url: String) : AiRouterEffect
-    data object OpenLocalGgufPicker : AiRouterEffect
+    data class LaunchWebLogin(val loginUrl: String, val protocol: String) : AiRouterEffect
 }
 
 val aiRouterTaskTypes = listOf(

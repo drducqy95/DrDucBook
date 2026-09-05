@@ -27,6 +27,7 @@ import io.legado.app.domain.usecase.ImportBookshelfUseCase
 import io.legado.app.domain.usecase.RefreshTocUseCase
 import io.legado.app.domain.usecase.UpdateBooksGroupUseCase
 import io.legado.app.domain.usecase.TranslateChapterUseCase
+import io.legado.app.domain.usecase.TranslateDynamicUiTextUseCase
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
@@ -94,6 +95,7 @@ class BookshelfViewModel(
     private val exportBookshelfUseCase: ExportBookshelfUseCase,
     private val deleteBooksUseCase: DeleteBooksUseCase,
     private val translateChapterUseCase: TranslateChapterUseCase,
+    private val translateDynamicUiTextUseCase: TranslateDynamicUiTextUseCase,
 ) : BaseViewModel(application) {
     private var addBookJob: Coroutine<*>? = null
 
@@ -679,12 +681,39 @@ class BookshelfViewModel(
                 contextText = contextText,
             ).getOrElse { value }
         }
+
+        val translatedAuthor = book.author.takeIf(String::isNotBlank)?.let { author ->
+            translateDynamicUiTextUseCase.executeAuthorName(
+                scopeKey = scopeKey,
+                originalText = author,
+                book = dictionaryBook,
+            ).getOrElse { translated(book.author).orEmpty() }
+        } ?: translated(book.author).orEmpty()
+
+        val translatedDurChapter = book.durChapterTitle?.takeIf(String::isNotBlank)?.let { title ->
+            translateDynamicUiTextUseCase.executeChapterTitle(
+                scopeKey = scopeKey,
+                originalText = title,
+                book = dictionaryBook,
+                contextText = contextText,
+            ).getOrElse { translated(book.durChapterTitle) }
+        } ?: translated(book.durChapterTitle)
+
+        val translatedLatestChapter = book.latestChapterTitle?.takeIf(String::isNotBlank)?.let { title ->
+            translateDynamicUiTextUseCase.executeChapterTitle(
+                scopeKey = scopeKey,
+                originalText = title,
+                book = dictionaryBook,
+                contextText = contextText,
+            ).getOrElse { translated(book.latestChapterTitle) }
+        } ?: translated(book.latestChapterTitle)
+
         return book.copy(
             name = translated(book.name).orEmpty(),
-            author = translated(book.author).orEmpty(),
+            author = translatedAuthor,
             originName = translated(book.originName).orEmpty(),
-            durChapterTitle = translated(book.durChapterTitle),
-            latestChapterTitle = translated(book.latestChapterTitle),
+            durChapterTitle = translatedDurChapter,
+            latestChapterTitle = translatedLatestChapter,
             intro = translated(book.intro),
             kind = translated(book.kind),
             customTag = translated(book.customTag),

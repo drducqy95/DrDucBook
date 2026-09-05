@@ -29,6 +29,7 @@ import io.legado.app.data.entities.BookProgress
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.HttpTTS
+import io.legado.app.data.entities.TranslationRevisionStatus
 import io.legado.app.data.local.preferences.LocalPreferencesKeys
 import io.legado.app.data.local.preferences.LocalPreferencesRepository
 import io.legado.app.data.repository.HighlightRuleRepository
@@ -42,9 +43,12 @@ import io.legado.app.domain.gateway.AiProfileGateway
 import io.legado.app.domain.gateway.AiPromptPresetGateway
 import io.legado.app.domain.gateway.AiRouterGateway
 import io.legado.app.domain.gateway.BookContentProcessGateway
+import io.legado.app.domain.gateway.DictionaryGateway
 import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
-import io.legado.app.domain.gateway.DictionaryGateway
+import io.legado.app.domain.gateway.TranslationCacheGateway
+import io.legado.app.domain.model.dictionaryAwareContentHash
+import io.legado.app.domain.usecase.applyProviderConfigurationRevision
 import io.legado.app.domain.model.AiFailureKind
 import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.ExternalAssetCatalog
@@ -229,6 +233,7 @@ class ReadBookViewModel(
     private val quickDictionaryGateway: QuickDictionaryGateway,
     private val quickTranslationGateway: QuickTranslationGateway,
     private val accountEntitlementUseCase: AccountEntitlementUseCase,
+    private val translationCacheGateway: TranslationCacheGateway,
 ) : BaseViewModel(application), ReadBook.CallBack {
 
     // --- MVI State ---
@@ -311,6 +316,10 @@ class ReadBookViewModel(
     private var autoTranslationTaskKey: TranslationChapterKey? = null
     private var autoTranslationGeneration: Long = 0L
     private var lastAutoTranslationRequest: AutoTranslationRequest? = null
+    private var autoRewriteJob: Job? = null
+    private var autoRewriteTaskKey: TranslationChapterKey? = null
+    private var autoRewriteGeneration: Long = 0L
+    private var lastAutoRewriteRequest: AutoTranslationRequest? = null
     private var pendingAiTextCleanRequest: PendingAiTextCleanRequest? = null
     private var pendingAiTextRewriteRequest: PendingAiTextRewriteRequest? = null
 
@@ -539,6 +548,32 @@ class ReadBookViewModel(
                     )
                 }
                 maybeStartAutoTranslationQueue()
+            }
+            is ReadBookIntent.SetAutoRewriteEnabled -> {
+                TranslationConfig.autoRewriteEnabled = intent.enabled
+                _uiState.update {
+                    it.copy(
+                        aiTextRewrite = it.aiTextRewrite.copy(
+                            autoRewriteEnabled = intent.enabled,
+                        )
+                    )
+                }
+                if (intent.enabled) {
+                    maybeStartAutoRewriteQueue()
+                } else {
+                    stopAutoRewriteQueue()
+                }
+            }
+            is ReadBookIntent.SetAutoRewriteNextChapters -> {
+                TranslationConfig.autoRewriteNextChapters = intent.count
+                _uiState.update {
+                    it.copy(
+                        aiTextRewrite = it.aiTextRewrite.copy(
+                            autoRewriteNextChapters = TranslationConfig.autoRewriteNextChapters,
+                        )
+                    )
+                }
+                maybeStartAutoRewriteQueue()
             }
             is ReadBookIntent.SetInheritSeriesMemory -> {
                 ReadBook.book?.let { currentBook ->
@@ -1454,17 +1489,29 @@ class ReadBookViewModel(
                 if (intent.value) postEvent(EventBus.MEDIA_BUTTON, false)
             }
             is ReadBookIntent.ReadAloudPrevParagraph -> ReadAloud.prevParagraph(context)
+            is ReadBookIntent.ReadAloudNextParagraph -> ReadAloud.nextParagraph(context)
             is ReadBookIntent.ReadAloudTogglePause -> _effects.tryEmit(ReadBookEffect.ToggleReadAloud)
             is ReadBookIntent.ReadAloudStop -> {
                 ReadAloud.stop(context)
                 _uiState.update { it.copy(isReadAloudRunning = false, isReadAloudPaused = false) }
             }
-            is ReadBookIntent.ReadAloudNextParagraph -> ReadAloud.nextParagraph(context)
-            is ReadBookIntent.ReadAloudPrevChapter -> ReadBook.moveToPrevChapter(
-                upContent = true,
-                toLast = false
-            )
-            is ReadBookIntent.ReadAloudNextChapter -> ReadBook.moveToNextChapter(true)
+            is ReadBookIntent.ReadAloudPrevChapter -> {
+                if (BaseReadAloudService.isRun || ReadAloud.isLocalSessionRunning) {
+                    ReadAloud.prevChapter(context)
+                } else {
+                    ReadBook.moveToPrevChapter(
+                        upContent = true,
+                        toLast = false,
+                    )
+                }
+            }
+            is ReadBookIntent.ReadAloudNextChapter -> {
+                if (BaseReadAloudService.isRun || ReadAloud.isLocalSessionRunning) {
+                    ReadAloud.nextChapter(context)
+                } else {
+                    ReadBook.moveToNextChapter(true)
+                }
+            }
             is ReadBookIntent.SetReadAloudTtsTimer -> setReadAloudTtsTimer(intent.value)
             is ReadBookIntent.SetReadAloudTtsFollowSys -> {
                 viewModelScope.launch { readAloudSettingsRepository.setTtsFollowSys(intent.value) }
@@ -2124,6 +2171,7 @@ class ReadBookViewModel(
         scheduleCurrentChapterTitleTranslation()
         _effects.tryEmit(ReadBookEffect.ContentLoadFinish)
         maybeStartAutoTranslationQueue()
+        maybeStartAutoRewriteQueue()
     }
 
     override fun upPageAnim(upRecorder: Boolean) {
@@ -3590,6 +3638,7 @@ class ReadBookViewModel(
                 text = text,
                 chapterIndex = ReadBook.durChapterIndex,
                 chapterPosition = 0,
+                isWholeChapterMode = true,
             )
         }
     }
@@ -3598,6 +3647,7 @@ class ReadBookViewModel(
         text: String,
         chapterIndex: Int,
         chapterPosition: Int,
+        isWholeChapterMode: Boolean = false,
     ) {
         val book = ReadBook.book ?: return
         val chapterTitle = appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)?.title
@@ -3621,6 +3671,7 @@ class ReadBookViewModel(
             sourceContentHash = buildAiRewriteSourceContentHash(text),
             contextBefore = contextBefore,
             contextAfter = contextAfter,
+            isWholeChapterMode = isWholeChapterMode,
         )
         pendingAiTextRewriteRequest = request
         closeReadMenu()
@@ -3639,6 +3690,9 @@ class ReadBookViewModel(
                         chapterTitle = request.chapterTitle,
                         selectedPresetId = selectedPresetId,
                         presets = presets.toImmutableList(),
+                        isWholeChapterMode = isWholeChapterMode,
+                        autoRewriteEnabled = TranslationConfig.autoRewriteEnabled,
+                        autoRewriteNextChapters = TranslationConfig.autoRewriteNextChapters,
                     )
                 } else {
                     AiTextRewriteUiState(
@@ -3648,6 +3702,9 @@ class ReadBookViewModel(
                         originalText = request.originalText,
                         selectedPresetId = selectedPresetId,
                         presets = presets.toImmutableList(),
+                        isWholeChapterMode = isWholeChapterMode,
+                        autoRewriteEnabled = TranslationConfig.autoRewriteEnabled,
+                        autoRewriteNextChapters = TranslationConfig.autoRewriteNextChapters,
                     )
                 },
             )
@@ -3873,11 +3930,12 @@ class ReadBookViewModel(
                         }
 
                         is AiTextFactoryUseCase.StreamEvent.Done -> {
+                            val finalRewrittenText = normalizeVietnameseProsePunctuation(event.text)
                             _uiState.update {
                                 it.copy(
                                     aiTextRewrite = it.aiTextRewrite.copy(
                                         isLoading = false,
-                                        rewrittenText = event.text,
+                                        rewrittenText = finalRewrittenText,
                                         reasoningText = event.reasoning.ifBlank {
                                             fullReasoning.toString()
                                         },
@@ -3887,6 +3945,39 @@ class ReadBookViewModel(
                                 )
                             }
                             loadAiRewriteHistory(request, selectLatest = false)
+
+                            val isWholeChapter = request.isWholeChapterMode ||
+                                _uiState.value.aiTextRewrite.isWholeChapterMode
+                            if (isWholeChapter && finalRewrittenText.isNotBlank()) {
+                                try {
+                                    val book = ReadBook.book
+                                    val chapter = ReadBook.curTextChapter?.chapter
+                                        ?: withContext(IO) {
+                                            appDb.bookChapterDao.getChapter(request.bookUrl, request.chapterIndex)
+                                        }
+                                    if (book != null && chapter != null) {
+                                        saveRewriteToTranslationCache(
+                                            book = book,
+                                            chapter = chapter,
+                                            rewrittenContent = finalRewrittenText,
+                                            originalText = request.originalText,
+                                        )
+                                        if (book.getReaderContentMode(providerReaderContentMode()) == ReaderContentMode.REWRITE ||
+                                            _uiState.value.readerContentMode == ReaderContentMode.REWRITE
+                                        ) {
+                                            ReadBook.clearTextChapter()
+                                            ReadBook.loadContent(false)
+                                        }
+                                        _effects.tryEmit(
+                                            ReadBookEffect.ShowToast(
+                                                context.getString(R.string.ai_text_rewrite_saved)
+                                            )
+                                        )
+                                    }
+                                } catch (e: Exception) {
+                                    AppLog.put("Failed to auto-save rewrite result", e)
+                                }
+                            }
                         }
                     }
                 }
@@ -3961,20 +4052,41 @@ class ReadBookViewModel(
         }
         viewModelScope.launch {
             try {
-                saveBookContentProcessUseCase.saveReplacement(
-                    bookUrl = rewriteState.bookUrl,
-                    chapterIndex = rewriteState.chapterIndex,
-                    chapterPosition = pendingAiTextRewriteRequest?.chapterPosition ?: 0,
-                    selectedText = pattern,
-                    contextBefore = pendingAiTextRewriteRequest?.contextBefore.orEmpty(),
-                    contextAfter = pendingAiTextRewriteRequest?.contextAfter.orEmpty(),
-                    replacementText = replacement,
-                    kind = BookContentProcess.KIND_AI_REWRITE,
-                ).getOrThrow()
-                reloadCurrentChapterAfterContentProcessChanged(
-                    bookUrl = rewriteState.bookUrl,
-                    chapterIndex = rewriteState.chapterIndex,
-                )
+                if (rewriteState.isWholeChapterMode) {
+                    val chapter = ReadBook.curTextChapter?.chapter
+                        ?: withContext(IO) {
+                            appDb.bookChapterDao.getChapter(rewriteState.bookUrl, rewriteState.chapterIndex)
+                        }
+                    if (chapter != null) {
+                        saveRewriteToTranslationCache(
+                            book = book,
+                            chapter = chapter,
+                            rewrittenContent = replacement,
+                            originalText = pattern,
+                        )
+                        if (book.getReaderContentMode(providerReaderContentMode()) == ReaderContentMode.REWRITE ||
+                            _uiState.value.readerContentMode == ReaderContentMode.REWRITE
+                        ) {
+                            ReadBook.clearTextChapter()
+                            ReadBook.loadContent(false)
+                        }
+                    }
+                } else {
+                    saveBookContentProcessUseCase.saveReplacement(
+                        bookUrl = rewriteState.bookUrl,
+                        chapterIndex = rewriteState.chapterIndex,
+                        chapterPosition = pendingAiTextRewriteRequest?.chapterPosition ?: 0,
+                        selectedText = pattern,
+                        contextBefore = pendingAiTextRewriteRequest?.contextBefore.orEmpty(),
+                        contextAfter = pendingAiTextRewriteRequest?.contextAfter.orEmpty(),
+                        replacementText = replacement,
+                        kind = BookContentProcess.KIND_AI_REWRITE,
+                    ).getOrThrow()
+                    reloadCurrentChapterAfterContentProcessChanged(
+                        bookUrl = rewriteState.bookUrl,
+                        chapterIndex = rewriteState.chapterIndex,
+                    )
+                }
                 pendingAiTextRewriteRequest = null
                 _uiState.update {
                     it.copy(
@@ -4001,6 +4113,43 @@ class ReadBookViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun saveRewriteToTranslationCache(
+        book: Book,
+        chapter: BookChapter,
+        rewrittenContent: String,
+        originalText: String,
+    ) = withContext(IO) {
+        val originalContent = BookHelp.getContent(book, chapter) ?: originalText
+        val rawContentHash = translationCacheGateway.computeContentHash(originalContent)
+        val dictionaryRevision = quickDictionaryGateway.getEffectiveRevision(book, originalContent)
+        val dictionaryContentHash = dictionaryAwareContentHash(
+            originalContentHash = rawContentHash,
+            provider = TranslationConstants.PROVIDER_REWRITE,
+            dictionaryRevision = dictionaryRevision,
+            quickTranslationPackVersion = quickTranslationGateway.packVersionFor(
+                book.getQuickTranslationPronounModeOverride(),
+            ),
+        )
+        val contentHash = applyProviderConfigurationRevision(
+            contentHash = dictionaryContentHash,
+            providerConfigurationRevision =
+                translateChapterUseCase.currentProviderConfigurationRevision(TranslationConstants.PROVIDER_REWRITE),
+            computeHash = translationCacheGateway::computeContentHash,
+        )
+        translationCacheGateway.writeTranslation(
+            book = book,
+            bookChapter = chapter,
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+            content = rewrittenContent,
+            originalContentHash = contentHash,
+            provider = TranslationConstants.PROVIDER_REWRITE,
+            revisionStatus = TranslationRevisionStatus.MACHINE_DRAFT,
+            actor = "user_rewrite",
+            rawContentHash = rawContentHash,
+            dictionaryRevision = dictionaryRevision.cacheToken,
+        )
     }
 
     private fun openAiRewritePresetConfig() {
@@ -4144,12 +4293,37 @@ class ReadBookViewModel(
     }
 
     private fun loadAiRewritePresets(): List<AiRewritePresetUi> {
+        val defaults = defaultAiRewritePresets()
         if (aiPromptPresetGateway.countByTaskTypeSync(AiTaskType.REWRITE_TEXT) == 0) {
             aiPromptPresetGateway.savePresetsSync(
-                defaultAiRewritePresets().mapIndexed { index, preset ->
+                defaults.mapIndexed { index, preset ->
                     preset.toAiPromptPreset(index)
                 }
             )
+        } else {
+            val existing = aiPromptPresetGateway.getEnabledByTaskType(AiTaskType.REWRITE_TEXT)
+            val defaultsMap = defaults.associateBy { it.id }
+            var changed = false
+            val updated = existing.map { preset ->
+                if (preset.builtIn && defaultsMap.containsKey(preset.id)) {
+                    val defaultPreset = defaultsMap[preset.id]!!
+                    if (preset.instruction != defaultPreset.instruction || preset.name != defaultPreset.name) {
+                        changed = true
+                        preset.copy(
+                            name = defaultPreset.name,
+                            instruction = defaultPreset.instruction,
+                            updatedAt = System.currentTimeMillis(),
+                        )
+                    } else {
+                        preset
+                    }
+                } else {
+                    preset
+                }
+            }
+            if (changed) {
+                aiPromptPresetGateway.savePresetsSync(updated)
+            }
         }
         return aiPromptPresetGateway.getEnabledByTaskType(AiTaskType.REWRITE_TEXT)
             .map { it.toAiRewritePresetUi() }
@@ -6729,23 +6903,42 @@ class ReadBookViewModel(
         }
         ReadBook.clearTextChapter()
         ReadBook.loadContent(false)
+        if (mode == ReaderContentMode.REWRITE) {
+            maybeStartAutoRewriteQueue()
+        } else if (mode != ReaderContentMode.RAW) {
+            maybeStartAutoTranslationQueue()
+        }
     }
 
     private fun providerReaderContentMode(): ReaderContentMode = when (TranslationConfig.llmProvider) {
         TranslationConstants.PROVIDER_GOOGLE -> ReaderContentMode.GOOGLE
         TranslationConstants.PROVIDER_ML_KIT -> ReaderContentMode.ML_KIT
         TranslationConstants.PROVIDER_QUICK_TRANSLATOR -> ReaderContentMode.QUICK_TRANSLATOR
+        TranslationConstants.PROVIDER_LOCAL_AI -> ReaderContentMode.LOCAL_AI
         TranslationConstants.PROVIDER_NMT -> ReaderContentMode.NMT
         else -> ReaderContentMode.AI
     }
 
-    private fun availableReaderContentModes(): List<ReaderContentMode> = buildList {
-        add(ReaderContentMode.RAW)
-        add(ReaderContentMode.TRANSLATION)
-        add(ReaderContentMode.HAN_VIET)
-        add(ReaderContentMode.QUICK_TRANSLATOR)
-        add(providerReaderContentMode())
-    }.distinct()
+    private fun availableReaderContentModes(): List<ReaderContentMode> {
+        val book = ReadBook.book ?: return listOf(ReaderContentMode.RAW)
+        val isVietnamese = book.isVietnameseSource()
+        return buildList {
+            add(ReaderContentMode.RAW)
+            if (isVietnamese) {
+                add(ReaderContentMode.REWRITE)
+            } else {
+                add(ReaderContentMode.TRANSLATION)
+                add(ReaderContentMode.HAN_VIET)
+                add(ReaderContentMode.QUICK_TRANSLATOR)
+                val providerMode = providerReaderContentMode()
+                if (providerMode != ReaderContentMode.QUICK_TRANSLATOR &&
+                    providerMode != ReaderContentMode.HAN_VIET
+                ) {
+                    add(providerMode)
+                }
+            }
+        }.distinct()
+    }
 
     private fun openTranslationRevision() {
         val book = ReadBook.book ?: return
@@ -6898,6 +7091,7 @@ class ReadBookViewModel(
             taskFlow?.let(::observeTranslationTask)
             if (taskFlow?.value?.status != TranslationChapterStatus.Translating) {
                 maybeStartAutoTranslationQueue()
+                maybeStartAutoRewriteQueue()
             }
         }
     }
@@ -7315,6 +7509,237 @@ class ReadBookViewModel(
         }
     }
 
+    private fun maybeStartAutoRewriteQueue() {
+        if (!TranslationConfig.autoRewriteEnabled) return
+        val book = ReadBook.book ?: return
+        if (!book.isVietnameseSource()) return
+        if (TranslationManager.getChapterTaskStateFlow(
+                bookUrl = book.bookUrl,
+                chapterIndex = ReadBook.durChapterIndex,
+            ) != null
+        ) {
+            return
+        }
+        val request = AutoTranslationRequest(
+            bookUrl = book.bookUrl,
+            currentChapterIndex = ReadBook.durChapterIndex,
+            provider = TranslationConstants.PROVIDER_REWRITE,
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+            nextChapterCount = TranslationConfig.autoRewriteNextChapters,
+        )
+        if (_uiState.value.aiTextRewrite.autoRewriteQueueRunning ||
+            lastAutoRewriteRequest == request
+        ) {
+            return
+        }
+        startFollowingChapterRewrites(book, ReadBook.durChapterIndex)
+    }
+
+    private fun startFollowingChapterRewrites(book: Book, currentChapterIndex: Int) {
+        if (!TranslationConfig.autoRewriteEnabled) return
+        val provider = TranslationConstants.PROVIDER_REWRITE
+        val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val count = TranslationConfig.autoRewriteNextChapters
+        val lastChapterIndex = (currentChapterIndex + count)
+            .coerceAtMost((ReadBook.chapterSize - 1).coerceAtLeast(currentChapterIndex))
+        if (count <= 0 || lastChapterIndex <= currentChapterIndex) {
+            stopAutoRewriteQueue()
+            return
+        }
+
+        stopAutoRewriteQueue(resetProgress = false, clearLastRequest = false)
+        lastAutoRewriteRequest = AutoTranslationRequest(
+            bookUrl = book.bookUrl,
+            currentChapterIndex = currentChapterIndex,
+            provider = provider,
+            targetLanguage = targetLanguage,
+            nextChapterCount = count,
+        )
+        val generation = ++autoRewriteGeneration
+        val total = lastChapterIndex - currentChapterIndex
+        updateAutoRewriteQueue(generation) {
+            copy(
+                autoRewriteQueueRunning = true,
+                autoRewriteCompletedChapters = 0,
+                autoRewriteTotalChapters = total,
+                autoRewriteCurrentChapter = "",
+                autoRewriteMessage = null,
+            )
+        }
+        autoRewriteJob = viewModelScope.launch {
+            try {
+                var completed = 0
+                for (index in (currentChapterIndex + 1)..lastChapterIndex) {
+                    val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index) ?: break
+                    updateAutoRewriteQueue(generation) {
+                        copy(
+                            autoRewriteCurrentChapter = chapter.title,
+                        )
+                    }
+
+                    if (TranslationManager.hasTranslatedCache(
+                            book,
+                            chapter,
+                            provider,
+                            targetLanguage,
+                        )
+                    ) {
+                        completed += 1
+                        updateAutoRewriteQueue(generation) {
+                            copy(autoRewriteCompletedChapters = completed)
+                        }
+                        continue
+                    }
+
+                    if (!ensureOriginalChapterCached(book, chapter)) {
+                        completed += 1
+                        updateAutoRewriteQueue(generation) {
+                            copy(
+                                autoRewriteCompletedChapters = completed,
+                                autoRewriteMessage = context.getString(
+                                    R.string.translation_auto_source_failed,
+                                    chapter.title,
+                                ),
+                            )
+                        }
+                        continue
+                    }
+
+                    val flow = TranslationManager.startRewrite(
+                        book = book,
+                        chapter = chapter,
+                    )
+                    if (flow == null) {
+                        completed += 1
+                        updateAutoRewriteQueue(generation) {
+                            copy(autoRewriteCompletedChapters = completed)
+                        }
+                        continue
+                    }
+                    autoRewriteTaskKey = flow.value.key
+                    val terminalState = withTimeoutOrNull(
+                        AUTO_TRANSLATION_CHAPTER_TIMEOUT_MILLIS
+                    ) {
+                        flow.first { state ->
+                            state.status == TranslationChapterStatus.Translated ||
+                                state.status == TranslationChapterStatus.Failed ||
+                                state.status == TranslationChapterStatus.Cancelled
+                        }
+                    }
+                    if (terminalState == null) {
+                        val key = autoRewriteTaskKey
+                        if (key != null) {
+                            TranslationManager.cancelTranslation(
+                                bookUrl = key.bookUrl,
+                                chapterIndex = key.chapterIndex,
+                                provider = key.provider,
+                                targetLanguage = key.targetLanguage,
+                            )
+                        }
+                        autoRewriteTaskKey = null
+                        updateAutoRewriteQueue(generation) {
+                            copy(
+                                autoRewriteMessage = context.getString(
+                                    R.string.translation_auto_chapter_timeout,
+                                    chapter.title,
+                                ),
+                            )
+                        }
+                        break
+                    }
+                    autoRewriteTaskKey = null
+                    val pauseQueue = terminalState.failure?.kind in setOf(
+                        AiFailureKind.ROUTE_UNAVAILABLE,
+                        AiFailureKind.AUTHENTICATION,
+                        AiFailureKind.QUOTA,
+                        AiFailureKind.CONFIGURATION,
+                    )
+                    if (pauseQueue) {
+                        updateAutoRewriteQueue(generation) {
+                            copy(
+                                autoRewriteMessage = terminalState.errorMessage
+                                    ?: terminalState.failure?.userMessage,
+                            )
+                        }
+                        break
+                    }
+                    completed += 1
+                    updateAutoRewriteQueue(generation) {
+                        copy(
+                            autoRewriteCompletedChapters = completed,
+                            autoRewriteMessage = terminalState.errorMessage?.let { error ->
+                                context.getString(
+                                    R.string.translation_auto_chapter_failed,
+                                    chapter.title,
+                                    error,
+                                )
+                            } ?: autoRewriteMessage,
+                        )
+                    }
+                }
+            } finally {
+                autoRewriteTaskKey = null
+                updateAutoRewriteQueue(generation) {
+                    copy(
+                        autoRewriteQueueRunning = false,
+                        autoRewriteCurrentChapter = "",
+                    )
+                }
+            }
+        }
+    }
+
+    private fun stopAutoRewriteQueue(
+        resetProgress: Boolean = true,
+        message: String? = null,
+        clearLastRequest: Boolean = true,
+    ) {
+        autoRewriteGeneration += 1
+        autoRewriteJob?.cancel()
+        autoRewriteJob = null
+        autoRewriteTaskKey?.let { key ->
+            TranslationManager.cancelTranslation(
+                bookUrl = key.bookUrl,
+                chapterIndex = key.chapterIndex,
+                provider = key.provider,
+                targetLanguage = key.targetLanguage,
+            )
+        }
+        autoRewriteTaskKey = null
+        if (clearLastRequest) {
+            lastAutoRewriteRequest = null
+        }
+        _uiState.update {
+            it.copy(
+                aiTextRewrite = it.aiTextRewrite.copy(
+                    autoRewriteQueueRunning = false,
+                    autoRewriteCompletedChapters = if (resetProgress) {
+                        0
+                    } else {
+                        it.aiTextRewrite.autoRewriteCompletedChapters
+                    },
+                    autoRewriteTotalChapters = if (resetProgress) {
+                        0
+                    } else {
+                        it.aiTextRewrite.autoRewriteTotalChapters
+                    },
+                    autoRewriteCurrentChapter = "",
+                    autoRewriteMessage = message,
+                )
+            )
+        }
+    }
+
+    private inline fun updateAutoRewriteQueue(
+        generation: Long,
+        transform: AiTextRewriteUiState.() -> AiTextRewriteUiState,
+    ) {
+        if (generation != autoRewriteGeneration) return
+        _uiState.update {
+            it.copy(aiTextRewrite = transform(it.aiTextRewrite))
+        }
+    }
+
     private fun retranslateCurrentChapter() {
         startCurrentChapterTranslation(forceRetranslate = true)
     }
@@ -7661,7 +8086,58 @@ private data class PendingAiTextRewriteRequest(
     val sourceContentHash: String,
     val contextBefore: String,
     val contextAfter: String,
+    val isWholeChapterMode: Boolean = false,
 )
+
+internal fun normalizeVietnameseProsePunctuation(text: String): String {
+    if (text.isBlank()) return text
+    var result = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    // 1. Space between adjacent closing and opening quotes: à?!""Em -> à?!" "Em
+    result = result.replace(Regex("([\"”»])([\"“«])")) { match ->
+        "${match.groupValues[1]} ${match.groupValues[2]}"
+    }
+
+    // 2. Space before opening quotes: mộng.«Dị -> mộng. «Dị
+    result = result.replace(Regex("([.?!,;:]+)([«“])")) { match ->
+        "${match.groupValues[1]} ${match.groupValues[2]}"
+    }
+
+    // 3. Space after closing quotes: »open -> » open, ”Một -> ” Một
+    result = result.replace(Regex("([»”])([\\p{L}\\d«“])")) { match ->
+        "${match.groupValues[1]} ${match.groupValues[2]}"
+    }
+
+    // 4. Quotes with straight double-quote:
+    // a) Ellipsis or colon followed by opening quote: lại...."Vẫn -> lại.... "Vẫn, nói:"Em -> nói: "Em
+    result = result.replace(Regex("(\\.{2,}|[,;:])(\")([\\p{L}\\d])")) { match ->
+        "${match.groupValues[1]} \"${match.groupValues[3]}"
+    }
+    // b) Sentence-ending punctuation followed by closing quote and next word: đấy!"Một -> đấy!" Một
+    result = result.replace(Regex("([.?!]+)(\")([\\p{L}\\d«“])")) { match ->
+        "${match.groupValues[1]}\" ${match.groupValues[3]}"
+    }
+
+    // 5. Sentence-ending punctuation followed directly by capital letter or digit (excluding decimals): nặng.Một -> nặng. Một
+    result = result.replace(Regex("([.?!]+)([\\p{Lu}\\d])")) { match ->
+        val punct = match.groupValues[1]
+        val next = match.groupValues[2]
+        if (punct == "." && match.range.first > 0 && result[match.range.first - 1].isDigit() && next.first().isDigit()) {
+            match.value
+        } else {
+            "$punct $next"
+        }
+    }
+
+    // 6. Comma, semicolon, colon followed directly by letter or digit: thế,suy -> thế, suy
+    result = result.replace(Regex("([,;:])([\\p{L}\\d])")) { match ->
+        "${match.groupValues[1]} ${match.groupValues[2]}"
+    }
+
+    return result.lines().joinToString("\n") { line ->
+        line.trimEnd()
+    }
+}
 
 private data class AiRewriteReferenceContext(
     val text: String = "",

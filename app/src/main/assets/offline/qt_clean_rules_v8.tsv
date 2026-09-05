@@ -14,3 +14,17 @@ QT_TEMPLATE	864	跑去将{0:person}扶起来	chạy tới đỡ {0} dậy	action
 QT_TEMPLATE	864	对着{0:person}的头发位置	nhắm vào vị trí tóc của {0}	location_person
 REPLACE	-132	,(?=["“‘])	, 	punctuation_spacing
 REPLACE	-115	\b([0-9]{4})\s+năm\s+ngày\s+([0-9]{1,2})\s+tháng\s+([0-9]{1,2})\b	ngày $2 tháng $3 năm $1	cleanup_hybrid_date_order
+REPLACE	-115	\bCủa\s+(mang|được|có|làm|ở|cho|đi|đến|đem|lấy|hiểu|thấy|nghe|nói|biết|cười|khóc)\b	$1	clean_sentence_start_cua
+REPLACE	-115	\b(trong|ngoài|trên|dưới|giữa)\s+của\b	$1	clean_preposition_cua
+REPLACE	-115	\bcủa\s+(càng\s+[\p{L}\p{M}]+)\b	$1	clean_comparative_cua
+REPLACE	-115	\bcủa\s+(tối thiểu|tối đa|ít nhất|nhiều nhất)\b	$1	clean_adverb_cua
+REPLACE	-115	\bcủa\s+(và|cùng|với)\b	$1	clean_conjunction_cua
+REPLACE	-115	\bcủa\s+(hiểu|biết|thấy)\s+([\p{L}\p{M}]+)\b	$1 $2	clean_verb_cua
+REPLACE	-115	\b(kết quả|hậu quả|nguyên nhân|quá trình)\s+của\s+(giải thích|phân tích|nghiên cứu|điều tra)\b	$1 $2	clean_abstract_noun_cua
+REPLACE	-115	\bcủa\s+(đối diện|bên cạnh|gần đây|xung quanh|phía trước|phía sau|bên trái|bên phải)\b	$1	clean_position_cua
+REPLACE	-116	(?:^|\n)\s*[Cc]ủa\s+([\p{L}\p{M}]+(?:\s+[\p{L}\p{M}]+){0,2})\s+(trên|dưới|trong|ngoài|ở)\b	$1 $2	clean_sentence_start_cua_v2
+REPLACE	-115	\b(thiết kế|mẫu|hình|kiểu|loại)\s+của\s+([\p{L}\p{M}]+)\b	$1 $2	clean_design_cua
+REPLACE	-114	\b(\d+)\s+tuổi\s+của\s+([\p{L}\p{M}]+(?:\s+[\p{L}\p{M}]+){0,3})\b	$2 lúc $1 tuổi	clean_age_cua
+REPLACE	-115	\bcủa\s+(đã\s+từng|từng)\s+([\p{L}\p{M}]+)\b	$1 $2	clean_past_tense_cua
+REPLACE	-115	\b(kết quả|hậu quả|nguyên nhân|quá trình|nội dung|mục đích|ý nghĩa)\s+của\s+(giải thích|phân tích|nghiên cứu|điều tra|giáo dục|đào tạo|huấn luyện)\b	$1 $2	clean_abstract_noun_cua_v2
+

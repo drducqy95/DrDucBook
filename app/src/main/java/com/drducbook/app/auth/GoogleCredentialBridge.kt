@@ -51,6 +51,9 @@ object GoogleCredentialBridge {
                 "Google đang chặn DrDucBook vì ứng dụng đang ở chế độ kiểm thử. Hãy thêm tài khoản vào Test users trong Google Cloud hoặc hoàn tất xác minh OAuth."
             raw.contains("DEVELOPER_ERROR", ignoreCase = true) || raw.contains("status code: 10") ->
                 "Cấu hình Google của DrDucBook chưa khớp. Hãy kiểm tra OAuth client, package com.drducbook.app và SHA-1 của bản đang cài."
+            raw.contains("No credentials", ignoreCase = true) ||
+                raw.contains("NoCredential", ignoreCase = true) ->
+                "Không tìm thấy tài khoản Google tương thích trên thiết bị hoặc cấu hình OAuth chưa khớp."
             raw.isNotBlank() -> raw
             else -> "Không thể đăng nhập bằng Google"
         }

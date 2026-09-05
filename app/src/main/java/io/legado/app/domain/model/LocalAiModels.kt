@@ -58,30 +58,31 @@ object LocalAiRuntimePlanner {
         return when {
             isHuaweiPuraClass -> LocalAiRuntimeProfile(
                 threads = processors.coerceIn(4, 6),
-                batchThreads = processors.coerceIn(4, 7),
-                batchSize = 256,
-                microBatchSize = 64,
+                batchThreads = processors.coerceIn(4, 8),
+                batchSize = 512,
+                microBatchSize = 512,
                 contextWindow = contextWindow,
-                preferredChunkChars = 768,
-                adjacentContextChars = 160,
+                preferredChunkChars = 512,
+                adjacentContextChars = 96,
             )
             abi == "arm64-v8a" -> LocalAiRuntimeProfile(
-                threads = processors.coerceIn(3, 5),
-                batchThreads = processors.coerceIn(3, 6),
-                batchSize = if (lowMemory) 128 else 192,
-                microBatchSize = if (lowMemory) 32 else 64,
+                threads = processors.coerceIn(2, 4),
+                batchThreads = processors.coerceIn(2, 6),
+                batchSize = if (lowMemory) 256 else 512,
+                microBatchSize = if (lowMemory) 256 else 512,
                 contextWindow = contextWindow,
-                preferredChunkChars = if (lowMemory) 480 else 640,
-                adjacentContextChars = if (lowMemory) 96 else 128,
+                preferredChunkChars = if (lowMemory) 384 else 480,
+                adjacentContextChars = if (lowMemory) 64 else 96,
             )
             else -> LocalAiRuntimeProfile(
-                threads = processors.coerceIn(2, 6),
-                batchThreads = processors.coerceIn(2, 8),
-                batchSize = 256,
-                microBatchSize = 64,
+                threads = processors.coerceIn(2, 4),
+                batchThreads = processors.coerceIn(2, 4),
+                batchSize = if (lowMemory) 256 else 512,
+                microBatchSize = if (lowMemory) 256 else 512,
                 contextWindow = contextWindow,
-                preferredChunkChars = 640,
-                adjacentContextChars = 128,
+                useMmap = false,
+                preferredChunkChars = if (lowMemory) 256 else 384,
+                adjacentContextChars = if (lowMemory) 48 else 64,
             )
         }
     }
@@ -125,9 +126,13 @@ object LocalAiTranslationBudgetPlanner {
         val safeChars = (
             usableForSourceAndOutput / (SOURCE_TOKENS_PER_CHAR + OUTPUT_TOKENS_PER_CHAR)
         ).toInt().coerceAtLeast(MIN_CHUNK_CHARS)
+        val requestedChars = if (configuredMaxSourceChars > 0) {
+            configuredMaxSourceChars
+        } else {
+            preferredChunkChars
+        }
         val chunkChars = minOf(
-            configuredMaxSourceChars.coerceAtLeast(MIN_CHUNK_CHARS),
-            preferredChunkChars.coerceAtLeast(MIN_CHUNK_CHARS),
+            requestedChars.coerceAtLeast(MIN_CHUNK_CHARS),
             safeChars,
         )
         val requestedOutput = ceil(

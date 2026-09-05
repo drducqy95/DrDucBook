@@ -21,7 +21,7 @@ import org.junit.Test
 
 class AiTextRepositoryImplTest {
 
-    private val repository = AiTextRepositoryImpl(UnusedLocalEngine)
+    private val repository = AiTextRepositoryImpl()
 
     @Test
     fun generateNormalizesRegistryErrorsWithProviderModelAndAttempt() = runBlocking {
@@ -74,7 +74,13 @@ class AiTextRepositoryImplTest {
         override suspend fun inspectModel(modelPath: String): Result<LocalAiModelMetadata> =
             Result.failure(AssertionError("unused"))
 
-        override suspend fun importModel(sourceUri: String): Result<LocalAiModelMetadata> =
+        override suspend fun validateModel(modelPath: String): Result<LocalAiModelMetadata> =
+            Result.failure(AssertionError("unused"))
+
+        override suspend fun importModel(
+            sourceUri: String,
+            onProgress: ((bytesRead: Long, totalBytes: Long) -> Unit)?,
+        ): Result<LocalAiModelMetadata> =
             Result.failure(AssertionError("unused"))
 
         override suspend fun unload() = Unit

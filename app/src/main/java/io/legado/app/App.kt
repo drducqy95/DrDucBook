@@ -78,6 +78,7 @@ import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isDebuggable
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.worker.BookSourceHealthWorker
+import io.legado.app.worker.ModelDiscoveryWorker
 import io.legado.app.worker.SourceHealthRetentionWorker
 import io.legado.app.domain.gateway.AppearanceGateway
 import kotlinx.coroutines.launch
@@ -242,6 +243,7 @@ open class App : Application(), ImageLoaderFactory {
             Cronet.preDownload()
             createNotificationChannels()
             BookshelfAutomationScheduler.applyConfig(this@App)
+            ModelDiscoveryWorker.schedule(this@App, AppConfig.modelDiscoveryIntervalHours)
             if (FeatureFlags.sourceDailyHealth) {
                 BookSourceHealthWorker.schedulePeriodic(this@App)
                 SourceHealthRetentionWorker.schedulePeriodic(this@App)

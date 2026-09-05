@@ -202,6 +202,45 @@ class OpenAiResponsesHandler : AiProtocolHandler {
                             )
                         )
                     }
+                    "response.output_text.annotation.added" -> {
+                        root.getAsJsonObject("annotation")?.let { ann ->
+                            val url = ann.getString("url")
+                                ?: ann.getAsJsonObject("url_citation")?.getString("url")
+                            if (!url.isNullOrBlank()) {
+                                emitEvent(
+                                    AiStreamEvent.Citation(
+                                        startIndex = ann.get("start_index")?.asInt,
+                                        endIndex = ann.get("end_index")?.asInt,
+                                        uri = url,
+                                        title = ann.getString("title").orEmpty(),
+                                    )
+                                )
+                            }
+                        }
+                    }
+                    "response.done",
+                    "response.completed" -> {
+                        val responseObj = root.getAsJsonObject("response") ?: root
+                        responseObj.getAsJsonObject("usage")?.let { usage ->
+                            val promptTokens = usage.get("input_tokens")?.asInt
+                                ?: usage.get("prompt_tokens")?.asInt ?: 0
+                            val completionTokens = usage.get("output_tokens")?.asInt
+                                ?: usage.get("completion_tokens")?.asInt ?: 0
+                            val totalTokens = usage.get("total_tokens")?.asInt ?: (promptTokens + completionTokens)
+                            val reasoningTokens = usage.getAsJsonObject("output_token_details")
+                                ?.get("reasoning_tokens")?.asInt
+                                ?: usage.getAsJsonObject("completion_tokens_details")
+                                    ?.get("reasoning_tokens")?.asInt ?: 0
+                            emitEvent(
+                                AiStreamEvent.Usage(
+                                    promptTokens = promptTokens,
+                                    completionTokens = completionTokens,
+                                    totalTokens = totalTokens,
+                                    reasoningTokens = reasoningTokens,
+                                )
+                            )
+                        }
+                    }
                     "response.failed" -> {
                         throw Exception(root.extractResponseFailureMessage() ?: "OpenAI response failed")
                     }

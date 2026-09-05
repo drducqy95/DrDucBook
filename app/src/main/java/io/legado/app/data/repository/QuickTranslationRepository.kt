@@ -1177,9 +1177,9 @@ class QuickTranslationRepository : QuickTranslationGateway {
         isPersonHead(match) -> TermPos.PERSON
         isProperNameTarget(match.term.target) -> TermPos.NAME
         isPossessiveOwner(match) -> TermPos.PRONOUN
+        isAdverbSource(match.term.source) -> TermPos.ADVERB
         isNounSource(match.term.source) -> TermPos.NOUN
         isDescriptiveModifier(match) -> TermPos.ADJECTIVE
-        isAdverbSource(match.term.source) -> TermPos.ADVERB
         isVerbSource(match.term.source, match.term.target) -> TermPos.VERB
         match.term.projectOwned -> TermPos.NOUN
         else -> TermPos.UNKNOWN
@@ -1508,6 +1508,7 @@ class QuickTranslationRepository : QuickTranslationGateway {
             matchDynamicAttributiveDe(text, offset, matches),
             matchPluralSuffix(text, offset, matches),
             matchModifierHeadPhrase(offset, matches),
+            matchInterrogativePattern(text, offset, matches),
         ).maxWithOrNull(
             compareBy<StructuredMatch> { it.priority }
                 .thenBy { it.endExclusive }
@@ -1896,6 +1897,32 @@ class QuickTranslationRepository : QuickTranslationGateway {
         return best
     }
 
+    private fun matchInterrogativePattern(
+        text: String,
+        offset: Int,
+        matches: RuntimeMatchIndex,
+    ): StructuredMatch? {
+        for ((pattern, length, prefix) in INTERROGATIVE_PATTERNS) {
+            if (!text.startsWith(pattern, offset)) continue
+            val verbStart = offset + length
+            val phrase = grammarPhraseCandidateAt(
+                text = text,
+                start = verbStart,
+                acceptedPos = emptySet(),
+                matches = matches,
+            )
+            val verb = phrase ?: matches.termsAt(verbStart)
+                .firstOrNull { it.term.target.isNotBlank() }
+                ?: continue
+            return StructuredMatch(
+                endExclusive = verb.endExclusive,
+                translation = "$prefix ${verb.term.target} hay không",
+                priority = TRUSTED_GRAMMAR_PRIORITY + 30,
+            )
+        }
+        return null
+    }
+
     private fun renderAttributiveDe(
         left: TermMatch,
         right: TermMatch,
@@ -1903,6 +1930,9 @@ class QuickTranslationRepository : QuickTranslationGateway {
         rightTarget: String,
         matches: RuntimeMatchIndex? = null,
     ): String? {
+        if (isPersonHead(right) && isActionAttributiveModifier(left, leftTarget, matches)) {
+            return listOf(rightTarget, leftTarget).joinToStringByWord { it }
+        }
         if (isPossessiveOwner(left)) return null
         if (posOf(right, matches) in ATTRIBUTIVE_ACTION_HEAD_POS &&
             isActionAttributiveModifier(left, leftTarget, matches)
@@ -1913,6 +1943,8 @@ class QuickTranslationRepository : QuickTranslationGateway {
             TermPos.LOCATION -> listOf(rightTarget, "ở", leftTarget).joinToStringByWord { it }
             TermPos.ADJECTIVE -> listOf(rightTarget, leftTarget).joinToStringByWord { it }
             else -> when {
+                isAgeModifier(left) ->
+                    listOf(rightTarget, "lúc", leftTarget).joinToStringByWord { it }
                 isLocationModifier(left) ->
                     listOf(rightTarget, "ở", leftTarget).joinToStringByWord { it }
                 isDescriptiveModifier(left) ->
@@ -1984,6 +2016,18 @@ class QuickTranslationRepository : QuickTranslationGateway {
         if (target.any(Char::isUpperCase)) return true
         val normalized = target.lowercase()
         return POSSESSIVE_OWNER_TARGETS.any(normalized::contains)
+    }
+
+    private fun isAgeModifier(match: TermMatch): Boolean {
+        val source = match.term.source
+        if (source.length >= 2 && source.endsWith("岁")) {
+            val numPart = source.dropLast(1)
+            if (numPart.all { it.isDigit() || it in '０'..'９' || it in CHINESE_DIGITS || it in CHINESE_MULTIPLIERS || it == '十' || it == '百' }) {
+                return true
+            }
+        }
+        val target = match.term.target.trim().lowercase()
+        return target.endsWith("tuổi") && target.dropLast(4).trim().all { it.isDigit() || it.isWhitespace() }
     }
 
     private fun isLocationModifier(match: TermMatch): Boolean {
@@ -4533,6 +4577,14 @@ class QuickTranslationRepository : QuickTranslationGateway {
             "\u547C\u558A",
             "\u88C5",
             "\u9A82",
+            "过", "了", "曾", "曾经", "被", "把",
+        )
+        private val INTERROGATIVE_PATTERNS = listOf(
+            Triple("有没有", 3, "có"),
+            Triple("会不会", 3, "có"),
+            Triple("是不是", 3, "có phải là"),
+            Triple("能不能", 3, "có thể"),
+            Triple("可不可以", 4, "có thể"),
         )
         private const val MAX_PLACE_HIERARCHY_SEGMENTS = 8
         private const val MIN_SINGLE_PLACE_HIERARCHY_CHARS = 3
@@ -4657,10 +4709,14 @@ class QuickTranslationRepository : QuickTranslationGateway {
         private val POSSESSIVE_OWNER_SOURCES = setOf(
             "我", "你", "妳", "他", "她", "它", "咱", "俺", "我们", "咱们",
             "你们", "妳们", "他们", "她们", "它们", "本人", "自己",
+            "大家", "众人", "人们", "对方", "别人", "旁人",
+            "弟子", "门徒", "徒弟", "师傅", "师父", "长老", "宗主", "门人",
+            "修士", "道友", "兄台", "阁下", "前辈", "后辈", "晚辈",
         )
         private val POSSESSIVE_OWNER_TARGETS = listOf(
             "tôi", "ta", "mình", "ngươi", "anh", "cô", "hắn", "nàng",
             "ông", "bà", "người", "điều tra viên", "công tử", "tiểu thư",
+            "đệ tử", "sư phụ", "trưởng lão", "môn nhân",
         )
         private val LOCATION_MODIFIER_SUFFIXES = listOf(
             "嘴角", "眼角", "门口", "窗口", "身边", "身上", "脸上", "心里",
@@ -4678,12 +4734,14 @@ class QuickTranslationRepository : QuickTranslationGateway {
             "鼓胀", "高大", "娇小", "玲珑", "细长", "修长", "乌黑", "雪白",
             "漆黑", "巨大", "古怪", "奇怪", "特殊", "普通", "平静", "冰冷",
             "温柔", "灿烂", "明亮", "清澈", "深邃", "灵动", "寻常",
+            "更多", "更少", "很大", "微小", "极多", "极少",
+            "对面", "旁边", "附近", "周围", "上方", "下方", "前边", "后边", "左边", "右边", "外边", "里边",
         )
         private val DESCRIPTIVE_MODIFIER_CHARS = setOf(
             '大', '小', '高', '低', '长', '短', '黑', '白', '红', '青',
             '蓝', '绿', '紫', '黄', '灰', '瘦', '胖', '细', '粗', '新',
             '旧', '冷', '热', '美', '丑', '浓', '淡', '深', '浅', '柔',
-            '硬', '精', '灵',
+            '硬', '精', '灵', '多', '少', '窄', '宽', '慢', '快',
         )
         private val DESCRIPTIVE_MODIFIER_TARGET_PREFIXES = listOf(
             "m\u1EC7t", "nhanh", "r\u1EA5t", "cao",
@@ -4691,6 +4749,8 @@ class QuickTranslationRepository : QuickTranslationGateway {
             "mảnh", "cao", "nhỏ", "dài", "đen", "trắng", "đỏ", "xanh",
             "tím", "vàng", "xám", "lớn", "kỳ", "đặc", "bình", "lạnh",
             "ấm", "dịu", "sáng", "trong", "sâu", "linh",
+            "hẹp", "rộng", "chậm", "nhiều", "ít", "tối thiểu", "tối đa", "đầy", "vô số",
+            "đối diện", "bên cạnh", "gần đây", "xung quanh", "phía trên", "phía dưới", "phía trước", "phía sau", "bên trái", "bên phải", "bên ngoài", "bên trong",
         )
         private val ADVERBIAL_SOURCES = listOf(
             "突然", "忽然", "立刻", "马上", "缓缓", "慢慢", "轻轻", "狠狠",
@@ -4703,6 +4763,7 @@ class QuickTranslationRepository : QuickTranslationGateway {
             "说", "道", "问", "答", "喊", "叫", "看", "望", "想", "觉得",
             "认为", "发现", "听", "走", "来", "去", "进入", "离开", "拿",
             "放", "打", "杀", "攻", "守", "笑", "哭", "坐", "站", "躺",
+            "懂得", "明白", "理解", "解释",
         )
         private val VERB_TARGET_PREFIXES = listOf(
             "\u0111eo", "b\u01B0ng", "c\u1EA7m", "g\u00F5", "g\u1ECDi", "nh\u1ED3i",
@@ -4711,7 +4772,7 @@ class QuickTranslationRepository : QuickTranslationGateway {
             "nói", "hỏi", "đáp", "nhìn", "nghĩ", "cảm thấy", "cho rằng",
             "phát hiện", "nghe", "đi", "đến", "vào", "rời", "lấy", "đặt",
             "đánh", "giết", "tấn công", "bảo vệ", "cười", "khóc", "ngồi",
-            "đứng", "nằm",
+            "đứng", "nằm", "hiểu", "giải thích", "mang", "đem",
         )
         private val NOUN_SOURCE_SUFFIXES = listOf(
             "刀", "剑", "枪", "弓", "箭", "书", "信", "纸", "笔", "灯", "门",
@@ -5409,12 +5470,23 @@ internal object QuickTranslationTextPostProcessor {
             previous in inlineTerminators
     }
 
+    internal fun cleanRogueBooleanLiterals(text: String): String {
+        if (text.isEmpty() || (!text.contains("true", ignoreCase = true) && !text.contains("false", ignoreCase = true))) {
+            return text
+        }
+        return text.replace(Regex("(?<=\\s|^)(?:true|false)(?=\\s|$|[.,!?;:\"'”’])", RegexOption.IGNORE_CASE), "")
+            .replace(Regex(" {2,}"), " ")
+            .trim()
+    }
+
     internal fun normalizeNumericSpacing(value: String): String {
-        return collapseDecimalPointSpacing(
-            dedupeRepeatedHeadings(value)
-                .replace(Regex("(?<=\\d)[ \\t]*([,])[ \\t]*(?=\\d)"), "$1")
+        return cleanRogueBooleanLiterals(
+            collapseDecimalPointSpacing(
+                dedupeRepeatedHeadings(value)
+                    .replace(Regex("(?<=\\d)[ \\t]*([,])[ \\t]*(?=\\d)"), "$1")
+            )
+                .replace(Regex("(?<=\\d)[ \\t]+(?=\\d)"), "")
         )
-            .replace(Regex("(?<=\\d)[ \\t]+(?=\\d)"), "")
     }
 
     internal fun cleanHeadingArtifacts(value: String): String = dedupeRepeatedHeadings(value)

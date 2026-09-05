@@ -166,6 +166,8 @@ class AnthropicHandler : AiProtocolHandler {
             }
         }
         val toolBlocks = mutableMapOf<Int, AnthropicToolBlock>()
+        var promptTokens = 0
+        var completionTokens = 0
         try {
             response.readSseData { data ->
                 val event = runCatching {
@@ -176,6 +178,23 @@ class AnthropicHandler : AiProtocolHandler {
                 when (event.type) {
                     "error" -> {
                         throw Exception(event.error?.message ?: event.error?.type ?: "Anthropic stream error")
+                    }
+                    "message_start" -> {
+                        event.message?.usage?.input_tokens?.let {
+                            promptTokens = it
+                        }
+                    }
+                    "message_delta" -> {
+                        event.usage?.output_tokens?.let {
+                            completionTokens = it
+                            emitEvent(
+                                AiStreamEvent.Usage(
+                                    promptTokens = promptTokens,
+                                    completionTokens = completionTokens,
+                                    totalTokens = promptTokens + completionTokens,
+                                )
+                            )
+                        }
                     }
                     "content_block_start" -> {
                         val index = event.index ?: return@readSseData
@@ -439,7 +458,20 @@ internal data class AnthropicStreamEvent(
     val index: Int?,
     val content_block: AnthropicContentBlock?,
     val error: AnthropicStreamError?,
-    val delta: AnthropicStreamDelta?
+    val delta: AnthropicStreamDelta?,
+    val message: AnthropicStreamMessage? = null,
+    val usage: AnthropicStreamUsage? = null
+)
+
+@Keep
+internal data class AnthropicStreamMessage(
+    val usage: AnthropicStreamUsage? = null
+)
+
+@Keep
+internal data class AnthropicStreamUsage(
+    val input_tokens: Int? = null,
+    val output_tokens: Int? = null
 )
 
 @Keep

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.legado.app.domain.model.AiConnectionStatus
 import io.legado.app.domain.model.AiProviderAuthType
+import io.legado.app.domain.model.AiProviderCatalog
 import io.legado.app.domain.model.AiProtocol
 import io.legado.app.ui.config.ai.AiModelPickerOptionUi
 import io.legado.app.ui.config.ai.AiModelPickerSheet
@@ -34,10 +35,9 @@ internal fun ProviderConfigEditor(
     saving: Boolean,
     onChange: (AiRouterEditor.ProviderConfig) -> Unit,
     onTest: () -> Unit,
-    onOpenLocalGgufCatalog: () -> Unit,
-    onChooseLocalGguf: () -> Unit,
     onOpenCredential: (String) -> Unit,
     onAddCredential: () -> Unit,
+    onOpenWebLogin: ((protocol: String) -> Unit)? = null,
 ) {
     var showModelPicker by remember(editor.catalogId, editor.providerProfileId) { mutableStateOf(false) }
     var showAdvanced by remember(editor.catalogId, editor.providerProfileId) { mutableStateOf(false) }
@@ -66,16 +66,10 @@ internal fun ProviderConfigEditor(
     } else {
         modelOptions
     }
-    val isLocalGguf = editor.protocol == AiProtocol.LOCAL_GGUF
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        ClickableSettingItem(
-            title = editor.familyName.ifBlank { editor.name },
-            description = listOf(editor.connectionMode, editor.notice)
-                .filter(String::isNotBlank)
-                .joinToString(" · "),
-            option = statusLabel(editor.testStatus),
-            onClick = {},
-        )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         AppTextField(
             value = editor.name,
             onValueChange = { onChange(editor.copy(name = it, testStatus = AiConnectionStatus.UNVERIFIED)) },
@@ -83,61 +77,52 @@ internal fun ProviderConfigEditor(
             label = "Tên provider",
             singleLine = true,
         )
+        if (editor.notice.isNotBlank()) {
+            SettingItem(
+                title = "Ghi chú",
+                description = editor.notice,
+            )
+        }
         AppTextField(
             value = editor.baseUrl,
-            onValueChange = { newBaseUrl ->
+            onValueChange = { rawNewBaseUrl ->
+                val newBaseUrl = rawNewBaseUrl.trim()
+                val catalogEntry = AiProviderCatalog.byId(editor.catalogId)
+                val newProtocol = catalogEntry?.let { entry ->
+                    protocolForRebasedEndpoint(
+                        currentProtocol = editor.protocol,
+                        previousBaseUrl = entry.baseUrl,
+                        newBaseUrl = newBaseUrl,
+                    )
+                } ?: editor.protocol
+                val clearSelectedModel = catalogEntry?.let { entry ->
+                    shouldClearCatalogModelForEndpoint(
+                        catalogProtocol = entry.protocol,
+                        catalogBaseUrl = entry.baseUrl,
+                        newBaseUrl = newBaseUrl,
+                        selectedModelId = editor.modelId,
+                        catalogModelIds = entry.models.map { it.id }.toSet(),
+                    )
+                } ?: false
                 onChange(
                     editor.copy(
                         baseUrl = newBaseUrl,
-                        protocol = protocolForRebasedEndpoint(
-                            currentProtocol = editor.protocol,
-                            previousBaseUrl = editor.baseUrl,
-                            newBaseUrl = newBaseUrl,
-                        ),
+                        protocol = newProtocol,
                         modelsUrl = rebaseDerivedModelsUrl(
                             previousBaseUrl = editor.baseUrl,
                             newBaseUrl = newBaseUrl,
                             currentModelsUrl = editor.modelsUrl,
                         ),
+                        modelId = if (clearSelectedModel) "" else editor.modelId,
+                        modelName = if (clearSelectedModel) "" else editor.modelName,
                         testStatus = AiConnectionStatus.UNVERIFIED,
                     )
                 )
             },
             modifier = Modifier.fillMaxWidth(),
-            label = if (isLocalGguf) "GGUF model path" else "Base URL",
+            label = "Base URL",
             singleLine = true,
         )
-        if (isLocalGguf) {
-            ClickableSettingItem(
-                title = "Tải model GGUF",
-                description = "Mở kho model đã tải lên để lấy link tải.",
-                onClick = onOpenLocalGgufCatalog,
-            )
-            ClickableSettingItem(
-                title = "Chọn file GGUF",
-                description = editor.baseUrl.ifBlank { "Chưa chọn file model" },
-                onClick = onChooseLocalGguf,
-            )
-            SettingItem(
-                title = "Runtime cục bộ",
-                description = listOf(
-                    editor.localPrimaryAbi.takeIf(String::isNotBlank)?.let { "ABI $it" },
-                    editor.localTotalMemoryMb.takeIf { it > 0 }?.let { "RAM ${it} MB" },
-                    editor.localRuntimeProfile.takeIf(String::isNotBlank),
-                    editor.localModelSizeBytes.takeIf { it > 0 }
-                        ?.let { "Model ${it / (1_024L * 1_024L)} MB" },
-                    editor.localModelSha256.takeIf(String::isNotBlank)
-                        ?.let { "SHA-256 ${it.take(12)}…" },
-                ).filterNotNull().joinToString("\n").ifBlank {
-                    "Chọn model để kiểm tra cấu hình thiết bị"
-                },
-                option = when (editor.localRuntimeAvailable) {
-                    true -> "Sẵn sàng"
-                    false -> "Không hỗ trợ"
-                    null -> "Chưa kiểm tra"
-                },
-            )
-        }
         DropdownListSettingItem(
             title = "Loại xác thực",
             selectedValue = editor.authType,
@@ -149,27 +134,66 @@ internal fun ProviderConfigEditor(
             ),
             onValueChange = { onChange(editor.copy(authType = it, testStatus = AiConnectionStatus.UNVERIFIED)) },
         )
+        val isWebProtocol = editor.protocol == AiProtocol.GEMINI_WEB || editor.protocol == AiProtocol.CHATGPT_WEB
+        if (isWebProtocol && onOpenWebLogin != null) {
+            ClickableSettingItem(
+                title = "🌐 Đăng nhập qua trình duyệt",
+                description = if (editor.protocol == AiProtocol.GEMINI_WEB) {
+                    "Mở WebView đăng nhập Google để tự động lấy Cookie"
+                } else {
+                    "Mở WebView đăng nhập ChatGPT để tự động lấy Token"
+                },
+                onClick = { onOpenWebLogin(editor.protocol) },
+            )
+        }
         if (editor.authType != AiProviderAuthType.NONE) {
+            val credentialLabel = when (editor.protocol) {
+                AiProtocol.GEMINI_WEB -> if (editor.hasStoredSecret) {
+                    "Cookie mới (để trống để giữ Đã lưu)"
+                } else {
+                    "Google Cookie (__Secure-1PSID)"
+                }
+                AiProtocol.CHATGPT_WEB -> if (editor.hasStoredSecret) {
+                    "Token mới (để trống để giữ Đã lưu)"
+                } else {
+                    "Access Token (eyJ...) hoặc Session Cookie"
+                }
+                else -> if (editor.hasStoredSecret) {
+                    "Token mới (để trống để giữ Đã lưu)"
+                } else {
+                    "API key/token"
+                }
+            }
             AppTextField(
                 value = editor.apiKey,
                 onValueChange = {
                     onChange(editor.copy(apiKey = it, testStatus = AiConnectionStatus.UNVERIFIED))
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = if (editor.hasStoredSecret) {
-                    "Token mới (để trống để giữ Đã lưu)"
-                } else {
-                    "API key/token"
-                },
+                label = credentialLabel,
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
             )
+            if (editor.protocol == AiProtocol.GEMINI_WEB) {
+                Text(
+                    text = "💡 Gemini Web hỗ trợ Chế độ Miễn phí 100% không cần Cookie hay đăng nhập. Bạn có thể để trống ô trên, hoặc dán Cookie Google nếu muốn đồng bộ tài khoản cá nhân.",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary,
+                )
+            } else if (editor.protocol == AiProtocol.CHATGPT_WEB) {
+                Text(
+                    text = "💡 Đăng nhập ChatGPT qua WebView ở trên, hoặc dán Access Token (bắt đầu bằng eyJ...) / Cookie __Secure-next-auth.session-token.",
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             ProviderConnectionTest(
                 saving = saving,
                 testStatus = editor.testStatus,
                 testMessage = editor.testMessage,
                 testLatencyMs = editor.testLatencyMs,
                 discoveredModelCount = editor.discoveredModels.size,
+                isWebProtocol = isWebProtocol,
                 onTest = onTest,
             )
             SettingItem(
@@ -237,7 +261,7 @@ internal fun ProviderConfigEditor(
             description = "Models URL, đường dẫn giao thức và giới hạn token.",
             onClick = { showAdvanced = !showAdvanced },
         )
-        if (showAdvanced && !isLocalGguf) {
+        if (showAdvanced) {
             DropdownListSettingItem(
                 title = "Giao thức API",
                 selectedValue = editor.protocol,
@@ -246,12 +270,16 @@ internal fun ProviderConfigEditor(
                     "OpenAI Responses",
                     "Anthropic Messages",
                     "Google Gemini",
+                    "Google Gemini (Web)",
+                    "ChatGPT (Web)",
                 ),
                 entryValues = arrayOf(
                     AiProtocol.OPENAI_CHAT_COMPLETIONS,
                     AiProtocol.OPENAI_RESPONSES,
                     AiProtocol.ANTHROPIC_MESSAGES,
                     AiProtocol.GEMINI_GENERATE_CONTENT,
+                    AiProtocol.GEMINI_WEB,
+                    AiProtocol.CHATGPT_WEB,
                 ),
                 onValueChange = {
                     onChange(editor.copy(protocol = it, testStatus = AiConnectionStatus.UNVERIFIED))
@@ -400,6 +428,7 @@ private fun ProviderConnectionTest(
     testMessage: String,
     testLatencyMs: Long?,
     discoveredModelCount: Int,
+    isWebProtocol: Boolean = false,
     onTest: () -> Unit,
 ) {
     Row(
@@ -407,7 +436,11 @@ private fun ProviderConnectionTest(
         horizontalArrangement = Arrangement.End,
     ) {
         TextButton(enabled = !saving, onClick = onTest) {
-            Text(if (saving) "Đang kiểm tra…" else "Kiểm tra API key & lấy model")
+            Text(
+                if (saving) "Đang kiểm tra…"
+                else if (isWebProtocol) "Kiểm tra kết nối & lấy model"
+                else "Kiểm tra API key & lấy model"
+            )
         }
     }
     if (testMessage.isNotBlank()) {

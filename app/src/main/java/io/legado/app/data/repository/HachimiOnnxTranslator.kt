@@ -636,12 +636,30 @@ class HachimiOnnxTranslator(
             ).use { ids ->
                 detokenizer.run(mapOf("ids" to ids)).use { result ->
                     val value = result.tensor("text", fallbackIndex = 0).value
-                    return when (value) {
+                    val raw = when (value) {
                         is Array<*> -> value.firstOrNull()?.toString().orEmpty()
-                        else -> value.toString()
+                        is String -> value
+                        else -> {
+                            val str = value.toString()
+                            if (str.equals("true", ignoreCase = true) || str.equals("false", ignoreCase = true)) {
+                                ""
+                            } else {
+                                str
+                            }
+                        }
                     }.trim()
+                    return cleanDetokenizedArtifacts(raw)
                 }
             }
+        }
+
+        private fun cleanDetokenizedArtifacts(text: String): String {
+            if (text.isEmpty() || (!text.contains("true", ignoreCase = true) && !text.contains("false", ignoreCase = true))) {
+                return text
+            }
+            return text.replace(Regex("(?<=\\s|^)(?:true|false)(?=\\s|$|[.,!?;:\"'”’])", RegexOption.IGNORE_CASE), "")
+                .replace(Regex(" {2,}"), " ")
+                .trim()
         }
 
         private fun runTokenizer(session: OrtSession, text: String): Tokenized {

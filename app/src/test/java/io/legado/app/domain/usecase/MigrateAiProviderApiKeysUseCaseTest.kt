@@ -13,6 +13,7 @@ import io.legado.app.domain.model.AiModelConfig
 import io.legado.app.domain.model.AiModelDraft
 import io.legado.app.domain.model.AiProfileDraft
 import io.legado.app.domain.model.AiProviderAuthType
+import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiProviderDraft
 import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.model.AiRouteProfileConfig
@@ -88,10 +89,21 @@ private class FakeMigrationProfileGateway(
 
     override fun observeProviders(): Flow<List<AiProviderProfile>> = flowOf(providers)
     override fun observeModels(): Flow<List<AiModelProfile>> = flowOf(emptyList())
+    override fun observeActiveModels(): Flow<List<AiModelProfile>> = flowOf(emptyList())
     override fun observePresets(): Flow<List<AiTaskPreset>> = flowOf(emptyList())
     override suspend fun getProvider(id: String): AiProviderProfile? = providers.firstOrNull { it.id == id }
+    override suspend fun getEnabledProviders(): List<AiProviderProfile> = providers.filter { it.enabled }
     override suspend fun getModel(id: String): AiModelProfile? = null
     override suspend fun getModelConfig(id: String): AiModelConfig? = null
+    override suspend fun toProviderConfig(provider: AiProviderProfile): AiProviderConfig = AiProviderConfig(
+        id = provider.id,
+        name = provider.name,
+        protocol = provider.protocol,
+        baseUrl = provider.baseUrl,
+        apiKey = provider.apiKey,
+        authType = provider.authType,
+        modelsUrl = provider.modelsUrl,
+    )
     override suspend fun getTaskPreset(taskType: String): AiTaskPresetConfig? = null
     override suspend fun getProviderApiKey(providerId: String): String = ""
 
@@ -115,6 +127,11 @@ private class FakeMigrationProfileGateway(
         providerId: String,
         models: List<AiAvailableModel>,
     ): List<AiModelProfile> = error("unused")
+    override suspend fun syncDiscoveredModels(
+        providerId: String,
+        discovered: List<AiAvailableModel>,
+    ): List<AiModelProfile> = emptyList()
+    override suspend fun deprecateStaleModels() = Unit
 
     override suspend fun setDefaultModel(modelProfileId: String): AiTaskPresetConfig = error("unused")
     override suspend fun saveDefaultChatProfile(draft: AiProfileDraft): AiTaskPresetConfig = error("unused")

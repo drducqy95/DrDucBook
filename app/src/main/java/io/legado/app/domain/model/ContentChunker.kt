@@ -117,6 +117,19 @@ object ContentChunker {
         }
     }
 
+    /**
+     * Resilient layout restoration for Local AI and offline MT models.
+     * Preserves translated paragraphs with the chunk's original boundary whitespace even if
+     * internal paragraph cardinality differs slightly.
+     */
+    fun restoreLayoutRelaxed(chunk: TextChunk, translated: String): String {
+        if (translated.isBlank() && chunk.content.isNotBlank()) return chunk.content
+        val clean = translated.trim()
+        val restored = restoreLayout(chunk, clean)
+        if (restored != null) return restored
+        return chunk.leadingWhitespace + clean + chunk.trailingWhitespace
+    }
+
     fun sourceWithLayout(chunk: TextChunk): String {
         return requireNotNull(restoreLayout(chunk, chunk.content)) {
             "Internal translation layout is inconsistent"

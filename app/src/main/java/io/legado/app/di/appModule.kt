@@ -147,8 +147,10 @@ import io.legado.app.domain.gateway.SafBackupGateway
 import io.legado.app.domain.gateway.StoryImageStorageGateway
 import io.legado.app.domain.gateway.HomeDashboardGateway
 import io.legado.app.domain.gateway.HomepageModulesGateway
+import io.legado.app.data.repository.LocalAiTranslationRepository
 import io.legado.app.domain.gateway.LocalBookGateway
 import io.legado.app.domain.gateway.LocalAiEngineGateway
+import io.legado.app.domain.gateway.LocalAiTranslationGateway
 import io.legado.app.domain.gateway.LocalTtsModelGateway
 import io.legado.app.domain.gateway.MediaResolverGateway
 import io.legado.app.domain.gateway.MediaDownloadGateway
@@ -485,6 +487,7 @@ val appModule = module {
     }
     single<AiPromptPresetGateway> { AiPromptPresetRepository(get()) }
     single<LocalAiEngineGateway> { LocalAiEngineRepository(get()) }
+    single<LocalAiTranslationGateway> { LocalAiTranslationRepository(get(), get()) }
     single<AiSecretStore> { AndroidAiSecretStore(get()) }
     single<AiOAuthGateway> {
         AiOAuthRepository(
@@ -495,7 +498,7 @@ val appModule = module {
             clock = Clock.systemUTC(),
         )
     }
-    single<AiTextGateway>(named(RAW_AI_TEXT_GATEWAY)) { AiTextRepositoryImpl(get()) }
+    single<AiTextGateway>(named(RAW_AI_TEXT_GATEWAY)) { AiTextRepositoryImpl() }
     single {
         AiRouterRepository(
             dao = get(),
@@ -693,7 +696,7 @@ val appModule = module {
     viewModelOf(::ThemeManageViewModel)
     viewModelOf(::PersonalizationViewModel)
     viewModelOf(::BackupConfigViewModel)
-    viewModelOf(::AiConfigViewModel)
+    viewModel { AiConfigViewModel(get(), get(named(RAW_AI_TEXT_GATEWAY)), get()) }
     viewModelOf(::AiRouterViewModel)
     viewModelOf(::AgentDashboardViewModel)
     viewModelOf(::CustomAgentToolManagerViewModel)
@@ -721,7 +724,6 @@ val appModule = module {
             aiProfileGateway = get(),
             aiRouterGateway = get(),
             aiTextGateway = get(),
-            localAiEngineGateway = get(),
         )
     }
     viewModel { (providerId: String?, modelProfileId: String?) ->
@@ -766,6 +768,7 @@ val appModule = module {
             quickDictionaryGateway = get(),
             quickTranslationGateway = get(),
             accountEntitlementUseCase = get(),
+            translationCacheGateway = get(),
         )
     }
     viewModelOf(::ChangeCoverViewModel)
@@ -815,4 +818,4 @@ val appModule = module {
 private fun platformImageDecoderFactory(): ImageDecoderDecoder.Factory =
     ImageDecoderDecoder.Factory()
 
-private const val RAW_AI_TEXT_GATEWAY = "rawAiTextGateway"
+internal const val RAW_AI_TEXT_GATEWAY = "rawAiTextGateway"

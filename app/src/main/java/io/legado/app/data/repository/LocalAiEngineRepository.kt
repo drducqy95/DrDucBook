@@ -6,8 +6,11 @@ import android.os.Build
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import io.legado.app.domain.gateway.AiStreamEvent
+import io.legado.app.domain.gateway.LocalAiCorruptedModelException
 import io.legado.app.domain.gateway.LocalAiEngineGateway
 import io.legado.app.domain.gateway.LocalAiModelMetadata
+import io.legado.app.domain.gateway.LocalAiOutOfMemoryException
+import io.legado.app.domain.gateway.LocalAiUnsupportedAbiException
 import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.LocalAiDeviceInfo
 import io.legado.app.domain.model.LocalAiModelCatalog
@@ -17,11 +20,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
@@ -30,6 +35,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -59,23 +66,44 @@ class LocalAiEngineRepository(
     override suspend fun inspectModel(modelPath: String): Result<LocalAiModelMetadata> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val file = requireGguf(modelPath)
-                metadata(file, "")
+                val (file, version) = requireGguf(modelPath)
+                metadata(file, "", version)
             }
         }
 
-    override suspend fun importModel(sourceUri: String): Result<LocalAiModelMetadata> =
+    override suspend fun validateModel(modelPath: String): Result<LocalAiModelMetadata> =
+        inspectModel(modelPath)
+
+    override suspend fun importModel(
+        sourceUri: String,
+        onProgress: ((bytesRead: Long, totalBytes: Long) -> Unit)?,
+    ): Result<LocalAiModelMetadata> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val uri = Uri.parse(sourceUri)
-                val document = DocumentFile.fromSingleUri(context, uri)
-                val sourceName = document?.name.orEmpty()
-                    .ifBlank { uri.lastPathSegment.orEmpty() }
-                    .replace(Regex("[^\\p{L}\\p{N}._ -]"), "_")
-                    .takeLast(160)
-                require(sourceName.endsWith(".gguf", ignoreCase = true)) {
-                    "Only GGUF models are supported"
+                if (uri.scheme == "file" || sourceUri.startsWith("/")) {
+                    val directPath = if (sourceUri.startsWith("/")) sourceUri else uri.path.orEmpty()
+                    val directFile = File(directPath)
+                    if (directFile.exists() && directFile.isFile) {
+                        val (_, version) = requireGguf(directFile)
+                        val digest = MessageDigest.getInstance("SHA-256")
+                        directFile.inputStream().buffered().use { input ->
+                            val buf = ByteArray(DEFAULT_BUFFER_SIZE * 8)
+                            while (true) {
+                                val r = input.read(buf)
+                                if (r < 0) break
+                                digest.update(buf, 0, r)
+                            }
+                        }
+                        val hash = digest.digest().joinToString("") { "%02x".format(it) }
+                        return@runCatching metadata(directFile, hash, version)
+                    }
                 }
+
+                val document = DocumentFile.fromSingleUri(context, uri)
+                val rawName = resolveDisplayName(uri, document)
+                val cleanName = rawName.replace(Regex("[^\\p{L}\\p{N}._ -]"), "_").takeLast(160)
+                val sourceName = if (cleanName.endsWith(".gguf", ignoreCase = true)) cleanName else "$cleanName.gguf"
                 val declaredSize = document?.length()?.takeIf { it > 0 } ?: 0L
                 val modelDir = File(
                     context.getExternalFilesDir(null) ?: context.filesDir,
@@ -83,18 +111,19 @@ class LocalAiEngineRepository(
                 ).apply { mkdirs() }
                 if (declaredSize > 0) {
                     require(modelDir.usableSpace > declaredSize + MIN_FREE_SPACE_AFTER_IMPORT) {
-                        "Not enough free storage to import this model"
+                        "Không đủ dung lượng bộ nhớ trống để nhập model này"
                     }
                 }
                 val target = File(modelDir, sourceName)
-                val temporary = File(modelDir, ".$sourceName.importing")
+                val temporary = File(modelDir, ".$sourceName.tmp")
                 runCatching {
                     modelDir.listFiles()?.forEach { file ->
-                        if (file.name.endsWith(".importing")) file.delete()
+                        if (file.name.endsWith(".tmp") || file.name.endsWith(".importing")) file.delete()
                     }
                 }
                 try {
                     val digest = MessageDigest.getInstance("SHA-256")
+                    var totalRead = 0L
                     context.contentResolver.openInputStream(uri)?.buffered()?.use { input ->
                         temporary.outputStream().buffered().use { output ->
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE * 8)
@@ -102,28 +131,48 @@ class LocalAiEngineRepository(
                                 currentCoroutineContext().ensureActive()
                                 val read = input.read(buffer)
                                 if (read < 0) break
-                                require(modelDir.usableSpace > MIN_FREE_SPACE_AFTER_IMPORT + read) {
-                                    "Not enough free storage to finish importing this model"
-                                }
                                 digest.update(buffer, 0, read)
                                 output.write(buffer, 0, read)
+                                totalRead += read
+                                onProgress?.invoke(totalRead, declaredSize)
                             }
                         }
-                    } ?: error("Không thể mở model đã chọn")
+                    } ?: error("Không thể mở tệp model đã chọn")
                     val hash = digest.digest().joinToString("") { "%02x".format(it) }
                     verifyKnownHyMt2Hash(sourceName, hash)
-                    requireGguf(temporary)
-                    if (target.exists() && !target.delete()) error("Không thể thay thế model")
+                    val (_, version) = requireGguf(temporary)
+                    if (target.exists() && !target.delete()) error("Không thể thay thế model cũ")
                     if (!temporary.renameTo(target)) {
                         temporary.copyTo(target, overwrite = true)
                         temporary.delete()
                     }
-                    metadata(target, hash)
+                    metadata(target, hash, version)
                 } finally {
-                    temporary.delete()
+                    if (temporary.exists()) temporary.delete()
                 }
             }
         }
+
+    private fun resolveDisplayName(uri: Uri, document: DocumentFile?): String {
+        if (uri.scheme == "content") {
+            try {
+                context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val index = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (index != -1) {
+                            val name = cursor.getString(index)
+                            if (!name.isNullOrBlank()) return name
+                        }
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+        val docName = document?.name
+        if (!docName.isNullOrBlank()) return docName
+        val lastSegment = uri.lastPathSegment.orEmpty().substringAfterLast('/')
+        if (lastSegment.isNotBlank()) return lastSegment
+        return "imported_model.gguf"
+    }
 
     override fun generateStream(
         modelPath: String,
@@ -139,7 +188,7 @@ class LocalAiEngineRepository(
             try {
                 kotlinx.coroutines.runBlocking {
                     modelMutex.withLock {
-                        val file = requireGguf(modelPath)
+                        val (file, _) = requireGguf(modelPath)
                         val profile = runtimeProfile(
                             request.model.contextWindow.takeIf { it > 0 } ?: DEFAULT_CONTEXT_WINDOW
                         )
@@ -184,7 +233,7 @@ class LocalAiEngineRepository(
             LocalAiNativeBridge.cancel()
             worker.interrupt()
         }
-    }.flowOn(Dispatchers.IO)
+    }.buffer(Channel.UNLIMITED).flowOn(Dispatchers.IO)
 
     override suspend fun unload() = withContext(Dispatchers.IO) {
         modelMutex.withLock {
@@ -199,6 +248,17 @@ class LocalAiEngineRepository(
     private fun ensureLoaded(file: File, profile: LocalAiRuntimeProfile) {
         if (loadedPath == file.absolutePath && nativeHandle != 0L) return
         if (nativeHandle != 0L) LocalAiNativeBridge.free(nativeHandle)
+
+        // Memory pre-check before calling into C++ engine
+        val activityManager = context.getSystemService(ActivityManager::class.java)
+        val memoryInfo = ActivityManager.MemoryInfo().also(activityManager::getMemoryInfo)
+        val availMb = memoryInfo.availMem / (1_024L * 1_024L)
+        if (availMb < 300L) {
+            throw LocalAiOutOfMemoryException(
+                "RAM khả dụng quá thấp (${availMb}MB). Local AI cần ít nhất 350MB RAM trống để nạp model ${file.name}. Vui lòng đóng bớt ứng dụng chạy ngầm và thử lại."
+            )
+        }
+
         nativeHandle = LocalAiNativeBridge.load(
             nativeLibDir = context.applicationInfo.nativeLibraryDir,
             modelPath = file.absolutePath,
@@ -211,7 +271,9 @@ class LocalAiEngineRepository(
             useMlock = profile.useMlock,
             gpuLayers = profile.gpuLayers,
         )
-        check(nativeHandle != 0L) { "Native engine failed to load ${file.name}" }
+        check(nativeHandle != 0L) {
+            "Native engine không thể nạp tệp model ${file.name}. Vui lòng kiểm tra tính toàn vẹn của tệp GGUF."
+        }
         loadedPath = file.absolutePath
     }
 
@@ -250,23 +312,40 @@ class LocalAiEngineRepository(
         )
     }
 
-    private fun requireGguf(modelPath: String): File = requireGguf(File(modelPath))
+    private fun requireGguf(modelPath: String): Pair<File, Int> = requireGguf(File(modelPath))
 
-    private fun requireGguf(file: File): File {
-        require(file.isFile && file.canRead()) {
-            "Local GGUF model is not readable: ${file.absolutePath}"
+    private fun requireGguf(file: File): Pair<File, Int> {
+        if (!file.isFile || !file.canRead()) {
+            throw LocalAiCorruptedModelException(
+                "Tệp model GGUF không tồn tại hoặc không thể đọc: ${file.absolutePath}"
+            )
         }
-        require(file.extension.equals("gguf", ignoreCase = true)) { "Only GGUF models are supported" }
-        RandomAccessFile(file, "r").use { input ->
-            val magic = ByteArray(4)
-            require(input.read(magic) == magic.size && magic.contentEquals(GGUF_MAGIC)) {
-                "The selected file is not a valid GGUF model"
+        if (file.length() < 1024L * 1024L) {
+            throw LocalAiCorruptedModelException(
+                "Tệp model GGUF bị lỗi hoặc quá nhỏ (${file.length()} bytes)"
+            )
+        }
+        val version = RandomAccessFile(file, "r").use { input ->
+            val header = ByteArray(8)
+            val read = input.read(header)
+            if (read < 8) {
+                throw LocalAiCorruptedModelException("Không thể đọc header của tệp GGUF: ${file.name}")
             }
+            val magic = header.copyOfRange(0, 4)
+            if (!magic.contentEquals(GGUF_MAGIC)) {
+                throw LocalAiCorruptedModelException("Tệp đã chọn không phải định dạng GGUF hợp lệ (magic header không khớp)")
+            }
+            val buffer = ByteBuffer.wrap(header, 4, 4).order(ByteOrder.LITTLE_ENDIAN)
+            val v = buffer.int
+            if (v !in 1..3) {
+                throw LocalAiCorruptedModelException("Phiên bản GGUF v$v không được hỗ trợ (chỉ hỗ trợ v2/v3)")
+            }
+            v
         }
-        return file
+        return file to version
     }
 
-    private fun metadata(file: File, hash: String): LocalAiModelMetadata {
+    private fun metadata(file: File, hash: String, ggufVersion: Int = 3): LocalAiModelMetadata {
         val device = deviceInfo()
         val profile = LocalAiRuntimePlanner.plan(
             device = device,
@@ -281,6 +360,7 @@ class LocalAiEngineRepository(
             sha256 = hash,
             primaryAbi = device.primaryAbi,
             totalMemoryMb = device.totalMemoryMb,
+            ggufVersion = ggufVersion,
         )
     }
 
@@ -309,10 +389,17 @@ internal object LocalAiNativeBridge {
     val isAvailable: Boolean
 
     init {
-        val result = runCatching { System.loadLibrary("legado_local_ai") }
-        isAvailable = result.isSuccess
-        loadErrorMessage = result.exceptionOrNull()?.message
-            ?: "The local AI native runtime is not packaged for this device ABI"
+        val supported64Bit = Build.SUPPORTED_64_BIT_ABIS
+        if (supported64Bit == null || supported64Bit.isEmpty()) {
+            isAvailable = false
+            loadErrorMessage = "Thiết bị không hỗ trợ 64-bit ABI (chỉ hỗ trợ: ${Build.SUPPORTED_ABIS.joinToString()}). Local AI yêu cầu arm64-v8a hoặc x86_64."
+        } else {
+            val result = runCatching { System.loadLibrary("legado_local_ai") }
+            isAvailable = result.isSuccess
+            loadErrorMessage = result.exceptionOrNull()?.let { err ->
+                "Không thể nạp thư viện native liblegado_local_ai.so: ${err.message ?: err::class.java.simpleName}. ABI: ${supported64Bit.firstOrNull()}"
+            } ?: "The local AI native runtime is not packaged for this device ABI"
+        }
     }
 
     interface Callback {

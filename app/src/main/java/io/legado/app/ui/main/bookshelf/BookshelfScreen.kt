@@ -81,6 +81,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -175,6 +176,7 @@ fun BookshelfScreen(
     onNavigateToRemoteImport: () -> Unit,
     onNavigateToLocalImport: () -> Unit,
     onNavigateToCache: (Long) -> Unit,
+    onNavigateToBookCacheManage: () -> Unit = {},
     onNavigateToAiRouter: () -> Unit,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
@@ -261,11 +263,16 @@ fun BookshelfScreen(
     }
     val folderGridState = rememberLazyGridState()
     val standaloneSearchGridState = rememberLazyGridState()
-    val groupGridStates = mutableMapOf<Long, LazyGridState>()
+    val groupGridStates = remember { mutableStateMapOf<Long, LazyGridState>() }
     uiState.groups.forEach { group ->
         key(group.groupId) {
-            groupGridStates[group.groupId] = rememberLazyGridState()
+            val state = rememberLazyGridState()
+            groupGridStates[group.groupId] = state
         }
+    }
+    LaunchedEffect(uiState.groups) {
+        val activeGroupIds = uiState.groups.map { it.groupId }.toSet()
+        groupGridStates.keys.retainAll(activeGroupIds)
     }
     val latestGroups by rememberUpdatedState(uiState.groups)
     val latestSelectedGroupId by rememberUpdatedState(uiState.selectedGroupId)
@@ -573,6 +580,14 @@ fun BookshelfScreen(
                                         dismiss()
                                     },
                                     leadingIcon = { Icon(Icons.Default.Bookmarks, null) }
+                                )
+                                RoundDropdownMenuItem(
+                                    text = stringResource(R.string.download),
+                                    onClick = {
+                                        onNavigateToBookCacheManage()
+                                        dismiss()
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.Download, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.export_bookshelf),
@@ -928,7 +943,7 @@ fun BookshelfScreen(
                                             ?: uiState.bookshelfSort) == 3 &&
                                         isSelectedGroup
                                 BookshelfPage(
-                                    gridState = groupGridStates.getValue(group.groupId),
+                                    gridState = groupGridStates[group.groupId] ?: rememberLazyGridState(),
                                     paddingValues = paddingValues,
                                     books = books,
                                     uiState = uiState,

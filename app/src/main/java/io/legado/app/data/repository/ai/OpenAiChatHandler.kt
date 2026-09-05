@@ -112,6 +112,7 @@ class OpenAiChatHandler : AiProtocolHandler {
         if (hasReasoningCapability(request.model.capabilities) && params.reasoningLevel != AiReasoningLevel.AUTO) {
             body["reasoning_effort"] = params.reasoningLevel.toOpenAiEffort()
         }
+        body["stream_options"] = mapOf("include_usage" to true)
 
         // For streaming, we retry before establishing the SSE connection.
         // Once streaming starts, errors are not retried (partial output would be confusing).
@@ -159,6 +160,43 @@ class OpenAiChatHandler : AiProtocolHandler {
                             name = toolCall.function?.name,
                             argumentsDelta = toolCall.function?.arguments,
                             rawType = toolCall.type ?: "tool_call"
+                        )
+                    )
+                }
+
+                // Citations / Annotations
+                val choice = root?.getAsJsonArray("choices")?.firstOrNull()?.asJsonObjectOrNull()
+                val deltaObj = choice?.getAsJsonObject("delta")
+                deltaObj?.getAsJsonArray("annotations")?.forEach { elem ->
+                    elem.asJsonObjectOrNull()?.let { ann ->
+                        val url = ann.getString("url")
+                            ?: ann.getAsJsonObject("url_citation")?.getString("url")
+                        if (!url.isNullOrBlank()) {
+                            emitEvent(
+                                AiStreamEvent.Citation(
+                                    startIndex = ann.get("start_index")?.asInt,
+                                    endIndex = ann.get("end_index")?.asInt,
+                                    uri = url,
+                                    title = ann.getString("title").orEmpty(),
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Token usage
+                root?.getAsJsonObject("usage")?.let { usage ->
+                    val promptTokens = usage.get("prompt_tokens")?.asInt ?: 0
+                    val completionTokens = usage.get("completion_tokens")?.asInt ?: 0
+                    val totalTokens = usage.get("total_tokens")?.asInt ?: (promptTokens + completionTokens)
+                    val reasoningTokens = usage.getAsJsonObject("completion_tokens_details")
+                        ?.get("reasoning_tokens")?.asInt ?: 0
+                    emitEvent(
+                        AiStreamEvent.Usage(
+                            promptTokens = promptTokens,
+                            completionTokens = completionTokens,
+                            totalTokens = totalTokens,
+                            reasoningTokens = reasoningTokens,
                         )
                     )
                 }

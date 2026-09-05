@@ -24,6 +24,8 @@ class TranslationConstantsTest {
                 TranslationConstants.PROVIDER_QUICK_TRANSLATOR,
                 TranslationConstants.PROVIDER_NMT,
                 TranslationConstants.PROVIDER_APP_AI,
+                TranslationConstants.PROVIDER_LOCAL_AI,
+                TranslationConstants.PROVIDER_REWRITE,
             ),
             TranslationConstants.providerValues.toSet(),
         )

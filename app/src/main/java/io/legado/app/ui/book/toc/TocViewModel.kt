@@ -303,7 +303,7 @@ class TocViewModel(
             return@combine emptyMap()
         }
         val titles = chapters.map { it.getDisplayTitle(useReplace = false) }
-        translateDynamicUiTextUseCase.executeLines(
+        translateDynamicUiTextUseCase.executeChapterTitles(
             scopeKey = "toc:${book.bookUrl}",
             originalLines = titles,
             book = book,

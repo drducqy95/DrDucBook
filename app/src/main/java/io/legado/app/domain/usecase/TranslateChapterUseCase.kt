@@ -14,6 +14,7 @@ import io.legado.app.domain.gateway.NmtTranslationGateway
 import io.legado.app.domain.gateway.MlKitTranslationGateway
 import io.legado.app.domain.gateway.NmtDecodeConfig
 import io.legado.app.domain.gateway.AiPromptPresetGateway
+import io.legado.app.domain.gateway.LocalAiTranslationGateway
 import io.legado.app.domain.gateway.TranslationCacheGateway
 import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiCapability
@@ -83,6 +84,7 @@ class TranslateChapterUseCase(
     private val aiPromptPresetGateway: AiPromptPresetGateway,
     private val translateDynamicUiTextUseCase: TranslateDynamicUiTextUseCase,
     private val translationStoryMemoryUseCase: TranslationStoryMemoryUseCase? = null,
+    private val localAiTranslationGateway: LocalAiTranslationGateway? = null,
 ) {
 
     data class TranslationProgress(
@@ -201,9 +203,49 @@ class TranslateChapterUseCase(
                     text = source,
                     targetLanguage = targetLanguage,
                 )
-                TranslationConstants.PROVIDER_APP_AI -> {
-                    val preset = resolveTranslationPreset()
-                        ?: error("No AI translation preset configured")
+                TranslationConstants.PROVIDER_LOCAL_AI -> {
+                    val gateway = localAiTranslationGateway
+                        ?: error("Local AI translation gateway is not available")
+                    val rawText = gateway.translate(
+                        text = source,
+                        targetLanguage = targetLanguage,
+                        context = AiTranslationChunkContext(
+                            previous = previousContext.takeLast(160),
+                            next = nextContext.take(160),
+                        ),
+                        dictionary = selectRelevantDictionaries(dictionaries, source, maxPairs = 20),
+                        configuredPrompt = TranslationConfig.localAiPrompt,
+                    ).text
+                    if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE && rawText.hasCjkSourceCodePoints()) {
+                        val quickPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() }
+                        repairResidualCjkForVietnamese(
+                            text = rawText,
+                            targetLanguage = targetLanguage,
+                            translateResidual = { residual ->
+                                quickTranslationGateway.translate(
+                                    text = residual,
+                                    projectTerms = dictionaries,
+                                    customPhonetics = quickPhonetics,
+                                    pronounMode = quickPronounMode,
+                                )
+                            },
+                            phoneticResidual = { residual ->
+                                quickTranslationGateway.hanViet(residual, quickPhonetics)
+                            },
+                        )
+                    } else {
+                        rawText
+                    }
+                }
+                TranslationConstants.PROVIDER_APP_AI,
+                TranslationConstants.PROVIDER_REWRITE -> {
+                    val preset = if (provider == TranslationConstants.PROVIDER_REWRITE) {
+                        resolveRewritePreset()
+                            ?: error("No AI rewrite preset configured")
+                    } else {
+                        resolveTranslationPreset()
+                            ?: error("No AI translation preset configured")
+                    }
                     val promptStages = TranslationPromptStage.entries.associateWith { stage ->
                         aiPromptPresetGateway.getEnabledByTaskType(stage.taskType)
                             .map { it.instruction }
@@ -292,13 +334,18 @@ class TranslateChapterUseCase(
                     )
                 )
             }
-            val preset = if (provider == TranslationConstants.PROVIDER_APP_AI) {
-                resolveTranslationPreset()
-                    ?: return@withContext Result.failure(Exception("No AI translation preset configured"))
+            val preset = if (provider == TranslationConstants.PROVIDER_APP_AI || provider == TranslationConstants.PROVIDER_REWRITE) {
+                if (provider == TranslationConstants.PROVIDER_REWRITE) {
+                    resolveRewritePreset()
+                        ?: return@withContext Result.failure(Exception("No AI rewrite preset configured"))
+                } else {
+                    resolveTranslationPreset()
+                        ?: return@withContext Result.failure(Exception("No AI translation preset configured"))
+                }
             } else {
                 null
             }
-            val promptStages = if (provider == TranslationConstants.PROVIDER_APP_AI) {
+            val promptStages = if (provider == TranslationConstants.PROVIDER_APP_AI || provider == TranslationConstants.PROVIDER_REWRITE) {
                 TranslationPromptStage.entries.associateWith { stage ->
                     aiPromptPresetGateway.getEnabledByTaskType(stage.taskType)
                         .map { it.instruction }
@@ -517,34 +564,25 @@ class TranslateChapterUseCase(
                 )
             }
 
-            val localAiBudget = preset
-                ?.takeIf { it.model.provider.protocol == AiProtocol.LOCAL_GGUF }
-                ?.let {
-                    LocalAiTranslationBudgetPlanner.plan(
-                        contextWindow = it.model.contextWindow,
-                        providerMaxOutputTokens = it.model.maxOutputTokens,
-                        configuredMaxOutputTokens = it.params.maxOutputTokens,
-                        configuredMaxSourceChars = minOf(
-                            it.runtimeOptions.maxInputChars.coerceAtLeast(10),
-                            TranslationConfig.MAX_CHUNK_CHARS,
-                        ),
-                        preferredChunkChars = LOCAL_AI_PREFERRED_CHUNK_CHARS,
-                        adjacentContextChars = 0,
-                        fixedPromptChars = estimateFixedTranslationPromptChars(
-                            preset = it,
-                            dictionaries = dictionaries,
-                            promptStages = promptStages,
-                        ),
+            val maxCharsPerChunk = when (provider) {
+                TranslationConstants.PROVIDER_LOCAL_AI -> {
+                    val budget = LocalAiTranslationBudgetPlanner.plan(
+                        contextWindow = 4_096,
+                        providerMaxOutputTokens = 4_096,
+                        configuredMaxOutputTokens = null,
+                        configuredMaxSourceChars = TranslationConfig.localAiMaxCharsPerChunk,
+                        preferredChunkChars = TranslationConfig.localAiMaxCharsPerChunk,
+                        adjacentContextChars = LOCAL_AI_ADJACENT_CONTEXT_CHARS,
+                        fixedPromptChars = 400,
                     )
+                    budget.maxSourceChars
                 }
-            val maxCharsPerChunk = when {
-                localAiBudget != null -> localAiBudget.maxSourceChars
-                provider == TranslationConstants.PROVIDER_NMT ->
+                TranslationConstants.PROVIDER_NMT ->
                     TranslationConfig.nmtMaxCharsPerChunk
-                provider == TranslationConstants.PROVIDER_QUICK_TRANSLATOR ->
+                TranslationConstants.PROVIDER_QUICK_TRANSLATOR ->
                     QUICK_TRANSLATOR_CHUNK_CHARS
-                provider == TranslationConstants.PROVIDER_ML_KIT -> ML_KIT_CHUNK_CHARS
-                provider == TranslationConstants.PROVIDER_APP_AI -> preset
+                TranslationConstants.PROVIDER_ML_KIT -> ML_KIT_CHUNK_CHARS
+                TranslationConstants.PROVIDER_APP_AI -> preset
                     .let {
                         resolveAiRuntimeMaxInputChars(
                             runtimeOptions = it?.runtimeOptions,
@@ -696,7 +734,6 @@ class TranslateChapterUseCase(
             coroutineScope translationScope@{
                 val concurrentChunks = resolveTranslationChunkConcurrency(
                     provider = provider,
-                    hasLocalAiBudget = localAiBudget != null,
                     storyMemoryEnabled = translationStoryMemoryUseCase != null,
                     aiConcurrentRequests = resolveAiRuntimeConcurrentRequests(
                         runtimeOptions = preset?.runtimeOptions,
@@ -729,19 +766,24 @@ class TranslateChapterUseCase(
                                     quickIgnoredTerms = scopedQuickIgnoredTerms,
                                     quickPronounMode = quickPronounMode,
                                     isExplicitRetranslation = forceRetranslate,
-                                    aiContext = if (provider == TranslationConstants.PROVIDER_APP_AI) {
-                                        AiTranslationChunkPlanner.contextFor(
-                                            chunks = chunks,
-                                            chunkIndex = chunk.index,
-                                            maxCharsPerChunk = maxCharsPerChunk,
-                                            maxContextChars = if (localAiBudget != null) {
-                                                LOCAL_AI_ADJACENT_CONTEXT_CHARS
-                                            } else {
-                                                DEFAULT_AI_ADJACENT_CONTEXT_CHARS
-                                            },
-                                        )
-                                    } else {
-                                        AiTranslationChunkContext()
+                                    aiContext = when (provider) {
+                                        TranslationConstants.PROVIDER_APP_AI -> {
+                                            AiTranslationChunkPlanner.contextFor(
+                                                chunks = chunks,
+                                                chunkIndex = chunk.index,
+                                                maxCharsPerChunk = maxCharsPerChunk,
+                                                maxContextChars = DEFAULT_AI_ADJACENT_CONTEXT_CHARS,
+                                            )
+                                        }
+                                        TranslationConstants.PROVIDER_LOCAL_AI -> {
+                                            AiTranslationChunkPlanner.contextFor(
+                                                chunks = chunks,
+                                                chunkIndex = chunk.index,
+                                                maxCharsPerChunk = maxCharsPerChunk,
+                                                maxContextChars = LOCAL_AI_ADJACENT_CONTEXT_CHARS,
+                                            )
+                                        }
+                                        else -> AiTranslationChunkContext()
                                     },
                                     storyContextProvider = storyContextProvider,
                                     onStoryMemoryUpdate = onStoryMemoryUpdate,
@@ -1091,7 +1133,45 @@ class TranslateChapterUseCase(
                         config = currentNmtDecodeConfig(),
                     ).text
                 }
-                TranslationConstants.PROVIDER_APP_AI -> preset?.let { configuredPreset ->
+                TranslationConstants.PROVIDER_LOCAL_AI -> runCatching {
+                    val gateway = localAiTranslationGateway
+                        ?: error("Local AI translation gateway is not available")
+                    val rawText = gateway.translate(
+                        text = sourceContent,
+                        targetLanguage = targetLanguage,
+                        context = aiContext,
+                        dictionary = selectRelevantDictionaries(dictSnapshot, sourceContent, maxPairs = 20),
+                        configuredPrompt = TranslationConfig.localAiPrompt,
+                        retryInstruction = if (lastRetryReason == RetryReason.PARSE_ERROR) {
+                            "Ensure the output matches the paragraph structure of the source text exactly."
+                        } else "",
+                        onToken = onPartialTranslation,
+                    ).text
+                    if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE && rawText.hasCjkSourceCodePoints()) {
+                        repairResidualCjkForVietnamese(
+                            text = rawText,
+                            targetLanguage = targetLanguage,
+                            translateResidual = { residual ->
+                                quickTranslationGateway.translate(
+                                    text = residual,
+                                    projectTerms = mergeDictionaryTerms(
+                                        primaryTerms = dictSnapshot,
+                                        fallbackTerms = quickTranslatorTerms,
+                                    ),
+                                    customPhonetics = quickPhonetics,
+                                    pronounMode = quickPronounMode,
+                                )
+                            },
+                            phoneticResidual = { residual ->
+                                quickTranslationGateway.hanViet(residual, quickPhonetics)
+                            },
+                        )
+                    } else {
+                        rawText
+                    }
+                }
+                TranslationConstants.PROVIDER_APP_AI,
+                TranslationConstants.PROVIDER_REWRITE -> preset?.let { configuredPreset ->
                     translateWithAiGateway(
                         text = sourceContent,
                         targetLanguage = targetLanguage,
@@ -1110,7 +1190,7 @@ class TranslateChapterUseCase(
                         routeRetryOffset = pipelineAttempt - 1,
                         onPartial = onPartialTranslation,
                     )
-                } ?: Result.failure(Exception("No AI translation preset configured"))
+                } ?: Result.failure(Exception("No AI translation/rewrite preset configured"))
                 else -> Result.failure(IllegalArgumentException("Unknown translation provider: $provider"))
             }
             if (result.isSuccess) {
@@ -1121,7 +1201,9 @@ class TranslateChapterUseCase(
                     targetLanguage = targetLanguage,
                 )
                 if (qualityError != null) {
-                    val failure = if (provider == TranslationConstants.PROVIDER_APP_AI) {
+                    val failure = if (provider == TranslationConstants.PROVIDER_APP_AI ||
+                        provider == TranslationConstants.PROVIDER_REWRITE
+                    ) {
                         classifyAiTranslationFailure(
                             error = qualityError,
                             preset = preset,
@@ -1136,13 +1218,24 @@ class TranslateChapterUseCase(
                     continue
                 }
                 val restored = ContentChunker.restoreLayout(chunk, translated)
+                    ?: if (provider == TranslationConstants.PROVIDER_LOCAL_AI ||
+                        provider == TranslationConstants.PROVIDER_NMT ||
+                        provider == TranslationConstants.PROVIDER_QUICK_TRANSLATOR ||
+                        provider == TranslationConstants.PROVIDER_REWRITE
+                    ) {
+                        ContentChunker.restoreLayoutRelaxed(chunk, translated)
+                    } else {
+                        null
+                    }
                 if (restored != null) {
                     return Result.success(restored)
                 }
                 val layoutError = TranslationLayoutException(
                     "Translation parse error: changed paragraph count for chunk ${chunk.index}"
                 )
-                if (provider == TranslationConstants.PROVIDER_APP_AI) {
+                if (provider == TranslationConstants.PROVIDER_APP_AI ||
+                    provider == TranslationConstants.PROVIDER_REWRITE
+                ) {
                     val failure = classifyAiTranslationFailure(
                         error = layoutError,
                         preset = preset,
@@ -1160,7 +1253,9 @@ class TranslateChapterUseCase(
             val rawError = result.exceptionOrNull()?.let { error ->
                 error as? Exception ?: Exception(error.message, error)
             } ?: Exception("Translation provider returned a failed result without an error")
-            if (provider == TranslationConstants.PROVIDER_APP_AI) {
+            if (provider == TranslationConstants.PROVIDER_APP_AI ||
+                provider == TranslationConstants.PROVIDER_REWRITE
+            ) {
                 val failure = classifyAiTranslationFailure(
                     error = rawError,
                     preset = preset,
@@ -1182,7 +1277,7 @@ class TranslateChapterUseCase(
         }
         val terminalError = lastError ?: Exception("Translation pipeline ended without a result")
         val splitMaxChars = if (
-            provider == TranslationConstants.PROVIDER_APP_AI &&
+            (provider == TranslationConstants.PROVIDER_APP_AI || provider == TranslationConstants.PROVIDER_REWRITE) &&
             lastRetryReason == RetryReason.PARSE_ERROR
         ) {
             aiTranslationFallbackSplitMaxChars(chunk.content.length, splitDepth)
@@ -1297,6 +1392,15 @@ class TranslateChapterUseCase(
         )
     }
 
+    private suspend fun resolveRewritePreset(): AiTaskPresetConfig? {
+        aiProfileGateway.getTaskPreset(AiTaskType.REWRITE_TEXT)?.let { return it }
+        return aiProfileGateway.getTaskPreset(AiTaskType.CHAT)?.copy(
+            taskType = AiTaskType.REWRITE_TEXT,
+            name = "Rewrite fallback",
+            promptTemplate = TranslationConstants.DEFAULT_PROMPT,
+        ) ?: resolveTranslationPreset()
+    }
+
     suspend fun currentProviderConfigurationRevision(provider: String): String {
         return providerConfigurationRevision(provider)
     }
@@ -1401,6 +1505,18 @@ class TranslateChapterUseCase(
 
     private suspend fun providerConfigurationRevision(provider: String): String = when (provider) {
         TranslationConstants.PROVIDER_NMT -> currentNmtDecodeConfig().toString()
+        TranslationConstants.PROVIDER_LOCAL_AI -> {
+            GSON.toJson(
+                linkedMapOf(
+                    "model" to TranslationConfig.localAiModelPath,
+                    "prompt" to TranslationConfig.localAiPrompt,
+                    "temperature" to TranslationConfig.localAiTemperature,
+                    "topP" to TranslationConfig.localAiTopP,
+                    "topK" to TranslationConfig.localAiTopK,
+                    "repetitionPenalty" to TranslationConfig.localAiRepetitionPenalty,
+                )
+            )
+        }
         TranslationConstants.PROVIDER_APP_AI -> {
             val preset = resolveTranslationPreset()
             val promptStages = TranslationPromptStage.entries.associate { stage ->
@@ -1590,7 +1706,6 @@ class TranslateChapterUseCase(
         if (targetLanguage == "zh" && isMostlyChinese(text)) {
             return Result.success(text)
         }
-        val isLocalAi = preset.model.provider.protocol == AiProtocol.LOCAL_GGUF
         val isReasoningModel = AiCapability.REASONING in preset.model.capabilities ||
             AiCapability.REASONING in AiModelRegistry.inferCapabilities(preset.model.modelId)
 
@@ -1633,40 +1748,23 @@ class TranslateChapterUseCase(
             protectedInstruction = protectedInstruction,
         )
         val userPrompt = AiTranslationRefinePipeline.buildUserPrompt(contextPack)
-        val fixedPromptChars = systemPrompt.length + userPrompt.length - protectedSource.length + 64
-        val outputTokenBudget = if (isLocalAi) {
-            LocalAiTranslationBudgetPlanner.plan(
-                contextWindow = preset.model.contextWindow,
-                providerMaxOutputTokens = preset.model.maxOutputTokens,
-                configuredMaxOutputTokens = preset.params.maxOutputTokens,
-                configuredMaxSourceChars = text.length.coerceAtLeast(10),
-                preferredChunkChars = text.length.coerceAtLeast(10),
-                adjacentContextChars = 0,
-                fixedPromptChars = fixedPromptChars,
-                sourceChars = text.length,
-            ).maxOutputTokens
-        } else {
-            AiTranslationTokenBudget.forSourceChars(
-                sourceChars = text.length,
-                configuredLimit = preset.params.maxOutputTokens,
-                providerLimit = preset.model.maxOutputTokens,
-                reasoningModel = isReasoningModel,
-                structuredJson = true,
-            )
-        }
+        val outputTokenBudget = AiTranslationTokenBudget.forSourceChars(
+            sourceChars = text.length,
+            configuredLimit = preset.params.maxOutputTokens,
+            providerLimit = preset.model.maxOutputTokens,
+            reasoningModel = isReasoningModel,
+            structuredJson = true,
+        )
         val params = preset.params.copy(
             temperature = preset.params.temperature
                 ?: preset.model.defaultParams.temperature
-                ?: if (isLocalAi) 0.7f else TranslationConstants.DEFAULT_TEMPERATURE,
+                ?: TranslationConstants.DEFAULT_TEMPERATURE,
             topP = preset.params.topP
-                ?: preset.model.defaultParams.topP
-                ?: if (isLocalAi) 0.6f else null,
+                ?: preset.model.defaultParams.topP,
             topK = preset.params.topK
-                ?: preset.model.defaultParams.topK
-                ?: if (isLocalAi) 20 else null,
+                ?: preset.model.defaultParams.topK,
             repetitionPenalty = preset.params.repetitionPenalty
-                ?: preset.model.defaultParams.repetitionPenalty
-                ?: if (isLocalAi) 1.05f else null,
+                ?: preset.model.defaultParams.repetitionPenalty,
             reasoningLevel = if (preset.params.reasoningLevel == AiReasoningLevel.AUTO) {
                 AiReasoningLevel.OFF
             } else {
@@ -1676,14 +1774,10 @@ class TranslateChapterUseCase(
         )
         val request = AiGenerateRequest(
             model = preset.model,
-            messages = if (isLocalAi) {
-                listOf(AiMessage(AiMessageRole.USER, systemPrompt + "\n\n" + userPrompt))
-            } else {
-                listOf(
-                    AiMessage(AiMessageRole.SYSTEM, systemPrompt),
-                    AiMessage(AiMessageRole.USER, userPrompt),
-                )
-            },
+            messages = listOf(
+                AiMessage(AiMessageRole.SYSTEM, systemPrompt),
+                AiMessage(AiMessageRole.USER, userPrompt),
+            ),
             params = params,
             taskType = AiTaskType.TRANSLATE_CHAPTER,
             routeProfileId = preset.runtimeOptions.routeProfileId,
@@ -1828,6 +1922,7 @@ class TranslateChapterUseCase(
     private fun selectRelevantDictionaries(
         dictionaries: List<DictPair>,
         sourceAndContext: String,
+        maxPairs: Int = MAX_DICTIONARY_PAIRS,
     ): List<DictPair> {
         if (dictionaries.isEmpty() || sourceAndContext.isBlank()) return emptyList()
         return dictionaries.asSequence()
@@ -1836,7 +1931,7 @@ class TranslateChapterUseCase(
             }
             .distinctBy(DictPair::original)
             .sortedByDescending { it.original.length }
-            .take(MAX_DICTIONARY_PAIRS)
+            .take(maxPairs)
             .toList()
     }
 
@@ -1892,7 +1987,9 @@ class TranslateChapterUseCase(
     private fun postProcessTranslation(text: String, targetLanguage: String): String {
         return if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
             VietnameseTranslationPostProcessor.capitalizeSentences(
-                normalizeCjkPunctuation(text)
+                VietnameseTranslationPostProcessor.cleanRogueBooleanLiterals(
+                    normalizeCjkPunctuation(text)
+                )
             )
         } else {
             text
@@ -2004,12 +2101,11 @@ internal fun resolveAiRuntimeRetryCount(
 
 internal fun resolveTranslationChunkConcurrency(
     provider: String,
-    hasLocalAiBudget: Boolean,
     storyMemoryEnabled: Boolean,
     aiConcurrentRequests: Int,
     standardConcurrentRequests: Int,
 ): Int = when {
-    hasLocalAiBudget || provider == TranslationConstants.PROVIDER_NMT -> 1
+    provider == TranslationConstants.PROVIDER_LOCAL_AI || provider == TranslationConstants.PROVIDER_NMT -> 1
     provider == TranslationConstants.PROVIDER_APP_AI && storyMemoryEnabled -> {
         // Story memory is causal: chunk N+1 must see the accepted delta from chunk N.
         1

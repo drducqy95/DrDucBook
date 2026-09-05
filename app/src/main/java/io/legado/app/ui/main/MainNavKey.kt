@@ -51,6 +51,9 @@ data object MainRouteSettingsAi : MainRoute
 data object MainRouteSettingsAiRouter : MainRoute
 
 @Serializable
+data object MainRouteDownloads : MainRoute
+
+@Serializable
 data object MainRouteAiRouter : MainRoute
 
 @Serializable

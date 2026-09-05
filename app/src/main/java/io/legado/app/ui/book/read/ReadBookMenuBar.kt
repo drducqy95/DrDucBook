@@ -462,7 +462,9 @@ private fun ReaderContentMode.labelResource(): Int = when (this) {
     ReaderContentMode.GOOGLE -> R.string.reader_mode_google
     ReaderContentMode.ML_KIT -> R.string.reader_mode_ml_kit
     ReaderContentMode.AI -> R.string.reader_mode_ai
+    ReaderContentMode.LOCAL_AI -> R.string.reader_mode_local_ai
     ReaderContentMode.NMT -> R.string.reader_mode_nmt
+    ReaderContentMode.REWRITE -> R.string.reader_mode_rewrite
 }
 
 private sealed interface ReadBookMenuContent {

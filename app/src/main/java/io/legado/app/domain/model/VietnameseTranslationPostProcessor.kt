@@ -6,6 +6,15 @@ object VietnameseTranslationPostProcessor {
     private val sentenceEnd = setOf('.', '!', '?', '…', '。', '！', '？')
     private val paragraphEnd = setOf('\n', '\r', '\u2028', '\u2029')
 
+    fun cleanRogueBooleanLiterals(text: String): String {
+        if (text.isEmpty() || (!text.contains("true", ignoreCase = true) && !text.contains("false", ignoreCase = true))) {
+            return text
+        }
+        return text.replace(Regex("(?<=\\s|^)(?:true|false)(?=\\s|$|[.,!?;:\"'”’])", RegexOption.IGNORE_CASE), "")
+            .replace(Regex(" {2,}"), " ")
+            .trim()
+    }
+
     fun capitalizeSentences(text: String): String {
         if (text.isEmpty()) return text
         val output = StringBuilder(text.length)

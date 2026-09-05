@@ -102,9 +102,6 @@ sealed interface AiProviderEditIntent {
     data object TestConnection : AiProviderEditIntent
     data object SaveProvider : AiProviderEditIntent
     data object SyncModels : AiProviderEditIntent
-    data object ChooseLocalModel : AiProviderEditIntent
-    data object OpenLocalModelCatalog : AiProviderEditIntent
-    data class LocalModelSelected(val uri: String) : AiProviderEditIntent
     data object DeleteProvider : AiProviderEditIntent
     data class DeleteModel(val modelProfileId: String) : AiProviderEditIntent
 }
@@ -113,6 +110,5 @@ sealed interface AiProviderEditEffect {
     data class ShowMessage(val message: String) : AiProviderEditEffect
     data object NavigateBack : AiProviderEditEffect
     data object NavigateBackAfterDelete : AiProviderEditEffect
-    data object OpenLocalModelPicker : AiProviderEditEffect
     data class OpenUrl(val url: String) : AiProviderEditEffect
 }

@@ -38,12 +38,14 @@ import io.legado.app.domain.model.AiTranslationTokenBudget
 import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.usecase.AiRouteSelector
 import io.legado.app.domain.usecase.AiRouterPolicy
+import io.legado.app.worker.ModelDiscoveryWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import splitties.init.appCtx
 import java.time.Clock
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -239,7 +241,7 @@ class AiRouterRepository(
             throw error
         } catch (error: Throwable) {
             return Result.failure(classify(error, request))
-        } ?: return delegate.generate(request)
+        } ?: return delegate.generate(resolveDirectRequest(request))
         var lastError: Throwable? = null
         for (routePass in 0..1) {
             var attemptedCandidate = false
@@ -282,7 +284,7 @@ class AiRouterRepository(
                 throw error
             } catch (error: Throwable) {
                 return Result.failure(classify(error, request))
-            } ?: return delegate.generate(request)
+            } ?: return delegate.generate(resolveDirectRequest(request))
         }
         return Result.failure(
             lastError ?: classify(routeUnavailable(routeContext.profile), request)
@@ -297,7 +299,8 @@ class AiRouterRepository(
         } catch (error: Throwable) {
             throw classify(error, request)
         } ?: run {
-            delegate.generateStream(request).collect { emit(it) }
+            val direct = resolveDirectRequest(request)
+            delegate.generateStream(direct).collect { emit(it) }
             return@flow
         }
         var lastError: Throwable? = null
@@ -366,7 +369,8 @@ class AiRouterRepository(
             } catch (error: Throwable) {
                 throw classify(error, request)
             } ?: run {
-                delegate.generateStream(request).collect { emit(it) }
+                val direct = resolveDirectRequest(request)
+                delegate.generateStream(direct).collect { emit(it) }
                 return@flow
             }
         }
@@ -543,12 +547,61 @@ class AiRouterRepository(
             ?.trimEnd('/')
             ?.takeIf(String::isNotBlank)
             ?.let { "$it/v1" }
+        val effectiveBaseUrl = runtimeBaseUrl ?: provider.baseUrl
+            .ifBlank {
+                if (provider.protocol == AiProtocol.ANTIGRAVITY) ANTIGRAVITY_IDE_BASE_URL else provider.baseUrl
+            }
         return copy(
             provider = provider.copy(
                 apiKey = secret,
-                baseUrl = runtimeBaseUrl ?: provider.baseUrl,
+                baseUrl = effectiveBaseUrl,
                 runtimeMetadata = runtimeMetadata,
             )
+        )
+    }
+
+    private suspend fun resolveDirectRequest(request: AiGenerateRequest): AiGenerateRequest {
+        val provider = request.model.provider
+        val now = clock.millis()
+        val effectiveBaseUrl = provider.baseUrl
+            .ifBlank {
+                if (provider.protocol == AiProtocol.ANTIGRAVITY) ANTIGRAVITY_IDE_BASE_URL else provider.baseUrl
+            }
+        if (provider.apiKey.isNotBlank()) {
+            return if (effectiveBaseUrl != provider.baseUrl) {
+                request.copy(model = request.model.copy(provider = provider.copy(baseUrl = effectiveBaseUrl)))
+            } else {
+                request
+            }
+        }
+        val credentials = dao.getCredentialsForProvider(provider.id)
+            .filter { credential ->
+                credential.enabled &&
+                    credential.cooldownUntil <= now &&
+                    AiCredentialStatus.isRouterEligible(credential.status)
+            }
+            .ifEmpty {
+                dao.getCredentialsForProvider(provider.id).filter { it.enabled }
+            }
+        val bestCredential = credentials.minByOrNull { it.sortNumber } ?: return request.copy(
+            model = request.model.copy(provider = provider.copy(baseUrl = effectiveBaseUrl))
+        )
+        val secret = try {
+            resolveCredentialSecret(bestCredential)
+        } catch (_: Throwable) {
+            null
+        }?.takeIf(String::isNotBlank) ?: return request.copy(
+            model = request.model.copy(provider = provider.copy(baseUrl = effectiveBaseUrl))
+        )
+        val runtimeMetadata = bestCredential.runtimeMetadata()
+        return request.copy(
+            model = request.model.withCredential(secret, runtimeMetadata).let { resolvedModel ->
+                if (resolvedModel.provider.baseUrl.isBlank() && effectiveBaseUrl.isNotBlank()) {
+                    resolvedModel.copy(provider = resolvedModel.provider.copy(baseUrl = effectiveBaseUrl))
+                } else {
+                    resolvedModel
+                }
+            }
         )
     }
 
@@ -745,6 +798,13 @@ class AiRouterRepository(
             firstEventAt,
             now,
         )
+        if (failure.failure.statusCode == 404 ||
+            failure.failure.technicalDetail.contains("not found", ignoreCase = true) ||
+            failure.failure.technicalDetail.contains("unknown model", ignoreCase = true) ||
+            failure.failure.technicalDetail.contains("invalid model", ignoreCase = true)
+        ) {
+            runCatching { ModelDiscoveryWorker.runOnce(appCtx) }
+        }
     }
 
     private suspend fun recordAttempt(

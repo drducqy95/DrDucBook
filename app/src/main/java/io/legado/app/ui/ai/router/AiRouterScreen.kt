@@ -69,21 +69,6 @@ fun AiRouterRouteScreen(
     onBackClick: () -> Unit,
     viewModel: AiRouterViewModel = koinViewModel(),
 ) {
-    val localGgufPicker = rememberLauncherForActivityResult(
-        contract = FilteredOpenDocumentContract(
-            primaryMimeType = "application/octet-stream",
-            persistableAccess = false,
-        ),
-    ) { uri ->
-        uri?.let { viewModel.onIntent(AiRouterIntent.LocalGgufSelected(it.toString())) }
-    }
-    LaunchedEffect(viewModel) {
-        viewModel.effects.collectLatest { effect ->
-            if (effect == AiRouterEffect.OpenLocalGgufPicker) {
-                localGgufPicker.launch(arrayOf("application/octet-stream", "application/x-gguf"))
-            }
-        }
-    }
     AiRouterScreen(
         state = viewModel.uiState.collectAsStateWithLifecycle().value,
         effects = viewModel.effects,
@@ -128,12 +113,16 @@ fun AiRouterScreen(
         }
     }
 
+    var webLoginTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+
     LaunchedEffect(Unit) {
         effects.collectLatest { effect ->
             when (effect) {
                 is AiRouterEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
                 is AiRouterEffect.OpenUrl -> context.openUrl(effect.url)
-                AiRouterEffect.OpenLocalGgufPicker -> Unit
+                is AiRouterEffect.LaunchWebLogin -> {
+                    webLoginTarget = effect.loginUrl to effect.protocol
+                }
             }
         }
     }
@@ -337,8 +326,6 @@ fun AiRouterScreen(
                 saving = state.saving,
                 onChange = { onIntent(AiRouterIntent.UpdateProviderConfig(it)) },
                 onTest = { onIntent(AiRouterIntent.TestProviderConfig) },
-                onOpenLocalGgufCatalog = { onIntent(AiRouterIntent.OpenLocalGgufCatalog) },
-                onChooseLocalGguf = { onIntent(AiRouterIntent.ChooseLocalGguf) },
                 onOpenCredential = { onIntent(AiRouterIntent.OpenCredential(it)) },
                 onAddCredential = {
                     onIntent(
@@ -347,6 +334,9 @@ fun AiRouterScreen(
                             providerName = editor.name,
                         )
                     )
+                },
+                onOpenWebLogin = { protocol ->
+                    onIntent(AiRouterIntent.OpenWebLogin(protocol))
                 },
             )
 
@@ -396,6 +386,19 @@ fun AiRouterScreen(
 
             null -> Unit
         }
+    }
+
+    webLoginTarget?.let { (loginUrl, protocol) ->
+        WebLoginSheet(
+            show = true,
+            loginUrl = loginUrl,
+            protocol = protocol,
+            onLoginSuccess = { cookie ->
+                onIntent(AiRouterIntent.WebLoginComplete(cookie))
+                webLoginTarget = null
+            },
+            onDismissRequest = { webLoginTarget = null },
+        )
     }
 }
 

@@ -22,7 +22,7 @@ class LocalAiModelsTest {
 
         assertEquals(6, profile.threads)
         assertEquals(4_096, profile.contextWindow)
-        assertEquals(768, profile.preferredChunkChars)
+        assertEquals(512, profile.preferredChunkChars)
         assertEquals(0, profile.gpuLayers)
     }
 
@@ -46,8 +46,8 @@ class LocalAiModelsTest {
             fixedPromptChars = 1_800,
         )
 
-        assertTrue(budget.maxSourceChars in 500..768)
-        assertTrue(budget.maxOutputTokens in 1_000..1_600)
+        assertTrue(budget.maxSourceChars in 500..1000)
+        assertTrue(budget.maxOutputTokens in 1_000..1_900)
         assertEquals(409, budget.safetyTokens)
     }
 
