@@ -50,7 +50,18 @@ class TranslateDynamicBookUiUseCase(
             }
         }
 
-        // Author uses Hán Việt + Title Case
+        // Book name uses QT + Title Case
+        val translatedName = sourceBook.name.takeIf(String::isNotBlank)?.let {
+            translateDynamicUiTextUseCase.executeBookName(
+                scopeKey = scopeKey,
+                originalText = it,
+                book = dictionaryBook,
+                contextText = context,
+                forceRetranslate = forceRetranslate,
+            ).getOrElse { displayValues[0].orEmpty() }
+        } ?: displayValues[0].orEmpty()
+
+        // Author uses QT with dictionary terms + Title Case
         val translatedAuthor = sourceBook.author.takeIf(String::isNotBlank)?.let {
             translateDynamicUiTextUseCase.executeAuthorName(
                 scopeKey = scopeKey,
@@ -72,7 +83,7 @@ class TranslateDynamicBookUiUseCase(
         } ?: displayValues[5]
 
         return sourceBook.copy(
-            name = displayValues[0].orEmpty(),
+            name = translatedName,
             author = translatedAuthor,
             originName = displayValues[2].orEmpty(),
             kind = displayValues[3],

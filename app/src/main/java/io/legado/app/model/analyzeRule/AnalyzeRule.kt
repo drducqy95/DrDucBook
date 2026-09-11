@@ -428,7 +428,7 @@ class AnalyzeRule(
                 .getOrNull()
                 ?.let {
                     if (!loggedNonStandardJSON) {
-                        Debug.log("≡@put 规则 JSON 格式不规范，请改为规范格式")
+                        Debug.log("≡Định dạng JSON của quy tắc @put không chuẩn, vui lòng đổi thành định dạng chuẩn")
                         loggedNonStandardJSON = true
                     }
                     putMap.putAll(it)

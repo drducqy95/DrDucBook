@@ -53,6 +53,7 @@ object AiPromptCatalog {
                 - Không dùng cậu–tớ, mình–bạn hoặc anh/anh ấy/cô/cô ấy trong lời kể cảnh cổ đại, trừ khi nguyên tác thể hiện lời nói hiện đại có chủ ý.
                 - Ngôi ba nam trung tính dùng tên hoặc hắn; không đổi qua lại hắn/y/chàng/anh. Chưa rõ giới tính hoặc tuổi thì dùng tên/cách gọi trung tính.
                 </xung_ho>
+                <ngu_khi>Chỉ dùng thán từ cổ phong: Thật không ngờ, Trời đất, Đại đảm, Ngươi dám, Hừ, Đáng chết. CẤM các từ lóng hiện đại như Vãi, Đéo, WTF.</ngu_khi>
                 <thuat_ngu>Giữ Name và glossary; phân biệt công pháp, cảnh giới, pháp bảo, tông môn. Tên đứng trước chức vị khi phù hợp: Lý trưởng lão.</thuat_ngu>
                 <tinh_lien_tuc>Mọi Name, VietPhrase và Luật Nhân đã có là khóa liên chương; chỉ người dùng được sửa trong từ điển.</tinh_lien_tuc>
                 <dinh_dang>Mỗi lượt thoại xuống dòng trong ngoặc kép; chỉ xuất bản dịch.</dinh_dang>
@@ -70,6 +71,7 @@ object AiPromptCatalog {
                 - Không tự đưa trẫm, bổn tọa, tại hạ, huynh–đệ, vi sư–đồ nhi vào bối cảnh hiện đại.
                 - Ngôi ba dùng tên/anh/cô/ông/bà/họ; “hắn” chỉ khi giọng kể xa cách hoặc đối địch. Không tự đổi giới tính.
                 </xung_ho>
+                <ngu_khi>Thán từ phù hợp tính cách: Thật quá đáng, Không thể chấp nhận; chỉ dùng từ biểu cảm mạnh (Vãi thật, Đéo tin nổi, Mẹ kiếp) khi nhân vật có tính thô lỗ hoặc trong xung đột gay gắt.</ngu_khi>
                 <thuat_ngu>Giữ đúng chức danh, pháp lý, y khoa, công nghệ; glossary và tên riêng được ưu tiên hơn suy đoán.</thuat_ngu>
                 <tinh_lien_tuc>Mọi Name, VietPhrase và Luật Nhân đã có là khóa liên chương; chỉ người dùng được sửa trong từ điển.</tinh_lien_tuc>
                 <dinh_dang>Mỗi lượt thoại xuống dòng trong ngoặc kép; không thêm lời dẫn hay chú thích.</dinh_dang>
@@ -87,7 +89,8 @@ object AiPromptCatalog {
                 - Không dùng tại hạ, bổn tọa, sư huynh/sư muội, tông chủ cho nhân vật bản địa phương Tây nếu không có giao thoa.
                 - Ngôi ba nam trung tính dùng tên hoặc hắn; chưa rõ giới tính thì không tự gán hắn/nàng. Tước hiệu chính thức thường đứng trước tên.
                 </xung_ho>
-                <ten_rieng>Khôi phục tên Hán hóa về Latin chỉ khi có glossary hoặc bằng chứng chắc; nếu không chắc, giữ phương án nhất quán và trung tính.</ten_rieng>
+                <ten_rieng>BẮT BUỘC khôi phục tên phiên âm Hán-Việt về dạng Latin gốc (ví dụ: 迪奈尔 -> Deneir, 密斯特拉 -> Mystra, 阿尔萨斯 -> Arthas), tuyệt đối không dịch máy thành âm Hán-Việt thô kệch.</ten_rieng>
+                <ngu_khi>Kinh ngạc: Lạy Chư Thần, Thề với các vị thần, Không thể nào. Tức giận: Quỷ tha ma bắt, Đồ khốn, Chết tiệt. CẤM dùng teen-code VN hiện đại.</ngu_khi>
                 <tinh_lien_tuc>Mọi Name, VietPhrase và Luật Nhân đã có là khóa liên chương; chỉ người dùng được sửa trong từ điển.</tinh_lien_tuc>
                 <dinh_dang>Thoại xuống dòng, ngoặc kép; chỉ xuất bản dịch.</dinh_dang>
             """.trimIndent(),
@@ -104,9 +107,23 @@ object AiPromptCatalog {
                 - Không cổ phong hóa hệ thống, cơ giáp, quân hàm hoặc giao diện. Không biến lời kể thành thông báo hệ thống.
                 - Ngôi ba giữ tên, chức vụ và giới tính đã biết; dữ kiện chưa đủ thì dùng tên/cách gọi trung tính.
                 </xung_ho>
+                <ngu_khi>Đối thoại game/chiến đấu: Cái quái gì, Chết tiệt, Không thể nào. Thông báo hệ thống: Giữ trung tính, khách quan.</ngu_khi>
                 <thuat_ngu>Giữ nhất quán kỹ năng, vật phẩm, chỉ số, đơn vị và tên giao diện theo glossary.</thuat_ngu>
                 <tinh_lien_tuc>Mọi Name, VietPhrase và Luật Nhân đã có là khóa liên chương; chỉ người dùng được sửa trong từ điển.</tinh_lien_tuc>
                 <dinh_dang>Thông báo hệ thống gọn; thoại xuống dòng trong ngoặc kép; chỉ xuất bản dịch.</dinh_dang>
+            """.trimIndent(),
+        ),
+        translationStyle(
+            id = "context_envi_general_v3",
+            name = "Tiểu thuyết tiếng Anh (en → vi)",
+            description = "Dịch tác phẩm tiếng Anh sang tiếng Việt, giữ tên Latin gốc, dịch thoát thành ngữ, tỉnh lược chủ ngữ tự nhiên.",
+            style = """
+                <vai_tro>Dịch giả văn học chuyên nghiệp cho tác phẩm tiếng Anh sang tiếng Việt.</vai_tro>
+                <muc_tieu>Bản dịch tiếng Việt mượt mà, tự nhiên, thoát khỏi cấu trúc ngữ pháp tiếng Anh khô cứng.</muc_tieu>
+                <ten_rieng>GIỮ NGUYÊN 100% tên riêng Latin gốc (Arthur, John, Alice, Deneir...); không phiên âm hay Hán-Việt hóa.</ten_rieng>
+                <thanh_ngu>Dịch thành ngữ tiếng Anh tương đương sang tiếng Việt tự nhiên (ví dụ: break a leg -> chúc may mắn), không dịch từng từ máy móc.</thanh_ngu>
+                <chu_ngu>Áp dụng quy tắc tỉnh lược chủ ngữ khi ngữ cảnh hành động đã rõ ràng; không lặp lại đại từ liên tục ở mỗi câu ngắn.</chu_ngu>
+                <dinh_dang>Thoại xuống dòng, ngoặc kép; chỉ xuất bản dịch.</dinh_dang>
             """.trimIndent(),
         ),
         translationStyle(
@@ -208,6 +225,8 @@ object AiPromptCatalog {
                 Viết lại văn bản theo yêu cầu của người dùng trong khi giữ nguyên sự kiện,
                 quan hệ nhân quả, tên riêng, số liệu và các thuật ngữ đã khóa. BẮT BUỘC giữ nguyên
                 chính xác số lượng đoạn văn, dấu xuống dòng và khoảng trắng chuẩn sau dấu câu.
+                Viết hoa chữ cái đầu tiên của mỗi câu mới và mỗi đoạn văn mới.
+                Thụt đầu dòng (2 dấu cách) cho mỗi đoạn văn bản tự sự (KHÔNG thụt dòng thoại bắt đầu bằng —, -, hoặc ngoặc kép).
                 Không tự thêm tình tiết. Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
@@ -228,6 +247,8 @@ object AiPromptCatalog {
                 6. Giữ nguyên 100% sự kiện, quan hệ nhân quả, tên riêng, số liệu và thuật ngữ đã khóa.
                 7. Không tự thêm tình tiết mới, không lược bỏ thông tin quan trọng.
                 8. BẮT BUỘC giữ nguyên cấu trúc dòng, bố cục phân đoạn và các câu thoại của bản gốc (mỗi đoạn cách nhau bằng dấu xuống dòng rõ ràng). Tuyệt đối KHÔNG gộp các đoạn thành một khối văn bản duy nhất. Đảm bảo có khoảng trắng đúng chuẩn sau các dấu câu (chấm, phẩy, hỏi, than, ngoặc kép).
+                9. Viết hoa chữ cái đầu tiên của mỗi câu mới và mỗi đoạn văn mới.
+                10. Thụt đầu dòng (2 dấu cách) cho mỗi đoạn văn bản tự sự (KHÔNG thụt dòng thoại bắt đầu bằng —, -, hoặc ngoặc kép).
                 Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
@@ -246,6 +267,8 @@ object AiPromptCatalog {
                 4. Giữ nguyên nội dung và ý định của lời nói, chỉ làm mượt mà cách phát ngôn.
                 5. Câu thoại gãy gọn, tự nhiên; giữ đúng tên nhân vật và thuật ngữ đã khóa.
                 6. BẮT BUỘC giữ nguyên các dấu xuống dòng và bố cục thoại của từng đoạn. Đảm bảo có khoảng trắng đúng chuẩn sau các dấu câu.
+                7. Viết hoa chữ cái đầu tiên của mỗi câu mới và mỗi đoạn văn mới.
+                8. Giữ nguyên định dạng lề của câu thoại; thụt đầu dòng (2 dấu cách) cho các đoạn văn dẫn truyện tự sự.
                 Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
@@ -264,6 +287,8 @@ object AiPromptCatalog {
                 4. Giữ chính xác tên chiêu thức, pháp bảo, cấp độ và thuật ngữ đã khóa.
                 5. Tuyệt đối không thay đổi kết quả giao tranh hoặc sức mạnh thực tế của nhân vật.
                 6. BẮT BUỘC giữ nguyên cấu trúc phân đoạn và các dòng hành động. Đảm bảo có khoảng trắng chuẩn sau các dấu câu.
+                7. Viết hoa chữ cái đầu tiên của mỗi câu mới và mỗi đoạn văn mới.
+                8. Thụt đầu dòng (2 dấu cách) cho các đoạn văn tự sự; KHÔNG thụt lề cho câu thoại.
                 Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
@@ -282,6 +307,8 @@ object AiPromptCatalog {
                 4. Lời kể sâu lắng, có chất thơ và nhịp điệu văn học.
                 5. Giữ nguyên 100% cốt truyện, tên riêng, công pháp, cảnh giới và số liệu.
                 6. BẮT BUỘC giữ nguyên cấu trúc phân đoạn và bố cục dòng. Đảm bảo có khoảng trắng chuẩn sau các dấu câu.
+                7. Viết hoa chữ cái đầu tiên của mỗi câu mới và mỗi đoạn văn mới.
+                8. Thụt đầu dòng (2 dấu cách) cho các đoạn văn tự sự; KHÔNG thụt lề cho câu thoại.
                 Chỉ trả về văn bản hoàn chỉnh sau khi viết lại.
             """.trimIndent(),
         ),
@@ -329,4 +356,9 @@ object AiPromptCatalog {
             append(style)
         },
     )
+
+    fun findById(id: String): AiPromptCatalogTemplate? = templates.firstOrNull { it.id == id }
+
+    fun getRewritePresets(): List<AiPromptCatalogTemplate> =
+        templates.filter { it.taskType == AiTaskType.REWRITE_TEXT }
 }

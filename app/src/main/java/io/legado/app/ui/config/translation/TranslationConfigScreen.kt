@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -47,14 +48,21 @@ import io.legado.app.domain.model.quickDictionaryUniverseKey
 import io.legado.app.domain.model.TranslationConstants
 import io.legado.app.domain.usecase.TranslateChapterUseCase
 import io.legado.app.help.book.isNotShelf
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import io.legado.app.domain.model.AiPromptCatalog
 import io.legado.app.model.translation.HachimiOnnxImportPhase
 import io.legado.app.model.translation.HachimiOnnxImportProgress
 import io.legado.app.model.translation.HachimiOnnxModelImporter
 import io.legado.app.model.translation.HachimiOnnxModelRegistry
 import io.legado.app.ui.theme.adaptiveContentPadding
+import io.legado.app.ui.config.ai.AiComboModelPickerItemUi
+import io.legado.app.ui.config.ai.AiComboModelPickerSheet
 import io.legado.app.ui.config.ai.prompt.AI_PROMPT_SELECTION_MODEL_PREFIX
 import io.legado.app.ui.config.ai.prompt.AI_PROMPT_SELECTION_ROUTE_PREFIX
 import io.legado.app.ui.widget.components.AppScaffold
+import kotlinx.collections.immutable.toImmutableList
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
@@ -181,6 +189,11 @@ fun TranslationConfigScreen(
     var nmtImportJob by remember { mutableStateOf<Job?>(null) }
     var showQuickDictionaryImport by remember { mutableStateOf(false) }
     var showNmtPromptEditor by remember { mutableStateOf(false) }
+    var rewritePresetId by remember { mutableStateOf(TranslationConfig.rewritePresetId) }
+    var rewriteCustomPrompt by remember { mutableStateOf(TranslationConfig.rewriteCustomPrompt) }
+    var autoRewriteEnabled by remember { mutableStateOf(TranslationConfig.autoRewriteEnabled) }
+    var autoRewriteNextChapters by remember { mutableStateOf(TranslationConfig.autoRewriteNextChapters) }
+    val rewritePresets = remember { AiPromptCatalog.getRewritePresets() }
     LaunchedEffect(Unit) {
         if (TranslationConfig.llmProvider.shouldWarmQuickTranslation()) {
             withContext(Dispatchers.IO) {
@@ -514,12 +527,7 @@ fun TranslationConfigScreen(
                             description = stringResource(R.string.translation_app_ai_provider_summary),
                             onClick = onNavigateToAi
                         )
-                        val routeValues = translationAiRoutes.map {
-                            AI_PROMPT_SELECTION_ROUTE_PREFIX + it.id
-                        }
-                        val modelValues = translationAiModels.map {
-                            AI_PROMPT_SELECTION_MODEL_PREFIX + it.id
-                        }
+
                         val selectedRoute = translationAiRoutes
                             .firstOrNull { it.id == selectedPresetRouteId }
                         val selectedModel = translationAiModels
@@ -529,114 +537,159 @@ fun TranslationConfigScreen(
                                 AI_PROMPT_SELECTION_ROUTE_PREFIX + selectedRoute.id
                             selectedModel != null ->
                                 AI_PROMPT_SELECTION_MODEL_PREFIX + selectedModel.id
-                            else -> (routeValues + modelValues).firstOrNull().orEmpty()
+                            else -> ""
                         }
-                        if (routeValues.isNotEmpty() || modelValues.isNotEmpty()) {
-                            DropdownListSettingItem(
-                                title = stringResource(R.string.ai_prompt_editor_model_or_combo),
-                                selectedValue = selectedTargetValue,
-                                displayEntries = (translationAiRoutes.map { route ->
-                                    val targetCount =
-                                        translationAiTargetsByRoute[route.id].orEmpty().size
-                                    "Combo · ${route.name} ($targetCount)"
-                                } + translationAiModels.map { model ->
-                                    val providerName = enabledAiProviderNames[model.providerId]
-                                        .orEmpty()
-                                    resources.getString(
-                                        R.string.ai_prompt_editor_model_entry,
-                                        "$providerName · ${model.displayName} (${model.modelId})",
+
+                        var showComboModelPicker by remember { mutableStateOf(false) }
+
+                        val comboModelDescription = selectedRoute?.let { route ->
+                            stringResource(
+                                R.string.translation_ai_fallback_combo_summary,
+                                translationAiTargetsByRoute[route.id].orEmpty().size,
+                                route.maxAttempts,
+                            )
+                        } ?: selectedModel?.let { model ->
+                            "${enabledAiProviderNames[model.providerId].orEmpty()} · ${model.displayName}"
+                        } ?: stringResource(R.string.ai_prompt_editor_model_required)
+
+                        val selectedLabel = selectedRoute?.let { route ->
+                            val targetCount = translationAiTargetsByRoute[route.id].orEmpty().size
+                            "Combo · ${route.name} ($targetCount)"
+                        } ?: selectedModel?.let { model ->
+                            val providerName = enabledAiProviderNames[model.providerId].orEmpty()
+                            resources.getString(
+                                R.string.ai_prompt_editor_model_entry,
+                                "$providerName · ${model.displayName} (${model.modelId})",
+                            )
+                        }
+
+                        ClickableSettingItem(
+                            title = stringResource(R.string.ai_prompt_editor_model_or_combo),
+                            description = comboModelDescription,
+                            option = selectedLabel,
+                            onClick = {
+                                if (translationAiRoutes.isNotEmpty() || translationAiModels.isNotEmpty()) {
+                                    showComboModelPicker = true
+                                } else {
+                                    onNavigateToAi()
+                                }
+                            },
+                        )
+
+                        fun applySelection(selection: String) {
+                            coroutineScope.launch {
+                                runCatching {
+                                    val preset = aiProfileGateway.getTaskPreset(
+                                        AiTaskType.TRANSLATE_CHAPTER
+                                    ) ?: error(
+                                        resources.getString(
+                                            R.string.ai_prompt_editor_model_required
+                                        )
                                     )
-                                }).toTypedArray(),
-                                entryValues = (routeValues + modelValues).toTypedArray(),
-                                description = selectedRoute?.let { route ->
-                                    stringResource(
-                                        R.string.translation_ai_fallback_combo_summary,
-                                        translationAiTargetsByRoute[route.id].orEmpty().size,
-                                        route.maxAttempts,
-                                    )
-                                } ?: selectedModel?.let { model ->
-                                    "${enabledAiProviderNames[model.providerId].orEmpty()} · ${model.displayName}"
-                                } ?: stringResource(R.string.ai_prompt_editor_model_required),
-                                onValueChange = { selection ->
-                                    coroutineScope.launch {
-                                        runCatching {
-                                            val preset = aiProfileGateway.getTaskPreset(
-                                                AiTaskType.TRANSLATE_CHAPTER
-                                            ) ?: error(
-                                                resources.getString(
-                                                    R.string.ai_prompt_editor_model_required
-                                                )
-                                            )
-                                            val routeId = selection
-                                                .takeIf {
-                                                    it.startsWith(
-                                                        AI_PROMPT_SELECTION_ROUTE_PREFIX
-                                                    )
-                                                }
-                                                ?.removePrefix(AI_PROMPT_SELECTION_ROUTE_PREFIX)
-                                                .orEmpty()
-                                            val selectedModelProfileId = if (routeId.isNotBlank()) {
-                                                translationAiTargetsByRoute[routeId]
-                                                    .orEmpty()
-                                                    .sortedWith(
-                                                        compareBy<io.legado.app.domain.model.AiRouteTargetConfig> {
-                                                            it.priority
-                                                        }.thenBy { it.sortNumber }
-                                                            .thenBy { it.id }
-                                                    )
-                                                    .firstOrNull()
-                                                    ?.modelProfileId
-                                                    ?: error(
-                                                        resources.getString(
-                                                            R.string.translation_ai_fallback_combo_empty
-                                                        )
-                                                    )
-                                            } else {
-                                                selection.removePrefix(
-                                                    AI_PROMPT_SELECTION_MODEL_PREFIX
-                                                ).takeIf { modelId ->
-                                                    translationAiModels.any { it.id == modelId }
-                                                } ?: error(
-                                                    resources.getString(
-                                                        R.string.ai_prompt_editor_model_required
-                                                    )
-                                                )
-                                            }
-                                            aiProfileGateway.saveTaskPreset(
-                                                AiTaskPresetDraft(
-                                                    presetId = preset.id,
-                                                    taskType = preset.taskType,
-                                                    name = preset.name,
-                                                    description = preset.description,
-                                                    modelProfileId = selectedModelProfileId,
-                                                    promptTemplate = preset.promptTemplate,
-                                                    params = preset.params,
-                                                    runtimeOptions = preset.runtimeOptions.copy(
-                                                        routeProfileId = routeId
-                                                    ),
-                                                    enabled = true,
-                                                    makeDefault = true,
-                                                    sortNumber = selectedTranslationPreset
-                                                        ?.sortNumber
-                                                        ?: 0,
-                                                )
-                                            )
-                                        }.onFailure { error ->
-                                            context.toastOnUi(
-                                                error.localizedMessage
-                                                    ?: resources.getString(R.string.error)
+                                    val routeId = selection
+                                        .takeIf {
+                                            it.startsWith(
+                                                AI_PROMPT_SELECTION_ROUTE_PREFIX
                                             )
                                         }
+                                        ?.removePrefix(AI_PROMPT_SELECTION_ROUTE_PREFIX)
+                                        .orEmpty()
+                                    val selectedModelProfileId = if (routeId.isNotBlank()) {
+                                        translationAiTargetsByRoute[routeId]
+                                            .orEmpty()
+                                            .sortedWith(
+                                                compareBy<io.legado.app.domain.model.AiRouteTargetConfig> {
+                                                    it.priority
+                                                }.thenBy { it.sortNumber }
+                                                    .thenBy { it.id }
+                                            )
+                                            .firstOrNull()
+                                            ?.modelProfileId
+                                            ?: error(
+                                                resources.getString(
+                                                    R.string.translation_ai_fallback_combo_empty
+                                                )
+                                            )
+                                    } else {
+                                        selection.removePrefix(
+                                            AI_PROMPT_SELECTION_MODEL_PREFIX
+                                        ).takeIf { modelId ->
+                                            translationAiModels.any { it.id == modelId }
+                                        } ?: error(
+                                            resources.getString(
+                                                R.string.ai_prompt_editor_model_required
+                                            )
+                                        )
                                     }
-                                },
-                            )
-                        } else {
-                            ClickableSettingItem(
-                                title = stringResource(R.string.ai_prompt_editor_model_or_combo),
-                                description = stringResource(R.string.ai_prompt_editor_model_required),
-                                onClick = onNavigateToAi,
-                            )
+                                    aiProfileGateway.saveTaskPreset(
+                                        AiTaskPresetDraft(
+                                            presetId = preset.id,
+                                            taskType = preset.taskType,
+                                            name = preset.name,
+                                            description = preset.description,
+                                            modelProfileId = selectedModelProfileId,
+                                            promptTemplate = preset.promptTemplate,
+                                            params = preset.params,
+                                            runtimeOptions = preset.runtimeOptions.copy(
+                                                routeProfileId = routeId
+                                            ),
+                                            enabled = true,
+                                            makeDefault = true,
+                                            sortNumber = selectedTranslationPreset
+                                                ?.sortNumber
+                                                ?: 0,
+                                        )
+                                    )
+                                }.onFailure { error ->
+                                    context.toastOnUi(
+                                        error.localizedMessage
+                                            ?: resources.getString(R.string.error)
+                                    )
+                                }
+                            }
                         }
+
+                        val pickerCombos = remember(translationAiRoutes, translationAiTargetsByRoute) {
+                            translationAiRoutes.map { route ->
+                                val targets = translationAiTargetsByRoute[route.id].orEmpty()
+                                AiComboModelPickerItemUi.ComboItem(
+                                    id = route.id,
+                                    displayName = route.name,
+                                    targetCount = targets.size,
+                                    maxAttempts = route.maxAttempts,
+                                    taskType = route.taskType,
+                                )
+                            }.toImmutableList()
+                        }
+                        val pickerModels = remember(translationAiModels, enabledAiProviderNames) {
+                            translationAiModels.map { model ->
+                                val providerName = enabledAiProviderNames[model.providerId].orEmpty()
+                                AiComboModelPickerItemUi.ModelItem(
+                                    id = model.id,
+                                    displayName = "${model.displayName} (${model.modelId})",
+                                    providerName = providerName,
+                                    modelName = model.displayName,
+                                    modelId = model.modelId,
+                                    contextWindow = model.contextWindow,
+                                    maxOutputTokens = model.maxOutputTokens,
+                                )
+                            }.toImmutableList()
+                        }
+
+                        AiComboModelPickerSheet(
+                            show = showComboModelPicker,
+                            title = stringResource(R.string.ai_prompt_editor_model_or_combo),
+                            selectedId = selectedTargetValue,
+                            combos = pickerCombos,
+                            models = pickerModels,
+                            onDismissRequest = { showComboModelPicker = false },
+                            onSelectCombo = { combo ->
+                                applySelection(AI_PROMPT_SELECTION_ROUTE_PREFIX + combo.id)
+                            },
+                            onSelectModel = { model ->
+                                applySelection(AI_PROMPT_SELECTION_MODEL_PREFIX + model.id)
+                            },
+                        )
                         ClickableSettingItem(
                             title = stringResource(R.string.ai_prompt_editor_title),
                             description = stringResource(R.string.ai_prompt_editor_summary),
@@ -825,6 +878,103 @@ fun TranslationConfigScreen(
                                 }
                             },
                         )
+                    }
+                }
+            }
+
+            if (TranslationConfig.llmProvider == TranslationConfig.PROVIDER_APP_AI) {
+                // Already handled above
+            }
+
+            if (TranslationConfig.llmProvider == TranslationConstants.PROVIDER_REWRITE) {
+                item {
+                    SplicedColumnGroup(
+                        title = stringResource(R.string.translation_rewrite_preset_section)
+                    ) {
+                        rewritePresets.forEach { preset ->
+                            val isSelected = rewritePresetId == preset.id
+                            ClickableSettingItem(
+                                title = preset.name,
+                                description = preset.description,
+                                trailingContent = if (isSelected) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                        )
+                                    }
+                                } else null,
+                                onClick = {
+                                    rewritePresetId = preset.id
+                                    TranslationConfig.rewritePresetId = preset.id
+                                },
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    SplicedColumnGroup(
+                        title = stringResource(R.string.translation_rewrite_custom_prompt_title)
+                    ) {
+                        val activeTemplate = remember(rewritePresetId) {
+                            AiPromptCatalog.findById(rewritePresetId)
+                        }
+                        AppTextField(
+                            value = rewriteCustomPrompt,
+                            onValueChange = {
+                                rewriteCustomPrompt = it
+                                TranslationConfig.rewriteCustomPrompt = it
+                            },
+                            label = stringResource(R.string.translation_rewrite_custom_prompt_title),
+                            placeholder = {
+                                AppText(activeTemplate?.prompt ?: stringResource(R.string.translation_rewrite_custom_prompt_hint))
+                            },
+                            minLines = 3,
+                            maxLines = 8,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                        if (rewriteCustomPrompt.isNotBlank()) {
+                            ClickableSettingItem(
+                                title = stringResource(R.string.translation_rewrite_reset_prompt),
+                                onClick = {
+                                    rewriteCustomPrompt = ""
+                                    TranslationConfig.rewriteCustomPrompt = ""
+                                },
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    SplicedColumnGroup(
+                        title = stringResource(R.string.translation_rewrite_auto_title)
+                    ) {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.translation_rewrite_auto_title),
+                            description = stringResource(R.string.translation_rewrite_auto_summary),
+                            checked = autoRewriteEnabled,
+                            onCheckedChange = {
+                                autoRewriteEnabled = it
+                                TranslationConfig.autoRewriteEnabled = it
+                            },
+                        )
+                        if (autoRewriteEnabled) {
+                            SliderSettingItem(
+                                title = stringResource(R.string.translation_rewrite_auto_chapters, autoRewriteNextChapters),
+                                value = autoRewriteNextChapters.toFloat(),
+                                defaultValue = 3f,
+                                valueRange = 1f..20f,
+                                steps = 18,
+                                description = autoRewriteNextChapters.toString(),
+                                onValueChange = {
+                                    autoRewriteNextChapters = it.toInt()
+                                    TranslationConfig.autoRewriteNextChapters = it.toInt()
+                                },
+                            )
+                        }
                     }
                 }
             }

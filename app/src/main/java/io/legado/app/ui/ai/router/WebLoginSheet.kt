@@ -70,7 +70,8 @@ internal fun WebLoginSheet(
     show: Boolean,
     loginUrl: String,
     protocol: String,
-    onLoginSuccess: (cookieString: String) -> Unit,
+    isAddingAccount: Boolean = false,
+    onLoginSuccess: (cookieString: String, isAddingAccount: Boolean) -> Unit,
     onDismissRequest: () -> Unit,
 ) {
     if (!show) return
@@ -83,6 +84,7 @@ internal fun WebLoginSheet(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
+    var addingAsNewAccount by remember(isAddingAccount) { mutableStateOf(isAddingAccount) }
     var selectedTab by remember { mutableIntStateOf(if (isGemini) 1 else 0) }
     var manualCookieText by remember { mutableStateOf("") }
     var capturedCookie by remember { mutableStateOf<String?>(null) }
@@ -231,16 +233,45 @@ internal fun WebLoginSheet(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Button(
-                            onClick = {
-                                onLoginSuccess("")
-                                onDismissRequest()
-                            },
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text("⚡ Kích hoạt ngay (Không cần Cookie / Đăng nhập)")
+                            Button(
+                                onClick = {
+                                    onLoginSuccess("", false)
+                                    onDismissRequest()
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("⚡ Kích hoạt ngay")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    addingAsNewAccount = true
+                                    selectedTab = 1
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text("+ Thêm tài khoản")
+                            }
                         }
                     }
+                }
+            }
+
+            if (addingAsNewAccount) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(
+                        text = "➕ Chế độ: Thêm tài khoản mới vào pool ($providerName)",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    )
                 }
             }
 
@@ -367,11 +398,11 @@ internal fun WebLoginSheet(
                                             } else {
                                                 fullCookies
                                             }
-                                            onLoginSuccess(finalPayload)
+                                            onLoginSuccess(finalPayload, addingAsNewAccount)
                                         } else {
                                             val finalCredential = capturedToken?.takeIf { it.isNotBlank() }
                                             if (!finalCredential.isNullOrBlank()) {
-                                                onLoginSuccess(finalCredential)
+                                                onLoginSuccess(finalCredential, addingAsNewAccount)
                                             }
                                         }
                                     },
@@ -775,7 +806,7 @@ internal fun WebLoginSheet(
                         if (text.isNotBlank()) {
                             val directJwt = if (!isGemini) ChatGptWebSessionManager.extractJwt(text) else null
                             if (directJwt != null) {
-                                onLoginSuccess(directJwt)
+                                onLoginSuccess(directJwt, addingAsNewAccount)
                             } else if (!isGemini && (text.contains("__Secure-next-auth.session-token") || text.contains("=") || text.startsWith("["))) {
                                 // Inject cookies into CookieManager and switch to Tab 0 so visible WebView can obtain the token
                                 val cm = CookieManager.getInstance()
@@ -801,20 +832,20 @@ internal fun WebLoginSheet(
                                 selectedTab = 0
                                 webViewInstance?.loadUrl("https://chatgpt.com/api/auth/session")
                             } else {
-                                onLoginSuccess(text)
+                                onLoginSuccess(text, addingAsNewAccount)
                             }
                         }
                     },
                     enabled = manualCookieText.isNotBlank() && !isTruncated,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Áp dụng & Lưu")
+                    Text(if (addingAsNewAccount) "💾 Lưu tài khoản mới vào pool" else "Áp dụng & Lưu")
                 }
 
                 if (isGemini) {
                     OutlinedButton(
                         onClick = {
-                            onLoginSuccess("")
+                            onLoginSuccess("", false)
                             onDismissRequest()
                         },
                         modifier = Modifier.fillMaxWidth(),

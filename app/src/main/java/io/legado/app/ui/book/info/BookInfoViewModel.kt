@@ -1586,8 +1586,17 @@ class BookInfoViewModel(
                 ).getOrElse { translated(bookSnapshot.latestChapterTitle) }
             } ?: translated(bookSnapshot.latestChapterTitle)
 
+            val translatedName = bookSnapshot.name.takeIf(String::isNotBlank)?.let { name ->
+                translateDynamicUiTextUseCase.executeBookName(
+                    scopeKey = scopeKey,
+                    originalText = name,
+                    book = bookSnapshot,
+                    contextText = contextText,
+                ).getOrElse { translated(bookSnapshot.name).orEmpty() }
+            } ?: translated(bookSnapshot.name).orEmpty()
+
             val translatedUi = rawUi.copy(
-                name = translated(bookSnapshot.name).orEmpty(),
+                name = translatedName,
                 author = translatedAuthor,
                 realAuthor = translatedRealAuthor,
                 originName = translated(bookSnapshot.originName).orEmpty(),

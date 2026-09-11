@@ -60,7 +60,7 @@ object WebBook {
         }
         val searchUrl = bookSource.searchUrl
         if (searchUrl.isNullOrBlank()) {
-            throw NoStackTraceException("搜索url不能为空")
+            throw NoStackTraceException("URL tìm kiếm không được để trống")
         }
         val ruleData = RuleData()
         val analyzeUrl = AnalyzeUrl(
@@ -326,7 +326,7 @@ object WebBook {
             }
         }.onFailure {
             coroutineContext.ensureActive()
-            AppLog.put("执行preUpdateJs规则失败 书源:${bookSource.bookSourceName}", it)
+            AppLog.put("Thực thi quy tắc preUpdateJs thất bại, nguồn sách: ${bookSource.bookSourceName}", it)
         }
     }
 
@@ -422,11 +422,11 @@ object WebBook {
             return VbookPluginAdapter.content(bookSource, book, bookChapter, needSave)
         }
         if (bookSource.getContentRule().content.isNullOrEmpty()) {
-            Debug.log(bookSource.bookSourceUrl, "⇒正文规则为空,使用章节链接:${bookChapter.url}")
+            Debug.log(bookSource.bookSourceUrl, "⇒Quy tắc nội dung trống, dùng liên kết chương:${bookChapter.url}")
             return bookChapter.url
         }
         if (bookChapter.isVolume && bookChapter.url.startsWith(bookChapter.title)) {
-            Debug.log(bookSource.bookSourceUrl, "⇒一级目录正文不解析规则")
+            Debug.log(bookSource.bookSourceUrl, "⇒Mục lục cấp một không phân tích quy tắc nội dung")
             return bookChapter.tag ?: ""
         }
         return if (bookChapter.url == book.bookUrl && !book.tocHtml.isNullOrEmpty()) {
@@ -494,7 +494,7 @@ object WebBook {
                     return@async Pair(book, source)
                 }
             }
-            throw NoStackTraceException("没有搜索到<$name>$author")
+            throw NoStackTraceException("Không tìm thấy <$name>$author")
         }
     }
 
@@ -513,7 +513,7 @@ object WebBook {
                 coroutineContext.ensureActive()
                 return@runCatching searchBook.toBook()
             }
-            throw NoStackTraceException("未搜索到 $name($author) 书籍")
+            throw NoStackTraceException("Không tìm thấy sách $name ($author)")
         }.onFailure {
             coroutineContext.ensureActive()
         }
@@ -525,8 +525,8 @@ object WebBook {
     private fun checkRedirect(bookSource: BookSource, response: StrResponse) {
         response.raw.priorResponse?.let {
             if (it.isRedirect) {
-                Debug.log(bookSource.bookSourceUrl, "≡检测到重定向(${it.code})")
-                Debug.log(bookSource.bookSourceUrl, "┌重定向后地址")
+                Debug.log(bookSource.bookSourceUrl, "≡Phát hiện chuyển hướng (${it.code})")
+                Debug.log(bookSource.bookSourceUrl, "┌Địa chỉ sau chuyển hướng")
                 Debug.log(bookSource.bookSourceUrl, "└${response.url}")
             }
         }

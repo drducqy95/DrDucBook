@@ -122,12 +122,37 @@ class BookStoryMemoryViewModel(
                 )
             }
             snapshot.timelines.forEach { timeline ->
+                val details = buildList {
+                    if (timeline.summary.isNotBlank()) add(timeline.summary)
+                    val charactersDesc = timeline.characters.takeIf { it.isNotEmpty() }?.joinToString(", ") { character ->
+                        val name = character.target.ifBlank { character.raw }
+                        val statusTag = if (character.status == "new") "mới" else null
+                        val roleTag = character.role.takeIf(String::isNotBlank)
+                        val extra = listOfNotNull(statusTag, roleTag).joinToString("/")
+                        if (extra.isNotBlank()) "$name ($extra)" else name
+                    }
+                    if (!charactersDesc.isNullOrBlank()) {
+                        add("Nhân vật: $charactersDesc")
+                    }
+                    val discoveriesDesc = timeline.discoveries.takeIf { it.isNotEmpty() }?.joinToString(", ") { disc ->
+                        val name = disc.target.ifBlank { disc.raw }
+                        val cat = disc.category.takeIf { it.isNotBlank() && it != "other" }
+                        if (cat != null) "$name ($cat)" else name
+                    }
+                    if (!discoveriesDesc.isNullOrBlank()) {
+                        add("Khám phá: $discoveriesDesc")
+                    }
+                    if (timeline.events.isNotEmpty()) {
+                        add("${timeline.events.size} sự kiện")
+                    }
+                }.joinToString(" · ")
+
                 add(
                     StoryMemoryItemUi(
                         id = TranslationStoryMemoryUseCase.timelineKey(timeline.chapterIndex),
                         kind = AiTranslationStoryMemoryKind.TIMELINE,
                         title = timeline.chapterTitle.ifBlank { "Chương ${timeline.chapterIndex + 1}" },
-                        subtitle = timeline.summary,
+                        subtitle = details.ifBlank { timeline.summary },
                         chapterIndex = timeline.chapterIndex.takeIf { it >= 0 },
                     )
                 )

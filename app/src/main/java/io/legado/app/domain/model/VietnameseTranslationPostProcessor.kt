@@ -78,4 +78,21 @@ object VietnameseTranslationPostProcessor {
             else -> null
         }
     }
+
+    /**
+     * Thụt đầu dòng 2 khoảng trắng cho đoạn văn tự sự.
+     * KHÔNG thụt dòng thoại bắt đầu bằng —, –, -, ", “, « hoặc dòng trống.
+     */
+    fun indentNarrativeParagraphs(text: String): String {
+        if (text.isBlank()) return text
+        val dialogueStarters = setOf('—', '–', '-', '"', '“', '«', '”', '\u2014', '\u2013', '\u201C', '\u201D')
+        return text.lines().joinToString("\n") { line ->
+            val trimmed = line.trimStart()
+            when {
+                trimmed.isBlank() -> ""
+                trimmed.firstOrNull() in dialogueStarters -> trimmed
+                else -> "  $trimmed"
+            }
+        }
+    }
 }

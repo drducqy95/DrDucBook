@@ -301,15 +301,22 @@ object AiTranslationStoryMemoryPipeline {
             relationship.source in currentNames || relationship.target in currentNames ||
                 source.contains(relationship.source, ignoreCase = true) ||
                 source.contains(relationship.target, ignoreCase = true)
-        }
+        }.take(30)
         val world = snapshot.worldBuilding.filter { entry ->
             source.contains(entry.raw, ignoreCase = true) ||
                 entry.target.takeIf(String::isNotBlank)?.let { source.contains(it, ignoreCase = true) } == true ||
                 entry.entityRefs.any { it in currentNames }
-        }
+        }.take(40)
         val timelines = snapshot.timelines
             .filter { it.chapterIndex in (chapterIndex - 2)..(chapterIndex - 1) }
             .sortedBy(AiTranslationStoryTimeline::chapterIndex)
+            .map { timeline ->
+                if (timeline.chapterIndex < chapterIndex - 1) {
+                    timeline.copy(characters = emptyList(), discoveries = emptyList())
+                } else {
+                    timeline
+                }
+            }
         val dictionary = snapshot.entities
             .asSequence()
             .filter { it.raw.isNotBlank() && it.target.isNotBlank() }

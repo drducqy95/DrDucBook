@@ -142,22 +142,22 @@ class TTSReadAloudService : BaseReadAloudService(), TextToSpeech.OnInitListener 
                 return@execute
             }
             utteranceTextMapping = mapping
-            AppLog.putDebug("TTS开始Speak: $text")
+            AppLog.putDebug("TTS bắt đầu đọc: $text")
             val result = tts.runCatching {
                 speak(text, TextToSpeech.QUEUE_FLUSH, null, AppConst.APP_TAG + nowSpeak)
             }.getOrElse {
-                AppLog.put("tts出错\n${it.localizedMessage}", it, true)
+                AppLog.put("Lỗi TTS\n${it.localizedMessage}", it, true)
                 TextToSpeech.ERROR
             }
             if (result == TextToSpeech.ERROR) {
-                AppLog.put("tts出错 尝试重新初始化")
+                AppLog.put("Lỗi TTS, đang thử khởi tạo lại")
                 clearTTS()
                 initTts()
                 return@execute
             }
-            LogUtils.d(TAG, "朗读内容添加完成")
+            LogUtils.d(TAG, "Đã thêm nội dung đọc xong")
         }.onError {
-            AppLog.putDebug("TTS协程异常: ${it.localizedMessage}")
+            AppLog.putDebug("Ngoại lệ coroutine TTS: ${it.localizedMessage}")
         }
     }
 

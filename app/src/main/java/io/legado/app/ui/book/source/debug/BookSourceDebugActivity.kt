@@ -83,7 +83,7 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
             override fun onQueryTextSubmit(query: String?): Boolean {
                 searchView.clearFocus()
                 openOrCloseHelp(false)
-                startSearch(query ?: "我的")
+                startSearch(query ?: binding.textMy.text.toString())
                 return true
             }
 
@@ -140,7 +140,7 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
                     binding.textFx.text = "${it.title}::${it.url}"
                     updateHelpContentDescriptions()
                     if (it.title.startsWith("ERROR:")) {
-                        adapter.addItem("获取发现出错\n${it.url}")
+                        adapter.addItem(getString(R.string.get_discovery_error, it.url))
                         openOrCloseHelp(false)
                         searchView.clearFocus()
                         return@launch
@@ -150,7 +150,7 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
                 @Suppress("USELESS_ELVIS")
                 exploreKinds?.map { it.title ?: "" }?.let { exploreKindTitles ->
                     binding.textFx.onLongClick {
-                        selector("选择发现", exploreKindTitles) { _, index ->
+                        selector(getString(R.string.select_discovery), exploreKindTitles) { _, index ->
                             val explore = exploreKinds[index]
                             binding.textFx.text = "${explore.title}::${explore.url}"
                             updateHelpContentDescriptions()
@@ -159,7 +159,7 @@ class BookSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, BookS
                     }
                 }
             } catch (e: NullPointerException) {
-                adapter.addItem("获取发现出错 JSON 数据错误\n$e")
+                adapter.addItem("${getString(R.string.get_discovery_error_json)}\n$e")
                 openOrCloseHelp(false)
                 searchView.clearFocus()
             }

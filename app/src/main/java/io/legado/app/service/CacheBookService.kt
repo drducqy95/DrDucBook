@@ -326,7 +326,7 @@ class CacheBookService : BaseService() {
                             model = cacheBook,
                         )
                         AppLog.put(
-                            "《$name》目录为空且加载详情页失败\n${it.localizedMessage}",
+                            "${getString(R.string.cache_book_empty_toc_and_info_failed, name)}\n${it.localizedMessage}",
                             it,
                             true
                         )
@@ -349,7 +349,7 @@ class CacheBookService : BaseService() {
                         model = cacheBook,
                     )
                     AppLog.put(
-                        "《$name》目录为空且加载目录失败\n${it.localizedMessage}",
+                        "${getString(R.string.cache_book_empty_toc_failed, name)}\n${it.localizedMessage}",
                         it,
                         true
                     )
@@ -541,7 +541,7 @@ class CacheBookService : BaseService() {
         val progress = CacheBook.completedCount
         val pendingBookCount = synchronized(admissionQueue) { admissionQueue.size }
         val summary = if (pendingBookCount > 0) {
-            "${CacheBook.downloadSummary} | 待入队:$pendingBookCount"
+            "${CacheBook.downloadSummary} | ${getString(R.string.cache_download_pending_admission, pendingBookCount)}"
         } else {
             CacheBook.downloadSummary
         }

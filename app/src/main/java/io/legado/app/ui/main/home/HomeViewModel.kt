@@ -401,18 +401,31 @@ class HomeViewModel(
     )
 
     private suspend fun HomeReadingBook.translatedForDisplay(): HomeReadingBook {
-        val sourceLines = listOf(name, author, chapterTitle.orEmpty())
         val book = bookUrl?.let { bookRepository.getBook(it) }
-        val translated = translateDynamicUiTextUseCase.executeLines(
+        val contextText = listOf(name, author, chapterTitle.orEmpty()).joinToString("\n")
+        val translatedName = translateDynamicUiTextUseCase.executeBookName(
             scopeKey = "home:${bookUrl.orEmpty()}",
-            originalLines = sourceLines,
+            originalText = name,
             book = book,
-            contextText = sourceLines.joinToString("\n"),
-        ).getOrElse { sourceLines }
+            contextText = contextText,
+        ).getOrElse { name }
+        val translatedAuthor = translateDynamicUiTextUseCase.executeAuthorName(
+            scopeKey = "home:${bookUrl.orEmpty()}",
+            originalText = author,
+            book = book,
+        ).getOrElse { author }
+        val translatedChapter = chapterTitle?.takeIf(String::isNotBlank)?.let { title ->
+            translateDynamicUiTextUseCase.executeChapterTitle(
+                scopeKey = "home:${bookUrl.orEmpty()}",
+                originalText = title,
+                book = book,
+                contextText = contextText,
+            ).getOrElse { title }
+        }
         return copy(
-            name = translated[0],
-            author = translated[1],
-            chapterTitle = translated[2].takeIf(String::isNotBlank),
+            name = translatedName,
+            author = translatedAuthor,
+            chapterTitle = translatedChapter ?: chapterTitle,
         )
     }
 }

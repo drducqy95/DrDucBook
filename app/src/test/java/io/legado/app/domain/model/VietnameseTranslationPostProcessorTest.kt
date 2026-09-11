@@ -42,4 +42,41 @@ class VietnameseTranslationPostProcessorTest {
             ),
         )
     }
+
+    @Test
+    fun indentsNarrativeParagraphsTwoSpacesAndPreservesDialogueLines() {
+        val input = """
+            Trời vừa rạng sáng, Diệp Trường Sinh bước ra khỏi động phủ.
+            — Ngươi muốn đi đâu?
+            Một giọng nói vang lên từ phía sau.
+            "Ta đi hái thuốc."
+            — Cẩn thận một chút, sơn cốc dạo này không yên ổn.
+            Gió núi thổi qua tà áo hắn, mang theo hơi lạnh buổi sớm.
+        """.trimIndent()
+
+        val expected = """
+              Trời vừa rạng sáng, Diệp Trường Sinh bước ra khỏi động phủ.
+            — Ngươi muốn đi đâu?
+              Một giọng nói vang lên từ phía sau.
+            "Ta đi hái thuốc."
+            — Cẩn thận một chút, sơn cốc dạo này không yên ổn.
+              Gió núi thổi qua tà áo hắn, mang theo hơi lạnh buổi sớm.
+        """.trimIndent()
+
+        assertEquals(
+            expected,
+            VietnameseTranslationPostProcessor.indentNarrativeParagraphs(input),
+        )
+    }
+
+    @Test
+    fun preservesBlankLinesAndNormalizesExistingNarrativeIndentation() {
+        val input = "    Đoạn một có thụt 4 space.\n\n— Lời thoại không thụt.\n\nĐoạn hai không có thụt."
+        val expected = "  Đoạn một có thụt 4 space.\n\n— Lời thoại không thụt.\n\n  Đoạn hai không có thụt."
+
+        assertEquals(
+            expected,
+            VietnameseTranslationPostProcessor.indentNarrativeParagraphs(input),
+        )
+    }
 }

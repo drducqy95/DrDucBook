@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.domain.model.AiCredentialKind
+import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.model.AiRouteStrategy
 import io.legado.app.domain.model.AiProviderAuthType
 import io.legado.app.ui.ai.bubble.ChatBubbleCoordinator
@@ -77,6 +78,12 @@ fun AiRouterRouteScreen(
     )
 }
 
+private data class WebLoginTargetState(
+    val loginUrl: String,
+    val protocol: String,
+    val isAddingAccount: Boolean = false,
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiRouterScreen(
@@ -113,7 +120,7 @@ fun AiRouterScreen(
         }
     }
 
-    var webLoginTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var webLoginTarget by remember { mutableStateOf<WebLoginTargetState?>(null) }
 
     LaunchedEffect(Unit) {
         effects.collectLatest { effect ->
@@ -121,7 +128,7 @@ fun AiRouterScreen(
                 is AiRouterEffect.ShowMessage -> snackbarHostState.showSnackbar(effect.message)
                 is AiRouterEffect.OpenUrl -> context.openUrl(effect.url)
                 is AiRouterEffect.LaunchWebLogin -> {
-                    webLoginTarget = effect.loginUrl to effect.protocol
+                    webLoginTarget = WebLoginTargetState(effect.loginUrl, effect.protocol, effect.isAddingAccount)
                 }
             }
         }
@@ -335,8 +342,8 @@ fun AiRouterScreen(
                         )
                     )
                 },
-                onOpenWebLogin = { protocol ->
-                    onIntent(AiRouterIntent.OpenWebLogin(protocol))
+                onOpenWebLogin = { protocol, isAddingAccount ->
+                    onIntent(AiRouterIntent.OpenWebLogin(protocol, isAddingAccount))
                 },
             )
 
@@ -361,6 +368,9 @@ fun AiRouterScreen(
                             providerName = editor.name,
                         )
                     )
+                },
+                onOpenWebLogin = { protocol, isAddingAccount ->
+                    onIntent(AiRouterIntent.OpenWebLogin(protocol, isAddingAccount))
                 },
             )
 
@@ -388,13 +398,14 @@ fun AiRouterScreen(
         }
     }
 
-    webLoginTarget?.let { (loginUrl, protocol) ->
+    webLoginTarget?.let { target ->
         WebLoginSheet(
             show = true,
-            loginUrl = loginUrl,
-            protocol = protocol,
-            onLoginSuccess = { cookie ->
-                onIntent(AiRouterIntent.WebLoginComplete(cookie))
+            loginUrl = target.loginUrl,
+            protocol = target.protocol,
+            isAddingAccount = target.isAddingAccount,
+            onLoginSuccess = { cookie, isNewAccount ->
+                onIntent(AiRouterIntent.WebLoginComplete(cookie, isNewAccount))
                 webLoginTarget = null
             },
             onDismissRequest = { webLoginTarget = null },
@@ -593,6 +604,7 @@ private fun ProviderCredentialPoolEditor(
     onSyncOAuth: (String) -> Unit,
     onOpenCredential: (String) -> Unit,
     onAddCredential: () -> Unit,
+    onOpenWebLogin: ((protocol: String, isAddingAccount: Boolean) -> Unit)? = null,
 ) {
     val accountCount = credentials.count { it.oauthProvider != null }
     val apiKeyCount = credentials.count { it.oauthProvider == null }
@@ -626,7 +638,14 @@ private fun ProviderCredentialPoolEditor(
                 onClick = { onStartOAuth(providerId) },
             )
         }
-        if (editor.supportsApiKey && !editor.providerProfileId.isNullOrBlank()) {
+        val isWeb = editor.protocol == AiProtocol.GEMINI_WEB || editor.protocol == AiProtocol.CHATGPT_WEB
+        if (isWeb && onOpenWebLogin != null) {
+            ClickableSettingItem(
+                title = "+ Thêm tài khoản web",
+                description = "Đăng nhập hoặc dán Session Token / Cookie để thêm tài khoản vào pool.",
+                onClick = { onOpenWebLogin(editor.protocol, true) },
+            )
+        } else if (editor.supportsApiKey && !editor.providerProfileId.isNullOrBlank()) {
             ClickableSettingItem(
                 title = "+ Thêm API key/token",
                 description = "Thêm key vào pool của provider hiện tại.",
@@ -745,11 +764,20 @@ private fun CredentialEditor(
             ),
             onValueChange = { onChange(editor.copy(kind = it)) },
         )
+        val rawProviderId = editor.providerId.removePrefix("catalog_")
+        val isWeb = rawProviderId.contains("gemini_web", ignoreCase = true) ||
+            rawProviderId.contains("chatgpt_web", ignoreCase = true) ||
+            editor.label.contains("Gemini Web", ignoreCase = true) ||
+            editor.label.contains("ChatGPT Web", ignoreCase = true)
         AppTextField(
             value = editor.secret,
             onValueChange = { onChange(editor.copy(secret = it)) },
             modifier = Modifier.fillMaxWidth(),
-            label = if (editor.hasStoredSecret) "Token mới (để trống để giữ nguyên)" else "API key/token",
+            label = if (editor.hasStoredSecret) {
+                if (isWeb) "Session Token / Cookie mới (để trống để giữ nguyên)" else "Token mới (để trống để giữ nguyên)"
+            } else {
+                if (isWeb) "Session Token (eyJ...) hoặc Google Cookie" else "API key/token"
+            },
             visualTransformation = PasswordVisualTransformation(),
             singleLine = true,
         )

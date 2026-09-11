@@ -39,6 +39,7 @@ def verify(path: Path, require_transparent_corners: bool = False) -> None:
 
 
 def main() -> None:
+    # 1. Release icons
     verify(ROOT / "branding/drducbook-icon-master.png", require_transparent_corners=True)
     verify(
         ROOT / "app/src/main/res/drawable-xxxhdpi/drducbook_icon_foreground.png",
@@ -47,7 +48,22 @@ def main() -> None:
     verify(ROOT / "app/src/main/res/drawable-xxxhdpi/drducbook_icon_monochrome.png")
     for path in sorted((ROOT / "app/src/main/res").glob("mipmap-*/ic_launcher*.webp")):
         verify(path, require_transparent_corners=True)
+
+    # 2. Debug B&W icons
+    verify(
+        ROOT / "app/src/debug/res/drawable-xxxhdpi/drducbook_icon_foreground.png",
+        require_transparent_corners=True,
+    )
+    for path in sorted((ROOT / "app/src/debug/res").glob("mipmap-*/ic_launcher*.webp")):
+        verify(path, require_transparent_corners=True)
+
+    # 3. WebService assets
     verify(ROOT / "modules/web/public/favicon.ico")
+    verify(ROOT / "modules/web/dist/favicon.ico")
+    verify(ROOT / "app/src/main/assets/web/favicon.ico")
+    verify(ROOT / "app/src/main/assets/web/vue/favicon.ico")
+    verify(ROOT / "app/src/main/assets/web/uploadBook/img/logo.png")
+    print("All Release, Debug B&W, and WebService icons verified successfully!")
 
 
 if __name__ == "__main__":

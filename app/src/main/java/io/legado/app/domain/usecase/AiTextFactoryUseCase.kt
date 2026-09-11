@@ -254,6 +254,8 @@ class AiTextFactoryUseCase(
                 append("- Return only the final text that should replace the original \"Text to process\".\n")
                 append("- CRITICAL LAYOUT REQUIREMENT: Strictly preserve the exact original paragraph breaks, line breaks, dialogue lines, and narrative structure. Do NOT merge multiple paragraphs into one single block.\n")
                 append("- Ensure standard punctuation spacing: Always put proper spaces after periods, commas, colons, semicolons, question marks, exclamation marks, and closing quotation marks (e.g. \". \", \"! \", \"? \", \", \").\n")
+                append("- Capitalize the first letter of every new sentence and every new paragraph.\n")
+                append("- Indent narrative paragraphs with two leading spaces. Do NOT indent dialogue lines starting with em-dash (—), hyphen (-), or quotation marks (\" \").\n")
                 append("- Do not output the chapter title, book title, headings, subtitles, labels, or section names unless they already appear inside \"Text to process\" and must remain part of the body.\n")
                 append("- Treat \"Chapter title\" and reference excerpts as context metadata, not as content to copy into the result.\n")
                 append("- Do not add Markdown fences, bullet labels, explanations, summaries, notes, or prefaces.\n")

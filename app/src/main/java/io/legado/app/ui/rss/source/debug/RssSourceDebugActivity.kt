@@ -117,7 +117,7 @@ class RssSourceDebugActivity : VMBaseActivity<ActivitySourceDebugBinding, RssSou
             sortKinds?.firstOrNull()?.let {
                 binding.textFx.text = String.format(Locale.ROOT, "%s::%s", it.first, it.second)
                 if (it.first.startsWith("ERROR:")) {
-                    adapter.addItem("获取发现出错\n${it.second}")
+                    adapter.addItem(getString(R.string.get_discovery_error, it.second))
                     binding.titleBar.findViewById<SearchView>(R.id.search_view).clearFocus()
                     return@launch
                 }

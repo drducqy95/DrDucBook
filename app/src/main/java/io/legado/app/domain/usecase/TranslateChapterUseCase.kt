@@ -35,6 +35,7 @@ import io.legado.app.domain.model.AiTranslationRefinerResult
 import io.legado.app.domain.model.AiTranslationTokenBudget
 import io.legado.app.domain.model.AiTranslationLayoutProtocol
 import io.legado.app.domain.model.AiTranslationStreamAccumulator
+import io.legado.app.domain.model.AiPromptCatalog
 import io.legado.app.domain.model.AiTaskPresetConfig
 import io.legado.app.domain.model.AiTaskRuntimeOptions
 import io.legado.app.domain.model.AiTaskType
@@ -140,6 +141,34 @@ class TranslateChapterUseCase(
         contextText: String = originalText,
         forceRetranslate: Boolean = false,
     ): Result<String> = translateDynamicUiTextUseCase.execute(
+        scopeKey = scopeKey,
+        originalText = originalText,
+        book = book,
+        contextText = contextText,
+        forceRetranslate = forceRetranslate,
+    )
+
+    suspend fun executeDynamicChapterTitle(
+        scopeKey: String,
+        originalText: String,
+        book: Book? = null,
+        contextText: String = originalText,
+        forceRetranslate: Boolean = false,
+    ): Result<String> = translateDynamicUiTextUseCase.executeChapterTitle(
+        scopeKey = scopeKey,
+        originalText = originalText,
+        book = book,
+        contextText = contextText,
+        forceRetranslate = forceRetranslate,
+    )
+
+    suspend fun executeDynamicBookName(
+        scopeKey: String,
+        originalText: String,
+        book: Book? = null,
+        contextText: String = originalText,
+        forceRetranslate: Boolean = false,
+    ): Result<String> = translateDynamicUiTextUseCase.executeBookName(
         scopeKey = scopeKey,
         originalText = originalText,
         book = book,
@@ -286,7 +315,11 @@ class TranslateChapterUseCase(
                 translated = repairedTranslation,
                 targetLanguage = targetLanguage,
             )?.let { throw it }
-            postProcessTranslation(repairedTranslation, targetLanguage)
+            postProcessTranslation(
+                repairedTranslation,
+                targetLanguage,
+                isRewrite = provider == TranslationConstants.PROVIDER_REWRITE,
+            )
         }
     }
 
@@ -334,6 +367,7 @@ class TranslateChapterUseCase(
                     )
                 )
             }
+            val isRewrite = provider == TranslationConstants.PROVIDER_REWRITE
             val preset = if (provider == TranslationConstants.PROVIDER_APP_AI || provider == TranslationConstants.PROVIDER_REWRITE) {
                 if (provider == TranslationConstants.PROVIDER_REWRITE) {
                     resolveRewritePreset()
@@ -396,6 +430,7 @@ class TranslateChapterUseCase(
                 val displayTranslation = postProcessTranslation(
                     protectedRevision.content,
                     targetLanguage,
+                    isRewrite = isRewrite,
                 )
                 onProgress(TranslationProgress(1, 1, displayTranslation, setOf(0)))
                 return@withContext Result.success(displayTranslation)
@@ -417,6 +452,7 @@ class TranslateChapterUseCase(
                     val displayTranslation = postProcessTranslation(
                         cachedTranslation.content,
                         targetLanguage,
+                        isRewrite = isRewrite,
                     )
                     if (isUsableCachedTranslation(
                             source = originalContent,
@@ -450,6 +486,7 @@ class TranslateChapterUseCase(
                 val displayTranslation = postProcessTranslation(
                     cachedTranslation,
                     targetLanguage,
+                    isRewrite = isRewrite,
                 )
                 if (isUsableCachedTranslation(
                         source = originalContent,
@@ -695,6 +732,7 @@ class TranslateChapterUseCase(
                 val mixedContent = postProcessTranslation(
                     PartialTranslationAssembler.assemble(chunks, displayChunks),
                     targetLanguage,
+                    isRewrite = isRewrite,
                 )
                 onProgress(TranslationProgress(
                     translatedChunks.size,
@@ -709,6 +747,7 @@ class TranslateChapterUseCase(
                 val mergedContent = postProcessTranslation(
                     ContentChunker.merge(sortedChunks),
                     targetLanguage,
+                    isRewrite = isRewrite,
                 )
                 translationCacheGateway.writeTranslation(
                     book = book,
@@ -827,6 +866,7 @@ class TranslateChapterUseCase(
                                         partialMap = streamingChunks,
                                     ),
                                     targetLanguage,
+                                    isRewrite = isRewrite,
                                 )
                                 onProgress(
                                     TranslationProgress(
@@ -850,6 +890,7 @@ class TranslateChapterUseCase(
                                             displayChunks,
                                         ),
                                         targetLanguage,
+                                        isRewrite = isRewrite,
                                     )
                                     onProgress(
                                         TranslationProgress(
@@ -871,6 +912,7 @@ class TranslateChapterUseCase(
                                             stableDisplayChunks(),
                                         ),
                                         targetLanguage,
+                                        isRewrite = isRewrite,
                                     )
                                     onProgress(
                                         TranslationProgress(
@@ -904,6 +946,7 @@ class TranslateChapterUseCase(
             val mergedContent = postProcessTranslation(
                 ContentChunker.merge(allTranslatedChunks),
                 targetLanguage,
+                isRewrite = isRewrite,
             )
             translationCacheGateway.writeTranslation(
                 book = book,
@@ -1393,12 +1436,25 @@ class TranslateChapterUseCase(
     }
 
     private suspend fun resolveRewritePreset(): AiTaskPresetConfig? {
-        aiProfileGateway.getTaskPreset(AiTaskType.REWRITE_TEXT)?.let { return it }
-        return aiProfileGateway.getTaskPreset(AiTaskType.CHAT)?.copy(
-            taskType = AiTaskType.REWRITE_TEXT,
-            name = "Rewrite fallback",
-            promptTemplate = TranslationConstants.DEFAULT_PROMPT,
-        ) ?: resolveTranslationPreset()
+        val basePreset = aiProfileGateway.getTaskPreset(AiTaskType.REWRITE_TEXT)
+            ?: aiProfileGateway.getTaskPreset(AiTaskType.CHAT)?.copy(
+                taskType = AiTaskType.REWRITE_TEXT,
+                name = "Rewrite fallback",
+                promptTemplate = TranslationConstants.DEFAULT_PROMPT,
+            ) ?: resolveTranslationPreset()
+
+        if (basePreset == null) return null
+
+        val customPrompt = TranslationConfig.rewriteCustomPrompt.trim()
+        val effectivePrompt = when {
+            customPrompt.isNotBlank() -> customPrompt
+            else -> {
+                val presetId = TranslationConfig.rewritePresetId
+                AiPromptCatalog.findById(presetId)?.prompt ?: basePreset.promptTemplate
+            }
+        }
+
+        return basePreset.copy(promptTemplate = effectivePrompt)
     }
 
     suspend fun currentProviderConfigurationRevision(provider: String): String {
@@ -1475,7 +1531,11 @@ class TranslateChapterUseCase(
                 originalContentHash = identityContentHash,
                 provider = identity.provider,
             ) ?: continue
-            val display = postProcessTranslation(content, targetLanguage)
+            val display = postProcessTranslation(
+                content,
+                targetLanguage,
+                isRewrite = identity.provider == TranslationConstants.PROVIDER_REWRITE,
+            )
             if (isUsableCachedTranslation(
                     source = originalContent,
                     translated = display,
@@ -1984,13 +2044,22 @@ class TranslateChapterUseCase(
         }
     }
 
-    private fun postProcessTranslation(text: String, targetLanguage: String): String {
+    private fun postProcessTranslation(
+        text: String,
+        targetLanguage: String,
+        isRewrite: Boolean = false,
+    ): String {
         return if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
-            VietnameseTranslationPostProcessor.capitalizeSentences(
+            val capitalized = VietnameseTranslationPostProcessor.capitalizeSentences(
                 VietnameseTranslationPostProcessor.cleanRogueBooleanLiterals(
                     normalizeCjkPunctuation(text)
                 )
             )
+            if (isRewrite) {
+                VietnameseTranslationPostProcessor.indentNarrativeParagraphs(capitalized)
+            } else {
+                capitalized
+            }
         } else {
             text
         }

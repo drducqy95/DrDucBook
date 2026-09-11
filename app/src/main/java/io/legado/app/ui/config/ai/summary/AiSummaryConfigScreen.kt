@@ -12,13 +12,20 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.legado.app.ui.config.ai.AiComboModelPickerItemUi
+import io.legado.app.ui.config.ai.AiComboModelPickerSheet
+import kotlinx.collections.immutable.toImmutableList
 import com.drducbook.app.R
+import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.TranslationConstants
 import io.legado.app.ui.theme.adaptiveContentPadding
 import io.legado.app.ui.config.ai.prompt.AI_PROMPT_SELECTION_MODEL_PREFIX
@@ -109,61 +116,77 @@ fun AiSummaryConfigScreen(
                 SplicedColumnGroup(title = stringResource(R.string.ai_model_config)) {
                     val selectedRoute = state.routes.firstOrNull { it.id == state.routeProfileId }
                     val selectedModel = state.models.firstOrNull { it.id == state.modelProfileId }
-                    val routeValues = state.routes.map {
-                        AI_PROMPT_SELECTION_ROUTE_PREFIX + it.id
-                    }
-                    val modelValues = state.models.map {
-                        AI_PROMPT_SELECTION_MODEL_PREFIX + it.id
-                    }
-                    if (routeValues.isNotEmpty() || modelValues.isNotEmpty()) {
-                        DropdownListSettingItem(
-                            title = stringResource(R.string.ai_prompt_editor_model_or_combo),
-                            selectedValue = if (selectedRoute != null) {
-                                AI_PROMPT_SELECTION_ROUTE_PREFIX + selectedRoute.id
-                            } else {
-                                AI_PROMPT_SELECTION_MODEL_PREFIX + state.modelProfileId
-                            },
-                            displayEntries = (state.routes.map {
-                                "Combo · ${it.displayLabel}"
-                            } + state.models.map {
-                                stringResource(
-                                    R.string.ai_prompt_editor_model_entry,
-                                    "${it.providerName} · ${it.modelName} (${it.modelId})",
-                                )
-                            }).toTypedArray(),
-                            entryValues = (routeValues + modelValues).toTypedArray(),
-                            description = selectedRoute?.let { route ->
-                                stringResource(
-                                    R.string.ai_prompt_editor_fallback_combo_summary,
-                                    route.targetCount,
-                                    route.maxAttempts,
-                                )
-                            } ?: selectedModel?.let {
-                                "${it.providerName} · ${it.modelName}"
-                            } ?: stringResource(R.string.ai_prompt_editor_model_required),
-                            onValueChange = { value ->
-                                if (value.startsWith(AI_PROMPT_SELECTION_ROUTE_PREFIX)) {
-                                    onIntent(
-                                        AiSummaryConfigIntent.UpdateRoute(
-                                            value.removePrefix(AI_PROMPT_SELECTION_ROUTE_PREFIX)
-                                        )
-                                    )
-                                } else if (value.startsWith(AI_PROMPT_SELECTION_MODEL_PREFIX)) {
-                                    onIntent(
-                                        AiSummaryConfigIntent.UpdateModel(
-                                            value.removePrefix(AI_PROMPT_SELECTION_MODEL_PREFIX)
-                                        )
-                                    )
-                                }
-                            },
-                        )
-                    } else {
-                        ClickableSettingItem(
-                            title = stringResource(R.string.ai_prompt_editor_model_or_combo),
-                            description = stringResource(R.string.ai_prompt_editor_combo_required),
-                            onClick = {},
+                    var showComboModelPicker by remember { mutableStateOf(false) }
+
+                    val selectedLabel = selectedRoute?.let { route ->
+                        stringResource(R.string.ai_prompt_editor_combo_entry, route.displayLabel)
+                    } ?: selectedModel?.let { model ->
+                        stringResource(
+                            R.string.ai_prompt_editor_model_entry,
+                            "${model.providerName} · ${model.modelName} (${model.modelId})",
                         )
                     }
+
+                    val comboModelDescription = selectedRoute?.let { route ->
+                        stringResource(
+                            R.string.ai_prompt_editor_fallback_combo_summary,
+                            route.targetCount,
+                            route.maxAttempts,
+                        )
+                    } ?: selectedModel?.let {
+                        "${it.providerName} · ${it.modelName}"
+                    } ?: stringResource(R.string.ai_prompt_editor_model_required)
+
+                    ClickableSettingItem(
+                        title = stringResource(R.string.ai_prompt_editor_model_or_combo),
+                        description = comboModelDescription,
+                        option = selectedLabel,
+                        onClick = { showComboModelPicker = true },
+                    )
+
+                    val pickerCombos = remember(state.routes) {
+                        state.routes.map { route ->
+                            AiComboModelPickerItemUi.ComboItem(
+                                id = route.id,
+                                displayName = route.displayLabel,
+                                targetCount = route.targetCount,
+                                maxAttempts = route.maxAttempts,
+                                taskType = AiTaskType.SUMMARIZE_CHAPTER,
+                            )
+                        }.toImmutableList()
+                    }
+                    val pickerModels = remember(state.models) {
+                        state.models.map { model ->
+                            AiComboModelPickerItemUi.ModelItem(
+                                id = model.id,
+                                displayName = "${model.modelName} (${model.modelId})",
+                                providerName = model.providerName,
+                                modelName = model.modelName,
+                                modelId = model.modelId,
+                                contextWindow = model.contextWindow,
+                                maxOutputTokens = model.maxOutputTokens,
+                            )
+                        }.toImmutableList()
+                    }
+
+                    AiComboModelPickerSheet(
+                        show = showComboModelPicker,
+                        title = stringResource(R.string.ai_prompt_editor_model_or_combo),
+                        selectedId = if (selectedRoute != null) {
+                            AI_PROMPT_SELECTION_ROUTE_PREFIX + selectedRoute.id
+                        } else {
+                            AI_PROMPT_SELECTION_MODEL_PREFIX + state.modelProfileId
+                        },
+                        combos = pickerCombos,
+                        models = pickerModels,
+                        onDismissRequest = { showComboModelPicker = false },
+                        onSelectCombo = { combo ->
+                            onIntent(AiSummaryConfigIntent.UpdateRoute(combo.id))
+                        },
+                        onSelectModel = { model ->
+                            onIntent(AiSummaryConfigIntent.UpdateModel(model.id))
+                        },
+                    )
                 }
             }
             item {

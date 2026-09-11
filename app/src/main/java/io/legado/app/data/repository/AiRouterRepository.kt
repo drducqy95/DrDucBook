@@ -489,7 +489,8 @@ class AiRouterRepository(
         } else {
             null
         }
-        if (model.provider.authType == AiProviderAuthType.NONE) {
+        val isWebProtocol = model.provider.protocol == AiProtocol.GEMINI_WEB || model.provider.protocol == AiProtocol.CHATGPT_WEB
+        if (model.provider.authType == AiProviderAuthType.NONE && !isWebProtocol) {
             return listOfNotNull(directCandidate)
         }
         val credentials = dao.getCredentialsForProvider(model.provider.id)

@@ -278,6 +278,7 @@ sealed interface AiRouterEditor {
         val oauthProviderId: String? = null,
         val oauthAvailable: Boolean = false,
         val supportsApiKey: Boolean = false,
+        val protocol: String = "",
     ) : AiRouterEditor
 
     @Stable
@@ -347,15 +348,15 @@ sealed interface AiRouterIntent {
     data class UpdateProviderSearch(val query: String) : AiRouterIntent
     data class SelectProviderFilter(val filter: String) : AiRouterIntent
     data class CreateComboTemplate(val templateId: String) : AiRouterIntent
-    data class OpenWebLogin(val protocol: String) : AiRouterIntent
-    data class WebLoginComplete(val cookieString: String) : AiRouterIntent
+    data class OpenWebLogin(val protocol: String, val isAddingAccount: Boolean = false) : AiRouterIntent
+    data class WebLoginComplete(val cookieString: String, val isAddingAccount: Boolean = false) : AiRouterIntent
     data object DismissEditor : AiRouterIntent
 }
 
 sealed interface AiRouterEffect {
     data class ShowMessage(val message: String) : AiRouterEffect
     data class OpenUrl(val url: String) : AiRouterEffect
-    data class LaunchWebLogin(val loginUrl: String, val protocol: String) : AiRouterEffect
+    data class LaunchWebLogin(val loginUrl: String, val protocol: String, val isAddingAccount: Boolean = false) : AiRouterEffect
 }
 
 val aiRouterTaskTypes = listOf(

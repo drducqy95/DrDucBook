@@ -116,8 +116,8 @@ class DownloadService : BaseService() {
         }.onFailure {
             it.printStackTrace()
             val msg = when (it) {
-                is SecurityException -> "下载出错,没有存储权限"
-                else -> "下载出错,${it.localizedMessage}"
+                is SecurityException -> getString(R.string.download_error_no_permission)
+                else -> getString(R.string.download_error_with_reason, it.localizedMessage.orEmpty())
             }
             toastOnUi(msg)
             AppLog.put(msg, it)
@@ -219,7 +219,7 @@ class DownloadService : BaseService() {
                 openFileUri(uri, type)
             }
         }.onFailure {
-            AppLog.put("打开下载文件${fileName}出错", it)
+            AppLog.put("Lỗi khi mở tệp tải xuống ${fileName}", it)
         }
     }
 

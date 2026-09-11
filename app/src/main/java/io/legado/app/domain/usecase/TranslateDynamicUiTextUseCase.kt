@@ -97,19 +97,62 @@ class TranslateDynamicUiTextUseCase(
     ): Result<List<String>> {
         if (originalLines.isEmpty()) return Result.success(emptyList())
         val normalized = originalLines.map { it.replace('\r', ' ').replace('\n', ' ') }
-        // Translate each label independently. Quick Translator may normalize a newline or
-        // concatenate adjacent labels when they are sent as one paragraph; one-line cache keys
-        // keep partial success and prevent a single malformed label from reverting the whole UI.
         return withContext(Dispatchers.IO) {
+            val provider = TranslationConstants.PROVIDER_QUICK_TRANSLATOR
+            val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+            val dictionaryRevision = book?.let {
+                quickDictionaryGateway.getEffectiveRevision(it, contextText)
+            } ?: QuickDictionaryRevision(
+                global = quickDictionaryGateway.revisionFor(QuickDictionaryScope.GLOBAL)
+            )
+            val cacheScopeBaseKey = dictionaryAwareScopeKey(
+                scopeKey = scopeKey,
+                provider = provider,
+                dictionaryRevision = dictionaryRevision,
+                quickTranslationPackVersion = quickTranslationGateway.packVersion,
+            )
+            val quickEntries = book
+                ?.let { quickDictionaryGateway.getEffectiveEntries(it, contextText) }
+                .orEmpty()
+            val quickTerms = quickEntries.mapNotNull { it.toQuickTranslationPair() }
+            val ignoredTerms = quickTerms
+                .filter { it.translation == QUICK_DICTIONARY_IGNORE_TARGET }
+                .map { it.original }
+            val bookTerms = book?.let(dictionaryGateway::getBookDictionaries)?.pairs.orEmpty()
+            val projectTerms = (quickTerms.filterNot {
+                it.translation == QUICK_DICTIONARY_IGNORE_TARGET
+            } + bookTerms).distinctBy { it.original.trim().lowercase() }
+            val customPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() }
+
             Result.success(
                 normalized.mapIndexed { index, line ->
-                    execute(
-                        scopeKey = "$scopeKey:line:$index",
-                        originalText = line,
-                        book = book,
-                        contextText = contextText,
-                        forceRetranslate = forceRetranslate,
-                    ).getOrElse { line }
+                    if (line.isBlank() || !line.containsCjk()) {
+                        return@mapIndexed line
+                    }
+                    val lineCacheKey = "$cacheScopeBaseKey:line:$index"
+                    if (!forceRetranslate) {
+                        translationCacheGateway.readDynamicUiTranslation(
+                            scopeKey = lineCacheKey,
+                            originalText = line,
+                            targetLanguage = targetLanguage,
+                            provider = provider,
+                        )?.let { return@mapIndexed it }
+                    }
+                    runCatching {
+                        val translated = quickTranslationGateway.translate(
+                            text = removeIgnoredTerms(line, ignoredTerms),
+                            projectTerms = projectTerms,
+                            customPhonetics = customPhonetics,
+                        )
+                        translationCacheGateway.writeDynamicUiTranslation(
+                            scopeKey = lineCacheKey,
+                            originalText = line,
+                            targetLanguage = targetLanguage,
+                            provider = provider,
+                            translatedText = translated,
+                        )
+                        translated
+                    }.getOrElse { line }
                 }
             )
         }
@@ -128,7 +171,7 @@ class TranslateDynamicUiTextUseCase(
             return@withContext Result.success(originalText.toTitleCase())
         }
 
-        val provider = TranslationConstants.PROVIDER_HAN_VIET
+        val provider = TranslationConstants.PROVIDER_QUICK_TRANSLATOR
         val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
         val dictionaryRevision = book?.let {
             quickDictionaryGateway.getEffectiveRevision(it, originalText)
@@ -147,16 +190,26 @@ class TranslateDynamicUiTextUseCase(
                 originalText = originalText,
                 targetLanguage = targetLanguage,
                 provider = provider,
-            )?.let { return@withContext Result.success(it) }
+            )?.let { return@withContext Result.success(it.restructureChapterNumbers().toTitleCase()) }
         }
 
         runCatching {
             val quickEntries = book
                 ?.let { quickDictionaryGateway.getEffectiveEntries(it, originalText) }
                 .orEmpty()
+            val quickTerms = quickEntries.mapNotNull { it.toQuickTranslationPair() }
+            val ignoredTerms = quickTerms
+                .filter { it.translation == QUICK_DICTIONARY_IGNORE_TARGET }
+                .map { it.original }
+            val bookTerms = book?.let(dictionaryGateway::getBookDictionaries)?.pairs.orEmpty()
             val customPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() }
-            val translated = quickTranslationGateway.hanViet(originalText, customPhonetics)
-                .toTitleCase()
+            val translated = quickTranslationGateway.translate(
+                text = removeIgnoredTerms(originalText, ignoredTerms),
+                projectTerms = (quickTerms.filterNot {
+                    it.translation == QUICK_DICTIONARY_IGNORE_TARGET
+                } + bookTerms).distinctBy { it.original.trim().lowercase() },
+                customPhonetics = customPhonetics,
+            ).restructureChapterNumbers().toTitleCase()
             translationCacheGateway.writeDynamicUiTranslation(
                 scopeKey = cacheScopeKey,
                 originalText = originalText,
@@ -167,6 +220,20 @@ class TranslateDynamicUiTextUseCase(
             translated
         }
     }
+
+    suspend fun executeBookName(
+        scopeKey: String,
+        originalText: String,
+        book: Book? = null,
+        contextText: String = originalText,
+        forceRetranslate: Boolean = false,
+    ): Result<String> = execute(
+        scopeKey = "$scopeKey:bookname",
+        originalText = originalText,
+        book = book,
+        contextText = contextText,
+        forceRetranslate = forceRetranslate,
+    ).map { it.toTitleCase() }
 
     suspend fun executeChapterTitle(
         scopeKey: String,
@@ -180,7 +247,7 @@ class TranslateDynamicUiTextUseCase(
         book = book,
         contextText = contextText,
         forceRetranslate = forceRetranslate,
-    ).map { it.toTitleCase() }
+    ).map { it.restructureChapterNumbers().toTitleCase() }
 
     suspend fun executeChapterTitles(
         scopeKey: String,
@@ -194,7 +261,7 @@ class TranslateDynamicUiTextUseCase(
         book = book,
         contextText = contextText,
         forceRetranslate = forceRetranslate,
-    ).map { titles -> titles.map { it.toTitleCase() } }
+    ).map { titles -> titles.map { it.restructureChapterNumbers().toTitleCase() } }
 
     suspend fun clearCache() {
         translationCacheGateway.clearDynamicUiTranslations()
@@ -213,8 +280,33 @@ class TranslateDynamicUiTextUseCase(
 
 fun String.toTitleCase(): String =
     split(" ").joinToString(" ") { word ->
-        if (word.isBlank()) word
-        else word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        if (word.isBlank()) {
+            word
+        } else {
+            val letterIdx = word.indexOfFirst { it.isLetter() }
+            if (letterIdx >= 0 && word[letterIdx].isLowerCase()) {
+                word.substring(0, letterIdx) +
+                    word[letterIdx].titlecase() +
+                    word.substring(letterIdx + 1)
+            } else {
+                word
+            }
+        }
+    }
+
+private val chapterNumberPattern = Regex(
+    """(?i)(?:^|(?<=[\s\p{Punct}]))[Đđ]ệ\s*([0-9IVXLCDMivxlcdm]+(?:[.\-_][0-9IVXLCDMivxlcdm]+)?|[Nn]hất|[Nn]hị|[Tt]am|[Tt]ứ|[Nn]gũ|[Ll]ục|[Tt]hất|[Bb]át|[Cc]ửu|[Tt]hập(?:\s*(?:[Nn]hất|[Nn]hị|[Tt]am|[Tt]ứ|[Nn]gũ|[Ll]ục|[Tt]hất|[Bb]át|[Cc]ửu))?|[Bb]ách|[Tt]hiên|[Vv]ạn)\s*([Cc]hương|[Tt]iết|[Qq]uyển|[Hh]ồi|[Tt]hiên|[Tt]ập|[Pp]hần|[Mm]ục|[Tt]hoại|[Bb]ộ|[Kk]ỳ|[Bb]ản|[Tt]rang)"""
+)
+
+fun String.restructureChapterNumbers(): String =
+    chapterNumberPattern.replace(this) { match ->
+        val number = match.groupValues[1]
+        val classifier = match.groupValues[2]
+        val classifierTitle = classifier.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase() else it.toString()
+        }
+        val hasTrailingLetter = match.range.last + 1 < length && this[match.range.last + 1].isLetter()
+        if (hasTrailingLetter) "$classifierTitle $number " else "$classifierTitle $number"
     }
 
 internal fun String.containsCjk(): Boolean = codePoints().anyMatch { codePoint ->

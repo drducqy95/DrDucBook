@@ -467,7 +467,7 @@ class PageView(
      */
     @SuppressLint("SetTextI18n")
     fun setProgress(textPage: TextPage) = textPage.apply {
-        tvBookName?.setTextIfNotEqual(ReadBook.book?.name)
+        tvBookName?.setTextIfNotEqual(ReadBook.dynamicBookName ?: ReadBook.book?.name)
         tvTitle?.setTextIfNotEqual(textPage.title)
         tvTitleArrow?.setTextIfNotEqual(textPage.title)
         tvTitleArrowClassic?.setTextIfNotEqual(textPage.title)

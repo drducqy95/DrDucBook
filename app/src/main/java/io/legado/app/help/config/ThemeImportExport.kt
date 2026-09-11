@@ -534,7 +534,7 @@ object ThemeImportExport {
             navIconRss = root.string("Z"),
             navIconMy = root.string("a0"),
             useMiuixMonet = root.boolean("b0"),
-            useFlexibleTopAppBar = root.boolean("c0", true),
+            useFlexibleTopAppBar = root.boolean("c0", false),
             bgImageLight = root.nullableString("d0"),
             bgImageDark = root.nullableString("e0"),
             bgImageBlurring = root.int("f0"),
@@ -701,7 +701,7 @@ data class ThemeExportData(
     val useMiuixMonet: Boolean = false,
 
     // 其他
-    val useFlexibleTopAppBar: Boolean = true,
+    val useFlexibleTopAppBar: Boolean = false,
     val bgImageLight: String? = null,
     val bgImageDark: String? = null,
     val bgImageBlurring: Int = 0,

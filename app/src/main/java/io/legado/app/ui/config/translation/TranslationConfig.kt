@@ -317,6 +317,16 @@ object TranslationConfig {
             storedAutoRewriteNextChapters = value.coerceIn(0, 20)
         }
 
+    var rewritePresetId by prefDelegate(
+        PreferKey.rewritePresetId,
+        "default_polish",
+    )
+
+    var rewriteCustomPrompt by prefDelegate(
+        PreferKey.rewriteCustomPrompt,
+        "",
+    )
+
     // Delegate constants to domain layer
     const val PROVIDER_OPENAI = TranslationConstants.PROVIDER_OPENAI
     const val PROVIDER_APP_AI = TranslationConstants.PROVIDER_APP_AI

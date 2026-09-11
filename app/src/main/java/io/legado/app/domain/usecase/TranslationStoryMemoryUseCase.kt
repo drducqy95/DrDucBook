@@ -157,18 +157,48 @@ class TranslationStoryMemoryUseCase(
                     chapterIndex = chapter.index,
                     chapterTitle = chapter.title,
                     characters = incomingTimeline.characters.filter { character ->
-                        source.contains(character.raw) || knownNames.contains(character.raw)
+                        character.raw.isNotBlank() && (
+                            source.contains(character.raw) ||
+                                knownNames.contains(character.raw) ||
+                                (character.target.isNotBlank() && knownNames.contains(character.target))
+                        )
+                    },
+                    discoveries = incomingTimeline.discoveries.filter { discovery ->
+                        discovery.raw.isNotBlank() && (
+                            source.contains(discovery.raw) ||
+                                knownNames.contains(discovery.raw) ||
+                                (discovery.target.isNotBlank() && knownNames.contains(discovery.target))
+                        )
                     },
                 )
+                val timelineCharactersAsEntities = timeline.characters
+                    .filter { character ->
+                        character.status.equals("new", ignoreCase = true) &&
+                            character.raw.isNotBlank() &&
+                            character.raw !in knownNames
+                    }
+                    .map { character ->
+                        AiTranslationStoryEntity(
+                            raw = character.raw,
+                            target = character.target.ifBlank { character.raw },
+                            type = "character",
+                            description = character.role.ifBlank { "Character from chapter timeline" },
+                            firstChapterIndex = chapter.index,
+                        )
+                    }
                 val analysis = AiTranslationStoryAnalysis(
                     chapterIndex = chapter.index,
                     chapterTitle = chapter.title,
-                    entities = (normalizedEntities + placeholders)
+                    entities = (normalizedEntities + placeholders + timelineCharactersAsEntities)
                         .distinctBy { it.raw.lowercase() },
                     relationships = normalizedRelationships
                         .distinctBy { "${it.source}\u0000${it.target}\u0000${it.relationship}".lowercase() },
                     worldBuilding = delta.worldBuilding
-                        .filter { source.contains(it.raw) }
+                        .filter { entry ->
+                            source.contains(entry.raw) ||
+                                knownNames.contains(entry.raw) ||
+                                (entry.target.isNotBlank() && knownNames.contains(entry.target))
+                        }
                         .map { it.copy(chapterIndex = chapter.index) }
                         .distinctBy { "${it.category}\u0000${it.raw}".lowercase() },
                     timeline = timeline,

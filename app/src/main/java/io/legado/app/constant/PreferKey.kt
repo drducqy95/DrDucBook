@@ -408,6 +408,8 @@ object PreferKey {
     const val translationAutoNextChapters = "translationAutoNextChapters"
     const val rewriteAutoEnabled = "rewriteAutoEnabled"
     const val rewriteAutoNextChapters = "rewriteAutoNextChapters"
+    const val rewritePresetId = "rewritePresetId"
+    const val rewriteCustomPrompt = "rewriteCustomPrompt"
     const val translationDynamicUiEnabled = "translationDynamicUiEnabled"
     const val quickTranslationPronounMode = "quickTranslationPronounMode"
     const val translationPromptPipelineInitialized = "translationPromptPipelineInitialized"

@@ -225,7 +225,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 preDownloadAudios(httpTts)
             }
         }.onError {
-            AppLog.put("朗读下载出错\n${it.localizedMessage}", it, true)
+            AppLog.put("Lỗi khi tải âm thanh đọc\n${it.localizedMessage}", it, true)
         }
     }
 
@@ -357,7 +357,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 preDownloadAudiosStream(httpTts, downloaderChannel)
             }
         }.onError {
-            AppLog.put("朗读下载出错\n${it.localizedMessage}", it, true)
+            AppLog.put("Lỗi khi tải âm thanh đọc\n${it.localizedMessage}", it, true)
         }
     }
 
@@ -481,7 +481,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                 when (e) {
                     is CancellationException -> throw e
                     is ScriptException, is WrappedException -> {
-                        AppLog.put("js错误\n${e.localizedMessage}", e, true)
+                        AppLog.put("Lỗi script JS\n${e.localizedMessage}", e, true)
                         e.printOnDebug()
                         throw e
                     }
@@ -489,7 +489,7 @@ class HttpReadAloudService : BaseReadAloudService(),
                     is SocketTimeoutException, is ConnectException -> {
                         downloadErrorNo++
                         if (downloadErrorNo > 5) {
-                            val msg = "tts超时或连接错误超过5次\n${e.localizedMessage}"
+                            val msg = "Lỗi kết nối hoặc quá thời gian TTS quá 5 lần\n${e.localizedMessage}"
                             AppLog.put(msg, e, true)
                             throw e
                         }
@@ -497,15 +497,15 @@ class HttpReadAloudService : BaseReadAloudService(),
 
                     else -> {
                         downloadErrorNo++
-                        val msg = "tts下载错误\n${e.localizedMessage}"
+                        val msg = "Lỗi tải TTS\n${e.localizedMessage}"
                         AppLog.put(msg, e)
                         e.printOnDebug()
                         if (downloadErrorNo > 5) {
-                            val msg1 = "TTS服务器连续5次错误，已暂停阅读。"
+                            val msg1 = "Máy chủ TTS bị lỗi 5 lần liên tiếp, đã tạm dừng đọc."
                             AppLog.put(msg1, e, true)
                             throw e
                         } else {
-                            AppLog.put("TTS下载音频出错，使用无声音频代替。\n朗读文本：$speakText")
+                            AppLog.put("Lỗi tải âm thanh TTS, dùng âm thanh yên lặng thay thế.\nVăn bản đọc: $speakText")
                             break
                         }
                     }

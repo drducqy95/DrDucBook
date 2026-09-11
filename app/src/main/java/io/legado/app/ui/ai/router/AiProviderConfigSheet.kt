@@ -37,7 +37,7 @@ internal fun ProviderConfigEditor(
     onTest: () -> Unit,
     onOpenCredential: (String) -> Unit,
     onAddCredential: () -> Unit,
-    onOpenWebLogin: ((protocol: String) -> Unit)? = null,
+    onOpenWebLogin: ((protocol: String, isAddingAccount: Boolean) -> Unit)? = null,
 ) {
     var showModelPicker by remember(editor.catalogId, editor.providerProfileId) { mutableStateOf(false) }
     var showAdvanced by remember(editor.catalogId, editor.providerProfileId) { mutableStateOf(false) }
@@ -143,7 +143,7 @@ internal fun ProviderConfigEditor(
                 } else {
                     "Mở WebView đăng nhập ChatGPT để tự động lấy Token"
                 },
-                onClick = { onOpenWebLogin(editor.protocol) },
+                onClick = { onOpenWebLogin(editor.protocol, false) },
             )
         }
         if (editor.authType != AiProviderAuthType.NONE) {
@@ -196,19 +196,41 @@ internal fun ProviderConfigEditor(
                 isWebProtocol = isWebProtocol,
                 onTest = onTest,
             )
+        }
+        if (editor.authType == AiProviderAuthType.NONE) {
+            ProviderConnectionTest(
+                saving = saving,
+                testStatus = editor.testStatus,
+                testMessage = editor.testMessage,
+                testLatencyMs = editor.testLatencyMs,
+                discoveredModelCount = editor.discoveredModels.size,
+                isWebProtocol = isWebProtocol,
+                onTest = onTest,
+            )
+        }
+        val showCredentialPool = editor.authType != AiProviderAuthType.NONE || isWebProtocol
+        if (showCredentialPool) {
             SettingItem(
-                title = "API key pool",
-                description = if (credentials.isEmpty()) {
-                    "Chưa có API key riêng cho provider này."
+                title = if (isWebProtocol) "Danh sách tài khoản (Account pool)" else "API key pool",
+                description = if (isWebProtocol) {
+                    if (credentials.isEmpty()) {
+                        "Chưa có tài khoản lưu riêng; router đang dùng phiên mặc định/Zero-Auth."
+                    } else {
+                        "${credentials.size} tài khoản đang lưu; router sẽ tự xoay vòng tài khoản khi gọi AI."
+                    }
                 } else {
-                    "${credentials.size} API key đang lưu; router sẽ tự xoay khi combo dùng model của provider này."
+                    if (credentials.isEmpty()) {
+                        "Chưa có API key riêng cho provider này."
+                    } else {
+                        "${credentials.size} API key đang lưu; router sẽ tự xoay khi combo dùng model của provider này."
+                    }
                 },
             )
             credentials.forEach { credential ->
                 ClickableSettingItem(
                     title = credential.label,
                     description = buildString {
-                        append(credential.kind)
+                        append(if (isWebProtocol) "Session / Cookie" else credential.kind)
                         if (credential.consecutiveFailures > 0) {
                             append(" · ").append(credential.consecutiveFailures).append(" lỗi liên tiếp")
                         }
@@ -218,19 +240,19 @@ internal fun ProviderConfigEditor(
                 )
             }
             ClickableSettingItem(
-                title = "+ Thêm API key/token",
-                description = "Thêm key vào pool của provider hiện tại.",
-                onClick = onAddCredential,
-            )
-        }
-        if (editor.authType == AiProviderAuthType.NONE) {
-            ProviderConnectionTest(
-                saving = saving,
-                testStatus = editor.testStatus,
-                testMessage = editor.testMessage,
-                testLatencyMs = editor.testLatencyMs,
-                discoveredModelCount = editor.discoveredModels.size,
-                onTest = onTest,
+                title = if (isWebProtocol) "+ Thêm tài khoản web" else "+ Thêm API key/token",
+                description = if (isWebProtocol) {
+                    "Mở đăng nhập hoặc dán Session Token / Cookie để thêm tài khoản vào pool."
+                } else {
+                    "Thêm key vào pool của provider hiện tại."
+                },
+                onClick = {
+                    if (isWebProtocol && onOpenWebLogin != null) {
+                        onOpenWebLogin(editor.protocol, true)
+                    } else {
+                        onAddCredential()
+                    }
+                },
             )
         }
         if (pickerOptions.isNotEmpty()) {

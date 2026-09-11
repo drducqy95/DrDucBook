@@ -52,11 +52,14 @@ import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.card.TextCard
+import io.legado.app.ui.config.ai.AiComboModelPickerItemUi
+import io.legado.app.ui.config.ai.AiComboModelPickerSheet
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
 import io.legado.app.ui.widget.components.settingItem.DropdownListSettingItem
 import io.legado.app.ui.widget.components.settingItem.InputSettingItem
 import io.legado.app.ui.widget.components.settingItem.SwitchSettingItem
+import kotlinx.collections.immutable.toImmutableList
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
@@ -347,6 +350,7 @@ private fun PromptPresetEditorSheet(
     onIntent: (AiPromptEditorIntent) -> Unit,
 ) {
     val editor = state.editor
+    var showComboModelPicker by remember(editor != null) { mutableStateOf(false) }
     AppModalBottomSheet(
         show = editor != null,
         onDismissRequest = { onIntent(AiPromptEditorIntent.CloseEditor) },
@@ -372,13 +376,6 @@ private fun PromptPresetEditorSheet(
         val modelOptions = state.models
         val selectedRoute = routeOptions.firstOrNull { it.id == editor.routeProfileId }
         val selectedModel = modelOptions.firstOrNull { it.id == editor.modelProfileId }
-        val selectionEntries = routeOptions.map {
-            stringResource(R.string.ai_prompt_editor_combo_entry, it.displayLabel)
-        } + modelOptions.map {
-            stringResource(R.string.ai_prompt_editor_model_entry, it.displayLabel)
-        }
-        val selectionValues = routeOptions.map { AI_PROMPT_SELECTION_ROUTE_PREFIX + it.id } +
-            modelOptions.map { AI_PROMPT_SELECTION_MODEL_PREFIX + it.id }
         val selectedSelection = when {
             editor.routeProfileId.isNotBlank() -> AI_PROMPT_SELECTION_ROUTE_PREFIX + editor.routeProfileId
             editor.modelProfileId.isNotBlank() -> AI_PROMPT_SELECTION_MODEL_PREFIX + editor.modelProfileId
@@ -402,29 +399,27 @@ private fun PromptPresetEditorSheet(
                     entryValues = taskValues,
                     onValueChange = { onIntent(AiPromptEditorIntent.UpdateTask(it)) },
                 )
-                if (selectionEntries.isNotEmpty()) {
-                    DropdownListSettingItem(
-                        title = stringResource(R.string.ai_prompt_editor_model_or_combo),
-                        selectedValue = selectedSelection,
-                        displayEntries = selectionEntries.toTypedArray(),
-                        entryValues = selectionValues.toTypedArray(),
-                        description = selectedRoute?.let { route ->
-                            stringResource(
-                                R.string.ai_prompt_editor_fallback_combo_summary,
-                                route.targetCount,
-                                route.maxAttempts,
-                            )
-                        } ?: selectedModel?.displayLabel
-                            ?: stringResource(R.string.ai_prompt_editor_combo_required),
-                        onValueChange = { onIntent(AiPromptEditorIntent.SelectModelOrRoute(it)) },
+                val comboModelDescription = selectedRoute?.let { route ->
+                    stringResource(
+                        R.string.ai_prompt_editor_fallback_combo_summary,
+                        route.targetCount,
+                        route.maxAttempts,
                     )
-                } else {
-                    ClickableSettingItem(
-                        title = stringResource(R.string.ai_prompt_editor_model_or_combo),
-                        description = stringResource(R.string.ai_prompt_editor_combo_required),
-                        onClick = {},
-                    )
+                } ?: selectedModel?.displayLabel
+                    ?: stringResource(R.string.ai_prompt_editor_combo_required)
+
+                val selectedLabel = selectedRoute?.let { route ->
+                    stringResource(R.string.ai_prompt_editor_combo_entry, route.displayLabel)
+                } ?: selectedModel?.let { model ->
+                    stringResource(R.string.ai_prompt_editor_model_entry, model.displayLabel)
                 }
+
+                ClickableSettingItem(
+                    title = stringResource(R.string.ai_prompt_editor_model_or_combo),
+                    description = comboModelDescription,
+                    option = selectedLabel,
+                    onClick = { showComboModelPicker = true },
+                )
             }
             item {
                 AppTextField(
@@ -645,6 +640,55 @@ private fun PromptPresetEditorSheet(
                 }
             }
         }
+    }
+
+    if (editor != null) {
+        val routeOptions = state.routes.filter { it.taskType == editor.taskType }
+        val modelOptions = state.models
+        val selectedSelection = when {
+            editor.routeProfileId.isNotBlank() -> AI_PROMPT_SELECTION_ROUTE_PREFIX + editor.routeProfileId
+            editor.modelProfileId.isNotBlank() -> AI_PROMPT_SELECTION_MODEL_PREFIX + editor.modelProfileId
+            else -> AI_PROMPT_SELECTION_DEFAULT
+        }
+        val pickerCombos = remember(routeOptions) {
+            routeOptions.map { route ->
+                AiComboModelPickerItemUi.ComboItem(
+                    id = route.id,
+                    displayName = route.displayLabel,
+                    targetCount = route.targetCount,
+                    maxAttempts = route.maxAttempts,
+                    taskType = route.taskType,
+                )
+            }.toImmutableList()
+        }
+        val pickerModels = remember(modelOptions) {
+            modelOptions.map { model ->
+                AiComboModelPickerItemUi.ModelItem(
+                    id = model.id,
+                    displayName = model.displayLabel,
+                    providerName = model.providerName,
+                    modelName = model.modelName,
+                    modelId = model.modelId,
+                    contextWindow = model.contextWindow,
+                    maxOutputTokens = model.maxOutputTokens,
+                )
+            }.toImmutableList()
+        }
+
+        AiComboModelPickerSheet(
+            show = showComboModelPicker,
+            title = stringResource(R.string.ai_prompt_editor_model_or_combo),
+            selectedId = selectedSelection,
+            combos = pickerCombos,
+            models = pickerModels,
+            onDismissRequest = { showComboModelPicker = false },
+            onSelectCombo = { combo ->
+                onIntent(AiPromptEditorIntent.SelectModelOrRoute(AI_PROMPT_SELECTION_ROUTE_PREFIX + combo.id))
+            },
+            onSelectModel = { model ->
+                onIntent(AiPromptEditorIntent.SelectModelOrRoute(AI_PROMPT_SELECTION_MODEL_PREFIX + model.id))
+            },
+        )
     }
 }
 

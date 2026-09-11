@@ -137,6 +137,7 @@ fun TocScreen(
     val context = LocalContext.current
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
     val book by viewModel.bookState.collectAsStateWithLifecycle()
+    val displayBookName by viewModel.displayBookNameFlow.collectAsStateWithLifecycle(initialValue = book?.name ?: "")
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     val pagerState = rememberPagerState { 2 }
@@ -173,16 +174,22 @@ fun TocScreen(
 
     val topBarTitle = remember(
         pagerState.currentPage,
-        book?.name,
+        displayBookName,
         book?.durChapterTitle,
+        book?.durChapterIndex,
+        state.items,
     ) {
         when (pagerState.currentPage) {
             0 -> {
-                book?.durChapterTitle?.takeIf { it.isNotBlank() } ?: (book?.name ?: "")
+                val durIndex = book?.durChapterIndex ?: -1
+                val durChapter = state.items.firstOrNull { it.id == durIndex }?.title
+                durChapter?.takeIf { it.isNotBlank() }
+                    ?: book?.durChapterTitle?.takeIf { it.isNotBlank() }
+                    ?: displayBookName
             }
 
             1 -> bookmarkManagementTitle
-            else -> book?.name ?: ""
+            else -> displayBookName
         }
     }
 

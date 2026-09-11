@@ -111,6 +111,9 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     private val translationObserverJobs = ConcurrentHashMap<Int, Job>()
     /** Display-only chapter titles; source/DB titles remain untouched. */
     private val dynamicChapterTitles = ConcurrentHashMap<String, String>()
+    /** Display-only translated book name; original Book.name remains untouched. */
+    @Volatile
+    var dynamicBookName: String? = null
     private val prevChapterLoadingLock = Mutex()
     private val curChapterLoadingLock = Mutex()
     private val nextChapterLoadingLock = Mutex()
@@ -149,6 +152,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     fun resetData(book: Book) {
         ReadBook.book = book
         dynamicChapterTitles.clear()
+        dynamicBookName = null
         readRecord.bookName = book.name
         readRecord.bookAuthor = book.author
         readRecord.readTime = appDb.readRecordDao.getReadTime("", book.name, book.author) ?: 0

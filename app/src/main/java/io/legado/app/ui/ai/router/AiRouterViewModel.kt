@@ -275,25 +275,62 @@ class AiRouterViewModel(
             is AiRouterIntent.UpdateProviderSearch -> updateProviderSearch(intent.query)
             is AiRouterIntent.SelectProviderFilter -> selectProviderFilter(intent.filter)
             is AiRouterIntent.CreateComboTemplate -> createComboTemplate(intent.templateId)
-            is AiRouterIntent.OpenWebLogin -> openWebLogin(intent.protocol)
-            is AiRouterIntent.WebLoginComplete -> completeWebLogin(intent.cookieString)
+            is AiRouterIntent.OpenWebLogin -> openWebLogin(intent.protocol, intent.isAddingAccount)
+            is AiRouterIntent.WebLoginComplete -> completeWebLogin(intent.cookieString, intent.isAddingAccount)
             AiRouterIntent.DismissEditor -> updateEditor(null)
         }
     }
 
-    private fun openWebLogin(protocol: String) {
+    private fun openWebLogin(protocol: String, isAddingAccount: Boolean = false) {
         val url = when (protocol) {
             AiProtocol.GEMINI_WEB -> "https://gemini.google.com/app"
             AiProtocol.CHATGPT_WEB -> "https://chatgpt.com"
             else -> return
         }
-        _effects.tryEmit(AiRouterEffect.LaunchWebLogin(url, protocol))
+        _effects.tryEmit(AiRouterEffect.LaunchWebLogin(url, protocol, isAddingAccount))
     }
 
-    private fun completeWebLogin(cookieString: String) {
-        val currentEditor = (_uiState.value.editor as? AiRouterEditor.ProviderConfig) ?: return
-        updateEditor(currentEditor.copy(apiKey = cookieString, testStatus = AiConnectionStatus.UNVERIFIED))
-        testProviderConfig()
+    private fun completeWebLogin(cookieString: String, isAddingAccount: Boolean = false) {
+        val currentEditor = (_uiState.value.editor as? AiRouterEditor.ProviderConfig)
+        if (cookieString.isBlank() && !isAddingAccount) {
+            if (currentEditor != null) {
+                updateEditor(currentEditor.copy(apiKey = "", testStatus = AiConnectionStatus.READY, testMessage = "Kích hoạt Chế độ Miễn phí thành công"))
+            }
+            return
+        }
+        if (currentEditor != null && !isAddingAccount) {
+            updateEditor(currentEditor.copy(apiKey = cookieString, testStatus = AiConnectionStatus.UNVERIFIED))
+            testProviderConfig()
+        } else {
+            val providerProfileId = currentEditor?.providerProfileId
+                ?: (_uiState.value.editor as? AiRouterEditor.ProviderCredentials)?.providerProfileId
+                ?: currentEditor?.catalogId?.let { "catalog_$it" }
+                ?: return
+            val protocol = currentEditor?.protocol ?: AiProtocol.GEMINI_WEB
+            val providerName = currentEditor?.name
+                ?: if (protocol == AiProtocol.GEMINI_WEB) "Gemini Web" else "ChatGPT Web"
+            val count = _uiState.value.credentials.count { it.providerId == providerProfileId } + 1
+            val label = "$providerName #$count"
+            viewModelScope.launch {
+                try {
+                    routerGateway.saveCredential(
+                        AiCredentialDraft(
+                            providerId = providerProfileId,
+                            label = label,
+                            kind = AiCredentialKind.BEARER_TOKEN,
+                            secret = cookieString,
+                            enabled = true,
+                        )
+                    )
+                    _effects.tryEmit(AiRouterEffect.ShowMessage("Đã thêm $label vào pool"))
+                    if (currentEditor != null && currentEditor.apiKey.isBlank()) {
+                        updateEditor(currentEditor.copy(apiKey = cookieString, testStatus = AiConnectionStatus.UNVERIFIED))
+                    }
+                } catch (error: Throwable) {
+                    _effects.tryEmit(AiRouterEffect.ShowMessage("Lỗi lưu tài khoản: ${error.message}"))
+                }
+            }
+        }
     }
 
     private fun updateProviderSearch(query: String) {
@@ -404,6 +441,7 @@ class AiRouterViewModel(
                 oauthProviderId = oauthProvider?.id,
                 oauthAvailable = oauthProvider?.available == true,
                 supportsApiKey = provider.category != AiRouterProviderFilter.OAUTH && provider.requiresKey,
+                protocol = AiProviderCatalog.byId(provider.id)?.protocol.orEmpty(),
             )
         )
     }
@@ -542,12 +580,13 @@ class AiRouterViewModel(
                 )
             )
         }
-        if (draft.authType != AiProviderAuthType.NONE && draft.apiKey.isNotBlank()) {
+        val isWebProtocol = draft.protocol == AiProtocol.GEMINI_WEB || draft.protocol == AiProtocol.CHATGPT_WEB
+        if ((draft.authType != AiProviderAuthType.NONE || isWebProtocol) && draft.apiKey.isNotBlank()) {
             routerGateway.saveCredential(
                 AiCredentialDraft(
                     providerId = provider.id,
-                    label = "${draft.providerName} API key",
-                    kind = AiCredentialKind.API_KEY,
+                    label = if (isWebProtocol) "${draft.providerName} Session" else "${draft.providerName} API key",
+                    kind = if (isWebProtocol) AiCredentialKind.BEARER_TOKEN else AiCredentialKind.API_KEY,
                     secret = draft.apiKey,
                     enabled = true,
                 )

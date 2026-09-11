@@ -9,6 +9,7 @@ import io.legado.app.domain.model.CachedChapterSnapshot
 import io.legado.app.domain.model.EbookDocument
 import io.legado.app.domain.model.EbookDocumentChapter
 import io.legado.app.domain.model.EbookImageBlock
+import io.legado.app.domain.model.EbookParagraphBlock
 import io.legado.app.service.export.EbookExportFormat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -23,8 +24,11 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import splitties.init.injectAsAppCtx
 import java.io.File
+import java.io.StringReader
 import java.nio.file.Files
 import java.util.zip.ZipFile
+import javax.xml.parsers.DocumentBuilderFactory
+import org.xml.sax.InputSource
 
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [35])
@@ -77,6 +81,92 @@ class ExportAuthoringProjectUseCaseTest {
             }
         } finally {
             imageDirectory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun epub3ExportIncludesDctermsNamespaceAndValidTimestamp() = runBlocking {
+        val project = AuthoringProject(
+            id = "project_metadata_test",
+            kind = AuthoringProjectKind.EBOOK_EDITOR,
+            title = "Test EPUB3 Title",
+            author = "Test Author",
+            document = EbookDocument(
+                chapters = listOf(
+                    EbookDocumentChapter(
+                        id = "ch1",
+                        title = "Chapter 1",
+                        blocks = listOf(EbookParagraphBlock(text = "Hello world")),
+                    )
+                ),
+            ),
+            createdAt = 1700000000123L,
+            updatedAt = 1700000000123L,
+        )
+        val output = ExportAuthoringProjectUseCase(
+            context = RuntimeEnvironment.getApplication(),
+            cachedChapterGateway = EmptyCachedChapterGateway,
+            validateEbookProject = ValidateEbookProjectUseCase(),
+        ).execute(project, EbookExportFormat.EPUB3)
+
+        ZipFile(output).use { zip ->
+            val opfText = zip.getInputStream(zip.getEntry("OEBPS/content.opf"))
+                .bufferedReader()
+                .readText()
+
+            // Verify dcterms namespace is declared in metadata
+            assertTrue(opfText.contains("xmlns:dcterms=\"http://purl.org/dc/terms/\""))
+            // Verify dcterms:modified tag exists
+            assertTrue(opfText.contains("<meta property=\"dcterms:modified\">"))
+            // Verify timestamp has no milliseconds (matches YYYY-MM-DDThh:mm:ssZ)
+            val modifiedRegex = Regex("<meta property=\"dcterms:modified\">(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)</meta>")
+            assertTrue("Timestamp should match standard UTC format without milliseconds", modifiedRegex.containsMatchIn(opfText))
+            // Verify <manifest> contains NO <meta name="cover">
+            val manifestSection = opfText.substringAfter("<manifest>").substringBefore("</manifest>")
+            assertFalse("<manifest> must not contain <meta>", manifestSection.contains("<meta"))
+        }
+    }
+
+    @Test
+    fun epub3ExportProducesWellFormedXhtmlParsableByXmlParser() = runBlocking {
+        val project = AuthoringProject(
+            id = "project_xhtml_test",
+            kind = AuthoringProjectKind.EBOOK_EDITOR,
+            title = "Valid XHTML Book",
+            author = "Author",
+            document = EbookDocument(
+                chapters = listOf(
+                    EbookDocumentChapter(
+                        id = "ch_xhtml",
+                        title = "Chapter With Entities & Tags",
+                        blocks = listOf(
+                            EbookParagraphBlock(text = "Line with & special chars and quotes \"test\""),
+                        ),
+                    )
+                ),
+            ),
+            createdAt = 1L,
+            updatedAt = 1L,
+        )
+        val output = ExportAuthoringProjectUseCase(
+            context = RuntimeEnvironment.getApplication(),
+            cachedChapterGateway = EmptyCachedChapterGateway,
+            validateEbookProject = ValidateEbookProjectUseCase(),
+        ).execute(project, EbookExportFormat.EPUB3)
+
+        ZipFile(output).use { zip ->
+            val chapterText = zip.getInputStream(zip.getEntry("OEBPS/Text/chapter_0.xhtml"))
+                .bufferedReader()
+                .readText()
+
+            // Verify that chapter is valid XML by parsing it with standard DocumentBuilder
+            val factory = DocumentBuilderFactory.newInstance()
+            factory.isNamespaceAware = true
+            val builder = factory.newDocumentBuilder()
+            val parsedDoc = builder.parse(InputSource(StringReader(chapterText)))
+            assertTrue(parsedDoc != null)
+            assertTrue(chapterText.contains("<html"))
+            assertTrue(chapterText.contains("</html>"))
         }
     }
 }

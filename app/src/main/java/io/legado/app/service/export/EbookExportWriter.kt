@@ -12,6 +12,9 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.util.Base64
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
+import org.jsoup.nodes.Entities
 import io.legado.app.domain.model.EbookBlock
 import io.legado.app.domain.model.EbookDividerBlock
 import io.legado.app.domain.model.EbookDividerType
@@ -180,12 +183,13 @@ class EbookExportWriter(
                     imageNamesBySource,
                     payload.imageOptimization,
                 )
+                val sanitizedBody = sanitizeXhtml(body)
                 zip.textEntry(
                     "OEBPS/Text/chapter_$index.xhtml",
                     xhtmlPage(
                         payload.language,
                         chapter.title,
-                        "<h2>${xml(chapter.title)}</h2>$body",
+                        "<h2>${xml(chapter.title)}</h2>$sanitizedBody",
                         styleHref = "../styles.css",
                         viewport = payload.viewport(),
                     ),
@@ -554,6 +558,7 @@ class EbookExportWriter(
         val metadataDate = payload.metadataDate
             ?.trim()
             ?.takeIf(String::isNotBlank)
+            ?.let(::formatEpub3Date)
             ?: DEFAULT_METADATA_DATE
         val id = payload.identifier
             ?.trim()
@@ -564,7 +569,11 @@ class EbookExportWriter(
             append("<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"")
                 .append(if (epub3) "3.0" else "2.0")
                 .append("\" unique-identifier=\"book-id\">")
-            append("<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">")
+            if (epub3) {
+                append("<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dcterms=\"http://purl.org/dc/terms/\">")
+            } else {
+                append("<metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">")
+            }
             append("<dc:identifier id=\"book-id\">").append(xml(id)).append("</dc:identifier>")
             append("<dc:title>").append(xml(payload.title)).append("</dc:title>")
             append("<dc:creator>").append(xml(payload.author)).append("</dc:creator>")
@@ -582,6 +591,16 @@ class EbookExportWriter(
                 append("<meta property=\"rendition:layout\">pre-paginated</meta>")
                 append("<meta property=\"rendition:orientation\">auto</meta>")
                 append("<meta property=\"rendition:spread\">auto</meta>")
+            }
+            if (!epub3) {
+                coverImageName?.let { cover ->
+                    val coverIndex = imageNames.indexOf(cover)
+                    if (coverIndex >= 0) {
+                        append("<meta name=\"cover\" content=\"image_")
+                            .append(coverIndex)
+                            .append("\"/>")
+                    }
+                }
             }
             append("</metadata>")
             append("<manifest>")
@@ -601,14 +620,6 @@ class EbookExportWriter(
                     .append(xml(name)).append("\" media-type=\"").append(imageMime(name)).append("\"")
                 if (name == coverImageName) append(" properties=\"cover-image\"")
                 append("/>")
-            }
-            coverImageName?.let { cover ->
-                val coverIndex = imageNames.indexOf(cover)
-                if (coverIndex >= 0) {
-                    append("<meta name=\"cover\" content=\"image_")
-                        .append(coverIndex)
-                        .append("\"/>")
-                }
             }
             append("</manifest><spine")
             if (!epub3) append(" toc=\"ncx\"")
@@ -797,6 +808,33 @@ class EbookExportWriter(
         .replace(">", "&gt;")
         .replace("\"", "&quot;")
         .replace("'", "&apos;")
+
+    private fun sanitizeXhtml(content: String): String {
+        if (content.isBlank()) return ""
+        val doc = Jsoup.parseBodyFragment(content)
+        doc.outputSettings()
+            .syntax(Document.OutputSettings.Syntax.xml)
+            .escapeMode(Entities.EscapeMode.xhtml)
+            .charset(Charsets.UTF_8)
+            .prettyPrint(false)
+        return doc.body().html()
+    }
+
+    private fun formatEpub3Date(dateString: String): String {
+        val trimmed = dateString.trim()
+        if (trimmed.isBlank()) return DEFAULT_METADATA_DATE
+        return runCatching {
+            java.time.Instant.parse(trimmed)
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                .toString()
+        }.getOrElse {
+            val noMillis = trimmed.replace(Regex("\\.\\d+(Z|[+-]\\d{2}:?\\d{2})?$")) { match ->
+                val zone = match.groupValues[1]
+                if (zone.isNotBlank()) zone else "Z"
+            }
+            if (noMillis.endsWith("Z", ignoreCase = true)) noMillis else "${noMillis}Z"
+        }
+    }
 
     companion object {
         private const val PAGE_WIDTH = 1240

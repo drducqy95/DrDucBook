@@ -52,7 +52,7 @@ object BookContent {
         body ?: throw NoStackTraceException(
             appCtx.getString(R.string.error_get_web_content, baseUrl)
         )
-        Debug.log(bookSource.bookSourceUrl, "≡获取成功:${baseUrl}")
+        Debug.log(bookSource.bookSourceUrl, "≡Tải thành công:${baseUrl}")
         if (!needSave) {
             Debug.log(bookSource.bookSourceUrl, body, state = 40)
         }
@@ -110,12 +110,12 @@ object BookContent {
                     nextUrl =
                         if (contentData.second.isNotEmpty()) contentData.second[0] else ""
                     appendContent(contentData.first)
-                    Debug.log(bookSource.bookSourceUrl, "第${pageCount}页完成")
+                    Debug.log(bookSource.bookSourceUrl, "Trang ${pageCount} hoàn thành")
                 }
             }
-            Debug.log(bookSource.bookSourceUrl, "◇本章总页数:${nextUrlList.size}")
+            Debug.log(bookSource.bookSourceUrl, "◇Tổng số trang của chương này:${nextUrlList.size}")
         } else if (contentData.second.size > 1) {
-            Debug.log(bookSource.bookSourceUrl, "◇并发解析正文,总页数:${contentData.second.size}")
+            Debug.log(bookSource.bookSourceUrl, "◇Phân tích nội dung đồng thời, tổng số trang:${contentData.second.size}")
             flow {
                 for (urlStr in contentData.second) {
                     emit(urlStr)
@@ -145,7 +145,7 @@ object BookContent {
             var title = analyzeRule.runCatching {
                 getString(titleRule)
             }.onFailure {
-                Debug.log(bookSource.bookSourceUrl, "获取标题出错, ${it.localizedMessage}")
+                Debug.log(bookSource.bookSourceUrl, "Lỗi khi lấy tiêu đề, ${it.localizedMessage}")
             }.getOrNull()
             if (!title.isNullOrBlank()) {
                 val matchResult = AppPattern.imgRegex.find(title)
@@ -171,16 +171,16 @@ object BookContent {
             contentStr = analyzeRule.getString(replaceRegex, contentStr)
             contentStr = contentStr.split(AppPattern.LFRegex).joinToString("\n") { "　　$it" }
         }
-        Debug.log(bookSource.bookSourceUrl, "┌获取章节名称")
+        Debug.log(bookSource.bookSourceUrl, "┌Lấy tên chương")
         Debug.log(bookSource.bookSourceUrl, "└${bookChapter.title}")
-        Debug.log(bookSource.bookSourceUrl, "┌获取正文内容")
+        Debug.log(bookSource.bookSourceUrl, "┌Lấy nội dung chính")
         if (needSave) {
-            Debug.log(bookSource.bookSourceUrl, "└正文长度:${contentStr.length}")
+            Debug.log(bookSource.bookSourceUrl, "└Độ dài nội dung: ${contentStr.length}")
         } else {
             Debug.log(bookSource.bookSourceUrl, "└\n$contentStr")
         }
         if (!bookChapter.isVolume && contentStr.isBlank()) {
-            throw ContentEmptyException("内容为空")
+            throw ContentEmptyException("Nội dung trống")
         }
         if (needSave) {
             BookHelp.saveContent(bookSource, book, bookChapter, contentStr)
@@ -238,7 +238,7 @@ object BookContent {
         if (getNextPageUrl) {
             val nextUrlRule = contentRule.nextContentUrl
             if (!nextUrlRule.isNullOrEmpty()) {
-                Debug.log(bookSource.bookSourceUrl, "┌获取正文下一页链接", printLog)
+                Debug.log(bookSource.bookSourceUrl, "┌Lấy liên kết trang tiếp theo", printLog)
                 analyzeRule.getStringList(nextUrlRule, isUrl = true)?.let {
                     nextUrlList.addAll(it)
                 }

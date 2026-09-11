@@ -1,12 +1,17 @@
 package io.legado.app.ui.media.player
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.app.PictureInPictureParams
+import android.app.RemoteAction
 import android.content.pm.ActivityInfo
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
+import android.graphics.drawable.Icon
 import android.graphics.Typeface
 import android.media.AudioManager
+import android.os.Build
 import android.util.Rational
 import android.view.View
 import android.view.ViewGroup
@@ -18,9 +23,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.PictureInPictureModeChangedInfo
+import androidx.core.util.Consumer
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.CaptionStyleCompat
@@ -30,6 +43,8 @@ import androidx.core.view.WindowInsetsCompat
 import io.legado.app.help.media.MediaPlaybackConnection
 import io.legado.app.ui.config.themeConfig.ThemeConfig
 import io.legado.app.service.MediaDownloadService
+import io.legado.app.service.MediaPlaybackService
+import com.drducbook.app.R
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.compose.koinInject
@@ -50,22 +65,65 @@ fun MediaPlayerRouteScreen(
     val player by playbackConnection.player.collectAsStateWithLifecycle()
     val activity = context.findActivity()
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isInPipMode by remember {
+        mutableStateOf(activity?.isInPictureInPictureMode == true)
+    }
+
     DisposableEffect(playbackConnection) {
         playbackConnection.connect()
         onDispose { playbackConnection.disconnect() }
     }
 
-    DisposableEffect(activity, state.isVideo, state.isPlaying) {
+    DisposableEffect(activity) {
+        val componentActivity = activity as? ComponentActivity
+        val pipListener = Consumer<PictureInPictureModeChangedInfo> { info ->
+            isInPipMode = info.isInPictureInPictureMode
+        }
+        componentActivity?.addOnPictureInPictureModeChangedListener(pipListener)
+        onDispose {
+            componentActivity?.removeOnPictureInPictureModeChangedListener(pipListener)
+        }
+    }
+
+    DisposableEffect(activity) {
         val componentActivity = activity as? ComponentActivity
         val listener = Runnable {
-            if (state.isVideo && state.isPlaying) {
-                componentActivity?.enterPictureInPictureMode(
-                    PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
-                )
+            val current = viewModel.uiState.value
+            if (current.isVideo && current.isPlaying) {
+                runCatching {
+                    componentActivity?.enterPictureInPictureMode(
+                        buildPipParams(context, current.isPlaying, current.isVideo)
+                    )
+                }
             }
         }
         componentActivity?.addOnUserLeaveHintListener(listener)
         onDispose { componentActivity?.removeOnUserLeaveHintListener(listener) }
+    }
+
+    LaunchedEffect(activity, state.isVideo, state.isPlaying) {
+        if (activity != null && state.isVideo) {
+            runCatching {
+                activity.setPictureInPictureParams(
+                    buildPipParams(context, state.isPlaying, state.isVideo)
+                )
+            }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, activity, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                val pipActive = activity?.isInPictureInPictureMode == true
+                val current = viewModel.uiState.value
+                if (current.isVideo && current.isPlaying && !pipActive) {
+                    viewModel.onIntent(MediaPlayerIntent.TogglePlayback)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LaunchedEffect(bookUrl, chapterIndex, viewModel) {
@@ -77,11 +135,11 @@ fun MediaPlayerRouteScreen(
             when (effect) {
                 MediaPlayerEffect.Exit -> onBack()
                 MediaPlayerEffect.EnterPictureInPicture -> {
-                    context.findActivity()?.enterPictureInPictureMode(
-                        PictureInPictureParams.Builder()
-                            .setAspectRatio(Rational(16, 9))
-                            .build()
-                    )
+                    runCatching {
+                        activity?.enterPictureInPictureMode(
+                            buildPipParams(context, state.isPlaying, state.isVideo)
+                        )
+                    }
                 }
                 MediaPlayerEffect.StartDownloadService -> MediaDownloadService.start(context)
                 MediaPlayerEffect.OpenDownloads -> onOpenDownloads()
@@ -142,6 +200,7 @@ fun MediaPlayerRouteScreen(
     MediaPlayerScreen(
         state = state,
         onIntent = viewModel::onIntent,
+        isInPipMode = isInPipMode,
         mediaSurface = {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -152,6 +211,8 @@ fun MediaPlayerRouteScreen(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                         )
                         useController = false
+                        isClickable = false
+                        isFocusable = false
                         this.player = player
                     }
                 },
@@ -163,6 +224,43 @@ fun MediaPlayerRouteScreen(
             )
         },
     )
+}
+
+private fun buildPipParams(
+    context: Context,
+    isPlaying: Boolean,
+    isVideo: Boolean,
+): PictureInPictureParams {
+    val playPauseIntent = Intent(context, MediaPlaybackService::class.java).apply {
+        action = if (isPlaying) MediaPlaybackService.ACTION_PAUSE else MediaPlaybackService.ACTION_PLAY
+    }
+    val playPausePendingIntent = PendingIntent.getService(
+        context,
+        if (isPlaying) 101 else 102,
+        playPauseIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+    val playPauseIcon = Icon.createWithResource(
+        context,
+        if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play,
+    )
+    val playPauseTitle = context.getString(if (isPlaying) R.string.pause else R.string.resume)
+    val playPauseAction = RemoteAction(
+        playPauseIcon,
+        playPauseTitle,
+        playPauseTitle,
+        playPausePendingIntent,
+    )
+
+    val builder = PictureInPictureParams.Builder()
+        .setAspectRatio(Rational(16, 9))
+        .setActions(listOf(playPauseAction))
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        builder.setAutoEnterEnabled(isVideo && isPlaying)
+    }
+
+    return builder.build()
 }
 
 @OptIn(UnstableApi::class)

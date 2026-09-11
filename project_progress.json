@@ -1,9 +1,9 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-09-05T13:20:00.000000",
+    "last_updated": "2026-09-11T10:38:00.000000",
     "overall_progress_percent": 100,
-    "current_phase": "Execution / Release Verified",
+    "current_phase": "Phase 26 - Multilingual Translation System Upgrade Completed (Release Ready)",
     "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9"
@@ -737,6 +737,197 @@
         {
           "id": "T19.5",
           "desc": "Build verification (compileAppDebugKotlin, testAppDebugUnitTest, assembleAppDebug) and live emulator-5554 UI verification",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P20",
+      "name": "AI Model Picker, Web Multi-Account, Rewrite Unification & Formatting",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T20.1",
+          "desc": "Phase 04 - Rewrite Prompt Formatting, Paragraph Indentation & Capitalization Post-Processor",
+          "status": "DONE"
+        },
+        {
+          "id": "T20.2",
+          "desc": "Phase 01 - AiComboModelPickerSheet & Bottom Sheet Integration (Prompt Editor, Translation Config, Summary Config)",
+          "status": "DONE"
+        },
+        {
+          "id": "T20.3",
+          "desc": "Phase 03 - AI Rewrite Provider Unification in Translation Settings (Presets, Custom Prompt, Auto-Rewrite)",
+          "status": "DONE"
+        },
+        {
+          "id": "T20.4",
+          "desc": "Phase 02 - Multi-Account Web Provider Support for Gemini Web & ChatGPT Web via WebLoginSheet",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P21",
+      "name": "Fix TOC Progressive Translation, Chapter Numbering Restructuring & Flexible Top Bar Default",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T21.1",
+          "desc": "TOC progressive chunked emission (50 chapters/batch) and topBarTitle/displayBookName flow integration",
+          "status": "DONE"
+        },
+        {
+          "id": "T21.2",
+          "desc": "Chapter number restructuring post-processor ('Đệ X Chương' -> 'Chương X') in TranslateDynamicUiTextUseCase",
+          "status": "DONE"
+        },
+        {
+          "id": "T21.3",
+          "desc": "Disable flexible top bar default (useFlexibleTopAppBar = false in ThemeConfig & ThemeImportExport)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P22",
+      "name": "Fix Metadata QT Translation, Book Name Title Case & Reader Footer Book Name",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T22.1",
+          "desc": "Migrate executeAuthorName() from hanViet() to translate() with dictionary projectTerms and restructureChapterNumbers()",
+          "status": "DONE"
+        },
+        {
+          "id": "T22.2",
+          "desc": "Implement executeBookName() with Title Case for Book Info, Bookshelf, Explore, Toc, and Home",
+          "status": "DONE"
+        },
+        {
+          "id": "T22.3",
+          "desc": "Implement dynamicBookName in ReadBook, ReadBookViewModel, and PageView footer bar",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P23",
+      "name": "EPUB3 Export Bug Fixes & XHTML / OPF Compliance",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T23.1",
+          "desc": "Declare xmlns:dcterms in OPF metadata for EPUB3",
+          "status": "DONE"
+        },
+        {
+          "id": "T23.2",
+          "desc": "Enforce UTC ISO-8601 without milliseconds for dcterms:modified (formatEpub3Date & ExportBookService)",
+          "status": "DONE"
+        },
+        {
+          "id": "T23.3",
+          "desc": "Remove illegal meta cover from OPF manifest and preserve inside metadata for EPUB2 only",
+          "status": "DONE"
+        },
+        {
+          "id": "T23.4",
+          "desc": "Sanitize chapter body HTML to well-formed XHTML with Jsoup Syntax.xml before writing chapter xhtml files",
+          "status": "DONE"
+        },
+        {
+          "id": "T23.5",
+          "desc": "Add automated unit tests validating OPF dcterms namespace, timestamp format, and XML parser compliance",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P24",
+      "name": "Video Player Controls & PiP Lifecycle Fixes",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T24.1",
+          "desc": "Phase 01 - Fix video controls visibility, gesture layer, icon tints, navigation bar insets, and auto-hide timing",
+          "status": "DONE"
+        },
+        {
+          "id": "T24.2",
+          "desc": "Phase 02 - Fix PiP lifecycle with Android 12 setAutoEnterEnabled, stable leave-hint listener, PiP RemoteActions, overlay cleanup, and non-PiP background auto-pause",
+          "status": "DONE"
+        },
+        {
+          "id": "T24.3",
+          "desc": "Phase 03 - Build verification (compileAppDebugKotlin) and regression tests",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P25",
+      "name": "Brand Icon Refresh & Vietnamese Localization Completion (Notifications & Source Debug)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T25.1",
+          "desc": "Phase 01 - Brand icon generation: Release adaptive/legacy/monochrome icons (#F5E9D8), Debug B&W icons (#EAEAEA), WebService icons/favicons, and BrandIdentityTest validation",
+          "status": "DONE"
+        },
+        {
+          "id": "T25.2",
+          "desc": "Phase 02 - Notification & Service string localization: strings-vi parity, DownloadService, ExportBookService, CacheBookService, CacheBook, CheckSourceService, and ReadAloud/TTS/Audio services",
+          "status": "DONE"
+        },
+        {
+          "id": "T25.3",
+          "desc": "Phase 03 - Source Debug localization: Debug.kt, BookSourceDebugActivity, RssSourceDebugActivity, activity_source_debug.xml, WebBook parsers (BookContent, BookInfo, BookList, BookChapterList, WebBook, Rss, RssParserByRule, RssParserDefault)",
+          "status": "DONE"
+        },
+        {
+          "id": "T25.4",
+          "desc": "Phase 04 - Verification & tests: Fix duplicate resources, compileAppDebugKotlin, and BrandIdentityTest passed",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P26",
+      "name": "Multilingual Translation System Upgrade & Pipeline Optimization",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T26.1",
+          "desc": "Phase 01 - Foreign Name Resolution & Jieba Pre-Process Integration (name-resolver.md, name-restoration-dict.json, source_analyzer.py, trinity_translation_runtime.py, glossary-manager.md, SKILL.md)",
+          "status": "DONE"
+        },
+        {
+          "id": "T26.2",
+          "desc": "Phase 02 - Hybrid Pipeline & Deterministic Hard Validation (7-step hybrid, hard validation engine, fast-pass reflection)",
+          "status": "DONE"
+        },
+        {
+          "id": "T26.3",
+          "desc": "Phase 03 - Token Budgeting & Context Compression (context pack trimmer, timeline deduplication, empty field skipping)",
+          "status": "DONE"
+        },
+        {
+          "id": "T26.4",
+          "desc": "Phase 04 - Prompt Quality, Unified XML Architecture & Register Exclamation (USER_LAYER/SYSTEM_LAYER separation, register-aware slang mapping)",
+          "status": "DONE"
+        },
+        {
+          "id": "T26.5",
+          "desc": "Phase 05 - en-vi Pair Bootstrap & Legado App Production Sync (en-vi database, TranslationConstants.kt, AiPromptCatalog.kt, AiTranslationRefinePipeline.kt, AiTranslationStoryMemory.kt)",
           "status": "DONE"
         }
       ]

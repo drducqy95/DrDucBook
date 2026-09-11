@@ -59,7 +59,7 @@ object ThemeConfig {
 
     var bottomBarLensRadius by prefDelegate(PreferKey.bottomBarLensRadius, 24f)
 
-    var useFlexibleTopAppBar by prefDelegate(PreferKey.useFlexibleTopAppBar, true)
+    var useFlexibleTopAppBar by prefDelegate(PreferKey.useFlexibleTopAppBar, false)
 
     var bookInfoFollowCoverColor by prefDelegate(PreferKey.bookInfoFollowCoverColor, true)
 

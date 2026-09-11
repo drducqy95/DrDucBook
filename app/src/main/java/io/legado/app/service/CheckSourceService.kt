@@ -342,11 +342,11 @@ class CheckSourceService : BaseService(), KoinComponent {
             timeoutMs = session.timeoutMs,
         )
         if (run.healthStatus in SUCCESS_STATUSES) {
-            Debug.updateFinalMessage(checkSource.bookSourceUrl, "校验成功")
+            Debug.updateFinalMessage(checkSource.bookSourceUrl, getString(R.string.check_source_success))
         } else {
             Debug.updateFinalMessage(
                 checkSource.bookSourceUrl,
-                "校验失败:${run.messageRedacted ?: run.healthStatus.name}"
+                getString(R.string.check_source_failed, run.messageRedacted ?: run.healthStatus.name)
             )
         }
         return run

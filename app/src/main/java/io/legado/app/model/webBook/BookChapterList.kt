@@ -44,7 +44,7 @@ object BookChapterList {
             appCtx.getString(R.string.error_get_web_content, baseUrl)
         )
         val chapterList = ArrayList<BookChapter>()
-        Debug.log(bookSource.bookSourceUrl, "≡获取成功:${baseUrl}")
+        Debug.log(bookSource.bookSourceUrl, "≡Tải thành công:${baseUrl}")
         Debug.log(bookSource.bookSourceUrl, body, state = 30)
         val tocRule = bookSource.getTocRule()
         val nextUrlList = arrayListOf(redirectUrl)
@@ -85,13 +85,13 @@ object BookChapterList {
                         chapterList.addAll(chapterData.first)
                     }
                 }
-                Debug.log(bookSource.bookSourceUrl, "◇目录总页数:${nextUrlList.size}")
+                Debug.log(bookSource.bookSourceUrl, "◇Tổng số trang mục lục:${nextUrlList.size}")
             }
 
             else -> {
                 Debug.log(
                     bookSource.bookSourceUrl,
-                    "◇并发解析目录,总页数:${chapterData.second.size}"
+                    "◇Phân tích mục lục đồng thời, tổng số trang:${chapterData.second.size}"
                 )
                 flow {
                     for (urlStr in chapterData.second) {
@@ -127,7 +127,7 @@ object BookChapterList {
         if (!book.getReverseToc()) {
             list.reverse()
         }
-        Debug.log(book.origin, "◇目录总数:${list.size}")
+        Debug.log(book.origin, "◇Tổng số mục mục lục:${list.size}")
         coroutineContext.ensureActive()
         list.forEachIndexed { index, bookChapter ->
             bookChapter.index = index
@@ -146,7 +146,7 @@ object BookChapterList {
                             bookChapter.title = it
                         }
                     }.onFailure {
-                        Debug.log(book.origin, "格式化标题出错, ${it.localizedMessage}")
+                        Debug.log(book.origin, "Lỗi định dạng tiêu đề, ${it.localizedMessage}")
                     }
                 }
             }
@@ -185,14 +185,14 @@ object BookChapterList {
         analyzeRule.setCoroutineContext(coroutineContext)
         //获取目录列表
         val chapterList = arrayListOf<BookChapter>()
-        Debug.log(bookSource.bookSourceUrl, "┌获取目录列表", log)
+        Debug.log(bookSource.bookSourceUrl, "┌Lấy danh sách mục lục", log)
         val elements = analyzeRule.getElements(listRule)
-        Debug.log(bookSource.bookSourceUrl, "└列表大小:${elements.size}", log)
+        Debug.log(bookSource.bookSourceUrl, "└Số lượng danh sách:${elements.size}", log)
         //获取下一页链接
         val nextUrlList = arrayListOf<String>()
         val nextTocRule = tocRule.nextTocUrl
         if (getNextUrl && !nextTocRule.isNullOrEmpty()) {
-            Debug.log(bookSource.bookSourceUrl, "┌获取目录下一页列表", log)
+            Debug.log(bookSource.bookSourceUrl, "┌Lấy danh sách trang mục lục tiếp theo", log)
             analyzeRule.getStringList(nextTocRule, isUrl = true)?.let {
                 for (item in it) {
                     if (item != redirectUrl) {
@@ -208,7 +208,7 @@ object BookChapterList {
         }
         coroutineContext.ensureActive()
         if (elements.isNotEmpty()) {
-            Debug.log(bookSource.bookSourceUrl, "┌解析目录列表", log)
+            Debug.log(bookSource.bookSourceUrl, "┌Phân tích danh sách mục lục", log)
             val nameRule = analyzeRule.splitSourceRule(tocRule.chapterName)
             val urlRule = analyzeRule.splitSourceRule(tocRule.chapterUrl)
             val vipRule = analyzeRule.splitSourceRule(tocRule.isVip)
@@ -233,13 +233,13 @@ object BookChapterList {
                         bookChapter.url = bookChapter.title + index
                         Debug.log(
                             bookSource.bookSourceUrl,
-                            "⇒一级目录${index}未获取到url,使用标题替代"
+                            "⇒Mục lục cấp một ${index} không lấy được URL, sử dụng tiêu đề thay thế"
                         )
                     } else {
                         bookChapter.url = baseUrl
                         Debug.log(
                             bookSource.bookSourceUrl,
-                            "⇒目录${index}未获取到url,使用baseUrl替代"
+                            "⇒Mục lục ${index} không lấy được URL, sử dụng baseUrl thay thế"
                         )
                     }
                 }
@@ -255,16 +255,16 @@ object BookChapterList {
                     chapterList.add(bookChapter)
                 }
             }
-            Debug.log(bookSource.bookSourceUrl, "└目录列表解析完成", log)
+            Debug.log(bookSource.bookSourceUrl, "└Phân tích danh sách mục lục hoàn tất", log)
             if (chapterList.isEmpty()) {
-                Debug.log(bookSource.bookSourceUrl, "◇章节列表为空", log)
+                Debug.log(bookSource.bookSourceUrl, "◇Danh sách chương trống", log)
             } else {
-                Debug.log(bookSource.bookSourceUrl, "≡首章信息", log)
-                Debug.log(bookSource.bookSourceUrl, "◇章节名称:${chapterList[0].title}", log)
-                Debug.log(bookSource.bookSourceUrl, "◇章节链接:${chapterList[0].url}", log)
-                Debug.log(bookSource.bookSourceUrl, "◇章节信息:${chapterList[0].tag}", log)
-                Debug.log(bookSource.bookSourceUrl, "◇是否VIP:${chapterList[0].isVip}", log)
-                Debug.log(bookSource.bookSourceUrl, "◇是否购买:${chapterList[0].isPay}", log)
+                Debug.log(bookSource.bookSourceUrl, "≡Thông tin chương đầu tiên", log)
+                Debug.log(bookSource.bookSourceUrl, "◇Tên chương:${chapterList[0].title}", log)
+                Debug.log(bookSource.bookSourceUrl, "◇Liên kết chương:${chapterList[0].url}", log)
+                Debug.log(bookSource.bookSourceUrl, "◇Thông tin chương:${chapterList[0].tag}", log)
+                Debug.log(bookSource.bookSourceUrl, "◇VIP:${chapterList[0].isVip}", log)
+                Debug.log(bookSource.bookSourceUrl, "◇Đã mua:${chapterList[0].isPay}", log)
             }
         }
         return Pair(chapterList, nextUrlList)

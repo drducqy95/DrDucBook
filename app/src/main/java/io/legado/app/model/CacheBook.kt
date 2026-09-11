@@ -3,6 +3,7 @@ package io.legado.app.model
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import com.drducbook.app.R
 import io.legado.app.constant.IntentAction
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -16,6 +17,7 @@ import io.legado.app.service.CacheBookService
 import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.onEachParallel
+import splitties.init.appCtx
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
@@ -306,7 +308,7 @@ object CacheBook {
             ContextCompat.startForegroundService(context, intent)
             true
         } catch (e: Exception) {
-            LogUtils.e("CacheBook", "启动下载服务失败: ${e.localizedMessage}")
+            LogUtils.e("CacheBook", "Khởi động dịch vụ tải xuống thất bại: ${e.localizedMessage}")
             false
         }
     }
@@ -578,7 +580,14 @@ object CacheBook {
         } else {
             0
         }
-        return "下载中:$downloadingCount | 等待:$waitingCount | 暂停:$pausedCount | 失败:${stateStore.state.totalFailure} | 已缓存:${successDownloadCount.get()}"
+        return appCtx.getString(
+            R.string.cache_task_summary,
+            downloadingCount,
+            waitingCount,
+            pausedCount,
+            stateStore.state.totalFailure,
+            successDownloadCount.get()
+        )
     }
 
     private fun CacheDownloadRequest.hasValidSelection(): Boolean {

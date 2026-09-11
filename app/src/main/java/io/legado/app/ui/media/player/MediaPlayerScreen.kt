@@ -15,8 +15,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -47,10 +49,13 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -90,9 +95,10 @@ fun MediaPlayerScreen(
     state: MediaPlayerUiState,
     onIntent: (MediaPlayerIntent) -> Unit,
     mediaSurface: @Composable () -> Unit,
+    isInPipMode: Boolean = false,
 ) {
     var controlsVisible by remember(state.bookUrl, state.chapterIndex) { mutableStateOf(true) }
-    val showTopBar = !state.isVideo || (controlsVisible && !state.controlsLocked)
+    val showTopBar = !isInPipMode && (!state.isVideo || (controlsVisible && !state.controlsLocked))
 
     LaunchedEffect(
         state.isVideo,
@@ -101,8 +107,10 @@ fun MediaPlayerScreen(
         state.showChapterSheet,
         state.showSettingsSheet,
         controlsVisible,
+        isInPipMode,
     ) {
         if (
+            !isInPipMode &&
             state.isVideo &&
             state.isPlaying &&
             controlsVisible &&
@@ -198,12 +206,15 @@ fun MediaPlayerScreen(
                     onShowControls = {
                         controlsVisible = true
                     },
+                    isInPipMode = isInPipMode,
                 )
             }
         }
     }
-    MediaChapterSheet(state, onIntent)
-    MediaPlayerSettingsSheet(state, onIntent)
+    if (!isInPipMode) {
+        MediaChapterSheet(state, onIntent)
+        MediaPlayerSettingsSheet(state, onIntent)
+    }
 }
 
 @Composable
@@ -214,6 +225,7 @@ private fun MediaPlayerContent(
     controlsVisible: Boolean,
     onToggleControls: () -> Unit,
     onShowControls: () -> Unit,
+    isInPipMode: Boolean = false,
 ) {
     if (state.isVideo) {
         VideoPlayerContent(
@@ -223,6 +235,7 @@ private fun MediaPlayerContent(
             controlsVisible = controlsVisible,
             onToggleControls = onToggleControls,
             onShowControls = onShowControls,
+            isInPipMode = isInPipMode,
         )
     } else {
         AudioPlayerContent(
@@ -240,80 +253,93 @@ private fun VideoPlayerContent(
     controlsVisible: Boolean,
     onToggleControls: () -> Unit,
     onShowControls: () -> Unit,
+    isInPipMode: Boolean = false,
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
-            .pointerInput(state.seekBackwardSeconds, state.seekForwardSeconds, state.controlsLocked) {
-                detectTapGestures(
-                    onTap = {
-                        if (state.controlsLocked) {
-                            onShowControls()
-                        } else {
-                            onToggleControls()
-                        }
-                    },
-                    onDoubleTap = { offset ->
-                        onShowControls()
-                        if (!state.controlsLocked) {
-                            onIntent(
-                                MediaPlayerIntent.SeekBy(
-                                    if (offset.x < size.width / 2f) {
-                                        -state.seekBackwardSeconds * 1_000L
-                                    } else {
-                                        state.seekForwardSeconds * 1_000L
-                                    }
-                                )
-                            )
-                        }
-                    },
-                    onPress = {
-                        if (!state.controlsLocked) {
-                            coroutineScope {
-                                var boosted = false
-                                val boostJob = launch {
-                                    delay(450L)
-                                    boosted = true
-                                    onIntent(MediaPlayerIntent.BeginSpeedBoost)
-                                }
-                                tryAwaitRelease()
-                                boostJob.cancel()
-                                if (boosted) onIntent(MediaPlayerIntent.EndSpeedBoost)
-                            }
-                        }
-                    },
-                )
-            }
-            .pointerInput(state.controlsLocked) {
-                if (state.controlsLocked) return@pointerInput
-                var adjustBrightness = false
-                detectVerticalDragGestures(
-                    onDragStart = {
-                        onShowControls()
-                        adjustBrightness = it.x < size.width / 2f
-                    },
-                    onVerticalDrag = { change, amount ->
-                        change.consume()
-                        val delta = -amount / size.height.coerceAtLeast(1).toFloat()
-                        onIntent(
-                            if (adjustBrightness) MediaPlayerIntent.AdjustBrightness(delta)
-                            else MediaPlayerIntent.AdjustVolume(delta)
-                        )
-                    },
-                    onDragEnd = { onIntent(MediaPlayerIntent.ClearGestureIndicator) },
-                    onDragCancel = { onIntent(MediaPlayerIntent.ClearGestureIndicator) },
-                )
-            },
+            .background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
         mediaSurface()
+
+        if (!isInPipMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(state.seekBackwardSeconds, state.seekForwardSeconds, state.controlsLocked) {
+                        detectTapGestures(
+                            onTap = {
+                                if (state.controlsLocked) {
+                                    onShowControls()
+                                } else {
+                                    onToggleControls()
+                                }
+                            },
+                            onDoubleTap = { offset ->
+                                onShowControls()
+                                if (!state.controlsLocked) {
+                                    onIntent(
+                                        MediaPlayerIntent.SeekBy(
+                                            if (offset.x < size.width / 2f) {
+                                                -state.seekBackwardSeconds * 1_000L
+                                            } else {
+                                                state.seekForwardSeconds * 1_000L
+                                            }
+                                        )
+                                    )
+                                }
+                            },
+                            onPress = {
+                                if (!state.controlsLocked) {
+                                    coroutineScope {
+                                        var boosted = false
+                                        val boostJob = launch {
+                                            delay(450L)
+                                            boosted = true
+                                            onIntent(MediaPlayerIntent.BeginSpeedBoost)
+                                        }
+                                        tryAwaitRelease()
+                                        boostJob.cancel()
+                                        if (boosted) onIntent(MediaPlayerIntent.EndSpeedBoost)
+                                    }
+                                }
+                            },
+                        )
+                    }
+                    .pointerInput(state.controlsLocked) {
+                        if (state.controlsLocked) return@pointerInput
+                        var adjustBrightness = false
+                        detectVerticalDragGestures(
+                            onDragStart = {
+                                onShowControls()
+                                adjustBrightness = it.x < size.width / 2f
+                            },
+                            onVerticalDrag = { change, amount ->
+                                change.consume()
+                                val delta = -amount / size.height.coerceAtLeast(1).toFloat()
+                                onIntent(
+                                    if (adjustBrightness) MediaPlayerIntent.AdjustBrightness(delta)
+                                    else MediaPlayerIntent.AdjustVolume(delta)
+                                )
+                            },
+                            onDragEnd = { onIntent(MediaPlayerIntent.ClearGestureIndicator) },
+                            onDragCancel = { onIntent(MediaPlayerIntent.ClearGestureIndicator) },
+                        )
+                    }
+            )
+        }
+
         if (state.isBuffering) {
             AppCircularProgressIndicator()
         }
-        if (controlsVisible || state.controlsLocked) {
+
+        if (!isInPipMode && (controlsVisible || state.controlsLocked)) {
             Row(
-                modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(8.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 AppIconButton(
@@ -344,19 +370,24 @@ private fun VideoPlayerContent(
                 }
             }
         }
-        if (controlsVisible && !state.controlsLocked) {
+
+        if (!isInPipMode && controlsVisible && !state.controlsLocked) {
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .background(Color.Black.copy(alpha = 0.68f))
+                    .navigationBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 MediaControlPanel(state = state, onIntent = onIntent)
             }
         }
-        MediaGestureOverlay(state, Modifier.align(Alignment.Center))
+
+        if (!isInPipMode) {
+            MediaGestureOverlay(state, Modifier.align(Alignment.Center))
+        }
     }
 }
 
@@ -403,31 +434,35 @@ private fun MediaControlPanel(
     state: MediaPlayerUiState,
     onIntent: (MediaPlayerIntent) -> Unit,
 ) {
-    Text(
-        text = state.episodeTitle,
-        style = LegadoTheme.typography.titleLarge,
-        fontWeight = FontWeight.SemiBold,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-        color = if (state.isVideo) Color.White else Color.Unspecified,
-    )
-    Text(
-        text = stringResource(
-            R.string.media_episode_progress,
-            state.chapterIndex + 1,
-            state.chapterCount,
-        ),
-        style = LegadoTheme.typography.bodySmall,
-        color = if (state.isVideo) Color.White.copy(alpha = 0.78f)
-        else LegadoTheme.colorScheme.onSurfaceVariant,
-    )
-    PlaybackSeekBar(state = state, onIntent = onIntent)
-    PlaybackControls(state = state, onIntent = onIntent)
-    DownloadCurrentButton(state = state, onIntent = onIntent)
-    VariantSelector(state = state, onIntent = onIntent)
-    SubtitleSelector(state = state, onIntent = onIntent)
-    AudioTrackSelector(state = state, onIntent = onIntent)
-    PlaybackSpeedSelector(state = state, onIntent = onIntent)
+    CompositionLocalProvider(
+        LocalContentColor provides if (state.isVideo) Color.White else LegadoTheme.colorScheme.onSurface
+    ) {
+        Text(
+            text = state.episodeTitle,
+            style = LegadoTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = if (state.isVideo) Color.White else Color.Unspecified,
+        )
+        Text(
+            text = stringResource(
+                R.string.media_episode_progress,
+                state.chapterIndex + 1,
+                state.chapterCount,
+            ),
+            style = LegadoTheme.typography.bodySmall,
+            color = if (state.isVideo) Color.White.copy(alpha = 0.78f)
+            else LegadoTheme.colorScheme.onSurfaceVariant,
+        )
+        PlaybackSeekBar(state = state, onIntent = onIntent)
+        PlaybackControls(state = state, onIntent = onIntent)
+        DownloadCurrentButton(state = state, onIntent = onIntent)
+        VariantSelector(state = state, onIntent = onIntent)
+        SubtitleSelector(state = state, onIntent = onIntent)
+        AudioTrackSelector(state = state, onIntent = onIntent)
+        PlaybackSpeedSelector(state = state, onIntent = onIntent)
+    }
 }
 
 @Composable
@@ -465,10 +500,12 @@ private fun PlaybackSeekBar(
         Text(
             text = formatDuration(if (dragging) (duration * sliderValue).toLong() else state.positionMs),
             style = LegadoTheme.typography.labelMedium,
+            color = if (state.isVideo) Color.White.copy(alpha = 0.88f) else Color.Unspecified,
         )
         Text(
             text = formatDuration(state.durationMs),
             style = LegadoTheme.typography.labelMedium,
+            color = if (state.isVideo) Color.White.copy(alpha = 0.88f) else Color.Unspecified,
         )
     }
 }
@@ -479,6 +516,7 @@ private fun PlaybackControls(
     onIntent: (MediaPlayerIntent) -> Unit,
 ) {
     val selected = state.variants.firstOrNull { it.id == state.selectedVariantId }
+    val iconTint = if (state.isVideo) Color.White else LocalContentColor.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -486,20 +524,30 @@ private fun PlaybackControls(
     ) {
         PlayerControlButton(
             enabled = state.hasPrevious,
-            icon = { Icon(Icons.Default.SkipPrevious, stringResource(R.string.previous_chapter)) },
+            isVideo = state.isVideo,
+            icon = {
+                Icon(
+                    Icons.Default.SkipPrevious,
+                    stringResource(R.string.previous_chapter),
+                    tint = iconTint,
+                )
+            },
             onClick = { onIntent(MediaPlayerIntent.Previous) },
         )
         PlayerControlButton(
+            isVideo = state.isVideo,
             icon = {
                 Icon(
                     Icons.Default.Replay10,
                     stringResource(R.string.media_rewind_seconds, state.seekBackwardSeconds),
+                    tint = iconTint,
                 )
             },
             onClick = { onIntent(MediaPlayerIntent.SeekBy(-state.seekBackwardSeconds * 1_000L)) },
         )
         PlayerControlButton(
             modifier = Modifier.size(64.dp),
+            isVideo = state.isVideo,
             icon = {
                 Icon(
                     imageVector = when {
@@ -513,23 +561,33 @@ private fun PlaybackControls(
                         state.isPlaying -> stringResource(R.string.pause)
                         else -> stringResource(R.string.audio_play)
                     },
+                    tint = iconTint,
                     modifier = Modifier.size(36.dp),
                 )
             },
             onClick = { onIntent(MediaPlayerIntent.TogglePlayback) },
         )
         PlayerControlButton(
+            isVideo = state.isVideo,
             icon = {
                 Icon(
                     Icons.Default.Forward10,
                     stringResource(R.string.media_forward_seconds, state.seekForwardSeconds),
+                    tint = iconTint,
                 )
             },
             onClick = { onIntent(MediaPlayerIntent.SeekBy(state.seekForwardSeconds * 1_000L)) },
         )
         PlayerControlButton(
             enabled = state.hasNext,
-            icon = { Icon(Icons.Default.SkipNext, stringResource(R.string.next_chapter)) },
+            isVideo = state.isVideo,
+            icon = {
+                Icon(
+                    Icons.Default.SkipNext,
+                    stringResource(R.string.next_chapter),
+                    tint = iconTint,
+                )
+            },
             onClick = { onIntent(MediaPlayerIntent.Next) },
         )
     }
@@ -565,11 +623,20 @@ private fun PlayerControlButton(
     icon: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    isVideo: Boolean = false,
 ) {
     AppIconButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        colors = if (isVideo) {
+            IconButtonDefaults.iconButtonColors(
+                contentColor = Color.White,
+                disabledContentColor = Color.White.copy(alpha = 0.38f),
+            )
+        } else {
+            IconButtonDefaults.iconButtonColors()
+        },
     ) {
         icon()
     }
@@ -584,6 +651,7 @@ private fun VariantSelector(
     Text(
         text = stringResource(R.string.media_quality),
         style = LegadoTheme.typography.titleSmall,
+        color = if (state.isVideo) Color.White else Color.Unspecified,
     )
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(state.variants, key = { it.id }) { variant ->
@@ -612,6 +680,7 @@ private fun PlaybackSpeedSelector(
     Text(
         text = stringResource(R.string.media_playback_speed),
         style = LegadoTheme.typography.titleSmall,
+        color = if (state.isVideo) Color.White else Color.Unspecified,
     )
     AppSlider(
         value = state.playbackSpeed,
@@ -624,13 +693,21 @@ private fun PlaybackSpeedSelector(
         accessibilityValue = "${state.playbackSpeed}x",
         modifier = Modifier.fillMaxWidth(),
     )
-    Text("${state.playbackSpeed}x", style = LegadoTheme.typography.labelMedium)
+    Text(
+        "${state.playbackSpeed}x",
+        style = LegadoTheme.typography.labelMedium,
+        color = if (state.isVideo) Color.White else Color.Unspecified,
+    )
 }
 
 @Composable
 private fun SubtitleSelector(state: MediaPlayerUiState, onIntent: (MediaPlayerIntent) -> Unit) {
     if (state.subtitleTracks.isEmpty()) return
-    Text(stringResource(R.string.media_subtitles), style = LegadoTheme.typography.titleSmall)
+    Text(
+        stringResource(R.string.media_subtitles),
+        style = LegadoTheme.typography.titleSmall,
+        color = if (state.isVideo) Color.White else Color.Unspecified,
+    )
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             FilterChip(
@@ -653,7 +730,11 @@ private fun SubtitleSelector(state: MediaPlayerUiState, onIntent: (MediaPlayerIn
 @Composable
 private fun AudioTrackSelector(state: MediaPlayerUiState, onIntent: (MediaPlayerIntent) -> Unit) {
     if (state.audioTracks.size <= 1) return
-    Text(stringResource(R.string.media_audio_tracks), style = LegadoTheme.typography.titleSmall)
+    Text(
+        stringResource(R.string.media_audio_tracks),
+        style = LegadoTheme.typography.titleSmall,
+        color = if (state.isVideo) Color.White else Color.Unspecified,
+    )
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(state.audioTracks, key = MediaTrackUi::id) { track ->
             FilterChip(
@@ -1082,7 +1163,7 @@ private val SubtitleBackgroundColors = listOf(
 
 private val SubtitleFontWeights = listOf(0, 1, 2)
 
-private const val VideoControlsAutoHideDelayMs = 3_500L
+private const val VideoControlsAutoHideDelayMs = 5_000L
 
 private fun formatDuration(valueMs: Long): String {
     val totalSeconds = (valueMs.coerceAtLeast(0L) / 1_000L)

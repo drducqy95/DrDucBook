@@ -48,6 +48,7 @@ import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
 import io.legado.app.domain.gateway.TranslationCacheGateway
 import io.legado.app.domain.model.dictionaryAwareContentHash
+import io.legado.app.domain.usecase.containsCjk
 import io.legado.app.domain.usecase.applyProviderConfigurationRevision
 import io.legado.app.domain.model.AiFailureKind
 import io.legado.app.domain.model.AiTaskType
@@ -58,6 +59,7 @@ import io.legado.app.domain.model.ReaderContentSnapshot
 import io.legado.app.domain.model.rebaseDisplayText
 import io.legado.app.domain.model.supportsQuickDictionaryEditing
 import io.legado.app.domain.model.QuickDictionaryEntry
+import io.legado.app.domain.model.VietnameseTranslationPostProcessor
 import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.domain.model.QuickDictionaryUniverse
@@ -312,6 +314,8 @@ class ReadBookViewModel(
     private var dynamicChapterTitleJob: Job? = null
     private var dynamicChapterTitleKey: DynamicChapterTitleKey? = null
     private var dynamicChapterTitle: String? = null
+    private var dynamicBookNameJob: Job? = null
+    private var dynamicBookNameKey: String? = null
     private var autoTranslationJob: Job? = null
     private var autoTranslationTaskKey: TranslationChapterKey? = null
     private var autoTranslationGeneration: Long = 0L
@@ -2142,6 +2146,7 @@ class ReadBookViewModel(
     ) {
         _uiState.update { syncFromReadBook(it) }
         scheduleCurrentChapterTitleTranslation()
+        scheduleBookNameTranslation()
         _effects.tryEmit(
             ReadBookEffect.UpContent(relativePosition, resetPageOffset, success)
         )
@@ -2155,6 +2160,7 @@ class ReadBookViewModel(
         withContext(Main.immediate) {
             _uiState.update { syncFromReadBook(it) }
             scheduleCurrentChapterTitleTranslation()
+            scheduleBookNameTranslation()
             _effects.tryEmit(
                 ReadBookEffect.UpContent(relativePosition, resetPageOffset, success)
             )
@@ -2169,6 +2175,7 @@ class ReadBookViewModel(
     override fun contentLoadFinish() {
         _uiState.update { syncFromReadBook(it).copy(isInitFinish = true) }
         scheduleCurrentChapterTitleTranslation()
+        scheduleBookNameTranslation()
         _effects.tryEmit(ReadBookEffect.ContentLoadFinish)
         maybeStartAutoTranslationQueue()
         maybeStartAutoRewriteQueue()
@@ -2467,7 +2474,7 @@ class ReadBookViewModel(
         return current.copy(
             book = book,
             bookSource = ReadBook.bookSource,
-            bookName = book?.name ?: "",
+            bookName = ReadBook.dynamicBookName ?: book?.name ?: "",
             chapterName = dynamicChapterTitle
                 ?.takeIf { dynamicChapterTitleKey == titleKey }
                 ?: rawChapterTitle,
@@ -2542,7 +2549,7 @@ class ReadBookViewModel(
         val book = ReadBook.book ?: return
         val textChapter = ReadBook.curTextChapter ?: return
         val rawTitle = textChapter.title
-        if (!TranslationConfig.dynamicUiTranslationEnabled || book.isLocal || rawTitle.isBlank()) {
+        if (!TranslationConfig.dynamicUiTranslationEnabled || rawTitle.isBlank()) {
             dynamicChapterTitleJob?.cancel()
             dynamicChapterTitleKey = null
             dynamicChapterTitle = null
@@ -2563,7 +2570,7 @@ class ReadBookViewModel(
         dynamicChapterTitleKey = key
         dynamicChapterTitle = null
         dynamicChapterTitleJob = viewModelScope.launch(IO) {
-            val translated = translateChapterUseCase.executeDynamicUiText(
+            val translated = translateChapterUseCase.executeDynamicChapterTitle(
                 scopeKey = "chapter-title:${book.bookUrl}",
                 originalText = rawTitle,
                 book = book,
@@ -2587,6 +2594,41 @@ class ReadBookViewModel(
                     // current cached layout so the first page uses the translated title too.
                     withContext(Main.immediate) {
                         ReadBook.clearTextChapter()
+                        ReadBook.loadContent(resetPageOffset = false)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun scheduleBookNameTranslation() {
+        val book = ReadBook.book ?: return
+        val rawName = book.name
+        if (!TranslationConfig.dynamicUiTranslationEnabled || !rawName.containsCjk()) {
+            dynamicBookNameJob?.cancel()
+            dynamicBookNameKey = null
+            ReadBook.dynamicBookName = null
+            return
+        }
+        val key = "${book.bookUrl}#$rawName#${quickDictionaryGateway.currentRevision}"
+        if (dynamicBookNameKey == key &&
+            (ReadBook.dynamicBookName != null || dynamicBookNameJob?.isActive == true)
+        ) {
+            return
+        }
+        dynamicBookNameJob?.cancel()
+        dynamicBookNameKey = key
+        dynamicBookNameJob = viewModelScope.launch(IO) {
+            val translated = translateChapterUseCase.executeDynamicBookName(
+                scopeKey = "reader-book-name:${book.bookUrl}",
+                originalText = rawName,
+                book = book,
+            ).getOrElse { rawName }
+            if (ReadBook.book?.bookUrl == book.bookUrl && dynamicBookNameKey == key) {
+                if (translated != rawName) {
+                    ReadBook.dynamicBookName = translated
+                    withContext(Main.immediate) {
+                        _uiState.update { it.copy(bookName = translated) }
                         ReadBook.loadContent(resetPageOffset = false)
                     }
                 }
@@ -2776,6 +2818,7 @@ class ReadBookViewModel(
         } else {
             ReadBook.resetData(book)
         }
+        scheduleBookNameTranslation()
         _uiState.update { it.copy(isInitFinish = true) }
         if (!book.isLocal && book.tocUrl.isEmpty() && !loadBookInfo(book)) {
             return
@@ -3930,7 +3973,10 @@ class ReadBookViewModel(
                         }
 
                         is AiTextFactoryUseCase.StreamEvent.Done -> {
-                            val finalRewrittenText = normalizeVietnameseProsePunctuation(event.text)
+                            val normalized = normalizeVietnameseProsePunctuation(event.text)
+                            val cleaned = VietnameseTranslationPostProcessor.cleanRogueBooleanLiterals(normalized)
+                            val capitalized = VietnameseTranslationPostProcessor.capitalizeSentences(cleaned)
+                            val finalRewrittenText = VietnameseTranslationPostProcessor.indentNarrativeParagraphs(capitalized)
                             _uiState.update {
                                 it.copy(
                                     aiTextRewrite = it.aiTextRewrite.copy(

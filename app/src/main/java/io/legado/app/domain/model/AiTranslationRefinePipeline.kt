@@ -104,6 +104,8 @@ object AiTranslationRefinePipeline {
                 stage.storageKey to promptStages[stage].orEmpty().filter(String::isNotBlank)
             }
             .filterValues(List<String>::isNotEmpty)
+        val trimmedPrevious = context.previous.lines().filter(String::isNotBlank).takeLast(6).joinToString("\n")
+        val trimmedNext = context.next.lines().filter(String::isNotBlank).take(6).joinToString("\n")
         return AiTranslationContextPack(
             translation_config = linkedMapOf(
                 "pipeline" to "translator_engine_android_v2",
@@ -123,9 +125,9 @@ object AiTranslationRefinePipeline {
             relationships_graph = storyContext.relationshipPromptRecords(),
             world_building = storyContext.worldBuildingPromptRecords(),
             translation_memory_hits = listOfNotNull(
-                context.previous.takeIf(String::isNotBlank)
+                trimmedPrevious.takeIf(String::isNotBlank)
                     ?.let { mapOf("kind" to "previous_context", "text" to it) },
-                context.next.takeIf(String::isNotBlank)
+                trimmedNext.takeIf(String::isNotBlank)
                     ?.let { mapOf("kind" to "next_context", "text" to it) },
             ),
             locked_dictionary = lockedDictionaryFor(sourceAndContext, dictionaries),
@@ -158,10 +160,12 @@ object AiTranslationRefinePipeline {
         appendLine("3. Use locked_dictionary targets exactly. Do not output raw source names when a target is locked.")
         appendLine("4. Keep every protected token byte-for-byte, exactly once, and in source order.")
         appendLine("5. For Vietnamese output, no CJK Han, Kana, or Hangul text may remain.")
-        appendLine("6. Add up to 10 new names or terms to new_entities when they should be reused later.")
-        appendLine("7. Fill new_entities, relationships, world_building, and story_timeline when the chapter reveals continuity facts.")
-        appendLine("8. Every relationship endpoint must be a raw entity name occurring in RAW or in new_entities.")
-        appendLine("9. Keep relationships and grammar_notes concise; empty arrays are valid.")
+        appendLine("6. For Western names transliterated into Chinese (e.g. 迪奈尔), restore to original Latin form (Deneir); never use crude Sino-Vietnamese transliteration (Địch Nại Nhĩ). Exclamations and slang must strictly match register and character persona.")
+        appendLine("7. Apply implicit subject omission for natural Vietnamese flow; avoid repetitive subject pronouns across consecutive sentences.")
+        appendLine("8. Add up to 10 new names or terms to new_entities when they should be reused later.")
+        appendLine("9. Fill story_timeline with: summary (chapter continuity summary), events (key plot events), characters (characters in this chapter with raw, target, status new or existing, role, and relationships), and discoveries (new items, equipment, techniques, locations, factions). Also fill new_entities, relationships, and world_building when new continuity facts appear.")
+        appendLine("10. Every relationship endpoint must be a raw entity name occurring in RAW or in new_entities.")
+        appendLine("11. Keep relationships and grammar_notes concise; empty arrays are valid.")
         if (retryInstruction.isNotBlank()) {
             appendLine()
             appendLine(retryInstruction.trim())
@@ -183,9 +187,25 @@ object AiTranslationRefinePipeline {
                     ),
                     "story_timeline" to linkedMapOf(
                         "summary" to "short chapter continuity summary",
-                        "events" to emptyList<String>(),
-                        "characters" to emptyList<Any>(),
-                        "discoveries" to emptyList<Any>(),
+                        "events" to listOf("Event description"),
+                        "characters" to listOf(
+                            linkedMapOf(
+                                "raw" to "Source Character Name",
+                                "target" to "Translated Name",
+                                "status" to "new",
+                                "role" to "protagonist",
+                                "relationships" to listOf("ally of B"),
+                            )
+                        ),
+                        "discoveries" to listOf(
+                            linkedMapOf(
+                                "raw" to "Source item/term",
+                                "target" to "Translated term",
+                                "category" to "equipment",
+                                "description" to "Item or technique description",
+                                "entity_refs" to emptyList<String>(),
+                            )
+                        ),
                     ),
                     "new_entities" to listOf(
                         linkedMapOf(
@@ -203,7 +223,15 @@ object AiTranslationRefinePipeline {
                             "relationship" to "ally_of",
                         )
                     ),
-                    "world_building" to emptyList<Any>(),
+                    "world_building" to listOf(
+                        linkedMapOf(
+                            "raw" to "source term",
+                            "target" to "canonical target",
+                            "category" to "item",
+                            "description" to "Description",
+                            "entity_refs" to emptyList<String>(),
+                        )
+                    ),
                     "grammar_notes" to emptyList<String>(),
                 )
             )
@@ -714,4 +742,52 @@ object AiTranslationRefinePipeline {
             this in 0x2B820..0x2CEAF ||
             this in 0x3040..0x30FF ||
             this in 0xAC00..0xD7AF
+
+    data class HardValidationResult(
+        val score: Int,
+        val isFastPass: Boolean,
+        val issues: List<String>,
+        val flaggedSegmentIds: List<Int>,
+    )
+
+    fun validateOutputHard(
+        refinedSegments: List<AiTranslationRefinedSegment>,
+        expectedSegmentIds: List<Int>,
+        rawText: String,
+        lockedTerms: Map<String, String>,
+    ): HardValidationResult {
+        val issues = mutableListOf<String>()
+        val flagged = mutableListOf<Int>()
+
+        // 1. Segment completeness
+        val returnedIds = refinedSegments.map { it.id }
+        if (returnedIds != expectedSegmentIds) {
+            issues.add("Segment IDs mismatch: expected $expectedSegmentIds, got $returnedIds")
+        }
+
+        // 2. CJK Residue
+        refinedSegments.forEach { seg ->
+            if (seg.refined_translation.hasCjkTextCodePoints()) {
+                issues.add("Segment ${seg.id} contains un-translated CJK characters")
+                flagged.add(seg.id)
+            }
+        }
+
+        // 3. Locked dictionary compliance
+        val fullOutput = refinedSegments.joinToString(" ") { it.refined_translation }
+        lockedTerms.forEach { (src, tgt) ->
+            if (rawText.contains(src) && !fullOutput.contains(tgt, ignoreCase = true)) {
+                issues.add("Locked term '$src' -> '$tgt' missing from output")
+            }
+        }
+
+        val penalties = issues.size * 10
+        val score = (100 - penalties).coerceAtLeast(0)
+        return HardValidationResult(
+            score = score,
+            isFastPass = score >= 90,
+            issues = issues,
+            flaggedSegmentIds = flagged.distinct(),
+        )
+    }
 }

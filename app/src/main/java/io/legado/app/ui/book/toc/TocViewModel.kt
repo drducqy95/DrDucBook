@@ -48,7 +48,9 @@ import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import io.legado.app.domain.usecase.containsCjk
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
@@ -294,23 +296,51 @@ class TocViewModel(
         .flatMapLatest { appDb.bookChapterDao.getChapterListFlow(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val displayBookNameFlow: Flow<String> = combine(
+        bookState.filterNotNull(),
+        snapshotFlow { TranslationConfig.dynamicUiTranslationEnabled }.distinctUntilChanged(),
+    ) { book, enabled ->
+        if (!enabled || !book.name.containsCjk()) {
+            book.name
+        } else {
+            translateDynamicUiTextUseCase.executeBookName(
+                scopeKey = "book:${book.bookUrl}:name",
+                originalText = book.name,
+                book = book,
+            ).getOrElse { book.name }
+        }
+    }.flowOn(Dispatchers.IO)
+
     private val translatedTitlesFlow = combine(
         bookState.filterNotNull(),
         chapterListFlow,
         snapshotFlow { TranslationConfig.dynamicUiTranslationEnabled }.distinctUntilChanged(),
     ) { book, chapters, enabled ->
-        if (!enabled || book.isLocal || chapters.isEmpty()) {
-            return@combine emptyMap()
+        Triple(book, chapters, enabled)
+    }.flatMapLatest { (book, chapters, enabled) ->
+        if (!enabled || chapters.isEmpty()) {
+            return@flatMapLatest flowOf(emptyMap())
         }
-        val titles = chapters.map { it.getDisplayTitle(useReplace = false) }
-        translateDynamicUiTextUseCase.executeChapterTitles(
-            scopeKey = "toc:${book.bookUrl}",
-            originalLines = titles,
-            book = book,
-            contextText = titles.joinToString("\n"),
-        ).getOrNull()?.mapIndexed { index, title ->
-            chapters[index].index to title
-        }?.toMap().orEmpty()
+        flow {
+            val accumulated = mutableMapOf<Int, String>()
+            val contextText = chapters.take(200)
+                .joinToString("\n") { it.getDisplayTitle(useReplace = false) }
+            chapters.chunked(50).forEachIndexed { batchIndex, batch ->
+                val titles = batch.map { it.getDisplayTitle(useReplace = false) }
+                val translated = translateDynamicUiTextUseCase.executeChapterTitles(
+                    scopeKey = "toc:${book.bookUrl}:b$batchIndex",
+                    originalLines = titles,
+                    book = book,
+                    contextText = contextText,
+                ).getOrNull()
+                if (!translated.isNullOrEmpty()) {
+                    translated.forEachIndexed { index, title ->
+                        accumulated[batch[index].index] = title
+                    }
+                    emit(accumulated.toMap())
+                }
+            }
+        }
     }.flowOn(Dispatchers.IO)
 
     override val rawDataFlow: Flow<List<TocDomainItem>> = combine(

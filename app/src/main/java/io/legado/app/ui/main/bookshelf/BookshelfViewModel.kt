@@ -708,8 +708,17 @@ class BookshelfViewModel(
             ).getOrElse { translated(book.latestChapterTitle) }
         } ?: translated(book.latestChapterTitle)
 
+        val translatedName = book.name.takeIf(String::isNotBlank)?.let { name ->
+            translateDynamicUiTextUseCase.executeBookName(
+                scopeKey = scopeKey,
+                originalText = name,
+                book = dictionaryBook,
+                contextText = contextText,
+            ).getOrElse { translated(book.name).orEmpty() }
+        } ?: translated(book.name).orEmpty()
+
         return book.copy(
-            name = translated(book.name).orEmpty(),
+            name = translatedName,
             author = translatedAuthor,
             originName = translated(book.originName).orEmpty(),
             durChapterTitle = translatedDurChapter,

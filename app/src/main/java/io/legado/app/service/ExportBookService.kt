@@ -236,7 +236,7 @@ class ExportBookService : BaseService(), KoinComponent {
             )
         } else {
             if (lastExportWantsKindle && lastExportPartCount > 1) {
-                notificationContentText = "Export complete; ${lastExportPartCount} Kindle parts are ready"
+                notificationContentText = getString(R.string.export_kindle_multi_part_complete, lastExportPartCount)
             }
             lastExportedFile
                 ?.takeIf { lastExportWantsKindle }
@@ -272,7 +272,7 @@ class ExportBookService : BaseService(), KoinComponent {
                     notification.addAction(
                         R.drawable.ic_share,
                         if (lastExportPartCount > 1) {
-                            "Send Kindle part 1/${lastExportPartCount}"
+                            getString(R.string.send_kindle_part, 1, lastExportPartCount)
                         } else {
                             getString(R.string.send_to_kindle)
                         },
@@ -335,7 +335,7 @@ class ExportBookService : BaseService(), KoinComponent {
                     return
                 }
                 notificationContentText = if (lastExportWantsKindle && lastExportPartCount > 1) {
-                    "Export complete; $lastExportPartCount Kindle parts are ready"
+                    getString(R.string.export_kindle_multi_part_complete, lastExportPartCount)
                 } else {
                     getString(R.string.export_complete)
                 }
@@ -456,12 +456,12 @@ class ExportBookService : BaseService(), KoinComponent {
                     exportMsg[book.bookUrl] = if (
                         exportConfig.sendToKindle && lastExportPartCount > 1
                     ) {
-                        "Export complete; $lastExportPartCount parts will be opened for sequential Send-to-Kindle."
+                        getString(R.string.export_kindle_sequential_ready, lastExportPartCount)
                     } else if (
                         exportConfig.imageOptimization == EbookExportImageOptimization.ORIGINAL &&
                         hasLargeExport(exportConfig.path, book, format)
                     ) {
-                        "Export complete. The file is large; Balanced/Small can reduce it before Send to Kindle."
+                        getString(R.string.export_kindle_large_file_hint)
                     } else {
                         getString(R.string.export_success)
                     }
@@ -726,7 +726,11 @@ class ExportBookService : BaseService(), KoinComponent {
                 .distinct(),
             metadataDate = book.lastCheckTime
                 .takeIf { it > 0L }
-                ?.let { java.time.Instant.ofEpochMilli(it).toString() },
+                ?.let {
+                    java.time.Instant.ofEpochMilli(it)
+                        .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                        .toString()
+                },
             cover = cover,
             chapters = exportChapters,
             labels = EbookExportLabels(
