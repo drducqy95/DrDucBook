@@ -40,3 +40,7 @@ _Append-only operation history._
 - `2026-09-05T00:06:43` — UPDATE [entity] project-legado-with-md3-main
 - `2026-09-05T00:06:43` — CREATE [insight] Session 2026-09-05 00-06-43 → .brain\wiki\insights\session-2026-09-05-00-06-43.md
 - `2026-09-05T00:06:43` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-12T07:34:58` — CREATE [pattern] VietnameseTranslationPostProcessor - PatternSyntaxException Pattern → .brain\wiki\patterns\vietnamesetranslationpostprocessor-patternsyntaxexception-pattern.md
+- `2026-09-12T07:34:58` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-12T08:22:20` — CREATE [pattern] AiTranslationRefinePipeline / StoryMemory - TranslationCjkResidueException Pattern → .brain\wiki\patterns\aitranslationrefinepipeline-storymemory-translationcjkresidueexception-pattern.md
+- `2026-09-12T08:22:20` — UPDATE [entity] project-legado-with-md3-main

@@ -32,6 +32,7 @@ import io.legado.app.domain.model.AiTranslationStoryTimeline
 import io.legado.app.domain.model.AiTranslationStoryWikiRecord
 import io.legado.app.domain.model.AiTranslationStreamAccumulator
 import io.legado.app.domain.model.AiTranslationTokenBudget
+import io.legado.app.domain.model.AiTranslationRefinePipeline
 import io.legado.app.domain.model.AiTranslationWorldEntry
 import io.legado.app.domain.model.AiTranslationRefinerResult
 import io.legado.app.domain.model.ContentChunker
@@ -146,7 +147,7 @@ class TranslationStoryMemoryUseCase(
                     .map { raw ->
                         AiTranslationStoryEntity(
                             raw = raw,
-                            target = raw,
+                            target = "",
                             type = "unknown",
                             description = "Placeholder created from a relationship endpoint",
                             firstChapterIndex = chapter.index,
@@ -230,7 +231,32 @@ class TranslationStoryMemoryUseCase(
 
     suspend fun loadSnapshot(bookUrl: String): AiTranslationStoryMemorySnapshot {
         val memories = aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
-        return memories.toStorySnapshot()
+        val snapshot = memories.toStorySnapshot()
+        healPoisonedEntities(bookUrl, memories, snapshot.entities)
+        return snapshot
+    }
+
+    private suspend fun healPoisonedEntities(
+        bookUrl: String,
+        memories: List<AiMemory>,
+        healedEntities: List<AiTranslationStoryEntity>,
+    ) {
+        val memoryMap = memories
+            .filter { it.key.startsWith(ENTITY_PREFIX) }
+            .mapNotNull { memory ->
+                memory.decodeValue<AiTranslationStoryEntity>()?.let { memory.key to it }
+            }
+            .toMap()
+
+        healedEntities.forEach { healed ->
+            val key = entityKey(healed.raw)
+            val original = memoryMap[key]
+            if (original != null && (original.target != healed.target || original.raw != healed.raw)) {
+                runCatching {
+                    upsertEntity(bookUrl, healed)
+                }
+            }
+        }
     }
 
     suspend fun loadSnapshotWithSeriesInheritance(
@@ -383,11 +409,49 @@ class TranslationStoryMemoryUseCase(
             storyMemories.mapNotNull { memory -> memory.toWikiRecord(bookNames) }
         }
 
-    private fun List<AiMemory>.toStorySnapshot(): AiTranslationStoryMemorySnapshot =
-        AiTranslationStoryMemorySnapshot(
-            entities = decodeValues(ENTITY_PREFIX),
+    private fun List<AiMemory>.toStorySnapshot(): AiTranslationStoryMemorySnapshot {
+        val rawEntities: List<AiTranslationStoryEntity> = decodeValues(ENTITY_PREFIX)
+        val sanitizedEntities = rawEntities.map { entity ->
+            val cleanRaw = entity.raw.replace("?", "·").trim()
+            val rawTarget = entity.target.trim()
+            val sanitizedTarget = if (rawTarget.isBlank() ||
+                rawTarget.equals(cleanRaw, ignoreCase = true) ||
+                AiTranslationRefinePipeline.hasCjkTextCodePoints(rawTarget)
+            ) {
+                val candidate = io.legado.app.domain.model.SinoForeignNameDetector.classifyName(cleanRaw)
+                if (candidate != null && candidate.origin != "chinese" && candidate.suggested.isNotBlank() && candidate.confidence >= 0.85f) {
+                    candidate.suggested
+                } else {
+                    ""
+                }
+            } else {
+                sanitizeExtractedEntityTarget(cleanRaw, rawTarget)
+            }
+            val finalTarget = if (sanitizedTarget.isNotBlank() &&
+                (sanitizedTarget.equals(cleanRaw, ignoreCase = true) ||
+                    AiTranslationRefinePipeline.hasCjkTextCodePoints(sanitizedTarget))
+            ) {
+                ""
+            } else {
+                sanitizedTarget
+            }
+            entity.copy(raw = cleanRaw, target = finalTarget)
+        }
+        val rawWorld: List<AiTranslationWorldEntry> = decodeValues(WORLD_PREFIX)
+        val sanitizedWorld = rawWorld.map { entry ->
+            if (entry.target.isNotBlank() &&
+                (entry.target.equals(entry.raw, ignoreCase = true) ||
+                    AiTranslationRefinePipeline.hasCjkTextCodePoints(entry.target))
+            ) {
+                entry.copy(target = "")
+            } else {
+                entry
+            }
+        }
+        return AiTranslationStoryMemorySnapshot(
+            entities = sanitizedEntities,
             relationships = decodeValues(RELATIONSHIP_PREFIX),
-            worldBuilding = decodeValues(WORLD_PREFIX),
+            worldBuilding = sanitizedWorld,
             timelines = decodeValues<AiTranslationStoryTimeline>(TIMELINE_PREFIX)
                 .sortedBy(AiTranslationStoryTimeline::chapterIndex),
             analyzedChapterIndices = asSequence()
@@ -401,9 +465,10 @@ class TranslationStoryMemoryUseCase(
                 .mapNotNull { it.removePrefix(PENDING_PREFIX).substringBefore(':').toIntOrNull() }
                 .toSet(),
         )
+    }
 
     suspend fun upsertEntity(bookUrl: String, entity: AiTranslationStoryEntity) {
-        require(entity.raw.isNotBlank() && entity.target.isNotBlank())
+        require(entity.raw.isNotBlank())
         upsertBookMemory(bookUrl, entityKey(entity.raw), AiMemory.TYPE_GLOSSARY, entity)
     }
 
@@ -704,11 +769,63 @@ class TranslationStoryMemoryUseCase(
         source: String,
         chapterIndex: Int,
     ): List<AiTranslationStoryEntity> = entities
-        .filter { it.raw.isNotBlank() && it.target.isNotBlank() && source.contains(it.raw) }
+        .filter { it.raw.isNotBlank() && (source.contains(it.raw) || source.contains(it.raw.replace("?", "·"))) }
         .map { entity ->
-            entity.copy(firstChapterIndex = entity.firstChapterIndex.takeIf { it >= 0 } ?: chapterIndex)
+            val cleanRaw = entity.raw.replace("?", "·")
+            val rawTarget = entity.target.trim()
+            val sanitizedTarget = if (rawTarget.isBlank() ||
+                rawTarget.equals(cleanRaw, ignoreCase = true) ||
+                AiTranslationRefinePipeline.hasCjkTextCodePoints(rawTarget)
+            ) {
+                val candidate = io.legado.app.domain.model.SinoForeignNameDetector.classifyName(cleanRaw)
+                if (candidate != null && candidate.origin != "chinese" && candidate.suggested.isNotBlank() && candidate.confidence >= 0.85f) {
+                    candidate.suggested
+                } else {
+                    ""
+                }
+            } else {
+                sanitizeExtractedEntityTarget(cleanRaw, rawTarget)
+            }
+            val finalTarget = if (sanitizedTarget.isNotBlank() &&
+                (sanitizedTarget.equals(cleanRaw, ignoreCase = true) ||
+                    AiTranslationRefinePipeline.hasCjkTextCodePoints(sanitizedTarget))
+            ) {
+                ""
+            } else {
+                sanitizedTarget
+            }
+            entity.copy(
+                raw = cleanRaw,
+                target = finalTarget,
+                firstChapterIndex = entity.firstChapterIndex.takeIf { it >= 0 } ?: chapterIndex
+            )
         }
         .distinctBy { it.raw.lowercase() }
+
+    fun sanitizeExtractedEntityTarget(raw: String, target: String): String {
+        val cleanTarget = target.replace("?", "").replace(Regex(" {2,}"), " ").trim()
+        val cleanRaw = raw.replace("?", "·").trim()
+        val candidate = io.legado.app.domain.model.SinoForeignNameDetector.classifyName(cleanRaw)
+        if (candidate != null && candidate.origin != "chinese" && candidate.suggested.isNotBlank() && candidate.confidence >= 0.85f) {
+            val targetLower = cleanTarget.lowercase()
+            val targetUnaccented = stripVietnameseDiacritics(targetLower)
+            if (targetUnaccented.contains("qiao en") ||
+                targetUnaccented.contains("kieu an") ||
+                targetUnaccented.contains("mai kiet") ||
+                targetUnaccented.contains("kiet phu") ||
+                targetUnaccented.contains("lac khac") ||
+                targetUnaccented.contains("la khac") ||
+                (targetUnaccented == "lok" && candidate.suggested == "Locke") ||
+                target.contains("?")
+            ) {
+                return candidate.suggested
+            }
+            if (candidate.detectionTier in setOf("exact", "canonical_alias", "title_compound", "compound_separated")) {
+                return candidate.suggested
+            }
+        }
+        return cleanTarget
+    }
 
     private fun pendingKey(
         chapterIndex: Int,
@@ -826,6 +943,14 @@ class TranslationStoryMemoryUseCase(
 
         fun timelineKey(chapterIndex: Int): String =
             TIMELINE_PREFIX + chapterIndex.toString().padStart(8, '0')
+
+        fun stripVietnameseDiacritics(text: String): String {
+            if (text.isBlank()) return ""
+            val normalized = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD)
+            return normalized.replace(Regex("""\p{M}"""), "")
+                .replace('đ', 'd')
+                .replace('Đ', 'D')
+        }
 
         private fun bookConversationId(bookUrl: String): String = "${AiMemory.SCOPE_BOOK}:$bookUrl"
 

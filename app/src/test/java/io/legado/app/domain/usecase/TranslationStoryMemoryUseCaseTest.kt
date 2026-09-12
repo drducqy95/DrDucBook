@@ -14,6 +14,7 @@ import io.legado.app.domain.model.AiGenerateResponse
 import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiTranslationRefinePipeline
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
+import io.legado.app.domain.model.AiTranslationWorldEntry
 import io.legado.app.domain.model.CachedChapterSnapshot
 import io.legado.app.domain.model.DictPair
 import io.legado.app.domain.model.QuickDictionaryCatalog
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -89,6 +91,171 @@ class TranslationStoryMemoryUseCaseTest {
             AiTranslationStoryMemoryKind.entries.toSet(),
             wikiRecords.map { it.kind }.toSet(),
         )
+    }
+
+    @Test
+    fun sanitizesCorruptOrPinyinEntityTargetsOnPersist() = runBlocking {
+        val book = Book(bookUrl = "test://sanitize", name = "Test Book", author = "test")
+        val chapter = BookChapter(url = "ch-1", title = "Ch 1", bookUrl = book.bookUrl, index = 0)
+        val memoryGateway = InMemoryAiMemoryGateway()
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = memoryGateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+        val refinerResult = AiTranslationRefinePipeline.parseRefinerOutput(
+            rawOutput = """
+                {
+                  "refined_segments":[{"id":1,"refined_translation":"Jon gap Medvedev."}],
+                  "new_entities":[
+                    {"raw":"乔恩","target":"Qiao En","type":"character"},
+                    {"raw":"梅杰夫","target":"Mai Kiệt Phu?","type":"character"}
+                  ]
+                }
+            """.trimIndent(),
+            expectedIds = listOf(1),
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+        )
+
+        useCase.persistRefinerResult(book, chapter, "乔恩见梅杰夫", refinerResult).getOrThrow()
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        val jon = snapshot.entities.find { it.raw == "乔恩" }
+        assertEquals("Jon", jon?.target)
+        val medvedev = snapshot.entities.find { it.raw == "梅杰夫" }
+        assertEquals("Medvedev", medvedev?.target)
+    }
+
+    @Test
+    fun placeholderEntityFromRelationshipHasEmptyTargetAndIsNotInEntityDictionary() = runBlocking {
+        val book = Book(bookUrl = "test://placeholder", name = "Test Book", author = "test")
+        val chapter = BookChapter(url = "ch-1", title = "Ch 1", bookUrl = book.bookUrl, index = 0)
+        val memoryGateway = InMemoryAiMemoryGateway()
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = memoryGateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+        val refinerResult = AiTranslationRefinePipeline.parseRefinerOutput(
+            rawOutput = """
+                {
+                  "refined_segments":[{"id":1,"refined_translation":"Captain America gap Howling Commandos."}],
+                  "new_entities":[
+                    {"raw":"美队","target":"Captain America","type":"character"}
+                  ],
+                  "relationships":[
+                    {"source":"美队","target":"咆哮突击队","relationship":"leader_of"}
+                  ]
+                }
+            """.trimIndent(),
+            expectedIds = listOf(1),
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+        )
+
+        useCase.persistRefinerResult(book, chapter, "美队带领咆哮突击队出击", refinerResult).getOrThrow()
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        val placeholder = snapshot.entities.find { it.raw == "咆哮突击队" }
+        assertEquals("", placeholder?.target)
+
+        val storyContext = io.legado.app.domain.model.AiTranslationStoryMemoryPipeline.selectContext(
+            snapshot = snapshot,
+            chapterIndex = 1,
+            source = "美队带领咆哮突击队出击",
+        )
+        val dictionaryRaws = storyContext.entityDictionary.map { it.original }
+        assertTrue(dictionaryRaws.contains("美队"))
+        assertFalse(dictionaryRaws.contains("咆哮突击队"))
+    }
+
+    @Test
+    fun loadSnapshotSanitizesLegacyPoisonedCjkTargets() = runBlocking {
+        val book = Book(bookUrl = "test://legacy-sanitize", name = "Test Book", author = "test")
+        val memoryGateway = InMemoryAiMemoryGateway()
+        memoryGateway.upsert(
+            AiMemory(
+                conversationId = "",
+                key = TranslationStoryMemoryUseCase.entityKey("咆哮突击队"),
+                value = """{"raw":"咆哮突击队","target":"咆哮突击队","type":"unknown","description":"Placeholder","firstChapterIndex":0,"aliases":[]}""",
+                scope = AiMemory.SCOPE_BOOK,
+                scopeId = book.bookUrl,
+                type = AiMemory.TYPE_GLOSSARY,
+            )
+        )
+        memoryGateway.upsert(
+            AiMemory(
+                conversationId = "",
+                key = TranslationStoryMemoryUseCase.worldKey(
+                    AiTranslationWorldEntry(raw = "帕特庄园", category = "location", chapterIndex = 0)
+                ),
+                value = """{"raw":"帕特庄园","target":"帕特庄园","category":"location","description":"Old manor","firstChapterIndex":0,"entityRefs":[]}""",
+                scope = AiMemory.SCOPE_BOOK,
+                scopeId = book.bookUrl,
+                type = AiMemory.TYPE_FACT,
+            )
+        )
+
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = memoryGateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        val entity = snapshot.entities.find { it.raw == "咆哮突击队" }
+        assertEquals("", entity?.target)
+        val world = snapshot.worldBuilding.find { it.raw == "帕特庄园" }
+        assertEquals("", world?.target)
+    }
+
+    @Test
+    fun healsLegacyHanVietForeignEntitiesOnLoadSnapshot() = runBlocking {
+        val book = Book(bookUrl = "https://example.com/test-western-fantasy", name = "Test Fantasy")
+        val memoryGateway = InMemoryAiMemoryGateway()
+
+        // Poisoned entity 1: 梅杰夫 -> Mai Kiệt Phu
+        memoryGateway.upsert(
+            AiMemory(
+                conversationId = "",
+                key = TranslationStoryMemoryUseCase.entityKey("梅杰夫"),
+                value = """{"raw":"梅杰夫","target":"Mai Kiệt Phu","type":"character","firstChapterIndex":1,"aliases":[]}""",
+                scope = AiMemory.SCOPE_BOOK,
+                scopeId = book.bookUrl,
+                type = AiMemory.TYPE_GLOSSARY,
+            )
+        )
+        // Poisoned entity 2: 梅杰夫大师 -> đại sư Mai Kiệt Phu
+        memoryGateway.upsert(
+            AiMemory(
+                conversationId = "",
+                key = TranslationStoryMemoryUseCase.entityKey("梅杰夫大师"),
+                value = """{"raw":"梅杰夫大师","target":"đại sư Mai Kiệt Phu","type":"character","firstChapterIndex":1,"aliases":[]}""",
+                scope = AiMemory.SCOPE_BOOK,
+                scopeId = book.bookUrl,
+                type = AiMemory.TYPE_GLOSSARY,
+            )
+        )
+
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = memoryGateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        val medvedev = snapshot.entities.find { it.raw == "梅杰夫" }
+        assertEquals("Medvedev", medvedev?.target)
+
+        val masterMedvedev = snapshot.entities.find { it.raw == "梅杰夫大师" }
+        assertEquals("đại sư Medvedev", masterMedvedev?.target)
+
+        // Verify that memory in gateway was healed
+        val updatedMemories = memoryGateway.getByScope(AiMemory.SCOPE_BOOK, book.bookUrl)
+        val medvedevMemory = updatedMemories.find { it.key == TranslationStoryMemoryUseCase.entityKey("梅杰夫") }
+        assertTrue(medvedevMemory?.value?.contains("Medvedev") == true)
+        assertTrue(medvedevMemory?.value?.contains("Mai Kiệt Phu") == false)
     }
 }
 

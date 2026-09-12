@@ -1222,6 +1222,7 @@ class TranslateChapterUseCase(
                         dictionaries = dictSnapshot,
                         onUpdate = onDictionaryUpdate,
                         retryReason = lastRetryReason,
+                        lastErrorMessage = lastError?.message,
                         promptStages = promptStages,
                         isExplicitRetranslation = isExplicitRetranslation,
                         context = aiContext,
@@ -1759,6 +1760,7 @@ class TranslateChapterUseCase(
         onPartial: (String) -> Unit,
         routeSessionKey: String? = null,
         routeRetryOffset: Int = 0,
+        lastErrorMessage: String? = null,
     ): Result<String> {
         if (targetLanguage == "en" && isMostlyEnglish(text)) {
             return Result.success(text)
@@ -1773,11 +1775,11 @@ class TranslateChapterUseCase(
             dictionaries = dictionaries,
             sourceAndContext = context.previous + text + context.next,
         )
-        val retryInstruction = buildRetryInstruction(retryReason)
+        val targetLanguageName = getLanguageDisplayName(targetLanguage)
+        val retryInstruction = buildRetryInstruction(retryReason, lastErrorMessage, targetLanguageName)
         val protectedText = AiTranslationProtectionProtocol.protect(text)
         val protectedInstruction = buildProtectedTokenInstruction(protectedText)
         val protectedSource = protectedText.value
-        val targetLanguageName = getLanguageDisplayName(targetLanguage)
         val includeRetranslateStage = shouldIncludeRetranslatePrompt(
             isExplicitRetranslation = isExplicitRetranslation,
             hasRetryReason = retryReason != null,
@@ -1798,6 +1800,7 @@ class TranslateChapterUseCase(
                     customPhonetics = emptyList(),
                 )
             },
+            configuredPrompt = preset.promptTemplate,
         )
         onStage("AI_STAGE=context_pack_ready segments=${contextPack.raw_segments.size}")
         val expectedIds = AiTranslationRefinePipeline.expectedIds(contextPack)
@@ -1995,10 +1998,27 @@ class TranslateChapterUseCase(
             .toList()
     }
 
-    private fun buildRetryInstruction(retryReason: RetryReason?): String {
+    private fun buildRetryInstruction(
+        retryReason: RetryReason?,
+        lastErrorMessage: String? = null,
+        targetLanguageName: String = "Vietnamese",
+    ): String {
         return when (retryReason) {
             RetryReason.EMPTY_RESPONSE -> "\nPrevious attempt returned empty content. Return the required JSON object with every refined_segments id."
-            RetryReason.PARSE_ERROR -> "\nPrevious attempt failed JSON, segment-id, layout, or no-CJK validation. Return JSON only and include every expected id exactly once."
+            RetryReason.PARSE_ERROR -> {
+                val specificError = lastErrorMessage?.trim().orEmpty()
+                if (specificError.contains("still contains CJK text", ignoreCase = true) ||
+                    specificError.contains("contains un-translated CJK", ignoreCase = true)
+                ) {
+                    val detail = specificError
+                        .substringAfter("Translation parse error:", specificError)
+                        .substringAfter("AI_STAGE=parse_error", specificError)
+                        .trim()
+                    "\nCRITICAL: Previous attempt failed validation because segments contain un-translated Chinese (CJK) text: $detail. You MUST translate EVERY Chinese word, term, and proper noun into $targetLanguageName. Absolutely NO Chinese Hanzi characters may appear in refined_segments."
+                } else {
+                    "\nPrevious attempt failed JSON, segment-id, layout, or no-CJK validation. Return JSON only and include every expected id exactly once."
+                }
+            }
             RetryReason.RATE_LIMIT,
             RetryReason.ROUTE_UNAVAILABLE,
             RetryReason.SERVER_ERROR,
@@ -2050,9 +2070,14 @@ class TranslateChapterUseCase(
         isRewrite: Boolean = false,
     ): String {
         return if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+            val cleanedNames = VietnameseTranslationPostProcessor.cleanRogueNameQuestionMarks(
+                normalizeCjkPunctuation(text)
+            )
+            val fixedDialogue = VietnameseTranslationPostProcessor.fixContradictoryDialoguePronouns(cleanedNames)
+            val fixedForeign = VietnameseTranslationPostProcessor.fixRogueForeignHanVietNames(fixedDialogue)
             val capitalized = VietnameseTranslationPostProcessor.capitalizeSentences(
                 VietnameseTranslationPostProcessor.cleanRogueBooleanLiterals(
-                    normalizeCjkPunctuation(text)
+                    fixedForeign
                 )
             )
             if (isRewrite) {

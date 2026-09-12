@@ -1,7 +1,7 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-09-05T00:06:43.841589",
+    "last_active": "2026-09-12T08:22:20.860501",
     "saved_at": "2026-09-05T00:06:43.841551",
     "resumed_at": "2026-08-26T10:02:26.310280"
   },
@@ -141,6 +141,25 @@
         "AiProviderFailure.kt"
       ],
       "error_id": "ERR_0016"
+    },
+    {
+      "type": "bugfix",
+      "description": "VietnameseTranslationPostProcessor: Syntax error in regexp pattern near index 3 (?U)(?<=\\p{L})\\?(?=\\p{L})",
+      "files": [
+        "VietnameseTranslationPostProcessor.kt"
+      ],
+      "error_id": "ERR_0018"
+    },
+    {
+      "type": "bugfix",
+      "description": "AiTranslationRefinePipeline / StoryMemory: Translation parse error: segment 24 still contains CJK text; segment 25 still contains CJK text",
+      "files": [
+        "app/src/main/java/io/legado/app/domain/model/AiTranslationRefinePipeline.kt",
+        "app/src/main/java/io/legado/app/domain/model/AiTranslationStoryMemory.kt",
+        "app/src/main/java/io/legado/app/domain/usecase/TranslationStoryMemoryUseCase.kt",
+        "app/src/main/java/io/legado/app/domain/usecase/TranslateChapterUseCase.kt"
+      ],
+      "error_id": "ERR_0019"
     }
   ],
   "context_notes": [

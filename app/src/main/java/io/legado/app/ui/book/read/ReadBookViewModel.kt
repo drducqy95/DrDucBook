@@ -3974,7 +3974,10 @@ class ReadBookViewModel(
 
                         is AiTextFactoryUseCase.StreamEvent.Done -> {
                             val normalized = normalizeVietnameseProsePunctuation(event.text)
-                            val cleaned = VietnameseTranslationPostProcessor.cleanRogueBooleanLiterals(normalized)
+                            val withoutRogueNames = VietnameseTranslationPostProcessor.cleanRogueNameQuestionMarks(normalized)
+                            val fixedDialogue = VietnameseTranslationPostProcessor.fixContradictoryDialoguePronouns(withoutRogueNames)
+                            val fixedForeign = VietnameseTranslationPostProcessor.fixRogueForeignHanVietNames(fixedDialogue)
+                            val cleaned = VietnameseTranslationPostProcessor.cleanRogueBooleanLiterals(fixedForeign)
                             val capitalized = VietnameseTranslationPostProcessor.capitalizeSentences(cleaned)
                             val finalRewrittenText = VietnameseTranslationPostProcessor.indentNarrativeParagraphs(capitalized)
                             _uiState.update {

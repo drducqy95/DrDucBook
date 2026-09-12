@@ -1,12 +1,12 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-09-11T10:38:00.000000",
+    "last_updated": "2026-09-12T09:53:00.000000",
     "overall_progress_percent": 100,
-    "current_phase": "Phase 26 - Multilingual Translation System Upgrade Completed (Release Ready)",
+    "current_phase": "Phase 33 - Fix Foreign Han-Viet Leakage (ERR_0020) & Title Compound Self-Healing Completed",
     "status": "DONE",
     "database_version": 105,
-    "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9"
+    "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
   "milestones": [
     {
@@ -928,6 +928,262 @@
         {
           "id": "T26.5",
           "desc": "Phase 05 - en-vi Pair Bootstrap & Legado App Production Sync (en-vi database, TranslationConstants.kt, AiPromptCatalog.kt, AiTranslationRefinePipeline.kt, AiTranslationStoryMemory.kt)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P27",
+      "name": "Translation Pipeline Optimization & Multi-Origin Foreign Name Resolution",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T27.1",
+          "desc": "Phase 01 - Prompt Deduplication & Compression (reduce DEFAULT_PROMPT, remove SEGMENTS_RAW_QT, remove suggested_dictionary, toCompactJson, compact output schema)",
+          "status": "DONE"
+        },
+        {
+          "id": "T27.2",
+          "desc": "Phase 02 - Context Deduplication (relationshipPromptRecords & worldBuildingPromptRecords deduplication, remove chapter_index from prompt records)",
+          "status": "DONE"
+        },
+        {
+          "id": "T27.3",
+          "desc": "Phase 03 - Multi-Origin Foreign Name Detection (SinoForeignNameDetector: Western, Japanese Kanji, Korean Hanja, name_candidates injection, Hard Rule 12, hybrid auto-pronouns)",
+          "status": "DONE"
+        },
+        {
+          "id": "T27.4",
+          "desc": "Phase 04 - Prompt Quality, Presets & Verification (update <ten_rieng> across presets, add JP Light Novel and KR Webnovel presets, compileAppDebugKotlin & tests)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P28",
+      "name": "Translation Pipeline Output Quality Fixes & QT Pre-Processing",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T28.1",
+          "desc": "Phase 01 - Fix assembleLatin & Expand SYLLABLE_MAP (no CJK character leakage, expanded exact matches including Hamilton, expanded phonetic transliteration characters)",
+          "status": "DONE"
+        },
+        {
+          "id": "T28.2",
+          "desc": "Phase 02 - Enforce Pronoun Addressing via Hard Rule 13 in buildSystemPrompt",
+          "status": "DONE"
+        },
+        {
+          "id": "T28.3",
+          "desc": "Phase 03 - QT Pre-processing Pipeline with Foreign Name Substitution (preProcessSourceForQt cleans up rough draft before feeding to AI)",
+          "status": "DONE"
+        },
+        {
+          "id": "T28.4",
+          "desc": "Phase 04 - Compound Foreign Term Detection (detectCompoundForeignTerms for languages, kingdoms, empires, cities with foreign prefixes)",
+          "status": "DONE"
+        },
+        {
+          "id": "T28.5",
+          "desc": "Phase 05 - Unit Testing & Full Regression Verification (SinoForeignNameDetectorTest, AiTranslationRefinePipelineTest, all 1100+ tests passed)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P29",
+      "name": "Emulator Output Analysis & Translation Pipeline Prompt/Kinship/Entity Fixes",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T29.1",
+          "desc": "Phase 01 - Analysis of Chapter 1 Outputs on Emulator & Prompt Enhancements (DEFAULT_PROMPT rules 4-6, Hard Rule 13 kinship, Hard Rule 14 ACG/webnovel slang)",
+          "status": "DONE"
+        },
+        {
+          "id": "T29.2",
+          "desc": "Phase 02 - Kinship Pronouns Auto-Detection & Inference (inferPronounHint brother/parent/kin mapping, scanKinshipPronouns text scanner)",
+          "status": "DONE"
+        },
+        {
+          "id": "T29.3",
+          "desc": "Phase 03 - Canonical Alias Resolution & Novel Character Matches (CANONICAL_ALIAS_MAP, exact matches for Jon, Locke, Lyon, Medvedev, Gwen, Peter, Scott)",
+          "status": "DONE"
+        },
+        {
+          "id": "T29.4",
+          "desc": "Phase 04 - Corrupt & Pinyin Target Sanitization (sanitizeExtractedEntityTarget prevents dictionary contamination)",
+          "status": "DONE"
+        },
+        {
+          "id": "T29.5",
+          "desc": "Phase 05 - Sync Genre Presets (context_western_fantasy_v3, context_modern_v3 slang and kinship rules)",
+          "status": "DONE"
+        },
+        {
+          "id": "T29.6",
+          "desc": "Phase 06 - Unit Tests & Regression Verification (SinoForeignNameDetectorTest, AiTranslationRefinePipelineTest, TranslationStoryMemoryUseCaseTest all pass)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P30",
+      "name": "Kinship Explicit Pronouns (SELF/OTHER) & 4-Layer Mojibake Defense (Noah? Pat)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T30.1",
+          "desc": "Hard Rule 13 & DEFAULT_PROMPT Rule 4 explicit Vietnamese examples and 我/你 replacement mechanism",
+          "status": "DONE"
+        },
+        {
+          "id": "T30.2",
+          "desc": "Format change: ambiguous 'anh/em' replaced with unambiguous 'SELF=anh, OTHER=em' across pipeline",
+          "status": "DONE"
+        },
+        {
+          "id": "T30.3",
+          "desc": "Direct candidate name discovery (findNamesInText) and alias expansion (getAliases) in SinoForeignNameDetector",
+          "status": "DONE"
+        },
+        {
+          "id": "T30.4",
+          "desc": "4-Layer Mojibake Defense for 'Noah? Pat': Layer 1 normalizeRawSource, Layer 2 compoundSeparated in SinoForeignNameDetector, Layer 3 lockedDictionaryFor & normalizeEntities sanitization, Layer 4 cleanRogueNameQuestionMarks in VietnameseTranslationPostProcessor",
+          "status": "DONE"
+        },
+        {
+          "id": "T30.5",
+          "desc": "Unit Tests: SinoForeignNameDetectorTest, VietnameseTranslationPostProcessorTest, AiTranslationRefinePipelineTest, TranslationStoryMemoryUseCaseTest all 43 tests pass",
+          "status": "DONE"
+        },
+        {
+          "id": "T30.6",
+          "desc": "Build debug APK and successfully install onto emulator-5554 via ADB",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P31",
+      "name": "Comprehensive Multi-Genre & Kinship Matrix System (All Relationship Formats)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T31.1",
+          "desc": "Re-architect inferPronounHint with GenreStyle enum (ANCIENT, WESTERN, MODERN, SCIFI) and full 8-group relationship matrix",
+          "status": "DONE"
+        },
+        {
+          "id": "T31.2",
+          "desc": "Re-architect scanKinshipPronouns with bounded distance regex (15-20 chars), direct dialogue speaker attribution, confidence protection (1-4), and reciprocal Latin/Chinese alias synchronization",
+          "status": "DONE"
+        },
+        {
+          "id": "T31.3",
+          "desc": "Automated post-processor fixContradictoryDialoguePronouns to eliminate calque ('của tôi' -> 'của anh/em') and contradictory dialogue addressing",
+          "status": "DONE"
+        },
+        {
+          "id": "T31.4",
+          "desc": "Update system prompt Hard Rule 13, DEFAULT_PROMPT Rule 4, and genre presets in AiPromptCatalog",
+          "status": "DONE"
+        },
+        {
+          "id": "T31.5",
+          "desc": "Unit Tests: AiTranslationRefinePipelineTest, VietnameseTranslationPostProcessorTest, SinoForeignNameDetectorTest, TranslateChapterAiRetryTest 100% pass",
+          "status": "DONE"
+        },
+        {
+          "id": "T31.6",
+          "desc": "Build debug APK (x86_64) and deploy to LDPlayer emulator-5554 successfully",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P32",
+      "name": "Fix CJK Residue Loop (ERR_0019) & 5-Layer Story Memory Defense",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T32.1",
+          "desc": "Layer 1: Hard guard in lockedDictionaryFor rejecting CJK and untranslated targets for Vietnamese",
+          "status": "DONE"
+        },
+        {
+          "id": "T32.2",
+          "desc": "Layer 2: Clean entityDictionary in AiTranslationStoryMemory.selectContext filtering CJK/raw targets",
+          "status": "DONE"
+        },
+        {
+          "id": "T32.3",
+          "desc": "Layer 3: Set placeholder entity target = empty string and sanitize extracted entity targets in normalizeEntities",
+          "status": "DONE"
+        },
+        {
+          "id": "T32.4",
+          "desc": "Layer 4: Sanitize legacy DB records on loadSnapshot defusing CJK targets to empty string",
+          "status": "DONE"
+        },
+        {
+          "id": "T32.5",
+          "desc": "Layer 5: Enhance retry instruction in TranslateChapterUseCase with specific CJK validation error details",
+          "status": "DONE"
+        },
+        {
+          "id": "T32.6",
+          "desc": "Unit Tests: AiTranslationRefinePipelineTest and TranslationStoryMemoryUseCaseTest 100% pass",
+          "status": "DONE"
+        },
+        {
+          "id": "T32.7",
+          "desc": "Build assembleAppDebug and deploy x86_64 APK to LDPlayer emulator-5554 successfully",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P33",
+      "name": "Fix Foreign Han-Viet Leakage (ERR_0020 - Mai Kiet Phu -> Medvedev) & Title Compound Self-Healing",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T33.1",
+          "desc": "Phase 1: Western title suffix/prefix decomposition in SinoForeignNameDetector (WESTERN_TITLE_SUFFIX_MAP, WESTERN_TITLE_PREFIX_MAP)",
+          "status": "DONE"
+        },
+        {
+          "id": "T33.2",
+          "desc": "Phase 2: stripVietnameseDiacritics & proactive self-healing in TranslationStoryMemoryUseCase (healPoisonedEntities on loadSnapshot)",
+          "status": "DONE"
+        },
+        {
+          "id": "T33.3",
+          "desc": "Phase 3: Auto-sanitization in AiTranslationRefinePipeline lockedDictionaryFor defusing foreign Han-Viet targets",
+          "status": "DONE"
+        },
+        {
+          "id": "T33.4",
+          "desc": "Phase 4: Book cache translation_dictionary.json self-healing in DictionaryRepositoryImpl.getBookDictionaries",
+          "status": "DONE"
+        },
+        {
+          "id": "T33.5",
+          "desc": "Phase 5: Safety net fallback cleanup in VietnameseTranslationPostProcessor.fixRogueForeignHanVietNames",
+          "status": "DONE"
+        },
+        {
+          "id": "T33.6",
+          "desc": "Phase 6: Automated verification (Unit Tests 100% pass, debug APK built, installed to LDPlayer, Chapter 2 verified live: đại sư Medvedev)",
           "status": "DONE"
         }
       ]

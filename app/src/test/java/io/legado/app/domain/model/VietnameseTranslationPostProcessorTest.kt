@@ -79,4 +79,22 @@ class VietnameseTranslationPostProcessorTest {
             VietnameseTranslationPostProcessor.indentNarrativeParagraphs(input),
         )
     }
+
+    @Test
+    fun removesRogueQuestionMarksEmbeddedInNames() {
+        val input = "Gia tộc Noah? Pat hùng mạnh. Cậu có biết Angel? Pat không? Thật sao?"
+        val expected = "Gia tộc Noah Pat hùng mạnh. Cậu có biết Angel Pat không? Thật sao?"
+        assertEquals(expected, VietnameseTranslationPostProcessor.cleanRogueNameQuestionMarks(input))
+    }
+
+    @Test
+    fun fixesContradictoryDialoguePronouns() {
+        val input = "\"Em trai thân yêu của tôi, Angel. Nghe giọng điệu của anh, chẳng lẽ anh biết hôm nay tôi sẽ đến sao?\" Lyon cười nói."
+        val expected = "\"Em trai thân yêu của anh, Angel. Nghe giọng điệu của em, chẳng lẽ em biết hôm nay anh sẽ đến sao?\" Lyon cười nói."
+        assertEquals(expected, VietnameseTranslationPostProcessor.fixContradictoryDialoguePronouns(input))
+
+        val input2 = "\"Anh trai thân yêu của tôi, Lyon...\""
+        val expected2 = "\"Anh trai thân yêu của em, Lyon...\""
+        assertEquals(expected2, VietnameseTranslationPostProcessor.fixContradictoryDialoguePronouns(input2))
+    }
 }

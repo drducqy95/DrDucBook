@@ -2,8 +2,10 @@ package io.legado.app.data.repository
 
 import io.legado.app.data.entities.Book
 import io.legado.app.domain.gateway.DictionaryGateway
+import io.legado.app.domain.model.AiTranslationRefinePipeline
 import io.legado.app.domain.model.BookDictionary
 import io.legado.app.domain.model.DictPair
+import io.legado.app.domain.model.SinoForeignNameDetector
 import io.legado.app.domain.model.normalizedForRuntime
 import io.legado.app.help.book.BookHelp
 import io.legado.app.utils.GSON
@@ -27,12 +29,48 @@ class DictionaryRepositoryImpl : DictionaryGateway {
             try {
                 val stored = GSON.fromJson(dictFile.readText(), BookDictionary::class.java)
                     ?: BookDictionary(book.bookUrl)
+                val rawPairs = runCatching { stored.pairs }
+                    .getOrNull()
+                    .orEmpty()
+                    .map(DictPair::normalizedForRuntime)
+                var hasChanges = false
+                val sanitizedPairs = rawPairs.mapNotNull { pair ->
+                    val orig = pair.original.trim()
+                    val trans = pair.translation.trim()
+                    if (orig.isBlank() || trans.isBlank()) return@mapNotNull null
+                    if (AiTranslationRefinePipeline.hasCjkTextCodePoints(trans) || trans.equals(orig, ignoreCase = true)) {
+                        hasChanges = true
+                        return@mapNotNull null
+                    }
+                    val candidate = SinoForeignNameDetector.classifyName(orig)
+                    val cleanTrans = if (candidate != null && candidate.origin != "chinese" && candidate.suggested.isNotBlank() && candidate.confidence >= 0.85f) {
+                        val unaccented = SinoForeignNameDetector.stripVietnameseDiacritics(trans.lowercase())
+                        if (unaccented.contains("mai kiet") || unaccented.contains("kiet phu") ||
+                            unaccented.contains("qiao en") || unaccented.contains("kieu an") ||
+                            unaccented.contains("lac khac") || unaccented.contains("la khac") ||
+                            candidate.detectionTier in setOf("exact", "canonical_alias", "title_compound")
+                        ) {
+                            candidate.suggested
+                        } else trans
+                    } else trans
+                    if (cleanTrans != pair.translation) {
+                        hasChanges = true
+                        pair.copy(translation = cleanTrans)
+                    } else {
+                        pair
+                    }
+                }
+                if (hasChanges) {
+                    val updated = BookDictionary(
+                        bookUrl = book.bookUrl,
+                        pairs = sanitizedPairs,
+                        updatedAt = System.currentTimeMillis(),
+                    )
+                    runCatching { saveDictionary(book, updated) }
+                }
                 BookDictionary(
                     bookUrl = book.bookUrl,
-                    pairs = runCatching { stored.pairs }
-                        .getOrNull()
-                        .orEmpty()
-                        .map(DictPair::normalizedForRuntime),
+                    pairs = sanitizedPairs,
                     updatedAt = stored.updatedAt,
                 )
             } catch (e: Exception) {

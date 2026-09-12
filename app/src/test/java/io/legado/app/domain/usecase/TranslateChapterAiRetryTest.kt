@@ -316,7 +316,8 @@ class TranslateChapterAiRetryTest {
             assertEquals("test://ai-retry", textGateway.requests.first().routeSessionKey?.substringBeforeLast("-"))
             val firstPrompt = textGateway.requests.first().messages.joinToString("\n") { it.content }
             assertTrue(firstPrompt.contains("CONTEXT_PACK_JSON"))
-            assertTrue(firstPrompt.contains("SEGMENTS_RAW_QT"))
+            assertFalse(firstPrompt.contains("SEGMENTS_RAW_QT"))
+            assertTrue(firstPrompt.contains("raw_segments"))
             assertTrue(firstPrompt.contains("refined_segments"))
             assertFalse(firstPrompt.contains("Keep every marker exactly once"))
             assertEquals(1, cacheGateway.savedChunks.size)

@@ -143,27 +143,33 @@ data class AiTranslationStoryContext(
         )
     }
 
-    fun relationshipPromptRecords(): List<Map<String, Any?>> = currentRelationships.map {
-        linkedMapOf(
-            "source" to it.source,
-            "target" to it.target,
-            "relationship" to it.relationship,
-            "description" to it.description,
-            "chapter_index" to it.chapterIndex,
-        )
-    }
+    fun relationshipPromptRecords(): List<Map<String, Any?>> = currentRelationships
+        .groupBy { Triple(it.source, it.target, it.relationship) }
+        .values
+        .map { group -> group.maxByOrNull { it.chapterIndex } ?: group.first() }
+        .map {
+            linkedMapOf(
+                "source" to it.source,
+                "target" to it.target,
+                "relationship" to it.relationship,
+                "description" to it.description,
+            )
+        }
 
-    fun worldBuildingPromptRecords(): List<Map<String, Any?>> =
-        currentWorldBuilding.map { entry -> entry.toPromptMap() }
+    fun worldBuildingPromptRecords(): List<Map<String, Any?>> = currentWorldBuilding
+        .groupBy { it.raw.lowercase() }
+        .values
+        .map { group -> group.maxByOrNull { it.description.length } ?: group.first() }
+        .map { entry -> entry.toPromptMap() }
 
-    private fun AiTranslationWorldEntry.toPromptMap(): Map<String, Any?> = linkedMapOf(
+    private fun AiTranslationWorldEntry.toPromptMap(): Map<String, Any?> = linkedMapOf<String, Any?>(
         "raw" to raw,
         "target" to target,
         "category" to category,
         "description" to description,
-        "entity_refs" to entityRefs,
-        "chapter_index" to chapterIndex,
-    )
+    ).apply {
+        if (entityRefs.isNotEmpty()) put("entity_refs", entityRefs)
+    }
 }
 
 enum class AiTranslationStoryMemoryKind {
@@ -319,7 +325,12 @@ object AiTranslationStoryMemoryPipeline {
             }
         val dictionary = snapshot.entities
             .asSequence()
-            .filter { it.raw.isNotBlank() && it.target.isNotBlank() }
+            .filter {
+                it.raw.isNotBlank() &&
+                    it.target.isNotBlank() &&
+                    !it.target.equals(it.raw, ignoreCase = true) &&
+                    !AiTranslationRefinePipeline.hasCjkTextCodePoints(it.target)
+            }
             .distinctBy { it.raw.lowercase() }
             .flatMap { entity ->
                 val type = if (entity.type.equals("character", ignoreCase = true)) {
