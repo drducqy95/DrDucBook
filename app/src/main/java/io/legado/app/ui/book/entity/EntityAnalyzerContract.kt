@@ -17,6 +17,10 @@ data class EntityCandidateUi(
     val firstChapterTitle: String,
     val context: String,
     val selected: Boolean = false,
+    val aiSuggestedTarget: String? = null,
+    val aiSuggestedType: QuickDictionaryType? = null,
+    val aiValid: Boolean? = null,
+    val aiDescription: String = "",
 )
 
 sealed interface EntityAnalyzerDialog {
@@ -45,11 +49,16 @@ data class EntityAnalyzerUiState(
     val candidates: ImmutableList<EntityCandidateUi> = persistentListOf(),
     @StringRes val errorRes: Int? = null,
     val dialog: EntityAnalyzerDialog? = null,
+    val aiEnriching: Boolean = false,
+    val aiEnrichProgress: String = "",
+    val aiEnrichAvailable: Boolean = false,
 )
 
 sealed interface EntityAnalyzerIntent {
     data object Analyze : EntityAnalyzerIntent
     data object CancelAnalysis : EntityAnalyzerIntent
+    data object EnrichWithAi : EntityAnalyzerIntent
+    data object CancelAiEnrich : EntityAnalyzerIntent
     data class Search(val query: String) : EntityAnalyzerIntent
     data class ToggleCandidate(val raw: String) : EntityAnalyzerIntent
     data object SelectVisible : EntityAnalyzerIntent

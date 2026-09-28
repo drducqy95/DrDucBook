@@ -44,11 +44,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MediumFlexibleTopAppBar
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +57,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.core.text.HtmlCompat
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -212,9 +216,15 @@ private fun BookInfoScreenContent(
     val scrollBehavior = if (isMiuix) {
         MiuixGlassScrollBehavior(MiuixScrollBehavior())
     } else {
-        M3GlassScrollBehavior(TopAppBarDefaults.exitUntilCollapsedScrollBehavior())
+        M3GlassScrollBehavior(TopAppBarDefaults.pinnedScrollBehavior())
     }
     val listState = rememberLazyListState()
+    val scrollFraction by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) 1f
+            else (listState.firstVisibleItemScrollOffset / 160f).coerceIn(0f, 1f)
+        }
+    }
     var showMenu by rememberSaveable { mutableStateOf(false) }
     var quickDictionaryRequest by remember { mutableStateOf<QuickDictionaryRequest?>(null) }
 
@@ -229,6 +239,7 @@ private fun BookInfoScreenContent(
                 onShowMenuChange = { showMenu = it },
                 onMenuAction = { onIntent(BookInfoIntent.MenuAction(it)) },
                 onBackPressed = onBack,
+                scrollFraction = scrollFraction,
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -483,6 +494,7 @@ private fun BookInfoTransparentTopAppBar(
     onShowMenuChange: (Boolean) -> Unit,
     onMenuAction: (BookInfoMenuAction) -> Unit,
     onBackPressed: () -> Unit,
+    scrollFraction: Float,
     scrollBehavior: GlassTopAppBarScrollBehavior,
 ) {
     val hazeState = LocalHazeState.current
@@ -492,17 +504,17 @@ private fun BookInfoTransparentTopAppBar(
     } else {
         GlassTopAppBarDefaults.scrolledContainerColor()
     }
-    val isAtTop = scrollBehavior.collapsedFraction <= 0.001f
-    val resolvedColor = if (isAtTop) Color.Transparent else collapsedColor
+    val resolvedColor = lerp(Color.Transparent, collapsedColor, scrollFraction)
     val topBarColors = TopAppBarDefaults.topAppBarColors(
         containerColor = resolvedColor,
         scrolledContainerColor = resolvedColor,
     )
 
     if (isMiuix) {
+        val showMiuixTitle = scrollFraction > 0.3f
         MiuixTopAppBar(
             modifier = hazeState?.let { Modifier.responsiveHazeEffectFixedStyle(it) } ?: Modifier,
-            title = "",
+            title = if (showMiuixTitle) state.book?.name.orEmpty() else "",
             subtitle = "",
             navigationIcon = {
                 TopBarNavigationButton(onClick = onBackPressed)
@@ -519,9 +531,16 @@ private fun BookInfoTransparentTopAppBar(
             scrollBehavior = (scrollBehavior as? MiuixGlassScrollBehavior)?.miuixBehavior,
         )
     } else {
-        MediumFlexibleTopAppBar(
+        TopAppBar(
             modifier = hazeState?.let { Modifier.responsiveHazeEffectFixedStyle(it) } ?: Modifier,
-            title = { Text(text = "", maxLines = 1) },
+            title = {
+                Text(
+                    text = state.book?.name.orEmpty(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.alpha(scrollFraction),
+                )
+            },
             navigationIcon = {
                 TopBarNavigationButton(onClick = onBackPressed)
             },
@@ -544,6 +563,7 @@ private fun BookInfoTransparentTopAppBar(
         )
     }
 }
+
 
 @Composable
 private fun rememberBookInfoColorTheme(
@@ -922,8 +942,8 @@ private fun BookInfoHeader(
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .align(Alignment.CenterVertically)
-                        .padding(top = 8.dp, bottom = 8.dp),
+                        .align(Alignment.Top)
+                        .padding(top = 4.dp, bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     var showTitleMenu by remember { mutableStateOf(false) }
@@ -1216,16 +1236,32 @@ private fun BookInfoSummary(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        val displayIntro = book.displayIntro.orEmpty().ifBlank {
+        val rawIntro = book.displayIntro.orEmpty().ifBlank {
             stringResource(R.string.intro_show_null)
+        }
+        val displayIntro = remember(rawIntro) {
+            try {
+                HtmlCompat.fromHtml(rawIntro, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
+            } catch (_: Throwable) {
+                rawIntro.trim()
+            }
+        }
+        val rawSourceIntro = book.sourceIntro.orEmpty().ifBlank { displayIntro }
+        val sourceIntro = remember(rawSourceIntro) {
+            try {
+                HtmlCompat.fromHtml(rawSourceIntro, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
+            } catch (_: Throwable) {
+                rawSourceIntro.trim()
+            }
         }
         QuickDictionarySelectableText(
             displayText = displayIntro,
-            sourceText = book.sourceIntro.orEmpty().ifBlank { displayIntro },
+            sourceText = sourceIntro,
             bookUrl = book.bookUrl,
             sourceLocation = "${book.name} · $introLabel",
             onQuickDictionaryRequest = onQuickDictionaryRequest,
             style = LegadoTheme.typography.bodyMedium,
+            color = LegadoTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
         )
     }

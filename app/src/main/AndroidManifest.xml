@@ -581,6 +581,10 @@
             android:name="io.legado.app.service.DownloadService"
             android:foregroundServiceType="dataSync" />
         <service
+            android:name="io.legado.app.service.DriveWebDavService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+        <service
             android:name="io.legado.app.service.BookshelfAutomationJobService"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />

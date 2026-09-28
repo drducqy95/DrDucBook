@@ -14,6 +14,7 @@ import io.legado.app.model.tts.LocalTtsModelRegistry
 import io.legado.app.model.tts.LocalTtsSynthesisEngine
 import io.legado.app.model.tts.PiperOnnxTtsEngine
 import io.legado.app.model.tts.ValtecOnnxTtsEngine
+import io.legado.app.model.tts.ZeroTtsOnnxEngine
 import io.legado.app.model.tts.parseLocalTtsEngine
 import io.legado.app.ui.config.readConfig.ReadConfig
 import kotlinx.collections.immutable.ImmutableList
@@ -64,6 +65,7 @@ class LocalTtsModelRepository(
         if (model.engine !in setOf(
                 LocalTtsModelRegistry.ENGINE_VALTEC_VITS,
                 LocalTtsModelRegistry.ENGINE_PIPER_VITS,
+                LocalTtsModelRegistry.ENGINE_ZEROTTS,
             )
         ) {
             return@withContext LocalTtsModelTestResult(
@@ -127,13 +129,15 @@ class LocalTtsModelRepository(
             checksum = checksum,
             sizeBytes = sizeBytes,
             runtimeReady = engine == LocalTtsModelRegistry.ENGINE_VALTEC_VITS ||
-                engine == LocalTtsModelRegistry.ENGINE_PIPER_VITS,
+                engine == LocalTtsModelRegistry.ENGINE_PIPER_VITS ||
+                engine == LocalTtsModelRegistry.ENGINE_ZEROTTS,
         )
     }
 
     private fun createEngine(model: LocalTtsModel): LocalTtsSynthesisEngine = when (model.engine) {
         LocalTtsModelRegistry.ENGINE_VALTEC_VITS -> ValtecOnnxTtsEngine(model)
         LocalTtsModelRegistry.ENGINE_PIPER_VITS -> PiperOnnxTtsEngine(context, model)
+        LocalTtsModelRegistry.ENGINE_ZEROTTS -> ZeroTtsOnnxEngine(model)
         else -> error("Runtime chưa hỗ trợ engine ${model.engine}")
     }
 }

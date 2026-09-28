@@ -355,6 +355,44 @@ data class Book(
         return config.rewritePresetId
     }
 
+    fun setCustomTranslationPrompt(prompt: String?, sourcePresetId: String? = null) {
+        config.customTranslationPrompt = prompt?.trim()?.ifBlank { null }
+        config.translationPromptSourcePresetId = if (prompt.isNullOrBlank()) null else sourcePresetId
+    }
+
+    fun getCustomTranslationPrompt(): String? =
+        config.customTranslationPrompt
+
+    fun getTranslationPromptSourcePresetId(): String? =
+        config.translationPromptSourcePresetId
+
+    fun hasPerBookTranslationPrompt(): Boolean =
+        !config.customTranslationPrompt.isNullOrBlank()
+
+    fun clearPerBookTranslationPrompt() {
+        config.customTranslationPrompt = null
+        config.translationPromptSourcePresetId = null
+    }
+
+    fun setCustomRewritePrompt(prompt: String?, sourcePresetId: String? = null) {
+        config.customRewritePrompt = prompt?.trim()?.ifBlank { null }
+        config.rewritePromptSourcePresetId = if (prompt.isNullOrBlank()) null else sourcePresetId
+    }
+
+    fun getCustomRewritePrompt(): String? =
+        config.customRewritePrompt
+
+    fun getRewritePromptSourcePresetId(): String? =
+        config.rewritePromptSourcePresetId
+
+    fun hasPerBookRewritePrompt(): Boolean =
+        !config.customRewritePrompt.isNullOrBlank()
+
+    fun clearPerBookRewritePrompt() {
+        config.customRewritePrompt = null
+        config.rewritePromptSourcePresetId = null
+    }
+
     fun isVietnameseSource(): Boolean {
         val detected = config.detectedSourceLanguage
         if (detected != null) {
@@ -516,6 +554,10 @@ data class Book(
         var inheritSeriesMemory: Boolean = false, // Kế thừa bộ nhớ bộ truyện từ các sách cùng nhóm
         var detectedSourceLanguage: String? = null, // Ngôn ngữ nguồn tự động nhận diện ("vi", "zh", "en", ...)
         var rewritePresetId: String? = null, // ID preset viết lại AI đã chọn cho sách
+        var customTranslationPrompt: String? = null, // Prompt dịch đã chỉnh sửa riêng cho sách
+        var translationPromptSourcePresetId: String? = null, // ID preset gốc mà prompt được copy từ (UI only)
+        var customRewritePrompt: String? = null, // Prompt viết lại AI đã chỉnh sửa riêng cho sách
+        var rewritePromptSourcePresetId: String? = null, // ID preset gốc của rewrite prompt (UI only)
     ) : Parcelable
 
     class Converters {

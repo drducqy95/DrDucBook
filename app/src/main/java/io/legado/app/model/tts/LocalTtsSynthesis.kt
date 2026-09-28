@@ -15,17 +15,27 @@ import io.legado.app.ui.config.readConfig.ReadConfig
 object LocalTtsSynthesis {
     private const val WAV_HEADER_SIZE = 44
     private val mutex = Mutex()
+    private val cachedEngines = java.util.concurrent.ConcurrentHashMap<String, LocalTtsSynthesisEngine>()
 
-    suspend fun synthesizeToWav(
+    private data class ResolvedTarget(
+        val model: LocalTtsModel,
+        val voiceId: Int,
+        val cleanText: String,
+        val targetFile: File,
+    )
+
+    private fun resolveTarget(
         context: Context,
         engineReference: String,
         text: String,
-        speed: Float = (ReadConfig.speechRatePlay + 5) / 10f,
-    ): File = mutex.withLock {
-        val reference = parseLocalTtsEngine(engineReference)
-            ?: error("LOCAL_TTS_ENGINE_INVALID")
-        val model = LocalTtsModelRegistry(context).get(reference.modelId)
-            ?: error("LOCAL_TTS_MODEL_NOT_FOUND")
+        speed: Float,
+    ): ResolvedTarget? {
+        val reference = parseLocalTtsEngine(engineReference) ?: return null
+        val registry = LocalTtsModelRegistry(context)
+        val model = registry.get(reference.modelId)
+            ?: registry.list().firstOrNull { it.engine == LocalTtsModelRegistry.ENGINE_ZEROTTS }
+            ?: registry.list().firstOrNull()
+            ?: return null
         val voiceId = reference.voiceId.takeIf { id -> model.voices.any { it.id == id } }
             ?: model.defaultVoiceId
         val cleanText = text
@@ -34,25 +44,65 @@ object LocalTtsSynthesis {
             .replace(Regex("\\s+"), " ")
             .trim()
             .takeIf(String::isNotBlank)
-            ?: error("TTS_TEXT_REQUIRED")
+            ?: return null
         val root = File(context.externalCacheDir ?: context.cacheDir, "local_tts_audio").apply { mkdirs() }
         val digest = MessageDigest.getInstance("SHA-256")
             .digest("${model.id}\u0000$voiceId\u0000$speed\u0000$cleanText".toByteArray())
             .joinToString("") { "%02x".format(it) }
         val target = File(root, "$digest.wav")
-        if (!target.isFile || target.length() <= WAV_HEADER_SIZE.toLong()) {
-            val engine = when (model.engine) {
+        return ResolvedTarget(model, voiceId, cleanText, target)
+    }
+
+    fun getCachedWav(
+        context: Context,
+        engineReference: String,
+        text: String,
+        speed: Float = (ReadConfig.speechRatePlay + 5) / 10f,
+    ): File? {
+        val resolved = resolveTarget(context, engineReference, text, speed) ?: return null
+        return if (resolved.targetFile.isFile && resolved.targetFile.length() > WAV_HEADER_SIZE.toLong()) {
+            resolved.targetFile
+        } else {
+            null
+        }
+    }
+
+    suspend fun synthesizeToWav(
+        context: Context,
+        engineReference: String,
+        text: String,
+        speed: Float = (ReadConfig.speechRatePlay + 5) / 10f,
+    ): File {
+        getCachedWav(context, engineReference, text, speed)?.let { return it }
+        return mutex.withLock {
+            val resolved = resolveTarget(context, engineReference, text, speed)
+                ?: error("LOCAL_TTS_ENGINE_INVALID")
+            if (!resolved.targetFile.isFile || resolved.targetFile.length() <= WAV_HEADER_SIZE.toLong()) {
+                val engine = getOrCreateEngine(context, resolved.model)
+                writeWaveAtomically(
+                    resolved.targetFile,
+                    engine.synthesize(resolved.cleanText, resolved.voiceId, speed),
+                    resolved.model.sampleRate
+                )
+            }
+            resolved.targetFile
+        }
+    }
+
+    private fun getOrCreateEngine(context: Context, model: LocalTtsModel): LocalTtsSynthesisEngine {
+        return cachedEngines.computeIfAbsent(model.id) {
+            when (model.engine) {
                 LocalTtsModelRegistry.ENGINE_VALTEC_VITS -> ValtecOnnxTtsEngine(model)
-                LocalTtsModelRegistry.ENGINE_PIPER_VITS -> PiperOnnxTtsEngine(context, model)
+                LocalTtsModelRegistry.ENGINE_PIPER_VITS -> PiperOnnxTtsEngine(context.applicationContext, model)
+                LocalTtsModelRegistry.ENGINE_ZEROTTS -> ZeroTtsOnnxEngine(model)
                 else -> error("LOCAL_TTS_ENGINE_UNSUPPORTED")
             }
-            try {
-                writeWaveAtomically(target, engine.synthesize(cleanText, voiceId, speed), model.sampleRate)
-            } finally {
-                engine.close()
-            }
         }
-        target
+    }
+
+    fun clearCache() {
+        cachedEngines.values.forEach { runCatching { it.close() } }
+        cachedEngines.clear()
     }
 
     private fun writeWaveAtomically(target: File, samples: FloatArray, sampleRate: Int) {

@@ -184,6 +184,7 @@ import io.legado.app.domain.usecase.AccountEntitlementUseCase
 import io.legado.app.domain.usecase.WebServiceAccessUseCase
 import io.legado.app.domain.usecase.AddToBookshelfUseCase
 import io.legado.app.domain.usecase.AnalyzeDownloadedEntitiesUseCase
+import io.legado.app.domain.usecase.EnrichEntitiesWithAiUseCase
 import io.legado.app.domain.usecase.AiChatGenerationUseCase
 import io.legado.app.domain.usecase.AssetDeliveryUseCase
 import io.legado.app.domain.usecase.AiTextFactoryUseCase
@@ -606,6 +607,7 @@ val appModule = module {
     singleOf(::CleanSelectedTextUseCase)
     singleOf(::AnalyzeDownloadedEntitiesUseCase)
     singleOf(::ImportEntityCandidatesUseCase)
+    singleOf(::EnrichEntitiesWithAiUseCase)
     singleOf(::SaveBookContentProcessUseCase)
     singleOf(::TranslateDynamicUiTextUseCase)
     singleOf(::TranslateBrowserPageUseCase)
@@ -680,6 +682,7 @@ val appModule = module {
             bookUrl = bookUrl,
             analyzeDownloadedEntities = get(),
             importEntityCandidates = get(),
+            enrichEntitiesWithAi = get(),
         )
     }
     viewModelOf(::GroupViewModel)
@@ -812,6 +815,11 @@ val appModule = module {
             searchContentRepository = get()
         )
     }
+
+    single { io.legado.app.data.repository.ManagedSourceRegistry(get()) }
+    single { io.legado.app.data.repository.RemoteBookMetadataRepository() }
+    single { io.legado.app.domain.usecase.DriveWebDavConnectionUseCase(get(), get()) }
+    viewModel { io.legado.app.ui.drive.DriveLibraryViewModel(get(), get(), get()) }
 }
 
 @TargetApi(Build.VERSION_CODES.P)

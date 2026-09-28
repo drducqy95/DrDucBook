@@ -140,8 +140,9 @@ open class WebDav(
     @Throws(WebDavException::class)
     suspend fun listFiles(): List<WebDavFile> {
         propFindResponse()?.let { body ->
+            val currentPath = path.trimEnd('/')
             return parseBody(body).filter {
-                it.path != path
+                it.path.trimEnd('/') != currentPath
             }
         }
         return emptyList()
@@ -222,6 +223,10 @@ open class WebDav(
                                 .toInstant().toEpochMilli()
                         }
                 }.getOrNull() ?: 0
+                val thumbnailUrl = element.getElementsByTag("thumbnail").firstOrNull()?.text()
+                    ?: element.getElementsByTag("cover").firstOrNull()?.text()
+                val description = element.getElementsByTag("description").firstOrNull()?.text()
+                    ?: element.getElementsByTag("intro").firstOrNull()?.text()
                 var fullURL = NetworkUtils.getAbsoluteURL(baseUrl, hrefDecode)
                 if (WebDavFile.isDir(contentType, resourceType) && !fullURL.endsWith("/")) {
                     fullURL += "/"
@@ -234,7 +239,9 @@ open class WebDav(
                     size = size,
                     contentType = contentType,
                     resourceType = resourceType,
-                    lastModify = lastModify
+                    lastModify = lastModify,
+                    thumbnailUrl = thumbnailUrl,
+                    description = description
                 )
                 list.add(webDavFile)
             } catch (e: MalformedURLException) {

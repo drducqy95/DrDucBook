@@ -14,6 +14,7 @@ import io.legado.app.data.repository.HachimiLexicalConstraint
 import io.legado.app.data.repository.HachimiOnnxTranslator
 import io.legado.app.domain.gateway.NmtDecodeConfig
 import io.legado.app.domain.gateway.NmtTranslationResult
+import io.legado.app.model.translation.HachimiOnnxRuntimeCoordinator
 import io.legado.app.domain.model.DictPair
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
@@ -111,6 +112,7 @@ class NmtOnnxService : Service() {
             val config = data.getString(NmtOnnxIpc.KEY_CONFIG_JSON)
                 ?.let { GSON.fromJson(it, NmtDecodeConfig::class.java) }
                 ?: NmtDecodeConfig()
+            HachimiOnnxRuntimeCoordinator.setActiveModelId(config.modelId)
             val constraints = dictionary.asSequence()
                 .filter { it.original.isNotBlank() && it.translation.isNotBlank() }
                 .distinctBy { it.original.trim() }

@@ -1,9 +1,9 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-09-12T09:53:00.000000",
+    "last_updated": "2026-09-15T11:10:00.000000",
     "overall_progress_percent": 100,
-    "current_phase": "Phase 33 - Fix Foreign Han-Viet Leakage (ERR_0020) & Title Compound Self-Healing Completed",
+    "current_phase": "Phase 42 - ZeroTTS Inference Optimization & Quantization",
     "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
@@ -1184,6 +1184,440 @@
         {
           "id": "T33.6",
           "desc": "Phase 6: Automated verification (Unit Tests 100% pass, debug APK built, installed to LDPlayer, Chapter 2 verified live: đại sư Medvedev)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P34",
+      "name": "Go/Gomobile Local WebDAV & NMT HachimiMT-60-QT Conversion",
+      "status": "DONE",
+      "progress": 100,
+      "plan_folder": "plans/260912-1210-go-webdav-nmt",
+      "tasks": [
+        {
+          "id": "T34.1",
+          "desc": "Phase 01: Spike & Decision Gate (Go/Gomobile/NDK, AAR sizing, R8 keep rules, XML/Basic Auth audit)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.2",
+          "desc": "Phase 02: Go Drive Filesystem & Multi-Provider Client (Google Drive v3, OneDrive, Dropbox, HTTP, Range seek)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.3",
+          "desc": "Phase 03: WebDAV Server & Session Auth (127.0.0.1, random 32-byte hex secret, Basic Auth, read-only, graceful stop)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.4",
+          "desc": "Phase 04: Gomobile Bridge & AAR Pipeline (C-shared bind, Kotlin GoBridge adapter, build.ps1, R8 keep rules)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.5",
+          "desc": "Phase 05: Android Service & Google Auth (DriveWebDavService dataSync, GoogleDriveAuthorizationBridge drive.file, silent refresh)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.6",
+          "desc": "Phase 06: Explore UI & Managed Source Registry (DriveLibrarySection in ExploreScreen, AddDriveSourceSheet, multi-source, selective download)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.7",
+          "desc": "Phase 07: WebDAV Test Matrix & Verification (Go/Kotlin unit tests, security confinement, stress, regression)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.8",
+          "desc": "Phase 08: CI/CD, Release & Developer Docs (tools/go-webdav-android README, architecture specs, CI runner pipeline)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.9",
+          "desc": "Phase 09: NMT Contract Audit & Golden Test Set (ngocdang83/HachimiMT-60-QT pin, tensor contract, 30-pair golden set, noRepeat=0)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.10",
+          "desc": "Phase 10: PyTorch to ONNX Export Pipeline (Transformers/Optimum, 5 graphs, decoder KV merge, ORT extensions, parity check)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.11",
+          "desc": "Phase 11: INT8 Quantization, Packaging & HuggingFace Upload (quantize_dynamic, package_hachimi_qt.ps1, CC-BY-4.0, HF direct URL)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.12",
+          "desc": "Phase 12: Multi-Model Runtime & Cache Isolation (NmtDecodeConfig modelId, NmtModelCatalog, HachimiOnnxRuntimeCoordinator switch, cache revision)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.13",
+          "desc": "Phase 13: Model Selector UI & Asset Delivery Catalog (TranslationConfigScreen selector, QT no-repeat auto-off/warning, ExternalAssetCatalog)",
+          "status": "DONE"
+        },
+        {
+          "id": "T34.14",
+          "desc": "Phase 14: Device Validation & Benchmark (ARM64 & x86_64, RAM/TTFS/speed benchmark, stress cancel, process death recovery, regression)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P35",
+      "name": "Debug & Fix: Explore Sub-Tabs, HachimiQT 404 & Google Drive Access",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T35.1",
+          "desc": "Tách Nguồn Sách & Thư viện Drive & Cloud thành 2 sub-tab riêng biệt trên ExploreScreen với AppTabRow và AnimatedContent",
+          "status": "DONE"
+        },
+        {
+          "id": "T35.2",
+          "desc": "Sửa lỗi 404 tải HachimiQT: Bổ sung translation-hachimi-qt-onnx vào manifest hf-artifacts-manifest.json và build-hf-asset-manifest.ps1 (HfArtifactManifestTest 100% PASS)",
+          "status": "DONE"
+        },
+        {
+          "id": "T35.3",
+          "desc": "Sửa lỗi quyền truy cập Google Drive: Bổ sung API Key và implement listGDrivePublic (Drive REST API v3) trong Go WebDAV engine, rebuild go-webdav.aar, cấu hình GOOGLE_DRIVE_API_KEY",
+          "status": "DONE"
+        },
+        {
+          "id": "T35.4",
+          "desc": "Hướng dẫn cấu hình Google Cloud OAuth Consent Screen (thêm Test User) & Google Cloud API Key cho public Google Drive folder",
+          "status": "DONE"
+        },
+        {
+          "id": "T35.5",
+          "desc": "Kiểm thử trực tiếp trên LDPlayer (emulator-5554): chuyển đổi mượt giữa 2 sub-tab, kiểm tra logcat và trạng thái kết nối",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P36",
+      "name": "Debug & Fix: Google Drive Public Folder Pagination & EPUB Download Corruption",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T36.1",
+          "desc": "Phân tích root cause link Drive chứa 85 thư mục nhưng SSR HTML chỉ render 50 thư mục đầu tiên; EPUB download bị thiếu 434 bytes cuối dẫn đến hỏng cấu trúc ZIP Central Directory (NPE trong EpubReader)",
+          "status": "DONE"
+        },
+        {
+          "id": "T36.2",
+          "desc": "Sửa native/go-webdav/drive/public_client.go: tích hợp Google Drive client public API key mặc định, query Google Drive REST API v3 với vòng lặp phân trang pageToken (pageSize=1000) tải đủ 100% 85 folders; lấy kích thước chính xác theo byte thay vì ước lượng parseHumanSize",
+          "status": "DONE"
+        },
+        {
+          "id": "T36.3",
+          "desc": "Sửa native/go-webdav/drive/reader.go: bỏ cutoff sớm khi kích thước thật lớn hơn estimate; sửa race condition cổng ngẫu nhiên trong DriveWebDavServiceController.kt và DriveWebDavConnectionUseCase.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T36.4",
+          "desc": "Rebuild native go-webdav.aar, rebuild :app:assembleAppDebug, cài đặt lên emulator-5554",
+          "status": "DONE"
+        },
+        {
+          "id": "T36.5",
+          "desc": "Kiểm thử thực tế trên LDPlayer (emulator-5554): duyệt qua toàn bộ 85 folders, vào folder (Hệ Thống), tải sách (Hệ Thống) Khi May Mắn Trị Giá Là Max Thì, import vào kệ sách, mở đọc và hiển thị mục lục cùng nội dung thành công 100%",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P37",
+      "name": "Fix: Book Info Screen Layout, Scroll Clipping & HTML Decoding in Description",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T37.1",
+          "desc": "Phân tích nguyên nhân lỗi bố cục màn hình thông tin truyện: MediumFlexibleTopAppBar giữ khoảng trống 2 dòng (112dp) làm tiêu đề trống bị guillotine cắt nửa bìa sách khi cuộn (exitUntilCollapsedScrollBehavior làm dịch chuyển contentPadding của LazyColumn), văn bản giới thiệu chứa thẻ <br> nguyên bản chưa qua giải mã HTML",
+          "status": "DONE"
+        },
+        {
+          "id": "T37.2",
+          "desc": "Thay thế MediumFlexibleTopAppBar bằng TopAppBar đơn dòng kết hợp TopAppBarDefaults.pinnedScrollBehavior(), tính toán scrollFraction động làm mờ/hiện tiêu đề sách và chuyển màu thanh công cụ mượt mà trên kính mờ",
+          "status": "DONE"
+        },
+        {
+          "id": "T37.3",
+          "desc": "Căn chỉnh cột tiêu đề/tác giả/nguồn trong BookInfoHeader lên Alignment.Top để cân xứng hoàn hảo với bìa sách 112dp x 156.8dp",
+          "status": "DONE"
+        },
+        {
+          "id": "T37.4",
+          "desc": "Sử dụng HtmlCompat.fromHtml(..., HtmlCompat.FROM_HTML_MODE_COMPACT) trong BookInfoViewModel và BookInfoScreen để làm sạch các thẻ HTML thô (<br>, <p>, &nbsp;) trong phần giới thiệu truyện mà không bị chèn ký tự toàn giác \\u3000",
+          "status": "DONE"
+        },
+        {
+          "id": "T37.5",
+          "desc": "Biên dịch Kotlin, build APK debug x86_64, cài đặt lên máy ảo và xác minh trực quan cả trạng thái đầu trang và sau khi cuộn",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P38",
+      "name": "Drive Remote Rich Book Catalog, DrDucBook WebDAV & Admin Account Management",
+      "status": "DONE",
+      "progress": 100,
+      "plan_folder": "plans/260913-0752-drive-remote-metadata-covers",
+      "tasks": [
+        {
+          "id": "T38.1",
+          "desc": "Phase 01 - WebDAV Branding (\"DrDucBook WebDAV\") & Google Drive API v3 Native Thumbnails (DriveWebDavService, server.go, public_client.go, WebDavFile, RemoteBook)",
+          "status": "DONE"
+        },
+        {
+          "id": "T38.2",
+          "desc": "Phase 02 - Zero-Download Range Extractors (EpubRemoteExtractor, MobiRemoteExtractor, DocxRemoteExtractor, PdfRemoteExtractor)",
+          "status": "DONE"
+        },
+        {
+          "id": "T38.3",
+          "desc": "Phase 03 - Text Format Analyzers, Companion Covers & Typography Cover Generator (TextRemoteExtractor, CompanionCoverResolver, TypographyCover)",
+          "status": "DONE"
+        },
+        {
+          "id": "T38.4",
+          "desc": "Phase 04 - Database Schema, Room Cache & Viewport Async Prefetcher (RemoteBookMetadata entity/dao/repository, LruCache, concurrency limit)",
+          "status": "DONE"
+        },
+        {
+          "id": "T38.5",
+          "desc": "Phase 05 - Rich Book Card UI, View Modes Switcher & Preview Sheet (DriveBookCard 5:7, format badges, ViewModeSwitcher, DriveBookPreviewSheet)",
+          "status": "DONE"
+        },
+        {
+          "id": "T38.6",
+          "desc": "Phase 06 - Admin Account Management Enhancement (Registration Date, Last Sign-in, Filters & Sorting in AccountScreen, AccountViewModel, Supabase)",
+          "status": "DONE"
+        },
+        {
+          "id": "T38.7",
+          "desc": "Phase 07 - Automated Testing, Bandwidth Benchmarks & Device Verification (Unit test suite 100%, <2MB bandwidth verification, 60fps on emulator)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P39",
+      "name": "EPUB Remote Metadata Fault Isolation & Account Activity Timestamps Fix",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T39.1",
+          "desc": "Fix EpubRemoteExtractor selector bug, path resolution & XML namespace element retrieval",
+          "status": "DONE"
+        },
+        {
+          "id": "T39.2",
+          "desc": "Fault isolation in RemoteBookMetadataRepository & DriveLibraryViewModel prefetch loop",
+          "status": "DONE"
+        },
+        {
+          "id": "T39.3",
+          "desc": "Fix ISO timestamp parser & legacy columns in SupabaseAccountAccessRepository",
+          "status": "DONE"
+        },
+        {
+          "id": "T39.4",
+          "desc": "Enhance account subtitle formatting in AccountScreen for Material 3 & Miuix",
+          "status": "DONE"
+        },
+        {
+          "id": "T39.5",
+          "desc": "Comprehensive automated unit tests and compileAppDebugKotlin check",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P40",
+      "name": "Per-Book Translation Prompt, Reader Bottom Bar & AI Entity Enrichment",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T40.1",
+          "desc": "Per-book translation prompt in Book.ReadConfig, 4-tier fallback in TranslateChapterUseCase",
+          "status": "DONE"
+        },
+        {
+          "id": "T40.2",
+          "desc": "Reader Translation Sheet UI with preset selector, editor and per-book save/clear",
+          "status": "DONE"
+        },
+        {
+          "id": "T40.3",
+          "desc": "Reorder default bottom bar tool buttons to Setting, Translate, AutoPage, ReadAloud, EntityAnalyzer",
+          "status": "DONE"
+        },
+        {
+          "id": "T40.4",
+          "desc": "EnrichEntitiesWithAiUseCase for batch AI entity classification, false positive filtering and translation suggestion",
+          "status": "DONE"
+        },
+        {
+          "id": "T40.5",
+          "desc": "Integrate AI enrichment into EntityAnalyzerScreen, ViewModel, Contract and Koin DI",
+          "status": "DONE"
+        },
+        {
+          "id": "T40.6",
+          "desc": "Debug: Fix save button UI feedback & isolate AI Provider and AI Rewrite prompts independently",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P41",
+      "name": "ZeroTTS ONNX Engine Integration & Voice Addon System",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T41.1",
+          "desc": "Repackaging and Hugging Face upload script for base model and 8 voice addons (scripts/repackage_zerotts.py)",
+          "status": "DONE"
+        },
+        {
+          "id": "T41.2",
+          "desc": "Lightweight NPY file format parser (NpyReader.kt) and unit tests",
+          "status": "DONE"
+        },
+        {
+          "id": "T41.3",
+          "desc": "Hugging Face BPE native tokenizer (ZeroTtsBpeTokenizer.kt) and unit tests",
+          "status": "DONE"
+        },
+        {
+          "id": "T41.4",
+          "desc": "ZeroTTS ONNX multi-session cascade synthesis engine (ZeroTtsOnnxEngine.kt) with idle unload and 48kHz audio output",
+          "status": "DONE"
+        },
+        {
+          "id": "T41.5",
+          "desc": "Local TTS plugin architecture integration in LocalTtsModelRegistry, LocalTtsSynthesis, and LocalTtsModelRepository",
+          "status": "DONE"
+        },
+        {
+          "id": "T41.6",
+          "desc": "LocalTtsModelImporter enhancement for directory extraction, voice addon patching, and binary file formats",
+          "status": "DONE"
+        },
+        {
+          "id": "T41.7",
+          "desc": "ExternalAssetCatalog definition for ZeroTTS base package and 8 voice addon assets",
+          "status": "DONE"
+        },
+        {
+          "id": "T41.8",
+          "desc": "Deploy Supabase Edge Functions asset-ticket & asset-download with updated manifest (resolve ERR_0029)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P42",
+      "name": "ZeroTTS Inference Optimization & Quantization",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T42.1",
+          "desc": "Phase 01 - Fix session lifecycle in LocalTtsSynthesis (cache engine between sentences)",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.2",
+          "desc": "Phase 01 - Enable XNNPACK + ALL_OPT + auto-detect CPU threads in ZeroTtsOnnxEngine",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.3",
+          "desc": "Phase 01 - Hoist constant sampling tensors out of autoregressive loop in ZeroTtsOnnxEngine",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.4",
+          "desc": "Phase 01 - Optimize KV-cache copy tensor management to reduce GC pressure",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.5",
+          "desc": "Phase 02 - Create Python quantization pipeline (tools/zerotts-quant) for mixed-precision INT8",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.6",
+          "desc": "Phase 02 - Run INT8 quantization on 3 transformer models (preserve FP32 vocoder)",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.7",
+          "desc": "Phase 02 - Update repackage_zerotts.py and package quantized zip (~500 MB)",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.8",
+          "desc": "Phase 02 - Support INT8 auto-detection in ZeroTtsOnnxEngine and whitelist in LocalTtsModelImporter",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.9",
+          "desc": "Phase 02 - Upload quantized package to HuggingFace replacing old FP32 package",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.10",
+          "desc": "Phase 03 - Prevent AudioSink watchdog timeout and reuse AudioTrack without player.stop()",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.11",
+          "desc": "Phase 03 - Implement hierarchical text chunking (maxChars=120) to eliminate quadratic O(N^2) attention latency and LMK kills",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.12",
+          "desc": "Phase 03 - End-to-end testing and verification on Android emulator reading consecutive chapters",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.13",
+          "desc": "Phase 04 - ZeroTTS Engine Tuning: Reduce maxChars to 85, optimize CPU thread allocation (3-6 threads), persistent direct buffers, and delta seenMask updates",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.14",
+          "desc": "Phase 04 - Lookahead Prefetch Pipeline: Implement 4-paragraph sliding window prefetching with lockless getCachedWav cache check",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.15",
+          "desc": "Phase 04 - ExoPlayer Gapless Playlist Queuing: Implement onMediaItemTransition and pre-buffering to achieve 0ms transition gap between sentences/paragraphs",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.16",
+          "desc": "Phase 04 - Assemble Release APK with R8 minification, resource shrinking, and multi-ABI packaging",
+          "status": "DONE"
+        },
+        {
+          "id": "T42.17",
+          "desc": "Phase 04 - Physical Device Performance Optimization: Re-enable CPU arena allocator & memory pattern, tune threading for big.LITTLE (clamp to 4, AR 2 threads), deduplicate prefetch in-flight race condition, and reduce lookahead depth",
           "status": "DONE"
         }
       ]

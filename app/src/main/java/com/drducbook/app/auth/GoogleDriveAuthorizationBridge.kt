@@ -44,6 +44,20 @@ object GoogleDriveAuthorizationBridge {
         )
     }.recoverCatching(::normalizeError)
 
+    suspend fun authorizeDriveFile(context: Context): Result<GoogleDriveAuthorization> = runCatching {
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope(CloudConsentScopes.googleDriveFile)))
+            .build()
+        val result = Identity.getAuthorizationClient(context)
+            .authorize(request)
+            .awaitResult()
+        val pendingIntent = result.pendingIntent
+        GoogleDriveAuthorization(
+            accessToken = result.accessToken?.takeIf(String::isNotBlank),
+            resolution = pendingIntent,
+        )
+    }.recoverCatching(::normalizeError)
+
     fun completeAuthorization(context: Context, data: Intent): Result<String> = runCatching {
         Identity.getAuthorizationClient(context)
             .getAuthorizationResultFromIntent(data)

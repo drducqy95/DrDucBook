@@ -174,6 +174,12 @@ class AccountViewModel(
             is AccountIntent.FilterAdminRole -> _uiState.update {
                 it.copy(adminRoleFilter = intent.role)
             }
+            is AccountIntent.SelectAdminSort -> _uiState.update {
+                it.copy(adminSortOption = intent.sort)
+            }
+            is AccountIntent.SelectAdminActivityFilter -> _uiState.update {
+                it.copy(adminActivityFilter = intent.filter)
+            }
             is AccountIntent.EditAccount -> editAccount(intent.userId)
             is AccountIntent.SelectAccountRole -> selectAccountRole(intent.role)
             is AccountIntent.SetAccountRoleDurationDays -> setAccountRoleDurationDays(intent.value)

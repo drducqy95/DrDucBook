@@ -196,6 +196,22 @@ class LocalTtsModelImporterTest {
         }
     }
 
+    @Test
+    fun testExtractZeroTtsBaseZip() = runBlocking {
+        val zipFile = File("dist/zerotts/legado-tts-zerotts-base.zip").let {
+            if (it.isFile) it else File("../dist/zerotts/legado-tts-zerotts-base.zip")
+        }
+        if (!zipFile.isFile) return@runBlocking
+        val extracted = LocalTtsModelImporter.extractRecognizedFiles(
+            input = zipFile.inputStream().buffered(),
+            staging = root,
+        )
+        assertEquals(13, extracted.size)
+        assertTrue(extracted.contains("prefix_step.onnx"))
+        assertTrue(extracted.contains("tokenizer.json"))
+        assertTrue(extracted.contains("zerotts_voices.json"))
+    }
+
     private fun extract(bytes: ByteArray): Set<String> = runBlocking {
         LocalTtsModelImporter.extractRecognizedFiles(
             input = ByteArrayInputStream(bytes),
@@ -215,3 +231,4 @@ class LocalTtsModelImporterTest {
         return output.toByteArray()
     }
 }
+

@@ -52,16 +52,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
 import io.legado.app.domain.model.AiPromptCatalog
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
 import io.legado.app.model.translation.HachimiOnnxImportPhase
 import io.legado.app.model.translation.HachimiOnnxImportProgress
 import io.legado.app.model.translation.HachimiOnnxModelImporter
 import io.legado.app.model.translation.HachimiOnnxModelRegistry
+import io.legado.app.model.translation.HachimiOnnxRuntimeCoordinator
 import io.legado.app.ui.theme.adaptiveContentPadding
 import io.legado.app.ui.config.ai.AiComboModelPickerItemUi
 import io.legado.app.ui.config.ai.AiComboModelPickerSheet
 import io.legado.app.ui.config.ai.prompt.AI_PROMPT_SELECTION_MODEL_PREFIX
 import io.legado.app.ui.config.ai.prompt.AI_PROMPT_SELECTION_ROUTE_PREFIX
 import io.legado.app.ui.widget.components.AppScaffold
+import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import kotlinx.collections.immutable.toImmutableList
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.SplicedColumnGroup
@@ -183,7 +193,12 @@ fun TranslationConfigScreen(
     }
     val selectedPresetModelId = selectedTranslationPreset?.modelProfileId.orEmpty()
     val nmtModelRegistry = remember(context) { HachimiOnnxModelRegistry(context) }
-    var isNmtModelInstalled by remember { mutableStateOf(nmtModelRegistry.isInstalled()) }
+    var installedNmtModels by remember { mutableStateOf(nmtModelRegistry.listInstalledModels()) }
+    var activeNmtModelId by remember { mutableStateOf(TranslationConfig.nmtActiveModelId) }
+    var showNmtModelSelectorDialog by remember { mutableStateOf(false) }
+    var isNmtModelInstalled by remember(installedNmtModels, activeNmtModelId) {
+        mutableStateOf(nmtModelRegistry.isInstalled(activeNmtModelId) || installedNmtModels.isNotEmpty())
+    }
     var isImportingNmtModel by remember { mutableStateOf(false) }
     var nmtImportProgress by remember { mutableStateOf<HachimiOnnxImportProgress?>(null) }
     var nmtImportJob by remember { mutableStateOf<Job?>(null) }
@@ -224,7 +239,9 @@ fun TranslationConfigScreen(
                         }
                     }
                 }
-                isNmtModelInstalled = nmtModelRegistry.isInstalled()
+                installedNmtModels = nmtModelRegistry.listInstalledModels()
+                activeNmtModelId = TranslationConfig.nmtActiveModelId
+                isNmtModelInstalled = installedNmtModels.isNotEmpty()
                 context.toastOnUi(R.string.nmt_model_imported)
             } catch (_: CancellationException) {
                 context.toastOnUi(R.string.nmt_model_import_cancelled)
@@ -400,10 +417,24 @@ fun TranslationConfigScreen(
                         description = stringResource(R.string.mlkit_language_models_summary),
                         onClick = onNavigateToMlKitModels,
                     )
+                    if (installedNmtModels.isNotEmpty()) {
+                        val currentNmtModelName = installedNmtModels.firstOrNull { it.id == activeNmtModelId }?.name
+                            ?: activeNmtModelId
+                        ClickableSettingItem(
+                            title = stringResource(R.string.nmt_active_model),
+                            description = currentNmtModelName,
+                            onClick = { showNmtModelSelectorDialog = true },
+                        )
+                    }
                     ClickableSettingItem(
                         title = stringResource(R.string.nmt_download_model),
                         description = stringResource(R.string.nmt_download_model_summary),
                         onClick = { context.openUrl(ExternalAssetCatalog.hachimiOnnxZipUrl) },
+                    )
+                    ClickableSettingItem(
+                        title = stringResource(R.string.nmt_download_qt_model),
+                        description = stringResource(R.string.nmt_download_qt_model_summary),
+                        onClick = { context.openUrl(ExternalAssetCatalog.hachimiQtOnnxZipUrl) },
                     )
                     ClickableSettingItem(
                         title = stringResource(
@@ -504,10 +535,18 @@ fun TranslationConfigScreen(
                             description = "%.1f".format(TranslationConfig.nmtRepetitionPenalty),
                             onValueChange = { TranslationConfig.nmtRepetitionPenalty = it },
                         )
+                        val isQtModel = (activeNmtModelId == HachimiOnnxModelRegistry.HACHIMI_QT_MODEL_ID)
                         SwitchSettingItem(
                             title = stringResource(R.string.nmt_no_repeat_bigram),
-                            checked = TranslationConfig.nmtNoRepeatBigram,
-                            onCheckedChange = { TranslationConfig.nmtNoRepeatBigram = it },
+                            description = if (isQtModel) {
+                                stringResource(R.string.nmt_no_repeat_bigram_qt_note)
+                            } else null,
+                            checked = if (isQtModel) false else TranslationConfig.nmtNoRepeatBigram,
+                            onCheckedChange = {
+                                if (!isQtModel) {
+                                    TranslationConfig.nmtNoRepeatBigram = it
+                                }
+                            },
                         )
                         SwitchSettingItem(
                             title = stringResource(R.string.nmt_retry_missing_terms),
@@ -1019,6 +1058,50 @@ fun TranslationConfigScreen(
                 }
             }
         }
+    }
+
+    if (showNmtModelSelectorDialog) {
+        AppAlertDialog(
+            show = showNmtModelSelectorDialog,
+            onDismissRequest = { showNmtModelSelectorDialog = false },
+            title = stringResource(R.string.nmt_active_model),
+            content = {
+                Column {
+                    installedNmtModels.forEach { model ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    TranslationConfig.nmtActiveModelId = model.id
+                                    activeNmtModelId = model.id
+                                    HachimiOnnxRuntimeCoordinator.setActiveModelId(model.id)
+                                    showNmtModelSelectorDialog = false
+                                }
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = (model.id == activeNmtModelId),
+                                onClick = null,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(model.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    model.attribution,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmText = stringResource(android.R.string.ok),
+            onConfirm = { showNmtModelSelectorDialog = false },
+            dismissText = stringResource(android.R.string.cancel),
+            onDismiss = { showNmtModelSelectorDialog = false },
+        )
     }
 
     NmtSourcePromptDialog(

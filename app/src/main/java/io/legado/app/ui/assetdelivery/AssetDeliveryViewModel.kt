@@ -200,15 +200,16 @@ class AssetDeliveryViewModel(
                 _effects.tryEmit(AssetDeliveryEffect.ShowMessage(message))
             }.onFailure { error ->
                 if (error is CancellationException) throw error
+                android.util.Log.e("AssetDeliveryVM", "Import failed in startDownload", error)
                 _uiState.update {
                     it.copy(
                         status = AssetDeliveryStatus.IMPORT_FAILED,
-                        errorMessage = error.message ?: "Unable to import downloaded package",
+                        errorMessage = error.message ?: "${error::class.java.simpleName}: Không thể nhập gói đã tải",
                     )
                 }
                 _effects.tryEmit(
                     AssetDeliveryEffect.ShowMessage(
-                        "Download succeeded but import failed; retry is available",
+                        error.message ?: "Không thể nhập gói đã tải: ${error::class.java.simpleName}",
                     ),
                 )
             }
@@ -280,14 +281,15 @@ class AssetDeliveryViewModel(
                         _effects.tryEmit(AssetDeliveryEffect.ShowMessage(message))
                     }.onFailure { error ->
                         if (error is CancellationException) throw error
+                        android.util.Log.e("AssetDeliveryVM", "Import failed in resumePendingImport", error)
                         _uiState.update {
                             it.copy(
                                 status = AssetDeliveryStatus.IMPORT_FAILED,
-                                errorMessage = error.message ?: "Không thể nhập gói đã tải",
+                                errorMessage = error.message ?: "${error::class.java.simpleName}: Không thể nhập gói đã tải",
                             )
                         }
                         _effects.tryEmit(
-                            AssetDeliveryEffect.ShowMessage("Đã tải nhưng nhập gói thất bại")
+                            AssetDeliveryEffect.ShowMessage(error.message ?: "Đã tải nhưng nhập gói thất bại: ${error::class.java.simpleName}")
                         )
                     }
                 }

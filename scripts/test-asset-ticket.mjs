@@ -23,6 +23,16 @@ test("manifest only resolves allow-listed DrDucBook artifacts", () => {
     buildHfResolveUrl(artifact),
     "https://huggingface.co/datasets/Drduc/Legadofork/resolve/main/packages/translation/legado-qt-clean-20260721.zip",
   );
+
+  const qtArtifact = findArtifact(manifest, "translation-hachimi-qt-onnx");
+  assert.equal(qtArtifact.hfRepo, "Drduc/Legadofork");
+  assert.equal(
+    buildHfResolveUrl(qtArtifact),
+    "https://huggingface.co/datasets/Drduc/Legadofork/resolve/main/packages/translation/hachimi-mt60-qt-zh-vi-onnx.zip",
+  );
+  assert.equal(qtArtifact.sizeBytes, 176484951);
+  assert.equal(qtArtifact.sha256, "0826c36e241e6338a8e43f6d9a99ff06285834a19d8f29dcfc4e434232c08294");
+
   assert.throws(() => normalizeArtifactId("../secret"), AssetTicketError);
   assert.throws(() => findArtifact(manifest, "unknown-artifact"), AssetTicketError);
 });

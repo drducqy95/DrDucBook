@@ -3,6 +3,7 @@ package io.legado.app.ui.config.translation
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.model.QuickTranslationPronounMode
 import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.model.translation.HachimiOnnxModelRegistry
 import io.legado.app.ui.config.prefDelegate
 
 object TranslationConfig {
@@ -223,6 +224,11 @@ object TranslationConfig {
     var nmtRetryMissingTerms by prefDelegate(
         PreferKey.nmtRetryMissingTerms,
         true,
+    )
+
+    var nmtActiveModelId by prefDelegate(
+        PreferKey.nmtActiveModelId,
+        HachimiOnnxModelRegistry.DEFAULT_MODEL_ID,
     )
 
     var localAiModelPath by prefDelegate(

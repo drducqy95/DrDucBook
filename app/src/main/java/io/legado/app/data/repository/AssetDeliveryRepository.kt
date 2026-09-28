@@ -341,6 +341,8 @@ class AssetDeliveryRepository(
     ) : IOException("Downloaded asset is incomplete ($downloaded/$expected bytes)")
 
     private fun IOException.isRetryableAssetFailure(): Boolean {
+        if (message?.contains("checksum", ignoreCase = true) == true) return false
+        if (message?.contains("size mismatch", ignoreCase = true) == true) return false
         val httpError = this as? AssetHttpException ?: return true
         return httpError.statusCode in RETRYABLE_HTTP_STATUS_CODES
     }

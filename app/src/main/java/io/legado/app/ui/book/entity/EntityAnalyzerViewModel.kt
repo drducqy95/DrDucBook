@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import com.drducbook.app.R
 import io.legado.app.domain.model.EntityAnalysisCandidate
 import io.legado.app.domain.usecase.AnalyzeDownloadedEntitiesUseCase
+import io.legado.app.domain.usecase.EnrichEntitiesWithAiUseCase
 import io.legado.app.domain.usecase.ImportEntityCandidatesUseCase
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -22,6 +24,7 @@ class EntityAnalyzerViewModel(
     private val bookUrl: String,
     private val analyzeDownloadedEntities: AnalyzeDownloadedEntitiesUseCase,
     private val importEntityCandidates: ImportEntityCandidatesUseCase,
+    private val enrichEntitiesWithAi: EnrichEntitiesWithAiUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EntityAnalyzerUiState())
@@ -32,6 +35,7 @@ class EntityAnalyzerViewModel(
 
     private var allCandidates: List<EntityCandidateUi> = emptyList()
     private var analysisJob: Job? = null
+    private var enrichJob: Job? = null
 
     init {
         analyze()
@@ -41,6 +45,8 @@ class EntityAnalyzerViewModel(
         when (intent) {
             EntityAnalyzerIntent.Analyze -> analyze()
             EntityAnalyzerIntent.CancelAnalysis -> cancelAnalysis()
+            EntityAnalyzerIntent.EnrichWithAi -> enrichWithAi()
+            EntityAnalyzerIntent.CancelAiEnrich -> cancelAiEnrich()
             is EntityAnalyzerIntent.Search -> {
                 _uiState.update { it.copy(searchQuery = intent.query) }
                 publishCandidates()
@@ -102,6 +108,7 @@ class EntityAnalyzerViewModel(
                         scannedChapters = result.totalChapters,
                         downloadedChapters = result.downloadedChapters,
                         trackedCandidates = result.candidates.size,
+                        aiEnrichAvailable = result.candidates.isNotEmpty(),
                         errorRes = if (result.downloadedChapters == 0) {
                             R.string.entity_analyzer_no_downloaded_chapters
                         } else {
@@ -127,6 +134,80 @@ class EntityAnalyzerViewModel(
         analysisJob?.cancel()
         analysisJob = null
         _uiState.update { it.copy(analyzing = false) }
+    }
+
+    private fun enrichWithAi() {
+        if (_uiState.value.aiEnriching) return
+        val candidates = allCandidates.filter { it.aiValid == null }
+        if (candidates.isEmpty()) return
+
+        enrichJob?.cancel()
+        _uiState.update { it.copy(aiEnriching = true, aiEnrichProgress = "0/${candidates.size}") }
+
+        enrichJob = viewModelScope.launch {
+            try {
+                val batches = candidates.chunked(AI_ENRICH_BATCH_SIZE)
+                var processed = 0
+
+                batches.forEach { batch ->
+                    ensureActive()
+                    val inputs = batch.map { c ->
+                        EnrichEntitiesWithAiUseCase.EnrichmentInput(
+                            raw = c.raw,
+                            hanViet = c.hanViet,
+                            currentTarget = c.target,
+                            currentType = c.type.name,
+                            occurrences = c.occurrences,
+                            context = c.context,
+                        )
+                    }
+                    val results = withContext(Dispatchers.IO) {
+                        enrichEntitiesWithAi(
+                            bookName = _uiState.value.bookName,
+                            candidates = inputs,
+                        )
+                    }
+                    val resultMap = results.associateBy { it.raw }
+                    allCandidates = allCandidates.map { c ->
+                        val result = resultMap[c.raw]
+                        if (result != null) {
+                            c.copy(
+                                aiSuggestedTarget = result.suggestedTarget,
+                                aiSuggestedType = result.suggestedType,
+                                aiValid = result.isValid,
+                                aiDescription = result.description,
+                                target = if (result.isValid) result.suggestedTarget else c.target,
+                                type = if (result.isValid) result.suggestedType else c.type,
+                                selected = if (!result.isValid) false else c.selected,
+                            )
+                        } else {
+                            c
+                        }
+                    }
+                    processed += batch.size
+                    _uiState.update { it.copy(aiEnrichProgress = "$processed/${candidates.size}") }
+                    publishCandidates()
+                }
+
+                _uiState.update { it.copy(aiEnriching = false) }
+                _effects.tryEmit(
+                    EntityAnalyzerEffect.ShowMessage(R.string.entity_analyzer_ai_enrich_done)
+                )
+            } catch (_: CancellationException) {
+                _uiState.update { it.copy(aiEnriching = false) }
+            } catch (_: Throwable) {
+                _uiState.update { it.copy(aiEnriching = false) }
+                _effects.tryEmit(
+                    EntityAnalyzerEffect.ShowMessage(R.string.entity_analyzer_ai_enrich_failed)
+                )
+            }
+        }
+    }
+
+    private fun cancelAiEnrich() {
+        enrichJob?.cancel()
+        enrichJob = null
+        _uiState.update { it.copy(aiEnriching = false) }
     }
 
     private fun selectVisible() {
@@ -265,4 +346,8 @@ class EntityAnalyzerViewModel(
         firstChapterTitle = firstChapterTitle,
         context = context,
     )
+
+    private companion object {
+        const val AI_ENRICH_BATCH_SIZE = 50
+    }
 }

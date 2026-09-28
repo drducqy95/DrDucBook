@@ -2,6 +2,9 @@ package io.legado.app.ui.main.explore
 
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -9,6 +12,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +63,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -97,6 +102,7 @@ import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.login.SourceLoginActivity
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.config.translation.TranslationConfig
+import io.legado.app.ui.drive.DriveLibraryRouteScreen
 import io.legado.app.ui.theme.LegadoTheme.composeEngine
 import io.legado.app.ui.theme.ThemeResolver
 import io.legado.app.ui.theme.adaptiveContentPadding
@@ -114,6 +120,7 @@ import io.legado.app.ui.widget.components.menuItem.MenuItemIcon
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import io.legado.app.ui.widget.components.progressIndicator.AppContainedLoadingIndicator
+import io.legado.app.ui.widget.components.tabRow.AppTabRow
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.utils.startActivity
@@ -161,6 +168,11 @@ private fun ExploreDiscoveryScreen(
     }
     var showSourceMenu by remember { mutableStateOf(false) }
     var showTranslationShortcut by remember { mutableStateOf(false) }
+    var selectedSubTab by rememberSaveable { mutableIntStateOf(0) }
+    val subTabTitles = listOf(
+        stringResource(R.string.book_source),
+        stringResource(R.string.drive_cloud_library),
+    )
     val exploreKindUseCase: ExploreKindUiUseCase = koinInject()
     val isMiuix = ThemeResolver.isMiuixEngine(composeEngine)
     var selectedKindTitle by rememberSaveable(selectedSource?.bookSourceUrl) {
@@ -238,31 +250,36 @@ private fun ExploreDiscoveryScreen(
 
     ListScaffold(
         title = stringResource(R.string.discovery),
-        subtitle = selectedSource?.let { source ->
-            uiState.sourceDisplayNames[source.bookSourceUrl] ?: source.bookSourceName
-        }
-            ?: uiState.selectedGroup.ifEmpty { stringResource(R.string.select_source) },
+        subtitle = if (selectedSubTab == 0) {
+            selectedSource?.let { source ->
+                uiState.sourceDisplayNames[source.bookSourceUrl] ?: source.bookSourceName
+            } ?: uiState.selectedGroup.ifEmpty { stringResource(R.string.select_source) }
+        } else {
+            stringResource(R.string.drive_cloud_library)
+        },
         state = uiState,
+        showSearchAction = (selectedSubTab == 0),
         onSearchQueryChange = viewModel::search,
         onSearchToggle = viewModel::toggleSearchVisible,
         searchPlaceholder = stringResource(R.string.search_source),
         topBarActions = {
-            TopBarActionButton(
-                onClick = { onOpenBrowser(null, null) },
-                imageVector = Icons.Default.Public,
-                contentDescription = stringResource(R.string.browser),
-            )
-            TopBarActionButton(
-                onClick = onOpenAiRouter,
-                imageVector = Icons.Default.AutoAwesome,
-                contentDescription = stringResource(R.string.ai_router),
-            )
-            TopBarActionButton(
-                onClick = { showTranslationShortcut = true },
-                imageVector = Icons.Default.Translate,
-                contentDescription = stringResource(R.string.translation_config),
-            )
-            Box {
+            if (selectedSubTab == 0) {
+                TopBarActionButton(
+                    onClick = { onOpenBrowser(null, null) },
+                    imageVector = Icons.Default.Public,
+                    contentDescription = stringResource(R.string.browser),
+                )
+                TopBarActionButton(
+                    onClick = onOpenAiRouter,
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = stringResource(R.string.ai_router),
+                )
+                TopBarActionButton(
+                    onClick = { showTranslationShortcut = true },
+                    imageVector = Icons.Default.Translate,
+                    contentDescription = stringResource(R.string.translation_config),
+                )
+                Box {
                 TopBarActionButton(
                     onClick = { showSourceMenu = true },
                     imageVector = Icons.Default.Language,
@@ -331,56 +348,87 @@ private fun ExploreDiscoveryScreen(
                     )
                 }
             }
+        }
         },
-        dropDownMenuContent = { dismiss ->
-            RoundDropdownMenuItem(
-                leadingIcon = { MenuItemIcon(Icons.Default.Group) },
-                text = stringResource(R.string.all),
-                onClick = { viewModel.setGroup(""); dismiss() },
-            )
-            uiState.groups.forEach { group ->
+        dropDownMenuContent = if (selectedSubTab == 0) {
+            { dismiss ->
                 RoundDropdownMenuItem(
-                    leadingIcon = { MenuItemIcon(Icons.AutoMirrored.Outlined.Label) },
-                    text = group,
-                    onClick = { viewModel.setGroup(group); dismiss() },
+                    leadingIcon = { MenuItemIcon(Icons.Default.Group) },
+                    text = stringResource(R.string.all),
+                    onClick = { viewModel.setGroup(""); dismiss() },
                 )
-            }
-        },
-        contentWindowInsets = WindowInsets(0),
-    ) { paddingValues ->
-        when {
-            uiState.items.isEmpty() || selectedSource == null -> {
-                EmptyMessage(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(
-                            top = paddingValues.calculateTopPadding(),
-                            bottom = paddingValues.calculateBottomPadding(),
-                        ),
-                    messageResId = R.string.explore_empty,
-                )
-            }
-
-            uiState.loadingKinds -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    AppContainedLoadingIndicator()
+                uiState.groups.forEach { group ->
+                    RoundDropdownMenuItem(
+                        leadingIcon = { MenuItemIcon(Icons.AutoMirrored.Outlined.Label) },
+                        text = group,
+                        onClick = { viewModel.setGroup(group); dismiss() },
+                    )
                 }
             }
+        } else null,
+        contentWindowInsets = WindowInsets(0),
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    top = paddingValues.calculateTopPadding(),
+                    bottom = paddingValues.calculateBottomPadding(),
+                )
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+            ) {
+                AppTabRow(
+                    tabTitles = subTabTitles,
+                    selectedTabIndex = selectedSubTab,
+                    onTabSelected = { selectedSubTab = it },
+                    isScrollable = false,
+                )
+            }
 
-            else -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    state = previewGridState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = adaptiveContentPadding(
-                        top = paddingValues.calculateTopPadding() + 8.dp,
-                        bottom = 120.dp,
-                    ),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    item(
-                        key = "source-header:${selectedSource.bookSourceUrl}",
+            AnimatedContent(
+                targetState = selectedSubTab,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "ExploreSubTabTransition",
+                modifier = Modifier.fillMaxSize(),
+            ) { currentTab ->
+                when (currentTab) {
+                    0 -> {
+                        when {
+                            uiState.items.isEmpty() || selectedSource == null -> {
+                                Column(
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    EmptyMessage(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        messageResId = R.string.explore_empty,
+                                    )
+                                }
+                            }
+
+                            uiState.loadingKinds -> {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    AppContainedLoadingIndicator()
+                                }
+                            }
+
+                            else -> {
+                                LazyVerticalGrid(
+                                    columns = GridCells.Fixed(3),
+                                    state = previewGridState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = adaptiveContentPadding(
+                                        top = 8.dp,
+                                        bottom = 120.dp,
+                                    ),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    item(
+                                        key = "source-header:${selectedSource.bookSourceUrl}",
                         span = { GridItemSpan(maxLineSpan) },
                     ) {
                         ExploreSourceHeader(
@@ -560,6 +608,24 @@ private fun ExploreDiscoveryScreen(
                                     },
                                 )
                             }
+                    }
+                }
+            }
+        }
+                    }
+
+                    1 -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            DriveLibraryRouteScreen(
+                                onOpenBookInfo = { bookUrl ->
+                                    onOpenBookInfo("", "", bookUrl, null, null)
+                                }
+                            )
+                        }
                     }
                 }
             }

@@ -66,6 +66,7 @@ object HachimiOnnxModelImporter {
                     totalBytes = sourceBytes,
                 )
             )
+            var installedModelId = HachimiOnnxModelRegistry.DEFAULT_MODEL_ID
             HachimiOnnxRuntimeCoordinator.accessMutex.withLock {
                 currentCoroutineContext().ensureActive()
                 onProgress(
@@ -78,7 +79,7 @@ object HachimiOnnxModelImporter {
                 // Runtime sessions are generation-bound. Installing under the shared mutex keeps
                 // translation away from the file swap; the next translation closes the old
                 // generation and reloads the newly activated model.
-                installAndActivateAtomically(root, staging)
+                installedModelId = installAndActivateAtomically(root, staging)
             }
             onProgress(
                 HachimiOnnxImportProgress(
@@ -87,7 +88,7 @@ object HachimiOnnxModelImporter {
                     totalBytes = sourceBytes,
                 )
             )
-            registry.installedDirectory()
+            registry.installedDirectory(installedModelId)
         } finally {
             staging.deleteRecursively()
         }
@@ -190,9 +191,22 @@ object HachimiOnnxModelImporter {
         return extracted
     }
 
-    internal fun installAndActivateAtomically(root: File, staging: File) {
-        installAtomically(root, staging)
-        HachimiOnnxRuntimeCoordinator.markModelChanged()
+    internal fun resolveModelId(staging: File): String {
+        val manifest = File(staging, HachimiOnnxModelRegistry.MANIFEST_FILE)
+        if (manifest.isFile) {
+            val json = runCatching { JSONObject(manifest.readText()) }.getOrNull()
+            val id = json?.optString("modelId")?.takeIf(String::isNotBlank)
+                ?: json?.optString("id")?.takeIf(String::isNotBlank)
+            if (id != null) return id
+        }
+        return HachimiOnnxModelRegistry.DEFAULT_MODEL_ID
+    }
+
+    internal fun installAndActivateAtomically(root: File, staging: File): String {
+        val modelId = resolveModelId(staging)
+        installAtomically(root, staging, modelId)
+        HachimiOnnxRuntimeCoordinator.setActiveModelId(modelId)
+        return modelId
     }
 
     private fun String.isRecognizedNmtModelFile(): Boolean =
@@ -210,10 +224,14 @@ object HachimiOnnxModelImporter {
         manifest.writeText(json.toString(2))
     }
 
-    internal fun installAtomically(root: File, staging: File) {
-        val target = File(root, HachimiOnnxModelRegistry.MODEL_ID)
-        val installing = File(root, "${HachimiOnnxModelRegistry.MODEL_ID}_installing")
-        val backup = File(root, "${HachimiOnnxModelRegistry.MODEL_ID}_backup")
+    internal fun installAtomically(
+        root: File,
+        staging: File,
+        modelId: String = HachimiOnnxModelRegistry.DEFAULT_MODEL_ID,
+    ) {
+        val target = File(root, modelId)
+        val installing = File(root, "${modelId}_installing")
+        val backup = File(root, "${modelId}_backup")
         installing.deleteRecursively()
         backup.deleteRecursively()
         if (!staging.renameTo(installing)) {

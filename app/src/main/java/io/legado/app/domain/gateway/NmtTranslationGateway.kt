@@ -19,6 +19,7 @@ data class NmtDecodeConfig(
     val repetitionPenalty: Float = 1.2f,
     val noRepeatNgramSize: Int = 2,
     val retryMissingRequiredTerms: Boolean = true,
+    val modelId: String = "hachimi_onnx",
 )
 
 interface NmtTranslationGateway {

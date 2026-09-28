@@ -12,6 +12,8 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.net.Uri
+import java.net.URI
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -532,6 +534,83 @@ class ReadBookController(
                 AppLog.put("执行图片链接click键值出错\n${e.localizedMessage}", e, true)
             }
         }
+    }
+
+    override fun clickUrl(url: String): Boolean {
+        val trimmed = url.trim()
+        if (trimmed.isBlank()) return false
+        val uri = runCatching { Uri.parse(trimmed) }.getOrNull()
+        val scheme = uri?.scheme?.lowercase()
+        if (scheme == "http" || scheme == "https" || scheme == "mailto" || scheme == "tel") {
+            return false
+        }
+
+        val book = ReadBook.book ?: return false
+        val curChapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+        val curUrl = curChapter?.url ?: ""
+
+        val rawTargetHref = trimmed.substringBefore("#")
+        val targetFragment = if (trimmed.contains("#")) trimmed.substringAfter("#") else null
+
+        val resolvedHref = if (rawTargetHref.isNotBlank()) {
+            runCatching {
+                if (curUrl.isNotBlank()) {
+                    val base = curUrl.substringBefore("#")
+                    val baseUri = URI(if (base.startsWith("/")) base else "/$base")
+                    baseUri.resolve(rawTargetHref).path.removePrefix("/")
+                } else {
+                    rawTargetHref.removePrefix("/")
+                }
+            }.getOrNull() ?: rawTargetHref.removePrefix("/")
+        } else {
+            curUrl.substringBefore("#")
+        }
+
+        val chapters = appDb.bookChapterDao.getChapterList(book.bookUrl)
+        if (chapters.isEmpty()) return false
+
+        // 1. Exact match (including fragment if present)
+        val fullTarget = if (targetFragment != null) "$resolvedHref#$targetFragment" else resolvedHref
+        var matched = chapters.firstOrNull { it.url == fullTarget }
+
+        // 2. Matching by path + fragmentId
+        if (matched == null && targetFragment != null) {
+            matched = chapters.firstOrNull { ch ->
+                val chPath = ch.url.substringBefore("#")
+                chPath == resolvedHref && (ch.startFragmentId == targetFragment || ch.url.substringAfter("#") == targetFragment)
+            }
+        }
+
+        // 3. Matching by path alone
+        if (matched == null && resolvedHref.isNotBlank()) {
+            matched = chapters.firstOrNull { ch ->
+                ch.url.substringBefore("#") == resolvedHref
+            }
+        }
+
+        // 4. Matching by filename alone
+        if (matched == null && resolvedHref.isNotBlank()) {
+            val fileName = resolvedHref.substringAfterLast("/")
+            if (fileName.isNotBlank()) {
+                matched = chapters.firstOrNull { ch ->
+                    ch.url.substringBefore("#").substringAfterLast("/") == fileName
+                }
+            }
+        }
+
+        // 5. Matching by fragment alone
+        if (matched == null && targetFragment != null) {
+            matched = chapters.firstOrNull { ch ->
+                ch.startFragmentId == targetFragment || ch.url.substringAfter("#") == targetFragment
+            }
+        }
+
+        if (matched != null) {
+            viewModel.onIntent(ReadBookIntent.OpenChapterResult(matched.index, 0))
+            return true
+        }
+
+        return false
     }
 
     override fun onTouch(v: View?, event: MotionEvent?): Boolean {

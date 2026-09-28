@@ -120,6 +120,13 @@ data class TranslationOptionUi(
     val label: String,
 )
 
+@Stable
+data class PromptPresetOptionUi(
+    val id: String,
+    val name: String,
+    val prompt: String,
+)
+
 enum class TranslationUiStatus {
     IDLE,
     TRANSLATING,
@@ -157,6 +164,20 @@ data class TranslationProgressUiState(
     val autoTranslateCurrentChapter: String = "",
     val autoTranslateMessage: String? = null,
     val inheritSeriesMemory: Boolean = false,
+    val perBookPromptEnabled: Boolean = false,
+    val perBookPromptText: String = "",
+    val perBookPromptSourcePresetId: String? = null,
+    val perBookPromptSourcePresetName: String = "",
+    val perBookPromptModified: Boolean = false,
+    val availablePromptPresets: ImmutableList<PromptPresetOptionUi> = persistentListOf(),
+    val activeGlobalPromptName: String = "",
+    val perBookRewritePromptEnabled: Boolean = false,
+    val perBookRewritePromptText: String = "",
+    val perBookRewritePromptSourcePresetId: String? = null,
+    val perBookRewritePromptSourcePresetName: String = "",
+    val perBookRewritePromptModified: Boolean = false,
+    val availableRewritePromptPresets: ImmutableList<PromptPresetOptionUi> = persistentListOf(),
+    val activeGlobalRewritePromptName: String = "",
 )
 
 @Stable
@@ -415,21 +436,21 @@ data class ReadBookButtonConfigItem(
 )
 
 internal val ReadBookButtonIds = listOf(
+    "setting",
+    "translate",
+    "auto_page",
+    "read_aloud",
     "entity_analyzer",
+    "search",
+    "catalog",
     "ai_summary",
     "ai_rewrite",
-    "search",
-    "auto_page",
-    "catalog",
-    "read_aloud",
-    "setting",
     "addBookmark",
     "theme",
     "prev_chapter",
     "next_chapter",
     "replace",
     "replace_badge",
-    "translate",
 )
 
 sealed interface ReadBookIntent {
@@ -493,6 +514,16 @@ sealed interface ReadBookIntent {
     data class SetAutoRewriteEnabled(val enabled: Boolean) : ReadBookIntent
     data class SetAutoRewriteNextChapters(val count: Int) : ReadBookIntent
     data class SetInheritSeriesMemory(val enabled: Boolean) : ReadBookIntent
+    data class TogglePerBookTranslationPrompt(val enabled: Boolean) : ReadBookIntent
+    data class LoadPresetIntoPerBookPrompt(val presetId: String) : ReadBookIntent
+    data class UpdatePerBookPromptText(val text: String) : ReadBookIntent
+    data object SavePerBookPrompt : ReadBookIntent
+    data object ClearPerBookTranslationPrompt : ReadBookIntent
+    data class TogglePerBookRewritePrompt(val enabled: Boolean) : ReadBookIntent
+    data class LoadPresetIntoPerBookRewritePrompt(val presetId: String) : ReadBookIntent
+    data class UpdatePerBookRewritePromptText(val text: String) : ReadBookIntent
+    data object SavePerBookRewritePrompt : ReadBookIntent
+    data object ClearPerBookRewritePrompt : ReadBookIntent
     data object CopyTranslationLog : ReadBookIntent
     data object OpenTranslationRevision : ReadBookIntent
     data class OpenQuickDictionary(

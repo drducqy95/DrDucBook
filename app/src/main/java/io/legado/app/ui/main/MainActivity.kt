@@ -80,6 +80,7 @@ open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
         private const val KEY_RESTORE_READ_ALOUD = "restoreReadAloud"
         private const val KEY_RESTORE_READ_IN_BOOKSHELF = "restoreReadInBookshelf"
         private const val KEY_RESTORE_READ_CHAPTER_CHANGED = "restoreReadChapterChanged"
+        private const val KEY_RESTORE_SETTINGS_THEME = "restoreSettingsTheme"
         private val startupUpdateCheckGate = ProcessStartupUpdateCheckGate()
 
         @Volatile
@@ -173,6 +174,7 @@ open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
     private var bookInfoVariableSetter: ((String, String?) -> Unit)? = null
     private var shouldApplyDefaultToRead = true
     private var restoredReadBookRoute: MainRouteReadBook? = null
+    private var restoredSettingsThemeRoute: Boolean = false
     private var latestBackStack: List<NavKey> = emptyList()
     internal var activeReadBookInputHandler: ReadBookInputHandler? = null
     internal var activeReadBookRoute: MainRouteReadBook? = null
@@ -181,6 +183,7 @@ open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
         installSplashScreen()
         shouldApplyDefaultToRead = savedInstanceState == null
         restoredReadBookRoute = savedInstanceState?.restoreReadBookRoute()
+        restoredSettingsThemeRoute = savedInstanceState?.getBoolean(KEY_RESTORE_SETTINGS_THEME, false) ?: false
         super.onCreate(savedInstanceState)
 
         if (checkStartupRoute()) return
@@ -238,6 +241,9 @@ open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
             when {
                 !hasExplicitStartRoute && restoredReadBookRoute != null -> {
                     arrayOf(MainRouteHome, restoredReadBookRoute!!)
+                }
+                !hasExplicitStartRoute && restoredSettingsThemeRoute -> {
+                    arrayOf(MainRouteHome, MainRouteSettingsTheme)
                 }
                 shouldApplyDefaultToRead && OtherConfig.defaultToRead && resolved == MainRouteHome -> {
                     arrayOf(MainRouteHome, MainRouteReadBook())
@@ -462,6 +468,9 @@ open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
             outState.putBoolean(KEY_RESTORE_READ_ALOUD, readRoute.readAloud)
             outState.putBoolean(KEY_RESTORE_READ_IN_BOOKSHELF, readRoute.inBookshelf)
             outState.putBoolean(KEY_RESTORE_READ_CHAPTER_CHANGED, readRoute.chapterChanged)
+        }
+        if (latestBackStack.lastOrNull() is MainRouteSettingsTheme) {
+            outState.putBoolean(KEY_RESTORE_SETTINGS_THEME, true)
         }
     }
 

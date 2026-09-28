@@ -116,6 +116,40 @@ fun TranslationProgressSheet(
             }
 
             HorizontalDivider()
+            AppText(
+                text = stringResource(R.string.per_book_translation_prompt_section_title),
+                style = LegadoTheme.typography.titleSmall,
+                color = LegadoTheme.colorScheme.primary,
+            )
+            PerBookTranslationPromptSection(
+                enabled = state.perBookPromptEnabled,
+                promptText = state.perBookPromptText,
+                sourcePresetName = state.perBookPromptSourcePresetName,
+                isModified = state.perBookPromptModified,
+                presets = state.availablePromptPresets,
+                globalPromptName = state.activeGlobalPromptName,
+                isTranslating = state.status == TranslationUiStatus.TRANSLATING,
+                onIntent = onIntent,
+            )
+
+            HorizontalDivider()
+            AppText(
+                text = stringResource(R.string.per_book_rewrite_prompt_section_title),
+                style = LegadoTheme.typography.titleSmall,
+                color = LegadoTheme.colorScheme.primary,
+            )
+            PerBookRewritePromptSection(
+                enabled = state.perBookRewritePromptEnabled,
+                promptText = state.perBookRewritePromptText,
+                sourcePresetName = state.perBookRewritePromptSourcePresetName,
+                isModified = state.perBookRewritePromptModified,
+                presets = state.availableRewritePromptPresets,
+                globalPromptName = state.activeGlobalRewritePromptName,
+                isBusy = state.status == TranslationUiStatus.TRANSLATING,
+                onIntent = onIntent,
+            )
+
+            HorizontalDivider()
             TranslationSwitchRow(
                 title = stringResource(R.string.translation_display_result),
                 checked = state.displayTranslation,
@@ -353,7 +387,7 @@ private fun TranslationStatus(state: TranslationProgressUiState) {
 }
 
 @Composable
-private fun TranslationSwitchRow(
+internal fun TranslationSwitchRow(
     title: String,
     checked: Boolean,
     enabled: Boolean = true,

@@ -37,3 +37,13 @@
 ### Working On
 - Feature: AI Web Providers & WebView Auth Resolution
 - Phase: Execution / Release Verified
+
+---
+## Session: 2026-09-12 22:40
+
+### Working On
+- Feature: Google Drive Public Folder Pagination & EPUB Download Corruption Fix
+- Phase: Phase 36
+
+### Notes
+- Fixed 50 items catalog limit via GDrive API v3 and pageToken loop (85 folders); eliminated 434-byte EPUB truncation by using exact byte sizes and dynamic stream expansion; synchronized WebDAV port in StateFlow.

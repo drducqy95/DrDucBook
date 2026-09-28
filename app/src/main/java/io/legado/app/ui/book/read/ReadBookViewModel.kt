@@ -51,6 +51,7 @@ import io.legado.app.domain.model.dictionaryAwareContentHash
 import io.legado.app.domain.usecase.containsCjk
 import io.legado.app.domain.usecase.applyProviderConfigurationRevision
 import io.legado.app.domain.model.AiFailureKind
+import io.legado.app.domain.model.AiPromptCatalog
 import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.ExternalAssetCatalog
 import io.legado.app.domain.model.PlaybackTimer
@@ -594,6 +595,16 @@ class ReadBookViewModel(
                     }
                 }
             }
+            is ReadBookIntent.TogglePerBookTranslationPrompt -> togglePerBookTranslationPrompt(intent.enabled)
+            is ReadBookIntent.LoadPresetIntoPerBookPrompt -> loadPresetIntoPerBookPrompt(intent.presetId)
+            is ReadBookIntent.UpdatePerBookPromptText -> updatePerBookPromptText(intent.text)
+            is ReadBookIntent.SavePerBookPrompt -> savePerBookPrompt()
+            is ReadBookIntent.ClearPerBookTranslationPrompt -> clearPerBookTranslationPrompt()
+            is ReadBookIntent.TogglePerBookRewritePrompt -> togglePerBookRewritePrompt(intent.enabled)
+            is ReadBookIntent.LoadPresetIntoPerBookRewritePrompt -> loadPresetIntoPerBookRewritePrompt(intent.presetId)
+            is ReadBookIntent.UpdatePerBookRewritePromptText -> updatePerBookRewritePromptText(intent.text)
+            is ReadBookIntent.SavePerBookRewritePrompt -> savePerBookRewritePrompt()
+            is ReadBookIntent.ClearPerBookRewritePrompt -> clearPerBookRewritePrompt()
             is ReadBookIntent.CopyTranslationLog -> {
                 context.sendToClip(_uiState.value.translationProgress.logs.joinToString("\n"))
             }
@@ -4184,7 +4195,7 @@ class ReadBookViewModel(
         val contentHash = applyProviderConfigurationRevision(
             contentHash = dictionaryContentHash,
             providerConfigurationRevision =
-                translateChapterUseCase.currentProviderConfigurationRevision(TranslationConstants.PROVIDER_REWRITE),
+                translateChapterUseCase.currentProviderConfigurationRevision(TranslationConstants.PROVIDER_REWRITE, book),
             computeHash = translationCacheGateway::computeContentHash,
         )
         translationCacheGateway.writeTranslation(
@@ -7134,6 +7145,22 @@ class ReadBookViewModel(
                         autoTranslateCurrentChapter = it.translationProgress.autoTranslateCurrentChapter,
                         autoTranslateMessage = it.translationProgress.autoTranslateMessage,
                         inheritSeriesMemory = book.getInheritSeriesMemory(),
+                        perBookPromptEnabled = book.hasPerBookTranslationPrompt(),
+                        perBookPromptText = book.getCustomTranslationPrompt().orEmpty(),
+                        perBookPromptSourcePresetId = book.getTranslationPromptSourcePresetId(),
+                        perBookPromptSourcePresetName = book.getTranslationPromptSourcePresetId()
+                            ?.let { AiPromptCatalog.findById(it)?.name }.orEmpty(),
+                        perBookPromptModified = isPerBookPromptModified(book),
+                        availablePromptPresets = loadAvailablePromptPresets(),
+                        activeGlobalPromptName = resolveGlobalPromptName(),
+                        perBookRewritePromptEnabled = book.hasPerBookRewritePrompt(),
+                        perBookRewritePromptText = book.getCustomRewritePrompt().orEmpty(),
+                        perBookRewritePromptSourcePresetId = book.getRewritePromptSourcePresetId(),
+                        perBookRewritePromptSourcePresetName = book.getRewritePromptSourcePresetId()
+                            ?.let { AiPromptCatalog.findById(it)?.name }.orEmpty(),
+                        perBookRewritePromptModified = isPerBookRewritePromptModified(book),
+                        availableRewritePromptPresets = loadAvailableRewritePromptPresets(),
+                        activeGlobalRewritePromptName = resolveGlobalRewritePromptName(),
                     )
                 )
             }
@@ -7142,6 +7169,252 @@ class ReadBookViewModel(
                 maybeStartAutoTranslationQueue()
                 maybeStartAutoRewriteQueue()
             }
+        }
+    }
+
+    private fun loadAvailablePromptPresets(): ImmutableList<PromptPresetOptionUi> {
+        return AiPromptCatalog.templates
+            .filter {
+                it.taskType == AiTaskType.TRANSLATE_CHAPTER
+            }
+            .map { PromptPresetOptionUi(id = it.id, name = it.name, prompt = it.prompt) }
+            .toImmutableList()
+    }
+
+    private fun loadAvailableRewritePromptPresets(): ImmutableList<PromptPresetOptionUi> {
+        return AiPromptCatalog.templates
+            .filter {
+                it.taskType == AiTaskType.REWRITE_TEXT
+            }
+            .map { PromptPresetOptionUi(id = it.id, name = it.name, prompt = it.prompt) }
+            .toImmutableList()
+    }
+
+    private fun resolveGlobalPromptName(): String {
+        return "Mặc định (AI Task)"
+    }
+
+    private fun resolveGlobalRewritePromptName(): String {
+        val customPrompt = TranslationConfig.rewriteCustomPrompt.trim()
+        if (customPrompt.isNotBlank()) return "Tùy chỉnh"
+        return AiPromptCatalog.findById(TranslationConfig.rewritePresetId)?.name ?: "Mặc định"
+    }
+
+    private fun isPerBookPromptModified(book: Book): Boolean {
+        val prompt = book.getCustomTranslationPrompt() ?: return false
+        val sourceId = book.getTranslationPromptSourcePresetId() ?: return prompt.isNotBlank()
+        val originalPrompt = AiPromptCatalog.findById(sourceId)?.prompt ?: return true
+        return prompt.trim() != originalPrompt.trim()
+    }
+
+    private fun isPerBookRewritePromptModified(book: Book): Boolean {
+        val prompt = book.getCustomRewritePrompt() ?: return false
+        val sourceId = book.getRewritePromptSourcePresetId() ?: return prompt.isNotBlank()
+        val originalPrompt = AiPromptCatalog.findById(sourceId)?.prompt ?: return true
+        return prompt.trim() != originalPrompt.trim()
+    }
+
+    private fun togglePerBookTranslationPrompt(enabled: Boolean) {
+        val book = ReadBook.book ?: return
+        if (!enabled) {
+            book.clearPerBookTranslationPrompt()
+            saveBookConfig(book)
+        }
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookPromptEnabled = enabled,
+                    perBookPromptText = if (enabled) it.translationProgress.perBookPromptText else "",
+                    perBookPromptSourcePresetId = if (enabled) it.translationProgress.perBookPromptSourcePresetId else null,
+                    perBookPromptSourcePresetName = if (enabled) it.translationProgress.perBookPromptSourcePresetName else "",
+                    perBookPromptModified = false,
+                )
+            )
+        }
+    }
+
+    private fun loadPresetIntoPerBookPrompt(presetId: String) {
+        val preset = AiPromptCatalog.findById(presetId) ?: return
+        val book = ReadBook.book ?: return
+        book.setCustomTranslationPrompt(preset.prompt, sourcePresetId = presetId)
+        saveBookConfig(book)
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookPromptEnabled = true,
+                    perBookPromptText = preset.prompt,
+                    perBookPromptSourcePresetId = presetId,
+                    perBookPromptSourcePresetName = preset.name,
+                    perBookPromptModified = false,
+                )
+            )
+        }
+        emitPromptChangedWarning()
+    }
+
+    private fun updatePerBookPromptText(text: String) {
+        val sourcePresetId = _uiState.value.translationProgress.perBookPromptSourcePresetId
+        val originalPrompt = sourcePresetId?.let { AiPromptCatalog.findById(it)?.prompt }
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookPromptText = text,
+                    perBookPromptModified = originalPrompt?.let { orig ->
+                        text.trim() != orig.trim()
+                    } ?: text.isNotBlank(),
+                )
+            )
+        }
+    }
+
+    private fun savePerBookPrompt() {
+        val book = ReadBook.book ?: return
+        val state = _uiState.value.translationProgress
+        val promptText = state.perBookPromptText.trim()
+        if (promptText.isBlank()) {
+            book.clearPerBookTranslationPrompt()
+        } else {
+            book.setCustomTranslationPrompt(
+                prompt = promptText,
+                sourcePresetId = state.perBookPromptSourcePresetId,
+            )
+        }
+        saveBookConfig(book)
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookPromptText = promptText,
+                    perBookPromptEnabled = promptText.isNotBlank(),
+                    perBookPromptModified = false,
+                )
+            )
+        }
+        if (promptText.isNotBlank()) {
+            context.toastOnUi(R.string.per_book_prompt_saved)
+        }
+    }
+
+    private fun clearPerBookTranslationPrompt() {
+        val book = ReadBook.book ?: return
+        book.clearPerBookTranslationPrompt()
+        saveBookConfig(book)
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookPromptEnabled = false,
+                    perBookPromptText = "",
+                    perBookPromptSourcePresetId = null,
+                    perBookPromptSourcePresetName = "",
+                    perBookPromptModified = false,
+                )
+            )
+        }
+    }
+
+    private fun togglePerBookRewritePrompt(enabled: Boolean) {
+        val book = ReadBook.book ?: return
+        if (!enabled) {
+            book.clearPerBookRewritePrompt()
+            saveBookConfig(book)
+        }
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookRewritePromptEnabled = enabled,
+                    perBookRewritePromptText = if (enabled) it.translationProgress.perBookRewritePromptText else "",
+                    perBookRewritePromptSourcePresetId = if (enabled) it.translationProgress.perBookRewritePromptSourcePresetId else null,
+                    perBookRewritePromptSourcePresetName = if (enabled) it.translationProgress.perBookRewritePromptSourcePresetName else "",
+                    perBookRewritePromptModified = false,
+                )
+            )
+        }
+    }
+
+    private fun loadPresetIntoPerBookRewritePrompt(presetId: String) {
+        val preset = AiPromptCatalog.findById(presetId) ?: return
+        val book = ReadBook.book ?: return
+        book.setCustomRewritePrompt(preset.prompt, sourcePresetId = presetId)
+        saveBookConfig(book)
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookRewritePromptEnabled = true,
+                    perBookRewritePromptText = preset.prompt,
+                    perBookRewritePromptSourcePresetId = presetId,
+                    perBookRewritePromptSourcePresetName = preset.name,
+                    perBookRewritePromptModified = false,
+                )
+            )
+        }
+        emitPromptChangedWarning()
+    }
+
+    private fun updatePerBookRewritePromptText(text: String) {
+        val sourcePresetId = _uiState.value.translationProgress.perBookRewritePromptSourcePresetId
+        val originalPrompt = sourcePresetId?.let { AiPromptCatalog.findById(it)?.prompt }
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookRewritePromptText = text,
+                    perBookRewritePromptModified = originalPrompt?.let { orig ->
+                        text.trim() != orig.trim()
+                    } ?: text.isNotBlank(),
+                )
+            )
+        }
+    }
+
+    private fun savePerBookRewritePrompt() {
+        val book = ReadBook.book ?: return
+        val state = _uiState.value.translationProgress
+        val promptText = state.perBookRewritePromptText.trim()
+        if (promptText.isBlank()) {
+            book.clearPerBookRewritePrompt()
+        } else {
+            book.setCustomRewritePrompt(
+                prompt = promptText,
+                sourcePresetId = state.perBookRewritePromptSourcePresetId,
+            )
+        }
+        saveBookConfig(book)
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookRewritePromptText = promptText,
+                    perBookRewritePromptEnabled = promptText.isNotBlank(),
+                    perBookRewritePromptModified = false,
+                )
+            )
+        }
+        if (promptText.isNotBlank()) {
+            context.toastOnUi(R.string.per_book_prompt_saved)
+        }
+    }
+
+    private fun clearPerBookRewritePrompt() {
+        val book = ReadBook.book ?: return
+        book.clearPerBookRewritePrompt()
+        saveBookConfig(book)
+        _uiState.update {
+            it.copy(
+                translationProgress = it.translationProgress.copy(
+                    perBookRewritePromptEnabled = false,
+                    perBookRewritePromptText = "",
+                    perBookRewritePromptSourcePresetId = null,
+                    perBookRewritePromptSourcePresetName = "",
+                    perBookRewritePromptModified = false,
+                )
+            )
+        }
+    }
+
+    private fun emitPromptChangedWarning() {
+        context.toastOnUi(R.string.per_book_prompt_changed_warning)
+    }
+
+    private fun saveBookConfig(book: Book) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            appDb.bookDao.update(book)
         }
     }
 
@@ -8093,16 +8366,14 @@ private const val AI_REWRITE_REFERENCE_SCAN_CHAPTERS = 80
 private const val AI_REWRITE_REFERENCE_MAX_EXCERPTS = 6
 private const val AI_REWRITE_REFERENCE_EXCERPT_CHARS = 600
 private val DEFAULT_ENABLED_BUTTON_IDS = setOf(
-    "search",
-    "auto_page",
-    "catalog",
-    "read_aloud",
     "setting",
+    "translate",
+    "auto_page",
+    "read_aloud",
+    "entity_analyzer",
 )
 private val DEFAULT_AI_TOOL_BUTTON_IDS = setOf(
     "entity_analyzer",
-    "ai_summary",
-    "ai_rewrite",
 )
 
 private const val DARK_LUX_THRESHOLD = 8f

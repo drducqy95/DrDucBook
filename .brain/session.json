@@ -1,13 +1,16 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-09-12T08:22:20.860501",
-    "saved_at": "2026-09-05T00:06:43.841551",
+    "last_active": "2026-09-14T22:49:49.755462",
+    "saved_at": "2026-09-12T22:40:26.729596",
     "resumed_at": "2026-08-26T10:02:26.310280"
   },
   "working_on": {
-    "feature": "AI Web Providers & WebView Auth Resolution",
-    "current_phase": "Execution / Release Verified"
+    "feature": "Drive Remote Rich Book Catalog & Zero-Download Metadata/Cover Extraction",
+    "current_milestone": "P38",
+    "current_plan_path": "plans/260913-0752-drive-remote-metadata-covers/",
+    "current_phase": "Phase 38",
+    "status": "planning_complete"
   },
   "pending_tasks": [],
   "recent_changes": [
@@ -160,6 +163,70 @@
         "app/src/main/java/io/legado/app/domain/usecase/TranslateChapterUseCase.kt"
       ],
       "error_id": "ERR_0019"
+    },
+    {
+      "type": "bugfix",
+      "description": "DriveWebDav/PublicClient: Google Drive public folder truncation to 50 items and EPUB download central directory corruption",
+      "files": [
+        "native/go-webdav/drive/public_client.go",
+        "native/go-webdav/drive/reader.go",
+        "DriveWebDavServiceController.kt",
+        "DriveWebDavConnectionUseCase.kt"
+      ],
+      "error_id": "ERR_0025"
+    },
+    {
+      "type": "bugfix",
+      "description": "EpubRemoteExtractor: org.jsoup.select.Selector$SelectorParseException: String must not be empty at io.legado.app.help.drive.extractor.EpubRemoteExtractor.extract(EpubRemoteExtractor.kt:52)",
+      "files": [
+        "app/src/main/java/io/legado/app/help/drive/extractor/EpubRemoteExtractor.kt",
+        "app/src/main/java/io/legado/app/data/repository/RemoteBookMetadataRepository.kt",
+        "app/src/main/java/io/legado/app/ui/drive/DriveLibraryViewModel.kt",
+        "app/src/main/java/io/legado/app/data/repository/SupabaseAccountAccessRepository.kt",
+        "app/src/main/java/io/legado/app/ui/account/AccountScreen.kt"
+      ],
+      "error_id": "ERR_0026"
+    },
+    {
+      "type": "bugfix",
+      "description": "Reader/PerBookPrompt: Nut luu prompt rieng khong phan hoi UI va tron lan prompt AI Translation voi AI Rewrite",
+      "files": [
+        "Book.kt",
+        "TranslateChapterUseCase.kt",
+        "ReadBookContract.kt",
+        "ReadBookViewModel.kt",
+        "PerBookTranslationPromptSection.kt",
+        "TranslationProgressSheet.kt"
+      ],
+      "error_id": "ERR_0027"
+    },
+    {
+      "type": "bugfix",
+      "description": "Reader/PerBookPrompt: Phan chinh sua prompt rieng khong an gon di sau khi luu",
+      "files": [
+        "PerBookTranslationPromptSection.kt"
+      ],
+      "error_id": "ERR_0028"
+    },
+    {
+      "type": "bugfix",
+      "description": "AssetDelivery/ZeroTTS: Asset ticket request failed (404): Artifact is not allow-listed when downloading tts-zerotts-base",
+      "files": [
+        "supabase/artifacts/hf-artifacts-manifest.json",
+        "scripts/build-hf-asset-manifest.ps1"
+      ],
+      "error_id": "ERR_0029"
+    },
+    {
+      "type": "bugfix",
+      "description": "AssetDelivery/ZeroTTS: Download finished reaching 100% but failed to complete and restart from 0% due to SHA-256 mismatch and retry loop",
+      "files": [
+        "app/src/main/java/io/legado/app/domain/model/ExternalAssetCatalog.kt",
+        "scripts/build-hf-asset-manifest.ps1",
+        "supabase/artifacts/hf-artifacts-manifest.json",
+        "app/src/main/java/io/legado/app/data/repository/AssetDeliveryRepository.kt"
+      ],
+      "error_id": "ERR_0031"
     }
   ],
   "context_notes": [

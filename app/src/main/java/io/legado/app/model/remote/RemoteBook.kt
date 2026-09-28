@@ -11,7 +11,10 @@ data class RemoteBook(
     val size: Long,
     val lastModify: Long,
     var contentType: String = "folder",
-    var isOnBookShelf: Boolean = false
+    var isOnBookShelf: Boolean = false,
+    var coverUrl: String? = null,
+    var author: String? = null,
+    var intro: String? = null
 ) {
 
     val isDir get() = contentType == "folder"
@@ -20,7 +23,9 @@ data class RemoteBook(
         webDavFile.displayName,
         webDavFile.path,
         webDavFile.size,
-        webDavFile.lastModify
+        webDavFile.lastModify,
+        coverUrl = webDavFile.thumbnailUrl,
+        intro = webDavFile.description
     ) {
         if (!webDavFile.isDir) {
             contentType = webDavFile.displayName.substringAfterLast(".")

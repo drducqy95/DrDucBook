@@ -515,41 +515,74 @@ private fun AccountAdminSection(
                     )
                 }
             }
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AccountAdminActivityFilter.entries.forEach { filter ->
+                    FilterChip(
+                        selected = state.adminActivityFilter == filter,
+                        onClick = { onIntent(AccountIntent.SelectAdminActivityFilter(filter)) },
+                        label = { AppText(filter.label) },
+                    )
+                }
+            }
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                AccountAdminSort.entries.forEach { sort ->
+                    FilterChip(
+                        selected = state.adminSortOption == sort,
+                        onClick = { onIntent(AccountIntent.SelectAdminSort(sort)) },
+                        label = { AppText(sort.label) },
+                    )
+                }
+            }
             val filteredAccounts = filterAdminAccounts(
                 accounts = state.adminAccounts,
                 query = state.adminSearchQuery,
                 role = state.adminRoleFilter,
+                activityFilter = state.adminActivityFilter,
+                sortOption = state.adminSortOption,
             )
             if (filteredAccounts.isEmpty()) {
                 SettingItem(title = stringResource(R.string.account_admin_no_results))
             } else {
-                filteredAccounts
-                    .groupBy(AccountAdminUi::role)
-                    .toSortedMap(compareByDescending { role -> role.ordinal })
-                    .forEach { (groupRole, accounts) ->
-                        SettingItem(
-                            title = stringResource(
-                                R.string.account_admin_role_group,
-                                roleLabel(groupRole),
-                                accounts.size,
-                            )
-                        )
-                        accounts.forEach { account ->
-                            val role = roleLabel(account.role)
-                            val description = account.roleExpiresAtEpochMillis?.let { expiresAt ->
-                                stringResource(
-                                    R.string.account_role_expires,
-                                    role,
-                                    formatDate(expiresAt),
-                                )
-                            } ?: role
-                            ClickableSettingItem(
-                                title = account.email.ifBlank { account.userId },
-                                description = description,
-                                onClick = { onIntent(AccountIntent.EditAccount(account.userId)) },
-                            )
+                SettingItem(
+                    title = "Danh sách tài khoản (${filteredAccounts.size})"
+                )
+                filteredAccounts.forEach { account ->
+                    val role = roleLabel(account.role)
+                    val description = buildString {
+                        append("Vai trò: $role")
+                        account.roleExpiresAtEpochMillis?.let { expiresAt ->
+                            append(" (hết hạn: ${formatDate(expiresAt)})")
+                        }
+                        append("\n")
+                        if (account.createdAtEpochMillis != null) {
+                            append("Đăng ký: ${formatDate(account.createdAtEpochMillis)}")
+                        } else {
+                            append("Chưa rõ ngày đăng ký")
+                        }
+                        if (account.lastSignInAtEpochMillis != null) {
+                            append(" • Đăng nhập: ${formatDateTime(account.lastSignInAtEpochMillis)}")
+                        } else {
+                            append(" • Chưa đăng nhập")
                         }
                     }
+                    ClickableSettingItem(
+                        title = account.email.ifBlank { account.userId },
+                        description = description,
+                        onClick = { onIntent(AccountIntent.EditAccount(account.userId)) },
+                    )
+                }
             }
         }
     }
@@ -640,6 +673,9 @@ private fun formatBytes(bytes: Long): String = when {
 
 private fun formatDate(epochMillis: Long): String =
     DateFormat.getDateInstance().format(Date(epochMillis))
+
+private fun formatDateTime(epochMillis: Long): String =
+    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(epochMillis))
 
 @Composable
 private fun AccountStatusSection(

@@ -31,7 +31,9 @@ class AppearanceRepository(
     override val state = _state.asStateFlow()
 
     init {
-        AppearanceThemeAdapter.apply(_state.value.activeProfile, ::resolveAsset)
+        if (_state.value.activeProfileId != AppearanceThemeAdapter.LEGACY_PROFILE_ID) {
+            AppearanceThemeAdapter.apply(_state.value.activeProfile, ::resolveAsset)
+        }
     }
 
     override fun initialize() = Unit

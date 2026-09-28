@@ -38,15 +38,19 @@ object AssetDeliveryCatalog {
 
 object ExternalAssetCatalog {
     const val hachimiOnnxAssetId = "translation-hachimi-onnx-arm64"
+    const val hachimiQtOnnxAssetId = "translation-hachimi-qt-onnx"
     const val quickTranslationCleanAssetId = "translation-quick-clean"
     const val ttsValtecModelAssetId = "tts-valtec-vietnamese"
+    const val ttsZeroTtsBaseAssetId = "tts-zerotts-base"
     const val ttsPiperVoiceCatalogId = "tts-piper-voices"
     const val ggufCatalogId = "local-ai-hy-mt2"
 
     val hachimiOnnxZipUrl = AssetDeliveryCatalog.downloadUri(hachimiOnnxAssetId)
+    val hachimiQtOnnxZipUrl = AssetDeliveryCatalog.downloadUri(hachimiQtOnnxAssetId)
     val quickTranslationCleanZipUrl = AssetDeliveryCatalog.downloadUri(quickTranslationCleanAssetId)
     val ttsPiperVoiceFolderUrl = AssetDeliveryCatalog.catalogUri(ttsPiperVoiceCatalogId)
     val ttsValtecModelZipUrl = AssetDeliveryCatalog.downloadUri(ttsValtecModelAssetId)
+    val ttsZeroTtsBaseZipUrl = AssetDeliveryCatalog.downloadUri(ttsZeroTtsBaseAssetId)
     val ggufFolderUrl = AssetDeliveryCatalog.catalogUri(ggufCatalogId)
 
     val translationAssets: List<ExternalPackageAsset> = listOf(
@@ -57,6 +61,15 @@ object ExternalAssetCatalog {
             downloadUrl = hachimiOnnxZipUrl,
             sizeBytes = 58_266_032L,
             sha256 = "8429161d6e3fdd504dedaf69054b2ab7b672c948948a38322b701900d10cf3db",
+            category = "translation",
+        ),
+        ExternalPackageAsset(
+            id = hachimiQtOnnxAssetId,
+            displayName = "HachimiMT-60-QT zh-vi ONNX (QT/Hán Việt)",
+            fileName = "hachimi-mt60-qt-zh-vi-onnx.zip",
+            downloadUrl = hachimiQtOnnxZipUrl,
+            sizeBytes = 176_484_951L,
+            sha256 = "0826c36e241e6338a8e43f6d9a99ff06285834a19d8f29dcfc4e434232c08294",
             category = "translation",
         ),
         ExternalPackageAsset(
@@ -81,6 +94,27 @@ object ExternalAssetCatalog {
             engine = "Valtec VITS ONNX",
             importSupported = true,
         ),
+        ExternalTtsVoiceAsset(
+            id = ttsZeroTtsBaseAssetId,
+            displayName = "ZeroTTS Vietnamese (Base + Mai Chi)",
+            fileName = "legado-tts-zerotts-base.zip",
+            downloadUrl = ttsZeroTtsBaseZipUrl,
+            sizeBytes = 443_902_601L,
+            sha256 = "57bbbbd098ac4a048d8d3b2264ebf31f785af17c66b2a2649aee830b38685cbd",
+            engine = "ZeroTTS ONNX",
+            importSupported = true,
+        ),
+    )
+
+    val ttsZeroTtsVoiceAssets: List<ExternalTtsVoiceAsset> = listOf(
+        zeroTtsVoice("maichi", "Mai Chi (Nữ, kể chuyện)", "legado-tts-zerotts-maichi.zip", 30_856L, "8fd8ba12941ce97bfc94aed106d4b6b8432189f6409b0431816c056a1bc2928d"),
+        zeroTtsVoice("baotrang", "Bảo Trang (Nữ, tin tức)", "legado-tts-zerotts-baotrang.zip", 30_860L, "c6a03ce35d67abcfb073e2037352ff058dce1d8fc8618b4a29fe79dcacb18a25"),
+        zeroTtsVoice("kimoanh", "Kim Oanh (Nữ, truyền cảm)", "legado-tts-zerotts-kimoanh.zip", 30_858L, "47481d6aeddc1ea352aacdc1830cd91a99014b016c39700e8298445706a38578"),
+        zeroTtsVoice("giahuy", "Gia Huy (Nam, tâm tình)", "legado-tts-zerotts-giahuy.zip", 30_856L, "a7e1d6cc311a7941c0bd4762ec50032e76d82f78c5b646a861c442e95ce7851b"),
+        zeroTtsVoice("huuduc", "Hữu Đức (Nam, điềm đạm)", "legado-tts-zerotts-huuduc.zip", 30_856L, "45bd920aee3f87c9ee7697b3f0653aa2ec304e90874d71374d20e551fdac8285"),
+        zeroTtsVoice("quangminh", "Quang Minh (Nam, dứt khoát)", "legado-tts-zerotts-quangminh.zip", 30_862L, "d462265c312f917b4f160b885a8baf7aa51ea1c546f0dc1590e2578ccd031e62"),
+        zeroTtsVoice("tiendat", "Tiến Đạt (Nam, sôi nổi)", "legado-tts-zerotts-tiendat.zip", 30_858L, "5aad2870e9c464a1ba18d32bddabd62635d204eb1e424da59f3e933fa6463302"),
+        zeroTtsVoice("hamy", "Hà My (Nữ, biểu cảm)", "legado-tts-zerotts-hamy.zip", 30_852L, "eeb74773a977ff1aa36d226723a9090e389dfba0abddba293886f25eb21124c4"),
     )
 
     val ttsPiperVoiceAssets: List<ExternalTtsVoiceAsset> = listOf(
@@ -116,12 +150,31 @@ object ExternalAssetCatalog {
     )
 
     val releaseEligibleTtsVoiceCatalog: List<ExternalTtsVoiceAsset> =
-        (ttsImportableModels + ttsPiperVoiceAssets).filter { it.releaseEligible }
+        (ttsImportableModels + ttsPiperVoiceAssets + ttsZeroTtsVoiceAssets).filter { it.releaseEligible }
 
     val ttsVoiceCatalog: List<ExternalTtsVoiceAsset> =
-        ttsImportableModels + ttsPiperVoiceAssets
+        ttsImportableModels + ttsPiperVoiceAssets + ttsZeroTtsVoiceAssets
 
     val externalPackageAssets: List<ExternalPackageAsset> = translationAssets
+
+    private fun zeroTtsVoice(
+        id: String,
+        displayName: String,
+        fileName: String,
+        sizeBytes: Long = 31_000L,
+        sha256: String = "",
+    ): ExternalTtsVoiceAsset = ExternalTtsVoiceAsset(
+        id = "tts-zerotts-$id",
+        displayName = "ZeroTTS - $displayName",
+        fileName = fileName,
+        downloadUrl = AssetDeliveryCatalog.downloadUri("tts-zerotts-$id"),
+        sizeBytes = sizeBytes,
+        sha256 = sha256,
+        engine = "ZeroTTS ONNX Voice Addon",
+        importSupported = true,
+        releaseEligible = true,
+        artifactId = "tts-zerotts-$id",
+    )
 
     private fun piperVoice(
         id: String,

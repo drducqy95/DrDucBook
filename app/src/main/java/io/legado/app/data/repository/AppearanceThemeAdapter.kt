@@ -64,29 +64,31 @@ internal object AppearanceThemeAdapter {
         resolveAsset: (String, String?) -> String?,
     ) {
         ThemeConfig.composeEngine = profile.engine.configValue
-        ThemeConfig.themeMode = profile.themeMode.configValue
-        ThemeConfig.appTheme = "12"
-        ThemeConfig.enableDeepPersonalization = true
-        ThemeConfig.cPrimary = profile.lightColors.primary
-        ThemeConfig.cNPrimary = profile.darkColors.primary
-        ThemeConfig.themeColor = profile.lightColors.primary
-        ThemeConfig.secondaryThemeColor = profile.lightColors.secondary
-        ThemeConfig.primaryTextColor = profile.lightColors.primaryText
-        ThemeConfig.secondaryTextColor = profile.lightColors.secondaryText
-        ThemeConfig.themeBackgroundColor = profile.lightColors.background
-        ThemeConfig.labelContainerColor = profile.lightColors.container
-        ThemeConfig.themeColorNight = profile.darkColors.primary
-        ThemeConfig.secondaryThemeColorNight = profile.darkColors.secondary
-        ThemeConfig.primaryTextColorNight = profile.darkColors.primaryText
-        ThemeConfig.secondaryTextColorNight = profile.darkColors.secondaryText
-        ThemeConfig.themeBackgroundColorNight = profile.darkColors.background
-        ThemeConfig.labelContainerColorNight = profile.darkColors.container
-        ThemeConfig.fontScale = profile.fontScale.coerceIn(8, 15)
-        ThemeConfig.containerOpacity = profile.containerOpacity.coerceIn(0, 100)
-        ThemeConfig.topBarOpacity = profile.topBarOpacity.coerceIn(0, 100)
-        ThemeConfig.bottomBarOpacity = profile.bottomBarOpacity.coerceIn(0, 100)
-        ThemeConfig.enableBlur = profile.blurEnabled
-        ThemeConfig.enableProgressiveBlur = profile.progressiveBlurEnabled
+        if (profile.id != LEGACY_PROFILE_ID) {
+            ThemeConfig.themeMode = profile.themeMode.configValue
+            ThemeConfig.appTheme = "12"
+            ThemeConfig.enableDeepPersonalization = true
+            ThemeConfig.cPrimary = profile.lightColors.primary
+            ThemeConfig.cNPrimary = profile.darkColors.primary
+            ThemeConfig.themeColor = profile.lightColors.primary
+            ThemeConfig.secondaryThemeColor = profile.lightColors.secondary
+            ThemeConfig.primaryTextColor = profile.lightColors.primaryText
+            ThemeConfig.secondaryTextColor = profile.lightColors.secondaryText
+            ThemeConfig.themeBackgroundColor = profile.lightColors.background
+            ThemeConfig.labelContainerColor = profile.lightColors.container
+            ThemeConfig.themeColorNight = profile.darkColors.primary
+            ThemeConfig.secondaryThemeColorNight = profile.darkColors.secondary
+            ThemeConfig.primaryTextColorNight = profile.darkColors.primaryText
+            ThemeConfig.secondaryTextColorNight = profile.darkColors.secondaryText
+            ThemeConfig.themeBackgroundColorNight = profile.darkColors.background
+            ThemeConfig.labelContainerColorNight = profile.darkColors.container
+            ThemeConfig.fontScale = profile.fontScale.coerceIn(8, 15)
+            ThemeConfig.containerOpacity = profile.containerOpacity.coerceIn(0, 100)
+            ThemeConfig.topBarOpacity = profile.topBarOpacity.coerceIn(0, 100)
+            ThemeConfig.bottomBarOpacity = profile.bottomBarOpacity.coerceIn(0, 100)
+            ThemeConfig.enableBlur = profile.blurEnabled
+            ThemeConfig.enableProgressiveBlur = profile.progressiveBlurEnabled
+        }
 
         ThemeConfig.navIconHome = profile.iconPath(IconSlot.NAV_HOME, resolveAsset)
         ThemeConfig.navIconBookshelf = profile.iconPath(IconSlot.NAV_BOOKSHELF, resolveAsset)

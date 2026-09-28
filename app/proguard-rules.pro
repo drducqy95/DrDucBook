@@ -197,3 +197,9 @@ cn.hutool.core.util.**{*;}
 -keep class io.legado.app.domain.gateway.** { *; }
 -keep class io.legado.app.data.entities.Ai* { *; }
 -keep class io.legado.app.data.repository.ai.** { *; }
+
+# Go / Gomobile WebDAV runtime (protects JNI bindings from R8 stripping - ref: ERR_0006)
+-keep class go.** { *; }
+-keep interface go.** { *; }
+-keep class io.legado.app.gowebdav.** { *; }
+-keep interface io.legado.app.gowebdav.** { *; }

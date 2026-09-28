@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "description": "30-pair Golden Test Set for HachimiMT-60-QT (Chinese -> Vietnamese, Xianxia / QT register)",
+  "test_cases": [
+    {
+      "id": "short-01",
+      "category": "title",
+      "zh": "第一章 呼吸就能变强",
+      "expected_vi_qt": "Đệ nhất chương Hô hấp tựu năng biến cường"
+    },
+    {
+      "id": "short-02",
+      "category": "dialogue",
+      "zh": "“道友请留步！”身后的灰袍老者忽然高声喊道。",
+      "expected_vi_qt": "“Đạo hữu thỉnh dừng bước!” Thân hậu đích hôi bào lão giả hốt nhiên cao thanh hảm đạo."
+    },
+    {
+      "id": "short-03",
+      "category": "dialogue",
+      "zh": "竖子尔敢！今日便是你的死期！",
+      "expected_vi_qt": "Thụ tử nhĩ cảm! Kim nhật tiện thị nhĩ đích tử kỳ!"
+    },
+    {
+      "id": "short-04",
+      "category": "phrase",
+      "zh": "螳螂捕蝉，黄雀在后。",
+      "expected_vi_qt": "Đường lang bổ thiền, hoàng tước tại hậu."
+    },
+    {
+      "id": "short-05",
+      "category": "cultivation",
+      "zh": "筑基初期与金丹大圆满，犹如云泥之别。",
+      "expected_vi_qt": "Trúc cơ sơ kỳ dữ kim đan đại viên mãn, do như vân nê chi biệt."
+    },
+    {
+      "id": "short-06",
+      "category": "action",
+      "zh": "他反手一剑，剑光如匹练般斩向虚空。",
+      "expected_vi_qt": "Tha phản thủ nhất kiếm, kiếm quang như thất luyện bàn trảm hướng hư không."
+    },
+    {
+      "id": "short-07",
+      "category": "item",
+      "zh": "这是一枚千年火灵芝，通体泛着赤红霞光。",
+      "expected_vi_qt": "Giá thị nhất mai thiên niên hỏa linh chi, thông thể phiếm trứ xích hồng hà quang."
+    },
+    {
+      "id": "short-08",
+      "category": "emotion",
+      "zh": "叶晨心中冷笑，面上却不动声色。",
+      "expected_vi_qt": "Diệp Thần tâm trung lãnh tiếu, diện thượng khước bất động thanh sắc."
+    },
+    {
+      "id": "short-09",
+      "category": "dialogue",
+      "zh": "“师兄，难道我们就这么算了？”少女咬牙问道。",
+      "expected_vi_qt": "“Sư huynh, nan đạo ngã môn tựu giá ma toán liễu?” Thiếu nữ giảo nha vấn đạo."
+    },
+    {
+      "id": "short-10",
+      "category": "scenery",
+      "zh": "夜幕降临，黑风山脉深处传来阵阵凄厉兽吼。",
+      "expected_vi_qt": "Dạ mạc hàng lâm, Hắc Phong sơn mạch thâm xứ truyền lai trận trận thê lệ thú hống."
+    },
+    {
+      "id": "med-01",
+      "category": "cultivation_breakthrough",
+      "zh": "随着体内灵力轰然运转三十六个周天，丹田深处的金色气旋猛然一震，终于冲破了那层无形的桎梏。",
+      "expected_vi_qt": "Tùy trứ thể nội linh lực oanh nhiên vận chuyển tam thập lục cá chu thiên, đan điền thâm xứ đích kim sắc khí toàn mãnh nhiên nhất chấn, chung vu xung phá liễu na tầng vô hình đích trĩ cốc."
+    },
+    {
+      "id": "med-02",
+      "category": "battle",
+      "zh": "九条火龙咆哮而出，带着焚山煮海的恐怖炽热，狠狠轰向那座遮天蔽日的黑色魔殿。",
+      "expected_vi_qt": "Cửu điều hỏa long bào háo nhi xuất, đái trứ phần sơn chử hải đích khủng bố sí nhiệt, ngoan ngoan oanh hướng na tọa già thiên tế nhật đích hắc sắc ma điện."
+    },
+    {
+      "id": "med-03",
+      "category": "alchemy",
+      "zh": "掌中丹火不断变换温度，待炉中药香四溢、结成九颗圆滚滚的凝气丹时，他才长舒了一口气。",
+      "expected_vi_qt": "Chưởng trung đan hỏa bất đoạn biến hoán ôn độ, đãi lô trung dược hương tứ dực, kết thành cửu khỏa viên cổn cổn đích ngưng khí đan thì, tha tài trường thư liễu nhất khẩu khí."
+    },
+    {
+      "id": "med-04",
+      "category": "plot",
+      "zh": "若是让人知道青云宗的镇派至宝落入一个外门弟子之手，整个修真界恐怕都会掀起腥风血雨。",
+      "expected_vi_qt": "Nhược thị nhượng nhân tri đạo Thanh Vân Tông đích trấn phái chí bảo lạc nhập nhất cá ngoại môn đệ tử chi thủ, chỉnh cá tu chân giới khủng phạ đô hội hiên khởi tinh phong huyết vũ."
+    },
+    {
+      "id": "med-05",
+      "category": "spell",
+      "zh": "只见他并指如刀，凌空虚画出一道繁复玄奥的金色符箓，瞬间将那头扑上来的嗜血妖狼定在半空。",
+      "expected_vi_qt": "Chỉ kiến tha tịnh chỉ như đao, lăng không hư họa xuất nhất đạo phồn phức huyền áo đích kim sắc phù lục, thuấn gian tương na đầu phác thượng lai đích thị huyết yêu lang định tại bán không."
+    },
+    {
+      "id": "med-06",
+      "category": "dialogue_long",
+      "zh": "“区区一个连筑基都未完成的蝼蚁，也配在此大放厥词？识相的便把储物袋留下，老夫尚可饶你一命。”",
+      "expected_vi_qt": "“Khu khu nhất cá liên trúc cơ đô vị hoàn thành đích lâu nghĩ, dã phối tại thử đại phóng quyết từ? Thức tương đích tiện bả trữ vật đại lưu hạ, lão phu thượng khả nhiêu nhĩ nhất mệnh.”"
+    },
+    {
+      "id": "med-07",
+      "category": "formation",
+      "zh": "护山大阵剧烈晃动，无数道阵纹在凌厉的飞剑轰击下寸寸崩裂，发出刺耳欲聋的咔嚓声响。",
+      "expected_vi_qt": "Hộ sơn đại trận kịch liệt hoảng động, vô số đạo trận văn tại lăng lệ đích phi kiếm oanh kích hạ thốn thốn băng liệt, phát xuất thứ nhĩ dục lung đích khát sát thanh hưởng."
+    },
+    {
+      "id": "med-08",
+      "category": "character_intro",
+      "zh": "白衣女子神色淡漠，宛若广寒仙子临尘，足尖轻点飞剑，飘然落在一处陡峭绝壁之上。",
+      "expected_vi_qt": "Bạch y nữ tử thần sắc đạm mạc, uyển nhược Quảng Hàn tiên tử lâm trần, túc tiêm khinh điểm phi kiếm, phiêu nhiên lạc tại nhất xứ đẩu khiếu tuyệt bích chi thượng."
+    },
+    {
+      "id": "med-09",
+      "category": "treasure",
+      "zh": "残破古卷上记载的赫然是一门失传已久的上古大荒经残篇，字里行间流淌着古老沧桑的岁月气息。",
+      "expected_vi_qt": "Tàn phá cổ quyển thượng ký tái đích hách nhiên thị nhất môn thất truyền dĩ cửu đích thượng cổ Đại Hoang Kinh tàn thiên, tự lý hành gian lưu thảng trứ cổ lão thương tang đích tuế nguyệt khí tức."
+    },
+    {
+      "id": "med-10",
+      "category": "mental_state",
+      "zh": "道心若是动摇，哪怕吞服再多灵丹妙药，终其一生也休想触碰到元婴大道的一丝门槛。",
+      "expected_vi_qt": "Đạo tâm nhược thị động dao, na phạ thôn phục tái đa linh đan diệu dược, chung kỳ nhất sinh dã hưu tưởng xúc bồng đáo nguyên anh đại đạo đích nhất ti môn hạm."
+    },
+    {
+      "id": "long-01",
+      "category": "complex_narrative",
+      "zh": "此时此刻，站在苍穹之巅的林轩俯瞰着下方连绵万里的无尽山河，想起三年前自己被逐出宗门时的狼狈与屈辱，胸中那一股压抑已久的郁气终于化作一声响彻云霄的长啸。",
+      "expected_vi_qt": "Thử thì thử khắc, trạm tại thương khung chi điên đích Lâm Hiên phủ khám trứ hạ phương liên miên vạn lý đích vô tận sơn hà, tưởng khởi tam niên tiền tự kỷ bị trục xuất tông môn thì đích lang bối dữ khuất nhục, hung trung na nhất cổ áp ức dĩ cửu đích uất khí chung vu hóa tác nhất thanh hưởng triệt vân tiêu đích trường khiếu."
+    },
+    {
+      "id": "long-02",
+      "category": "grand_battle",
+      "zh": "漫天魔气与纯阳剑气交织碰撞，方圆百里的虚空寸寸塌陷，无数高耸入云的山峰在狂暴的冲击波下瞬间化为齑粉，大地之上裂开一道道深不见底的狰狞鸿沟。",
+      "expected_vi_qt": "Mạn thiên ma khí dữ thuần dương kiếm khí giao chức bồng tràng, phương viên bách lý đích hư không thốn thốn tháp hãm, vô số cao tủng nhập vân đích sơn phong tại cuồng bạo đích xung kích ba hạ thuấn gian hóa vi tê phấn, đại địa chi thượng liệt khai nhất đạo đạo thâm bất kiến để đích tranh ninh hồng câu."
+    },
+    {
+      "id": "long-03",
+      "category": "auction_intrigue",
+      "zh": "天宝阁拍卖大厅内座无虚席，当红布揭开露出那截散发着幽幽寒芒的九天玄铁时，坐在天字一号包厢里的黑煞老怪率先开口，直接喊出了一个让在场所有人倒吸一口凉气的惊人天价。",
+      "expected_vi_qt": "Thiên Bảo Các phách mại đại thính nội tọa vô hư tịch, đương hồng bố yết khai lộ xuất na tiệt tán phát trứ u u hàn mang đích cửu thiên huyền thiết thì, tọa tại thiên tự nhất hào bao tương lý đích Hắc Sát Lão Quái suất tiên khai khẩu, trực tiếp hảm xuất liễu nhất cá nhượng tại tràng sở hữu nhân đảo hấp nhất khẩu lương khí đích kinh nhân thiên giá."
+    },
+    {
+      "id": "long-04",
+      "category": "ancient_relic",
+      "zh": "根据宗门古籍中残存的模糊记载，这座深埋于无底深渊底部的太古神庙乃是上古神魔大战时遗留下来的封魔重地，其内不仅布满了稍有不慎便会神魂俱灭的诛仙杀阵，更镇压着一尊沉睡了数万载的不死凶魔。",
+      "expected_vi_qt": "Căn cứ tông môn cổ tịch trung tàn tồn đích mô hồ ký tái, giá tọa thâm mai vu vô để thâm uyên để bộ đích thái cổ thần miếu nãi thị thượng cổ thần ma đại chiến thì di lưu hạ lai đích phong ma trọng địa, kỳ nội bất cận bố mãn liễu sảo hữu bất thận tiện hội thần hồn câu diệt đích chu tiên sát trận, cánh trấn áp trứ nhất tôn trầm thụy liễu sổ vạn tái đích bất tử hung ma."
+    },
+    {
+      "id": "long-05",
+      "category": "suspense_conversation",
+      "zh": "“楚师弟，你当真以为凭借你手中的那柄残缺灵剑，就能活着从这片万毒沼泽中走出去么？”黑衣人缓步逼近，嘴角勾起一抹残忍而诡异的弧度，手中的墨色骨杖悄然泛起阵阵令人作呕的绿芒。",
+      "expected_vi_qt": "“Sở sư đệ, nhĩ đương chân dĩ vi bằng tá nhĩ thủ trung đích na bính tàn khuyết linh kiếm, tựu năng hoạt trứ tòng giá phiến vạn độc chiểu trạch trung tẩu xuất khứ ma?” Hắc y nhân hoãn bộ bức cận, thủy giác câu khởi nhất mạt tàn nhẫn nhi quỷ dị đích cung độ, thủ trung đích mặc sắc cốt trượng tiễu nhiên phiếm khởi trận trận lệnh nhân tác ẩu đích lục mang."
+    },
+    {
+      "id": "long-06",
+      "category": "inner_monologue",
+      "zh": "他非常清楚，自己资质平庸，既没有世家大族倾注无尽资源作为后盾，也没有惊世骇俗的天灵根，能够走到今天这一步，全凭着胸膛中那一颗百折不挠、誓要逆天改命的坚毅道心。",
+      "expected_vi_qt": "Tha phi thường thanh sở, tự kỷ tư chất bình dung, ký một hữu thế gia đại tộc khuynh chú vô tận tư nguyên tác vi hậu thuẫn, dã một hữu kinh thế hãi tục đích thiên linh căn, năng cẩu tẩu đáo kim thiên giá nhất bộ, toàn bằng trứ hung đường trung na nhất khỏa bách chiết bất nạo, thệ yếu nghịch thiên cải mệnh đích kiên nghị đạo tâm."
+    },
+    {
+      "id": "long-07",
+      "category": "tribulation",
+      "zh": "劫云翻滚如墨，黑压压地笼罩在头顶方圆千里之内，第九道九九紫霄神雷在云层中狂暴酝酿，散发出的毁灭气息让整座千刃峰上的所有生灵都瑟瑟发抖、匍匐在地。",
+      "expected_vi_qt": "Kiếp vân phiên cổn như mặc, hắc áp áp địa lung triệu tại đầu đính phương viên thiên lý chi nội, đệ cửu đạo cửu cửu tử tiêu thần lôi tại vân tầng trung cuồng bạo uẩn nhưỡng, tán phát xuất đích hủy diệt khí tức nhượng chỉnh tọa Thiên Nhận phong thượng đích sở hữu sinh linh đô sắt sắt phát đâu, bồ phục tại địa."
+    },
+    {
+      "id": "long-08",
+      "category": "family_feud",
+      "zh": "赵家家主脸色铁青地拍案而起，怒视着堂下神色自若的少年，咬牙切齿地喝道：“好你个不知天高地厚的逆子，竟敢在家族大比之上公然废掉你堂兄的丹田气海，今日老夫若不清理门户，赵家颜面何存！”",
+      "expected_vi_qt": "Triệu gia gia chủ liên sắc thiết thanh địa phách án nhi khởi, nộ thị trứ đường hạ thần sắc tự nhược đích thiếu niên, giảo nha thiết xỉ địa hống đạo: “Hảo nhĩ cá bất tri thiên cao địa hậu đích nghịch tử, cánh cảm tại gia tộc đại bỉ chi thượng công nhiên phế điệu nhĩ đường huynh đích đan điền khí hải, kim nhật lão phu nhược bất thanh lý môn hộ, Triệu gia nhan diện hà tồn!”"
+    },
+    {
+      "id": "long-09",
+      "category": "beast_encounter",
+      "zh": "幽暗密林深处，那头生有三目、体型庞大如小山丘般的紫睛魔猿猛然人立而起，硕大无朋的双拳重重锤击在自己坚硬如铁的胸膛上，爆发出一阵阵震耳欲聋的闷雷之声。",
+      "expected_vi_qt": "U ám mật lâm thâm xứ, na đầu sinh hữu tam mục, thể hình bàng đại như tiểu sơn khâu bàn đích Tử Tình Ma Viên mãnh nhiên nhân lập nhi khởi, thạc đại vô bằng đích song quyền trọng trọng chùy kích tại tự kỷ kiên ngạnh như thiết đích hung đường thượng, bạo phát xuất nhất trận trận chấn nhĩ dục lung đích muộn lôi chi thanh."
+    },
+    {
+      "id": "long-10",
+      "category": "ending_reflection",
+      "zh": "回望来时那一路尸山血海、白骨累累的修仙长途，昔日同门挚友早已化作一杯黄土，唯有这浩瀚无垠的星空与亘古不变的长生大道，依旧孤寂而冰冷地横亘在眼前。",
+      "expected_vi_qt": "Hồi vọng lai thì na nhất lộ thi sơn huyết hải, bạch cốt luy luy đích tu tiên trường đồ, tích nhật đồng môn chí hữu tảo dĩ hóa tác nhất bôi hoàng thổ, duy hữu giá hạo hãn vô ngân đích tinh không dữ cắng cổ bất biến đích trường sinh đại đạo, y cựu cô tịch nhi băng lãnh địa hoạnh cắng tại nhãn tiền."
+    }
+  ]
+}

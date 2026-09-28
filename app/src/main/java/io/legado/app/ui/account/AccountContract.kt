@@ -28,6 +28,8 @@ data class AccountUiState(
     val adminAccounts: ImmutableList<AccountAdminUi> = persistentListOf(),
     val adminSearchQuery: String = "",
     val adminRoleFilter: AccountRole? = null,
+    val adminSortOption: AccountAdminSort = AccountAdminSort.LAST_SIGN_IN_DESC,
+    val adminActivityFilter: AccountAdminActivityFilter = AccountAdminActivityFilter.ALL,
     val editingAccount: AccountAdminUi? = null,
     val restoreConfirmationVisible: Boolean = false,
     val googleDriveRestoreConfirmationVisible: Boolean = false,
@@ -35,6 +37,20 @@ data class AccountUiState(
     val lastCloudBackup: CloudBackupUi? = null,
     val lastGoogleDriveBackup: CloudBackupUi? = null,
 )
+
+enum class AccountAdminSort(val label: String) {
+    LAST_SIGN_IN_DESC("Đăng nhập mới nhất"),
+    LAST_SIGN_IN_ASC("Đăng nhập cũ nhất"),
+    CREATED_AT_DESC("Đăng ký mới nhất"),
+    CREATED_AT_ASC("Đăng ký cũ nhất"),
+    EMAIL_ASC("Email A-Z"),
+}
+
+enum class AccountAdminActivityFilter(val label: String) {
+    ALL("Tất cả hoạt động"),
+    ACTIVE_30_DAYS("30 ngày gần đây"),
+    NEVER_SIGNED_IN("Chưa đăng nhập"),
+}
 
 @Stable
 data class AccountSessionUi(
@@ -72,6 +88,8 @@ data class AccountAdminUi(
     val role: AccountRole,
     val roleStartsAtEpochMillis: Long? = null,
     val roleExpiresAtEpochMillis: Long? = null,
+    val createdAtEpochMillis: Long? = null,
+    val lastSignInAtEpochMillis: Long? = null,
     val selectedRole: AccountRole = role,
     val selectedDurationDays: String = "",
     val selectedPermanent: Boolean = role != AccountRole.FREE && roleExpiresAtEpochMillis == null,
@@ -133,6 +151,8 @@ sealed interface AccountIntent {
     data object LoadAdminAccounts : AccountIntent
     data class UpdateAdminSearch(val query: String) : AccountIntent
     data class FilterAdminRole(val role: AccountRole?) : AccountIntent
+    data class SelectAdminSort(val sort: AccountAdminSort) : AccountIntent
+    data class SelectAdminActivityFilter(val filter: AccountAdminActivityFilter) : AccountIntent
     data class EditAccount(val userId: String) : AccountIntent
     data class SelectAccountRole(val role: AccountRole) : AccountIntent
     data class SetAccountRoleDurationDays(val value: String) : AccountIntent
@@ -219,6 +239,8 @@ internal fun AccountAccess.toAdminUi(): AccountAdminUi = AccountAdminUi(
     role = role,
     roleStartsAtEpochMillis = roleStartsAtEpochMillis,
     roleExpiresAtEpochMillis = roleExpiresAtEpochMillis,
+    createdAtEpochMillis = createdAtEpochMillis,
+    lastSignInAtEpochMillis = lastSignInAtEpochMillis,
     selectedDurationDays = roleExpiresAtEpochMillis
         ?.let { expiresAt ->
             val remainingMillis = (expiresAt - System.currentTimeMillis()).coerceAtLeast(0L)
@@ -232,13 +254,49 @@ internal fun filterAdminAccounts(
     accounts: List<AccountAdminUi>,
     query: String,
     role: AccountRole?,
+    activityFilter: AccountAdminActivityFilter = AccountAdminActivityFilter.ALL,
+    sortOption: AccountAdminSort = AccountAdminSort.LAST_SIGN_IN_DESC,
 ): List<AccountAdminUi> {
     val normalizedQuery = query.trim().lowercase()
-    return accounts.filter { account ->
-        (role == null || account.role == role) &&
-            (normalizedQuery.isBlank() ||
-                account.email.lowercase().contains(normalizedQuery) ||
-                account.userId.lowercase().contains(normalizedQuery))
+    val now = System.currentTimeMillis()
+    val thirtyDaysMillis = 30L * 24L * 60L * 60L * 1_000L
+
+    val filtered = accounts.filter { account ->
+        val matchesRole = role == null || account.role == role
+        val matchesQuery = normalizedQuery.isBlank() ||
+            account.email.lowercase().contains(normalizedQuery) ||
+            account.userId.lowercase().contains(normalizedQuery)
+        val matchesActivity = when (activityFilter) {
+            AccountAdminActivityFilter.ALL -> true
+            AccountAdminActivityFilter.ACTIVE_30_DAYS -> {
+                val lastSignIn = account.lastSignInAtEpochMillis
+                lastSignIn != null && (now - lastSignIn) <= thirtyDaysMillis
+            }
+            AccountAdminActivityFilter.NEVER_SIGNED_IN -> {
+                account.lastSignInAtEpochMillis == null
+            }
+        }
+        matchesRole && matchesQuery && matchesActivity
+    }
+
+    return when (sortOption) {
+        AccountAdminSort.LAST_SIGN_IN_DESC -> filtered.sortedWith(
+            compareByDescending<AccountAdminUi> { it.lastSignInAtEpochMillis ?: Long.MIN_VALUE }
+                .thenByDescending { it.createdAtEpochMillis ?: Long.MIN_VALUE }
+        )
+        AccountAdminSort.LAST_SIGN_IN_ASC -> filtered.sortedWith(
+            compareBy<AccountAdminUi> { it.lastSignInAtEpochMillis ?: Long.MAX_VALUE }
+                .thenBy { it.createdAtEpochMillis ?: Long.MAX_VALUE }
+        )
+        AccountAdminSort.CREATED_AT_DESC -> filtered.sortedWith(
+            compareByDescending<AccountAdminUi> { it.createdAtEpochMillis ?: Long.MIN_VALUE }
+                .thenByDescending { it.lastSignInAtEpochMillis ?: Long.MIN_VALUE }
+        )
+        AccountAdminSort.CREATED_AT_ASC -> filtered.sortedWith(
+            compareBy<AccountAdminUi> { it.createdAtEpochMillis ?: Long.MAX_VALUE }
+                .thenBy { it.lastSignInAtEpochMillis ?: Long.MAX_VALUE }
+        )
+        AccountAdminSort.EMAIL_ASC -> filtered.sortedBy { it.email.lowercase() }
     }
 }
 

@@ -67,3 +67,24 @@ supabase/.temp/
 **/*serviceAccountKey*.json
 __pycache__/
 *.py[cod]
+.venv/
+**/.venv/
+
+# Scratch & test outputs
+*.wav
+*.npy
+*.spm
+dump.xml
+window_dump.xml
+*.dump.xml
+ui_elements.txt
+drive_v3_all_85.txt
+hethong_files.txt
+items_dump.txt
+direct_natra.epub
+temp_test_ort/
+
+# Tools export directories and large model weights
+tools/**/dist/
+tools/**/exported_models/
+tools/**/_test_export/

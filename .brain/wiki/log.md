@@ -44,3 +44,23 @@ _Append-only operation history._
 - `2026-09-12T07:34:58` — UPDATE [entity] project-legado-with-md3-main
 - `2026-09-12T08:22:20` — CREATE [pattern] AiTranslationRefinePipeline / StoryMemory - TranslationCjkResidueException Pattern → .brain\wiki\patterns\aitranslationrefinepipeline-storymemory-translationcjkresidueexception-pattern.md
 - `2026-09-12T08:22:20` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-12T12:12:38` — CREATE [entity] Go Local WebDAV and NMT HachimiMT-60-QT → .brain\wiki\entities\go-local-webdav-and-nmt-hachimimt-60-qt.md
+- `2026-09-12T12:12:40` — CREATE [decision] Use Gomobile AAR for Local WebDAV Proxy → .brain\wiki\decisions\use-gomobile-aar-for-local-webdav-proxy.md
+- `2026-09-12T12:12:43` — CREATE [decision] Integrate Drive Library Section directly in Explore Tab → .brain\wiki\decisions\integrate-drive-library-section-directly-in-explore-tab.md
+- `2026-09-12T12:12:46` — CREATE [decision] Session Secret HTTP Basic Auth for Localhost WebDAV → .brain\wiki\decisions\session-secret-http-basic-auth-for-localhost-webdav.md
+- `2026-09-12T12:12:51` — CREATE [decision] Convert HachimiMT-60-QT to ONNX INT8 with No-Repeat Disabled → .brain\wiki\decisions\convert-hachimimt-60-qt-to-onnx-int8-with-no-repeat-disabled.md
+- `2026-09-12T22:38:52` — CREATE [pattern] DriveWebDav/PublicClient - CatalogTruncationAndDownloadCorruption Pattern → .brain\wiki\patterns\drivewebdavpublicclient-catalogtruncationanddownloadcorruption-pattern.md
+- `2026-09-12T22:38:52` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-12T22:40:26` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-12T22:40:26` — CREATE [insight] Session 2026-09-12 22-40-26 → .brain\wiki\insights\session-2026-09-12-22-40-26.md
+- `2026-09-12T22:40:26` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-13T11:21:14` — CREATE [pattern] EpubRemoteExtractor - SelectorParseException Pattern → .brain\wiki\patterns\epubremoteextractor-selectorparseexception-pattern.md
+- `2026-09-13T11:21:14` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-14T05:33:22` — CREATE [pattern] Reader/PerBookPrompt - LogicError Pattern → .brain\wiki\patterns\readerperbookprompt-logicerror-pattern.md
+- `2026-09-14T05:33:22` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-14T05:50:51` — CREATE [pattern] Reader/PerBookPrompt - UXDefect Pattern → .brain\wiki\patterns\readerperbookprompt-uxdefect-pattern.md
+- `2026-09-14T05:50:51` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-14T20:48:25` — CREATE [pattern] AssetDelivery/ZeroTTS - ArtifactNotAllowListed Pattern → .brain\wiki\patterns\assetdeliveryzerotts-artifactnotallowlisted-pattern.md
+- `2026-09-14T20:48:25` — UPDATE [entity] project-legado-with-md3-main
+- `2026-09-14T22:49:49` — CREATE [pattern] AssetDelivery/ZeroTTS - INTEGRITY_AND_CHECKSUM_DESYNC Pattern → .brain\wiki\patterns\assetdeliveryzerotts-integrity-and-checksum-desync-pattern.md
+- `2026-09-14T22:49:49` — UPDATE [entity] project-legado-with-md3-main

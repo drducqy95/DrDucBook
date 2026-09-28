@@ -48,9 +48,10 @@ class AssetDeliveryImportRepository(
             }
 
             AssetDeliveryArtifactKind.TRANSLATION -> when (artifact.id) {
-                ExternalAssetCatalog.hachimiOnnxAssetId -> {
+                ExternalAssetCatalog.hachimiOnnxAssetId,
+                ExternalAssetCatalog.hachimiQtOnnxAssetId -> {
                     HachimiOnnxModelImporter.import(context, Uri.fromFile(source))
-                    "Đã nhập model Hachimi NMT"
+                    "Đã nhập model NMT: ${artifact.displayName}"
                 }
 
                 ExternalAssetCatalog.quickTranslationCleanAssetId -> {

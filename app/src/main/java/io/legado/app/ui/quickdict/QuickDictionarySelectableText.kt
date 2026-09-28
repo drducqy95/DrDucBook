@@ -44,7 +44,12 @@ fun QuickDictionarySelectableText(
 ) {
     var fieldValue by remember(displayText) { mutableStateOf(TextFieldValue(displayText)) }
     val actionLabel = stringResource(com.drducbook.app.R.string.quick_dictionary_add)
-    val textStyle = if (color == Color.Unspecified) style else style.copy(color = color)
+    val resolvedColor = when {
+        color != Color.Unspecified -> color
+        style.color != Color.Unspecified -> style.color
+        else -> LegadoTheme.colorScheme.onSurface
+    }
+    val textStyle = style.copy(color = resolvedColor)
 
     BasicTextField(
         value = fieldValue,

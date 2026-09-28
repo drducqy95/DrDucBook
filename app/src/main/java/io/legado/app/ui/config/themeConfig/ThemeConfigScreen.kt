@@ -281,7 +281,7 @@ fun ThemeConfigScreen(
                                     selectedTheme = newTheme
                                     ThemeConfig.appTheme = newTheme
                                     if (oldTheme != newTheme) {
-                                        showRestartDialog = true
+                                        postEvent(EventBus.RECREATE, "")
                                     }
                                 }
                             )
@@ -323,15 +323,9 @@ fun ThemeConfigScreen(
                                         ThemeConfig.containerOpacity = 0
                                     }
                                 }
-                                val oldTheme = selectedTheme
                                 selectedTheme = theme
                                 ThemeConfig.appTheme = theme
-                                val isDynamicSwitch = (oldTheme == "12" || theme == "12")
-                                if (isDynamicSwitch) {
-                                    showRestartDialog = true
-                                } else {
-                                    postEvent(EventBus.RECREATE, "")
-                                }
+                                postEvent(EventBus.RECREATE, "")
                             }
                         )
                     }

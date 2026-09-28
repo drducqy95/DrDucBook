@@ -402,13 +402,22 @@ object LocalBook {
     /**
      * 下载在线的文件
      */
+    private fun ensureDefaultBookTreeUri(): String {
+        return OtherConfig.defaultBookTreeUri ?: run {
+            val booksDir = appCtx.externalFiles.getFile("books")
+            if (!booksDir.exists()) booksDir.mkdirs()
+            Uri.fromFile(booksDir).toString().also {
+                OtherConfig.defaultBookTreeUri = it
+            }
+        }
+    }
+
     suspend fun saveBookFile(
         str: String,
         fileName: String,
         source: BaseSource? = null,
     ): Uri {
-        OtherConfig.defaultBookTreeUri
-            ?: throw NoBooksDirException()
+        ensureDefaultBookTreeUri()
         val inputStream = when {
             str.isAbsUrl() -> AnalyzeUrl(
                 str, source = source, callTimeout = 0,
@@ -433,7 +442,7 @@ object LocalBook {
         fileName: String
     ): Uri {
         inputStream.use {
-            val defaultBookTreeUri = OtherConfig.defaultBookTreeUri
+            val defaultBookTreeUri = ensureDefaultBookTreeUri()
             if (defaultBookTreeUri.isNullOrBlank()) throw NoBooksDirException()
             val treeUri = defaultBookTreeUri.toUri()
             return if (treeUri.isContentScheme()) {
@@ -487,8 +496,7 @@ object LocalBook {
         val webDavUrl = localBook.getRemoteUrl()
         if (webDavUrl.isNullOrBlank()) throw NoStackTraceException("Book file is not webDav File")
         try {
-            OtherConfig.defaultBookTreeUri
-                ?: throw NoBooksDirException()
+            ensureDefaultBookTreeUri()
             // 兼容旧版链接
             val webdav: WebDav = kotlin.runCatching {
                 WebDav.fromPath(webDavUrl)

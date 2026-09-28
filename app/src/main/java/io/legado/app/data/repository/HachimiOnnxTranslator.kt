@@ -9,6 +9,7 @@ import android.app.ActivityManager
 import android.content.Context
 import io.legado.app.model.translation.HachimiOnnxModelRegistry
 import io.legado.app.model.translation.HachimiOnnxRuntimeCoordinator
+import io.legado.app.model.translation.NmtModelDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -89,6 +90,7 @@ class HachimiOnnxTranslator(
 ) {
     @Volatile private var runtime: Runtime? = null
     @Volatile private var runtimeGeneration: Long = Long.MIN_VALUE
+    @Volatile private var runtimeModelId: String? = null
     private var idleUnloadJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -118,13 +120,15 @@ class HachimiOnnxTranslator(
                 maxNewTokens = policy.maxNewTokens.coerceIn(1, MAX_SAFE_NEW_TOKENS),
                 maxSourceTokens = policy.maxSourceTokens.coerceIn(MIN_SOURCE_TOKENS, MAX_SAFE_SOURCE_TOKENS),
             )
+            val currentModelId = HachimiOnnxRuntimeCoordinator.currentModelId()
             val modelGeneration = HachimiOnnxRuntimeCoordinator.currentGeneration()
             val loaded = try {
-                runtime?.takeIf { runtimeGeneration == modelGeneration } ?: run {
+                runtime?.takeIf { runtimeGeneration == modelGeneration && runtimeModelId == currentModelId } ?: run {
                     runtime?.close()
-                    Runtime.load(context).also {
+                    Runtime.load(context, currentModelId).also {
                         runtime = it
                         runtimeGeneration = modelGeneration
+                        runtimeModelId = currentModelId
                     }
                 }
             } catch (error: OutOfMemoryError) {
@@ -198,7 +202,8 @@ class HachimiOnnxTranslator(
                 ),
                 sourceSegments = segments.size,
                 generatedTokens = generatedTokens,
-                missingRequiredTerms = missingRequiredTerms.toList()
+                missingRequiredTerms = missingRequiredTerms.toList(),
+                attribution = loaded.descriptor.attribution,
             )
             scheduleIdleUnload()
             result
@@ -211,6 +216,7 @@ class HachimiOnnxTranslator(
         val failedRuntime = runtime
         runtime = null
         runtimeGeneration = Long.MIN_VALUE
+        runtimeModelId = null
         try {
             failedRuntime?.close()
         } catch (_: Throwable) {
@@ -228,10 +234,12 @@ class HachimiOnnxTranslator(
         runtime?.close()
         runtime = null
         runtimeGeneration = Long.MIN_VALUE
+        runtimeModelId = null
     }
 
     private class Runtime(
         private val environment: OrtEnvironment,
+        val descriptor: NmtModelDescriptor,
         private val sourceTokenizer: OrtSession,
         private val targetTokenizer: OrtSession,
         private val detokenizer: OrtSession,
@@ -344,6 +352,11 @@ class HachimiOnnxTranslator(
             policy: HachimiDecodePolicy,
             constraints: List<EncodedConstraint>
         ): SegmentResult {
+            val effectivePolicy = if (descriptor.id == HachimiOnnxModelRegistry.HACHIMI_QT_MODEL_ID || descriptor.defaultNoRepeatNgramSize == 0) {
+                policy.copy(noRepeatNgramSize = 0)
+            } else {
+                policy
+            }
             runTokenizer(sourceTokenizer, source).use { tokenized ->
                 encoder.run(
                     mapOf(
@@ -355,18 +368,18 @@ class HachimiOnnxTranslator(
                     val first = decode(
                         attentionMask = tokenized.attentionMask,
                         encoderHidden = hidden,
-                        policy = policy,
+                        policy = effectivePolicy,
                         constraints = constraints,
                         strictConstraints = false
                     )
                     return if (
-                        policy.retryMissingRequiredTerms &&
+                        effectivePolicy.retryMissingRequiredTerms &&
                         first.missingRequiredTargets.isNotEmpty()
                     ) {
                         decode(
                             attentionMask = tokenized.attentionMask,
                             encoderHidden = hidden,
-                            policy = policy,
+                            policy = effectivePolicy,
                             constraints = constraints,
                             strictConstraints = true
                         )
@@ -674,7 +687,7 @@ class HachimiOnnxTranslator(
         }
 
         private fun createEmptyCache(): Map<String, OnnxTensor> =
-            (0 until DECODER_LAYERS).flatMap { layer ->
+            (0 until descriptor.decoderLayers).flatMap { layer ->
                 listOf("decoder", "encoder").flatMap { attention ->
                     listOf("key", "value").map { kind ->
                         val name = "past_key_values.$layer.$attention.$kind"
@@ -684,7 +697,7 @@ class HachimiOnnxTranslator(
                         name to OnnxTensor.createTensor(
                             environment,
                             buffer,
-                            longArrayOf(1, ATTENTION_HEADS, 0, HEAD_DIMENSION)
+                            longArrayOf(1, descriptor.attentionHeads, 0, descriptor.headDimension)
                         )
                     }
                 }
@@ -699,9 +712,14 @@ class HachimiOnnxTranslator(
         }
 
         companion object {
-            fun load(context: Context): Runtime {
+            fun load(
+                context: Context,
+                modelId: String = HachimiOnnxModelRegistry.DEFAULT_MODEL_ID,
+            ): Runtime {
                 val environment = OrtEnvironment.getEnvironment()
-                val modelDirectory = HachimiOnnxModelRegistry(context).installedDirectory()
+                val registry = HachimiOnnxModelRegistry(context)
+                val descriptor = registry.modelDescriptor(modelId)
+                val modelDirectory = registry.installedDirectory(modelId)
                 val modelPaths = MODEL_FILES.associateWith { fileName ->
                     modelFilePath(File(modelDirectory, fileName))
                 }
@@ -758,6 +776,7 @@ class HachimiOnnxTranslator(
                     ).also(openedSessions::add)
                     return Runtime(
                         environment = environment,
+                        descriptor = descriptor,
                         sourceTokenizer = sourceTokenizer,
                         targetTokenizer = targetTokenizer,
                         detokenizer = detokenizer,

@@ -42,6 +42,7 @@ object LocalTtsModelImporter {
         val staging = File(root, "import_${UUID.randomUUID()}")
         check(staging.mkdirs()) { "Không thể tạo thư mục tạm để nhập model TTS" }
         try {
+            android.util.Log.i("LocalTtsImporter", "import starting for uri: $uri, sourceBytes: $sourceBytes")
             val packageFiles = context.contentResolver.openInputStream(uri)?.buffered()?.use { input ->
                 extractRecognizedFiles(input, staging) { processedBytes ->
                     onProgress(
@@ -53,9 +54,20 @@ object LocalTtsModelImporter {
                     )
                 }
             } ?: throw IOException("Không thể đọc gói model TTS")
+            android.util.Log.i("LocalTtsImporter", "Extracted files count: ${packageFiles.size}")
             currentCoroutineContext().ensureActive()
             onProgress(LocalTtsImportProgress(LocalTtsImportStage.VALIDATING))
-            val model = if (packageFiles.looksLikePiperVoicePack()) {
+            val model = if (packageFiles.looksLikeVoiceAddon()) {
+                val updated = importVoiceAddon(context, staging)
+                onProgress(LocalTtsImportProgress(LocalTtsImportStage.INSTALLING))
+                return@withContext updated
+            } else if (packageFiles.looksLikeZeroTtsPack()) {
+                val checksum = registry.calculateChecksum(
+                    staging,
+                    LocalTtsModelRegistry.ENGINE_ZEROTTS,
+                )
+                prepareZeroTtsModel(staging, checksum)
+            } else if (packageFiles.looksLikePiperVoicePack()) {
                 val descriptor = preparePiperModel(staging, packageFiles)
                 PiperRuntimeAssets(context).ensureInstalled()
                 val checksum = registry.calculateChecksum(
@@ -75,6 +87,7 @@ object LocalTtsModelImporter {
                 )
                 createModel(staging, checksum.take(24), checksum)
             }
+            android.util.Log.i("LocalTtsImporter", "Model prepared: ${model.name}, id=${model.id}, engine=${model.engine}")
             currentCoroutineContext().ensureActive()
             onProgress(LocalTtsImportProgress(LocalTtsImportStage.PROBING))
             probeRuntime(context, model)
@@ -83,6 +96,9 @@ object LocalTtsModelImporter {
             registry.write(model, staging)
             installAtomically(root, staging, model.id)
             registry.get(model.id) ?: throw IOException("Không thể kiểm tra model TTS sau khi cài")
+        } catch (error: Throwable) {
+            android.util.Log.e("LocalTtsImporter", "import failed: ${error.javaClass.name}: ${error.message}", error)
+            throw error
         } finally {
             staging.deleteRecursively()
         }
@@ -116,7 +132,11 @@ object LocalTtsModelImporter {
                         if (!extracted.add(fileName)) {
                             throw IOException("Gói model chứa tệp trùng: $fileName")
                         }
-                        val destination = File(staging, fileName)
+                        val destination = if (normalized.startsWith("voices/")) {
+                            File(File(staging, "voices").apply { mkdirs() }, fileName)
+                        } else {
+                            File(staging, fileName)
+                        }
                         destination.outputStream().buffered().use { output ->
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                             var entryBytes = 0L
@@ -159,18 +179,33 @@ object LocalTtsModelImporter {
     }.getOrDefault(0L)
 
     private suspend fun probeRuntime(context: Context, model: LocalTtsModel) {
+        android.util.Log.i("LocalTtsImporter", "probeRuntime started: engine=${model.engine}, voiceId=${model.defaultVoiceId}, dir=${model.directoryPath}")
         val samples = try {
             when (model.engine) {
             LocalTtsModelRegistry.ENGINE_VALTEC_VITS ->
                 ValtecOnnxTtsEngine(model).use { it.synthesize(PROBE_TEXT, model.defaultVoiceId) }
             LocalTtsModelRegistry.ENGINE_PIPER_VITS ->
                 PiperOnnxTtsEngine(context, model).use { it.synthesize(PROBE_TEXT, model.defaultVoiceId) }
+            LocalTtsModelRegistry.ENGINE_ZEROTTS -> {
+                android.util.Log.i("LocalTtsImporter", "Instantiating ZeroTtsOnnxEngine...")
+                ZeroTtsOnnxEngine(model).use { engine ->
+                    android.util.Log.i("LocalTtsImporter", "ZeroTtsOnnxEngine instantiated, calling synthesize...")
+                    val result = engine.synthesize(PROBE_TEXT, model.defaultVoiceId)
+                    android.util.Log.i("LocalTtsImporter", "ZeroTtsOnnxEngine synthesize completed, samples=${result.size}")
+                    result
+                }
+            }
             else -> throw IOException("Runtime chưa hỗ trợ engine ${model.engine}")
             }
         } catch (error: OutOfMemoryError) {
+            android.util.Log.e("LocalTtsImporter", "OOM in probeRuntime", error)
             throw IOException("TTS model is too large for available memory", error)
+        } catch (error: Throwable) {
+            android.util.Log.e("LocalTtsImporter", "probeRuntime failed: ${error.javaClass.name}: ${error.message}", error)
+            throw IOException("Lỗi kiểm tra runtime (${error.javaClass.simpleName}): ${error.message ?: error.toString()}", error)
         }
         validateProbeSamples(samples)
+        android.util.Log.i("LocalTtsImporter", "probeRuntime validated successfully!")
     }
 
     internal fun validateProbeSamples(samples: FloatArray) {
@@ -183,6 +218,99 @@ object LocalTtsModelImporter {
         any { it.endsWith(".onnx.json", ignoreCase = true) } ||
             (count { it.endsWith(".onnx", ignoreCase = true) } == 1 &&
                 none { it == "tts_config.json" })
+
+    private fun Set<String>.looksLikeZeroTtsPack(): Boolean =
+        contains("prefix_step.onnx") && (contains("tokenizer.json") || contains("zerotts_voices.json"))
+
+    private fun Set<String>.looksLikeVoiceAddon(): Boolean =
+        none { it.endsWith(".onnx", ignoreCase = true) } && any { it.endsWith(".bin", ignoreCase = true) }
+
+    internal fun prepareZeroTtsModel(directory: File, checksum: String): LocalTtsModel {
+        val configFile = File(directory, "config.json")
+        if (!configFile.isFile) throw IOException("Gói ZeroTTS thiếu config.json")
+        val config = JSONObject(configFile.readText())
+        val sampleRate = config.optInt("sample_rate", 48000)
+
+        val catFile = File(directory, "zerotts_voices.json")
+        val voicesDir = File(directory, "voices").apply { mkdirs() }
+        val voices = mutableListOf<LocalTtsVoice>()
+        if (catFile.isFile) {
+            val catObj = JSONObject(catFile.readText())
+            val arr = catObj.optJSONArray("voices") ?: org.json.JSONArray()
+            for (i in 0 until arr.length()) {
+                val v = arr.getJSONObject(i)
+                val id = v.getInt("id")
+                val name = v.getString("name")
+                val key = v.optString("key", name)
+                if (File(voicesDir, "${id}_${key}.bin").isFile ||
+                    File(voicesDir, "${id}_${name}.bin").isFile ||
+                    File(directory, "${id}_${key}.bin").isFile ||
+                    id == 0
+                ) {
+                    voices.add(LocalTtsVoice(id, name))
+                }
+            }
+        }
+        if (voices.isEmpty()) {
+            voices.add(LocalTtsVoice(0, "Mai Chi"))
+        }
+
+        val id = checksum.take(24)
+        return LocalTtsModel(
+            id = id,
+            name = "ZeroTTS Vietnamese",
+            engine = LocalTtsModelRegistry.ENGINE_ZEROTTS,
+            language = "vi",
+            sampleRate = sampleRate,
+            voices = voices,
+            defaultVoiceId = voices.first().id,
+            attribution = "ZeroWeight AI (ZeroTTS Vietnamese)",
+            license = "MIT",
+            directoryPath = directory.absolutePath,
+            checksum = checksum,
+            sizeBytes = directory.walkTopDown().filter(File::isFile).sumOf(File::length),
+        )
+    }
+
+    private fun importVoiceAddon(context: Context, staging: File): LocalTtsModel {
+        val registry = LocalTtsModelRegistry(context)
+        val zeroTtsModel = registry.list().firstOrNull { it.engine == LocalTtsModelRegistry.ENGINE_ZEROTTS }
+            ?: throw IOException("Cần cài đặt ZeroTTS Base trước khi thêm giọng đọc mới")
+        val modelDir = File(zeroTtsModel.directoryPath)
+        val targetVoicesDir = File(modelDir, "voices").apply { mkdirs() }
+
+        staging.walkTopDown().filter { it.isFile && it.name.endsWith(".bin", ignoreCase = true) }.forEach { binFile ->
+            binFile.copyTo(File(targetVoicesDir, binFile.name), overwrite = true)
+        }
+
+        val catFile = File(modelDir, "zerotts_voices.json")
+        val allVoices = mutableListOf<LocalTtsVoice>()
+        if (catFile.isFile) {
+            val catObj = JSONObject(catFile.readText())
+            val arr = catObj.optJSONArray("voices") ?: org.json.JSONArray()
+            for (i in 0 until arr.length()) {
+                val v = arr.getJSONObject(i)
+                val id = v.getInt("id")
+                val name = v.getString("name")
+                val key = v.optString("key", name)
+                val hasFile = File(targetVoicesDir, "${id}_${key}.bin").isFile ||
+                    File(targetVoicesDir, "${id}_${name}.bin").isFile ||
+                    id == zeroTtsModel.defaultVoiceId
+                if (hasFile) {
+                    allVoices.add(LocalTtsVoice(id, name))
+                }
+            }
+        }
+        if (allVoices.isEmpty()) {
+            allVoices.addAll(zeroTtsModel.voices)
+        }
+        val updatedModel = zeroTtsModel.copy(
+            voices = allVoices.distinctBy(LocalTtsVoice::id).sortedBy(LocalTtsVoice::id),
+            sizeBytes = modelDir.walkTopDown().filter(File::isFile).sumOf(File::length),
+        )
+        registry.write(updatedModel, modelDir)
+        return updatedModel
+    }
 
     internal fun preparePiperModel(directory: File, packageFiles: Set<String>): PiperDescriptor {
         val configs = packageFiles.filter { it.endsWith(".onnx.json", ignoreCase = true) }
@@ -374,10 +502,17 @@ object LocalTtsModelImporter {
 
     private fun String.isRecognizedTtsFile(): Boolean =
         this in LocalTtsModelRegistry.REQUIRED_FILES ||
+            this in LocalTtsModelRegistry.ZEROTTS_REQUIRED_FILES ||
             this == "LICENSE" ||
             this == "LICENSE.txt" ||
             endsWith(".onnx", ignoreCase = true) ||
-            endsWith(".onnx.json", ignoreCase = true)
+            endsWith(".onnx.json", ignoreCase = true) ||
+            endsWith(".ort", ignoreCase = true) ||
+            endsWith(".npy", ignoreCase = true) ||
+            endsWith(".bin", ignoreCase = true) ||
+            endsWith(".data", ignoreCase = true) ||
+            this == "codec_browser_onnx_meta.json" ||
+            this == "zerotts_voices.json"
 
     private fun installAtomically(root: File, staging: File, id: String) {
         val target = File(root, id)
@@ -421,7 +556,7 @@ object LocalTtsModelImporter {
         }
     }
 
-    internal const val MAX_ENTRIES = 20
+    internal const val MAX_ENTRIES = 50
     internal const val MAX_ENTRY_BYTES = 2L * 1024L * 1024L * 1024L
     internal const val MAX_TOTAL_BYTES = 4L * 1024L * 1024L * 1024L
     private const val MAX_SOURCE_PACKAGE_BYTES = 4L * 1024L * 1024L * 1024L

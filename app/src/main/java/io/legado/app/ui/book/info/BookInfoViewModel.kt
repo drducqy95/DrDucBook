@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.text.HtmlCompat
 import androidx.lifecycle.viewModelScope
 import coil.ImageLoader
 import coil.request.SuccessResult
@@ -1603,9 +1604,9 @@ class BookInfoViewModel(
                 durChapterTitle = translatedDurChapter,
                 latestChapterTitle = translatedLatestChapter,
                 displayIntro = if (bookSnapshot.customIntro.isNullOrBlank()) {
-                    translated(bookSnapshot.intro)
+                    formatIntro(translated(bookSnapshot.intro))
                 } else {
-                    bookSnapshot.customIntro
+                    formatIntro(bookSnapshot.customIntro)
                 },
             )
             if (currentBook?.dynamicUiFingerprint() != expectedFingerprint) return@launch
@@ -1724,9 +1725,18 @@ class BookInfoViewModel(
             durChapterIndex = durChapterIndex,
             durChapterPos = durChapterPos,
             remark = remark,
-            displayIntro = getDisplayIntro(),
-            sourceIntro = intro.orEmpty().ifBlank { getDisplayIntro().orEmpty() },
+            displayIntro = formatIntro(getDisplayIntro()),
+            sourceIntro = formatIntro(intro.orEmpty().ifBlank { getDisplayIntro().orEmpty() }),
         )
+    }
+
+    private fun formatIntro(raw: String?): String? {
+        if (raw.isNullOrBlank()) return raw
+        return try {
+            HtmlCompat.fromHtml(raw, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
+        } catch (_: Throwable) {
+            raw.trim()
+        }
     }
 
     private fun Book.dynamicUiFingerprint(): String = listOfNotNull(

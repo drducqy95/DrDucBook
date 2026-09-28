@@ -58,6 +58,8 @@ data class AccountAccess(
     val roleStartsAtEpochMillis: Long? = null,
     val roleExpiresAtEpochMillis: Long? = null,
     val updatedAt: String? = null,
+    val createdAtEpochMillis: Long? = null,
+    val lastSignInAtEpochMillis: Long? = null,
 ) {
     fun effectiveRole(nowEpochMillis: Long = System.currentTimeMillis()): AccountRole {
         val hasStarted = roleStartsAtEpochMillis?.let { nowEpochMillis >= it } ?: true

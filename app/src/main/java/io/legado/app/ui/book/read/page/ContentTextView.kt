@@ -311,9 +311,11 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
                     }
                 }
                 is TextHtmlColumn -> {
-                    column.linkUrl?.let {
-                        activity?.startActivity<OpenUrlConfirmActivity> {
-                            putExtra("uri", it)
+                    column.linkUrl?.let { linkUrl ->
+                        if (!requireCallBack.clickUrl(linkUrl)) {
+                            activity?.startActivity<OpenUrlConfirmActivity> {
+                                putExtra("uri", linkUrl)
+                            }
                         }
                         handled = true
                     }
@@ -786,5 +788,6 @@ class ContentTextView(context: Context, attrs: AttributeSet?) : View(context, at
         fun onLongScreenshotTouchEvent(event: MotionEvent): Boolean
         fun oldClickImg(src: String): Boolean
         fun clickImg(click: String, src: String)
+        fun clickUrl(url: String): Boolean = false
     }
 }

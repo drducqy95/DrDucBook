@@ -1,0 +1,38 @@
+{
+  "model_id": "ngocdang83/HachimiMT-60-QT",
+  "commit_sha": "5588b84c0496ea582bb02c13e29af9b368a48150",
+  "last_modified": "2026-08-30T09:21:12.000Z",
+  "author": "ngocdang83",
+  "license": "CC-BY-4.0",
+  "architecture": {
+    "model_type": "marian",
+    "parameters": 56397120,
+    "d_model": 576,
+    "encoder_layers": 8,
+    "encoder_attention_heads": 8,
+    "encoder_ffn_dim": 2304,
+    "decoder_layers": 2,
+    "decoder_attention_heads": 8,
+    "decoder_ffn_dim": 2304,
+    "head_dimension": 72,
+    "vocab_size": 24000,
+    "max_position_embeddings": 512,
+    "activation_function": "swish",
+    "bos_token_id": 1,
+    "eos_token_id": 2,
+    "pad_token_id": 0,
+    "decoder_start_token_id": 1
+  },
+  "runtime_implications": {
+    "standard_hachimi_comparison": {
+      "standard_head_dimension": 64,
+      "qt_head_dimension": 72,
+      "impact": "Runtime createEmptyCache() MUST parameterize head dimension per model descriptor (64 for standard, 72 for QT) to avoid tensor shape mismatch in ONNX Runtime."
+    },
+    "no_repeat_ngram_size": {
+      "standard": 2,
+      "qt": 0,
+      "impact": "QT model card explicitly warns against no-repeat n-gram. Runtime MUST set noRepeatNgramSize = 0 for QT to avoid destroying natural Sino-Vietnamese word repetition."
+    }
+  }
+}

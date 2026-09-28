@@ -83,6 +83,23 @@ $artifacts += New-Artifact `
     -LocalSource "artifacts/drive-assets/legado-hachimi-onnx-arm64-20260721.zip" `
     -InventoryState "local_verified"
 
+$qtLocalSource = "tools/nmt-onnx/dist/hachimi-mt60-qt-zh-vi-onnx.zip"
+$qtHasLocalSource = Test-RepoFile $qtLocalSource
+
+$artifacts += New-Artifact `
+    -Id "translation-hachimi-qt-onnx" `
+    -DisplayName "HachimiMT-60-QT zh-vi ONNX (QT/Hán Việt)" `
+    -FileName "hachimi-mt60-qt-zh-vi-onnx.zip" `
+    -Category "translation" `
+    -HfPath "packages/translation/hachimi-mt60-qt-zh-vi-onnx.zip" `
+    -SizeBytes 176484951 `
+    -Sha256 "0826c36e241e6338a8e43f6d9a99ff06285834a19d8f29dcfc4e434232c08294" `
+    -License "CC-BY-4.0" `
+    -Provenance "ZIP includes model_manifest.json and NOTICE.txt for ngocdang83/HachimiMT-60-QT." `
+    -DeliveryClass $(if ($qtHasLocalSource) { "hf_proxy" } else { "storage_mirror_required" }) `
+    -LocalSource $(if ($qtHasLocalSource) { $qtLocalSource } else { "" }) `
+    -InventoryState $(if ($qtHasLocalSource) { "local_verified" } else { "metadata_only_pending_source" })
+
 $artifacts += New-Artifact `
     -Id "translation-quick-clean" `
     -DisplayName "Quick Translation clean pack" `
@@ -160,6 +177,60 @@ Get-ChildItem -LiteralPath $piperRoot -Filter "legado-tts-piper-*-20260721.zip" 
             -LocalSource $relative `
             -InventoryState $(if ($isApacheReviewed) { "local_verified" } else { "local_verified_license_pending" })
     }
+
+$zeroTtsBaseLocal = "dist/zerotts/legado-tts-zerotts-base.zip"
+$hasZeroTtsBase = Test-RepoFile $zeroTtsBaseLocal
+
+if ($hasZeroTtsBase) {
+    $baseItem = Get-Item (Join-Path $Root $zeroTtsBaseLocal)
+    $baseSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $baseItem.FullName).Hash.ToLowerInvariant()
+    $artifacts += New-Artifact `
+        -Id "tts-zerotts-base" `
+        -DisplayName "ZeroTTS Vietnamese (Base + Mai Chi)" `
+        -FileName "legado-tts-zerotts-base.zip" `
+        -Category "tts" `
+        -HfPath "packages/tts/zerotts/legado-tts-zerotts-base.zip" `
+        -SizeBytes $baseItem.Length `
+        -Sha256 $baseSha `
+        -License "Apache-2.0" `
+        -Provenance "Repackaged from zeroweight-ai/ZeroTTS with Mixed-Precision INT8 quantization for Legado Android." `
+        -DeliveryClass "hf_proxy" `
+        -LocalSource $zeroTtsBaseLocal `
+        -InventoryState "local_verified"
+}
+
+$zeroTtsVoices = @(
+    @{ Id = "maichi"; Name = "Mai Chi" },
+    @{ Id = "baotrang"; Name = "Bao Trang" },
+    @{ Id = "kimoanh"; Name = "Kim Oanh" },
+    @{ Id = "giahuy"; Name = "Gia Huy" },
+    @{ Id = "huuduc"; Name = "Huu Duc" },
+    @{ Id = "quangminh"; Name = "Quang Minh" },
+    @{ Id = "tiendat"; Name = "Tien Dat" },
+    @{ Id = "hamy"; Name = "Ha My" }
+)
+
+foreach ($zv in $zeroTtsVoices) {
+    $vFile = "dist/zerotts/legado-tts-zerotts-$($zv.Id).zip"
+    $hasV = Test-RepoFile $vFile
+    if ($hasV) {
+        $vItem = Get-Item (Join-Path $Root $vFile)
+        $vSha = (Get-FileHash -Algorithm SHA256 -LiteralPath $vItem.FullName).Hash.ToLowerInvariant()
+        $artifacts += New-Artifact `
+            -Id "tts-zerotts-$($zv.Id)" `
+            -DisplayName "ZeroTTS voice $($zv.Name)" `
+            -FileName "legado-tts-zerotts-$($zv.Id).zip" `
+            -Category "tts" `
+            -HfPath "packages/tts/zerotts/legado-tts-zerotts-$($zv.Id).zip" `
+            -SizeBytes $vItem.Length `
+            -Sha256 $vSha `
+            -License "Apache-2.0" `
+            -Provenance "Speaker embedding latent extracted from zeroweight-ai/ZeroTTS." `
+            -DeliveryClass "hf_proxy" `
+            -LocalSource $vFile `
+            -InventoryState "local_verified"
+    }
+}
 
 $hyMt2 = @(
     @{

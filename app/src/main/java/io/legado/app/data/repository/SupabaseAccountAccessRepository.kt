@@ -59,6 +59,27 @@ class SupabaseAccountAccessRepository : AccountAccessGateway {
                 ?: AccountAccess.defaultFor(userId)
         }.getOrElse { error ->
             when {
+                error.isMissingActivityColumns() -> {
+                    runCatching {
+                        val response = getAccountRows(
+                            columns = ACCESS_COLUMNS_WITHOUT_SIGN_IN,
+                            userId = userId,
+                        )
+                        parseAccountRows(response).firstOrNull()
+                            ?: AccountAccess.defaultFor(userId)
+                    }.getOrElse { innerError ->
+                        if (innerError.isMissingTimedRoleColumns()) {
+                            val response = getAccountRows(
+                                columns = LEGACY_ACCESS_COLUMNS,
+                                userId = userId,
+                            )
+                            parseAccountRows(response).firstOrNull()
+                                ?: AccountAccess.defaultFor(userId)
+                        } else {
+                            throw innerError
+                        }
+                    }
+                }
                 error.isMissingTimedRoleColumns() -> {
                     val response = getAccountRows(
                         columns = LEGACY_ACCESS_COLUMNS,
@@ -90,6 +111,33 @@ class SupabaseAccountAccessRepository : AccountAccessGateway {
             parseAccountRows(response)
         }.getOrElse { error ->
             when {
+                error.isMissingActivityColumns() -> {
+                    runCatching {
+                        val response = rest.get(
+                            path = "rest/v1/account_access",
+                            query = mapOf(
+                                "select" to ACCESS_COLUMNS_WITHOUT_SIGN_IN,
+                                "order" to "email.asc,user_id.asc",
+                                "limit" to "500",
+                            ),
+                        )
+                        parseAccountRows(response)
+                    }.getOrElse { innerError ->
+                        if (innerError.isMissingTimedRoleColumns()) {
+                            val response = rest.get(
+                                path = "rest/v1/account_access",
+                                query = mapOf(
+                                    "select" to LEGACY_ACCESS_COLUMNS,
+                                    "order" to "email.asc,user_id.asc",
+                                    "limit" to "500",
+                                ),
+                            )
+                            parseAccountRows(response)
+                        } else {
+                            throw innerError
+                        }
+                    }
+                }
                 error.isMissingTimedRoleColumns() -> {
                     val response = rest.get(
                         path = "rest/v1/account_access",
@@ -241,6 +289,8 @@ class SupabaseAccountAccessRepository : AccountAccessGateway {
             roleStartsAtEpochMillis = row.instantMillis("role_starts_at"),
             roleExpiresAtEpochMillis = row.instantMillis("role_expires_at"),
             updatedAt = row.string("updated_at"),
+            createdAtEpochMillis = row.instantMillis("created_at"),
+            lastSignInAtEpochMillis = row.instantMillis("last_sign_in_at"),
         )
     }
 
@@ -282,7 +332,7 @@ class SupabaseAccountAccessRepository : AccountAccessGateway {
         (get(name) as? JsonPrimitive)?.contentOrNull
 
     private fun JsonObject.instantMillis(name: String): Long? =
-        string(name)?.let { value -> runCatching { Instant.parse(value).toEpochMilli() }.getOrNull() }
+        parseIsoTimestampToEpochMillis(string(name))
 
     private suspend fun getAccountRows(columns: String, userId: String): String = rest.get(
         path = "rest/v1/account_access",
@@ -305,11 +355,36 @@ class SupabaseAccountAccessRepository : AccountAccessGateway {
         return isMissingTimedAccountAccessColumns(message.orEmpty())
     }
 
+    private fun Throwable.isMissingActivityColumns(): Boolean {
+        val msg = message.orEmpty()
+        return msg.contains("last_sign_in_at", ignoreCase = true) ||
+            msg.contains("created_at", ignoreCase = true)
+    }
+
     private companion object {
         const val ACCESS_COLUMNS =
-            "user_id,email,role,permissions,role_starts_at,role_expires_at,updated_at"
-        const val LEGACY_ACCESS_COLUMNS = "user_id,email,role,permissions,updated_at"
+            "user_id,email,role,permissions,role_starts_at,role_expires_at,updated_at,created_at,last_sign_in_at"
+        const val ACCESS_COLUMNS_WITHOUT_SIGN_IN =
+            "user_id,email,role,permissions,role_starts_at,role_expires_at,updated_at,created_at"
+        const val LEGACY_ACCESS_COLUMNS = "user_id,email,role,permissions,updated_at,created_at"
+        const val MINIMAL_ACCESS_COLUMNS = "user_id,email,role,permissions,updated_at"
     }
+}
+
+internal fun parseIsoTimestampToEpochMillis(raw: String?): Long? {
+    if (raw.isNullOrBlank()) return null
+    val trimmed = raw.trim()
+    return runCatching {
+        java.time.OffsetDateTime.parse(trimmed).toInstant().toEpochMilli()
+    }.recoverCatching {
+        java.time.Instant.parse(trimmed).toEpochMilli()
+    }.recoverCatching {
+        val normalized = trimmed.replace(" ", "T")
+        java.time.OffsetDateTime.parse(normalized).toInstant().toEpochMilli()
+    }.recoverCatching {
+        val normalized = trimmed.replace(" ", "T")
+        java.time.Instant.parse(normalized).toEpochMilli()
+    }.getOrNull()
 }
 
 internal fun isMissingTimedAccountAccessColumns(raw: String): Boolean =

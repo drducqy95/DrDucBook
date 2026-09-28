@@ -248,6 +248,17 @@ class EpubFile(var book: Book) {
             val resolvedHref = URLDecoder.decode(URI(href).resolve(src).toString(), "UTF-8")
             it.attr("src", resolvedHref)
         }
+        bodyElement.select("a[href]").forEach { a ->
+            val href = a.attr("href").trim()
+            if (!href.startsWith("http://") && !href.startsWith("https://") && !href.startsWith("mailto:") && !href.startsWith("tel:")) {
+                runCatching {
+                    val baseHref = res.href.encodeURI()
+                    val targetUri = href.encodeURI()
+                    val resolved = URLDecoder.decode(URI(baseHref).resolve(targetUri).toString(), "UTF-8")
+                    a.attr("href", resolved)
+                }
+            }
+        }
         return bodyElement
     }
 

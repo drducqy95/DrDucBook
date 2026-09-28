@@ -9,4 +9,5 @@ object CloudConsentScopes {
     )
 
     const val googleDriveAppData = "https://www.googleapis.com/auth/drive.appdata"
+    const val googleDriveFile = "https://www.googleapis.com/auth/drive.file"
 }

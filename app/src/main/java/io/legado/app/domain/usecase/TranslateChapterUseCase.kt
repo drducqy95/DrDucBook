@@ -13,6 +13,7 @@ import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.NmtTranslationGateway
 import io.legado.app.domain.gateway.MlKitTranslationGateway
 import io.legado.app.domain.gateway.NmtDecodeConfig
+import io.legado.app.model.translation.HachimiOnnxModelRegistry
 import io.legado.app.domain.gateway.AiPromptPresetGateway
 import io.legado.app.domain.gateway.LocalAiTranslationGateway
 import io.legado.app.domain.gateway.TranslationCacheGateway
@@ -269,10 +270,10 @@ class TranslateChapterUseCase(
                 TranslationConstants.PROVIDER_APP_AI,
                 TranslationConstants.PROVIDER_REWRITE -> {
                     val preset = if (provider == TranslationConstants.PROVIDER_REWRITE) {
-                        resolveRewritePreset()
+                        resolveRewritePreset(book)
                             ?: error("No AI rewrite preset configured")
                     } else {
-                        resolveTranslationPreset()
+                        resolveTranslationPreset(book)
                             ?: error("No AI translation preset configured")
                     }
                     val promptStages = TranslationPromptStage.entries.associateWith { stage ->
@@ -370,10 +371,10 @@ class TranslateChapterUseCase(
             val isRewrite = provider == TranslationConstants.PROVIDER_REWRITE
             val preset = if (provider == TranslationConstants.PROVIDER_APP_AI || provider == TranslationConstants.PROVIDER_REWRITE) {
                 if (provider == TranslationConstants.PROVIDER_REWRITE) {
-                    resolveRewritePreset()
+                    resolveRewritePreset(book)
                         ?: return@withContext Result.failure(Exception("No AI rewrite preset configured"))
                 } else {
-                    resolveTranslationPreset()
+                    resolveTranslationPreset(book)
                         ?: return@withContext Result.failure(Exception("No AI translation preset configured"))
                 }
             } else {
@@ -388,7 +389,7 @@ class TranslateChapterUseCase(
             } else {
                 emptyMap()
             }
-            val providerConfigRevision = providerConfigurationRevision(provider)
+            val providerConfigRevision = providerConfigurationRevision(provider, book)
 
             val originalContent = BookHelp.getContent(book, bookChapter)
                 ?: return@withContext Result.failure(Exception("Failed to read original content"))
@@ -1427,39 +1428,57 @@ class TranslateChapterUseCase(
         AiFailureKind.UNKNOWN -> RetryReason.UNKNOWN
     }
 
-    private suspend fun resolveTranslationPreset(): AiTaskPresetConfig? {
-        aiProfileGateway.getTaskPreset(AiTaskType.TRANSLATE_CHAPTER)?.let { return it }
-        return aiProfileGateway.getTaskPreset(AiTaskType.CHAT)?.copy(
-            taskType = AiTaskType.TRANSLATE_CHAPTER,
-            name = "Translation fallback",
-            promptTemplate = TranslationConstants.DEFAULT_PROMPT,
-        )
+    private fun resolveEffectiveTranslationPrompt(book: Book?, basePromptTemplate: String): String {
+        book?.getCustomTranslationPrompt()
+            ?.takeIf(String::isNotBlank)
+            ?.let { return it }
+
+        return basePromptTemplate
     }
 
-    private suspend fun resolveRewritePreset(): AiTaskPresetConfig? {
+    private fun resolveEffectiveRewritePrompt(book: Book?, basePromptTemplate: String): String {
+        book?.getCustomRewritePrompt()
+            ?.takeIf(String::isNotBlank)
+            ?.let { return it }
+
+        val globalCustom = TranslationConfig.rewriteCustomPrompt.trim()
+        if (globalCustom.isNotBlank()) return globalCustom
+
+        AiPromptCatalog.findById(TranslationConfig.rewritePresetId)?.prompt
+            ?.takeIf(String::isNotBlank)
+            ?.let { return it }
+
+        return basePromptTemplate
+    }
+
+    private suspend fun resolveTranslationPreset(book: Book? = null): AiTaskPresetConfig? {
+        val base = aiProfileGateway.getTaskPreset(AiTaskType.TRANSLATE_CHAPTER)
+            ?: aiProfileGateway.getTaskPreset(AiTaskType.CHAT)?.copy(
+                taskType = AiTaskType.TRANSLATE_CHAPTER,
+                name = "Translation fallback",
+                promptTemplate = TranslationConstants.DEFAULT_PROMPT,
+            )
+        if (base == null) return null
+        val effectivePrompt = resolveEffectiveTranslationPrompt(book, base.promptTemplate)
+        return base.copy(promptTemplate = effectivePrompt)
+    }
+
+    private suspend fun resolveRewritePreset(book: Book? = null): AiTaskPresetConfig? {
         val basePreset = aiProfileGateway.getTaskPreset(AiTaskType.REWRITE_TEXT)
             ?: aiProfileGateway.getTaskPreset(AiTaskType.CHAT)?.copy(
                 taskType = AiTaskType.REWRITE_TEXT,
                 name = "Rewrite fallback",
                 promptTemplate = TranslationConstants.DEFAULT_PROMPT,
-            ) ?: resolveTranslationPreset()
+            ) ?: resolveTranslationPreset(book)
 
         if (basePreset == null) return null
 
-        val customPrompt = TranslationConfig.rewriteCustomPrompt.trim()
-        val effectivePrompt = when {
-            customPrompt.isNotBlank() -> customPrompt
-            else -> {
-                val presetId = TranslationConfig.rewritePresetId
-                AiPromptCatalog.findById(presetId)?.prompt ?: basePreset.promptTemplate
-            }
-        }
-
+        val effectivePrompt = resolveEffectiveRewritePrompt(book, basePreset.promptTemplate)
         return basePreset.copy(promptTemplate = effectivePrompt)
     }
 
-    suspend fun currentProviderConfigurationRevision(provider: String): String {
-        return providerConfigurationRevision(provider)
+    suspend fun currentProviderConfigurationRevision(provider: String, book: Book? = null): String {
+        return providerConfigurationRevision(provider, book)
     }
 
     private suspend fun findPreferredProtectedRevision(
@@ -1554,17 +1573,27 @@ class TranslateChapterUseCase(
         return null
     }
 
-    private fun currentNmtDecodeConfig() = NmtDecodeConfig(
-        maxSourceTokens = TranslationConfig.nmtSourceTokenBudget,
-        maxSourceChars = TranslationConfig.nmtMaxCharsPerChunk,
-        sourcePrompt = TranslationConfig.nmtSourcePrompt,
-        maxNewTokens = TranslationConfig.nmtMaxNewTokens,
-        repetitionPenalty = TranslationConfig.nmtRepetitionPenalty,
-        noRepeatNgramSize = if (TranslationConfig.nmtNoRepeatBigram) 2 else 0,
-        retryMissingRequiredTerms = TranslationConfig.nmtRetryMissingTerms,
-    )
+    private fun currentNmtDecodeConfig(): NmtDecodeConfig {
+        val activeModel = TranslationConfig.nmtActiveModelId
+        return NmtDecodeConfig(
+            maxSourceTokens = TranslationConfig.nmtSourceTokenBudget,
+            maxSourceChars = TranslationConfig.nmtMaxCharsPerChunk,
+            sourcePrompt = TranslationConfig.nmtSourcePrompt,
+            maxNewTokens = TranslationConfig.nmtMaxNewTokens,
+            repetitionPenalty = TranslationConfig.nmtRepetitionPenalty,
+            noRepeatNgramSize = if (activeModel == HachimiOnnxModelRegistry.HACHIMI_QT_MODEL_ID) {
+                0
+            } else if (TranslationConfig.nmtNoRepeatBigram) {
+                2
+            } else {
+                0
+            },
+            retryMissingRequiredTerms = TranslationConfig.nmtRetryMissingTerms,
+            modelId = activeModel,
+        )
+    }
 
-    private suspend fun providerConfigurationRevision(provider: String): String = when (provider) {
+    private suspend fun providerConfigurationRevision(provider: String, book: Book? = null): String = when (provider) {
         TranslationConstants.PROVIDER_NMT -> currentNmtDecodeConfig().toString()
         TranslationConstants.PROVIDER_LOCAL_AI -> {
             GSON.toJson(
@@ -1579,7 +1608,27 @@ class TranslateChapterUseCase(
             )
         }
         TranslationConstants.PROVIDER_APP_AI -> {
-            val preset = resolveTranslationPreset()
+            val preset = resolveTranslationPreset(book)
+            val promptStages = TranslationPromptStage.entries.associate { stage ->
+                stage.storageKey to aiPromptPresetGateway.getEnabledByTaskType(stage.taskType)
+                    .map { it.instruction }
+                    .filter(String::isNotBlank)
+            }
+            GSON.toJson(
+                linkedMapOf(
+                    "pipeline" to AI_TRANSLATION_PIPELINE_REVISION,
+                    "preset_id" to preset?.id.orEmpty(),
+                    "model_id" to preset?.model?.modelId.orEmpty(),
+                    "provider_id" to preset?.model?.provider?.id.orEmpty(),
+                    "prompt" to preset?.promptTemplate.orEmpty(),
+                    "params" to preset?.params,
+                    "route_profile_id" to preset?.runtimeOptions?.routeProfileId,
+                    "prompt_stages" to promptStages,
+                )
+            )
+        }
+        TranslationConstants.PROVIDER_REWRITE -> {
+            val preset = resolveRewritePreset(book)
             val promptStages = TranslationPromptStage.entries.associate { stage ->
                 stage.storageKey to aiPromptPresetGateway.getEnabledByTaskType(stage.taskType)
                     .map { it.instruction }

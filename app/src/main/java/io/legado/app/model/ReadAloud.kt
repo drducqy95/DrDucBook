@@ -86,17 +86,56 @@ object ReadAloud {
         intent.putExtra("startPos", startPos)
         if (aloudClass == LocalTtsReadAloudService::class.java) {
             localSessionId = System.nanoTime().takeIf { it != 0L } ?: 1L
-            val chapterText = ReadBook.curTextChapter
-                ?.getNeedReadAloud(0, ReadConfig.readAloudByPage, 0)
-                .orEmpty()
-            if (chapterText.isBlank()) {
+            val textChapter = ReadBook.curTextChapter
+            if (textChapter == null || !textChapter.isCompleted) {
                 context.toastOnUi("Chương hiện tại chưa sẵn sàng để đọc")
                 return
             }
-            val sessionFile = File(appCtx.cacheDir, "local_tts_read_aloud_session.txt")
+            val readAloudByPage = ReadConfig.readAloudByPage
+            val paragraphs = textChapter.getParagraphs(readAloudByPage)
+            if (paragraphs.isEmpty()) {
+                context.toastOnUi("Chương hiện tại chưa sẵn sàng để đọc")
+                return
+            }
+            val initialCharPos = (textChapter.getReadLength(pageIndex) + startPos).coerceAtLeast(0)
+            val page = textChapter.getPage(pageIndex)
+            var pos = startPos
+            if (pos > 0 && page != null) {
+                for (paragraph in page.paragraphs) {
+                    val tmp = pos - paragraph.length - 1
+                    if (tmp < 0) break
+                    pos = tmp
+                }
+            }
+            val initialParagraphNum = textChapter.getParagraphNum(initialCharPos + 1, readAloudByPage) - 1
+            val initialParagraphIndex = if (initialParagraphNum in paragraphs.indices) {
+                initialParagraphNum
+            } else {
+                paragraphs.indexOfFirst { initialCharPos in it.chapterIndices }.takeIf { it >= 0 } ?: 0
+            }
+            if (!readAloudByPage && startPos == 0 && page != null && initialParagraphIndex in paragraphs.indices) {
+                pos = (page.chapterPosition - paragraphs[initialParagraphIndex].chapterPosition).coerceAtLeast(0)
+            }
+
+            val sessionFile = File(appCtx.cacheDir, "local_tts_read_aloud_session.json")
             runCatching {
                 sessionFile.parentFile?.mkdirs()
-                sessionFile.writeText(chapterText, Charsets.UTF_8)
+                val rootJson = org.json.JSONObject().apply {
+                    put("chapterIndex", textChapter.chapter.index)
+                    put("initialPageIndex", pageIndex)
+                    put("initialCharPos", initialCharPos)
+                    put("initialParagraphIndex", initialParagraphIndex)
+                    put("initialParagraphStartPos", pos)
+                    val pArray = org.json.JSONArray()
+                    for (p in paragraphs) {
+                        pArray.put(org.json.JSONObject().apply {
+                            put("text", p.text.replace(Regex("[袮꧁]"), " "))
+                            put("chapterPosition", p.chapterPosition)
+                        })
+                    }
+                    put("paragraphs", pArray)
+                }
+                sessionFile.writeText(rootJson.toString(), Charsets.UTF_8)
             }.onFailure { error ->
                 AppLog.put("Không thể chuẩn bị nội dung cho TTS local\n${error.localizedMessage}", error)
                 context.toastOnUi("Không thể chuẩn bị nội dung đọc")
@@ -172,6 +211,9 @@ object ReadAloud {
         if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.prevParagraph
+            if (aloudClass == LocalTtsReadAloudService::class.java) {
+                intent.putExtra("localTtsSessionId", localSessionId)
+            }
             context.startForegroundServiceCompat(intent)
         }
     }
@@ -180,6 +222,9 @@ object ReadAloud {
         if (BaseReadAloudService.isRun || localSessionStarted) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.nextParagraph
+            if (aloudClass == LocalTtsReadAloudService::class.java) {
+                intent.putExtra("localTtsSessionId", localSessionId)
+            }
             context.startForegroundServiceCompat(intent)
         }
     }

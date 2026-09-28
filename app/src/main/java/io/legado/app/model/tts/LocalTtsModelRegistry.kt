@@ -153,8 +153,16 @@ class LocalTtsModelRegistry(private val context: Context) {
         val digest = MessageDigest.getInstance("SHA-256")
         requiredFiles(engine).sorted().forEach { fileName ->
             digest.update(fileName.toByteArray(Charsets.UTF_8))
-            digest.update(0.toByte())
-            File(directory, fileName).inputStream().buffered().use { input ->
+            val file = if (File(directory, fileName).isFile) {
+                File(directory, fileName)
+            } else if (File(directory, fileName.replace(".onnx", ".int8.onnx")).isFile) {
+                File(directory, fileName.replace(".onnx", ".int8.onnx"))
+            } else if (File(directory, fileName.replace(".onnx", ".ort")).isFile) {
+                File(directory, fileName.replace(".onnx", ".ort"))
+            } else {
+                File(directory, fileName)
+            }
+            file.inputStream().buffered().use { input ->
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 while (true) {
                     val read = input.read(buffer)
@@ -172,6 +180,7 @@ class LocalTtsModelRegistry(private val context: Context) {
     companion object {
         const val ENGINE_VALTEC_VITS = "valtec-vits-onnx-v1"
         const val ENGINE_PIPER_VITS = "piper-vits-onnx-v1"
+        const val ENGINE_ZEROTTS = "zerotts-onnx-v1"
         const val MANIFEST_FILE = "tts-model.json"
         const val MODEL_ROOT = "tts_models"
         const val BUNDLED_DEBUG_ID = "76616c7465632d766e2d7631"
@@ -191,10 +200,24 @@ class LocalTtsModelRegistry(private val context: Context) {
             PIPER_CONFIG_FILE,
             PIPER_TOKENS_FILE,
         )
+        val ZEROTTS_REQUIRED_FILES = setOf(
+            "config.json",
+            "tokenizer.json",
+            "null_voice_emb.npy",
+            "silence_frame.npy",
+            "text_encoder.onnx",
+            "prefix_step.onnx",
+            "local_frame_decode.onnx",
+            "moss_audio_tokenizer_decode_full.onnx",
+            "moss_audio_tokenizer_decode_step.onnx",
+            "moss_audio_tokenizer_decode_shared.data",
+            "zerotts_voices.json",
+        )
 
         internal fun requiredFiles(engine: String): Set<String> = when (engine) {
             ENGINE_VALTEC_VITS -> REQUIRED_FILES
             ENGINE_PIPER_VITS -> PIPER_REQUIRED_FILES
+            ENGINE_ZEROTTS -> ZEROTTS_REQUIRED_FILES
             else -> throw IOException("Engine model TTS chưa được hỗ trợ: $engine")
         }
 

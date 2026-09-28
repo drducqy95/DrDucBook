@@ -421,6 +421,7 @@ object PreferKey {
     const val nmtRepetitionPenalty = "nmtRepetitionPenalty"
     const val nmtNoRepeatBigram = "nmtNoRepeatBigram"
     const val nmtRetryMissingTerms = "nmtRetryMissingTerms"
+    const val nmtActiveModelId = "nmtActiveModelId"
     const val localAiModelPath = "localAiModelPath"
     const val localAiTemperature = "localAiTemperature"
     const val localAiTopP = "localAiTopP"

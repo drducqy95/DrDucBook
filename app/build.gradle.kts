@@ -95,6 +95,11 @@ android {
         )
         buildConfigField(
             "String",
+            "GOOGLE_DRIVE_API_KEY",
+            quotedBuildValue(publicBuildValue("GOOGLE_DRIVE_API_KEY"))
+        )
+        buildConfigField(
+            "String",
             "DRDUC_UPDATE_REPOSITORY",
             quotedBuildValue(publicBuildValue("DRDUC_UPDATE_REPOSITORY"))
         )
@@ -311,6 +316,7 @@ dependencies {
     implementation(libs.onnxruntime.android)
     implementation(libs.onnxruntime.extensions.android)
     implementation(files("libs/sherpa-onnx-static-link-onnxruntime-1.13.4.aar"))
+    implementation(files("libs/go-webdav.aar"))
     implementation(fileTree(mapOf("dir" to "cronetlib", "include" to listOf("*.jar", "*.aar"))))
     implementation(libs.protobuf.javalite)
     implementation(libs.glide.glide)

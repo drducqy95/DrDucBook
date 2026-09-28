@@ -1,0 +1,17 @@
+HachimiMT-60-QT (ONNX INT8 Distribution for DrDucBook / Legado)
+================================================================
+
+This model package is an optimized ONNX INT8 conversion of HachimiMT-60-QT.
+
+Original Model:
+- Repository: https://huggingface.co/ngocdang83/HachimiMT-60-QT
+- Author: Ngọc Đặng (ngocdang83)
+- Pinned Commit: 5588b84c0496ea582bb02c13e29af9b368a48150
+- Architecture: MarianMT (Seq2Seq Transformer, d_model=576, 8 heads, head_dim=72)
+- Target Register: Sino-Vietnamese / Quick Translate (QT) Literary Style
+- License: Creative Commons Attribution 4.0 International (CC-BY-4.0)
+
+Conversion & Packaging:
+- Tooling: Optimum ONNX Runtime, ONNX Runtime Extensions, PyTorch
+- Optimization: Dynamic INT8 Quantization (QInt8) for CPU mobile inference
+- Recommended Decoding Setting: no_repeat_ngram_size = 0 (mandatory for Sino-Vietnamese fluency)

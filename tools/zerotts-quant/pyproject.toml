@@ -1,0 +1,14 @@
+[project]
+name = "zerotts-quant"
+version = "0.1.0"
+description = "ZeroTTS ONNX quantization and mobile optimization pipeline for Legado"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "onnx>=1.16.0",
+    "onnxruntime>=1.18.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

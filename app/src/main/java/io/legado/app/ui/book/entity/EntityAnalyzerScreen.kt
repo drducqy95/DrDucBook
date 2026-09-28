@@ -7,17 +7,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -32,6 +36,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalResources
@@ -111,6 +116,13 @@ fun EntityAnalyzerScreen(
                 scrollBehavior = scrollBehavior,
                 navigationIcon = { TopBarNavigationButton(onClick = onBack) },
                 actions = {
+                    if (state.aiEnrichAvailable && !state.analyzing && !state.aiEnriching) {
+                        TopBarActionButton(
+                            onClick = { onIntent(EntityAnalyzerIntent.EnrichWithAi) },
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = stringResource(R.string.entity_analyzer_ai_enrich),
+                        )
+                    }
                     TopBarActionButton(
                         onClick = { onIntent(EntityAnalyzerIntent.Analyze) },
                         imageVector = Icons.Default.Refresh,
@@ -292,6 +304,23 @@ private fun AnalysisStatus(
                 TextButton(onClick = { onIntent(EntityAnalyzerIntent.CancelAnalysis) }) {
                     AppText(stringResource(R.string.entity_analyzer_cancel))
                 }
+            } else if (state.aiEnriching) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                    AppText(
+                        text = stringResource(R.string.entity_analyzer_ai_enriching, state.aiEnrichProgress),
+                        style = LegadoTheme.typography.bodySmall,
+                        color = LegadoTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { onIntent(EntityAnalyzerIntent.CancelAiEnrich) }) {
+                        AppText(stringResource(R.string.entity_analyzer_cancel))
+                    }
+                }
             }
         }
     }
@@ -329,10 +358,35 @@ private fun CandidateRow(
                         style = LegadoTheme.typography.bodyMedium,
                         color = LegadoTheme.colorScheme.primary,
                     )
-                    AppText(
-                        text = candidate.target,
-                        style = LegadoTheme.typography.bodyMedium,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        AppText(
+                            text = candidate.target,
+                            style = LegadoTheme.typography.bodyMedium,
+                        )
+                        if (candidate.aiValid == false) {
+                            FilterChip(
+                                selected = false,
+                                onClick = {},
+                                label = { AppText(stringResource(R.string.entity_analyzer_false_positive)) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = LegadoTheme.colorScheme.errorContainer,
+                                    labelColor = LegadoTheme.colorScheme.onErrorContainer,
+                                ),
+                            )
+                        }
+                    }
+                    if (candidate.aiDescription.isNotBlank()) {
+                        AppText(
+                            text = candidate.aiDescription,
+                            style = LegadoTheme.typography.bodySmall,
+                            color = LegadoTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     AppText(
                         text = stringResource(
                             R.string.entity_analyzer_stats,
