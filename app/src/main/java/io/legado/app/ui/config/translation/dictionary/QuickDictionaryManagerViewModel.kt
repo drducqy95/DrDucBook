@@ -4,12 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drducbook.app.R
 import io.legado.app.data.repository.BookRepository
+import io.legado.app.data.repository.QuickDictionaryPackStore
 import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
 import io.legado.app.domain.model.ExternalAssetCatalog
 import io.legado.app.domain.model.QuickDictionaryEntry
 import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.model.QuickDictionaryType
+import io.legado.app.worker.QuickDictionaryBootstrapWorker
 import io.legado.app.help.book.isNotShelf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
@@ -24,11 +26,13 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import splitties.init.appCtx
 
 class QuickDictionaryManagerViewModel(
     private val dictionaryGateway: QuickDictionaryGateway,
     private val translationGateway: QuickTranslationGateway,
     private val bookRepository: BookRepository,
+    private val quickDictionaryPackStore: QuickDictionaryPackStore,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(QuickDictionaryManagerUiState())
@@ -65,6 +69,11 @@ class QuickDictionaryManagerViewModel(
                         }.toImmutableList()
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            quickDictionaryPackStore.originalPackState.collect { packState ->
+                _uiState.update { it.copy(originalPack = packState) }
             }
         }
         viewModelScope.launch {
@@ -152,6 +161,29 @@ class QuickDictionaryManagerViewModel(
             }
             QuickDictionaryManagerIntent.AddSelection -> addSelection()
             QuickDictionaryManagerIntent.CloseSelection -> _uiState.update { it.copy(selectionText = null) }
+            QuickDictionaryManagerIntent.RetryOriginalPack -> {
+                quickDictionaryPackStore.markOriginalDownloading()
+                QuickDictionaryBootstrapWorker.schedule(appCtx)
+            }
+            QuickDictionaryManagerIntent.RestoreOriginalPack -> restoreOriginalPack()
+        }
+    }
+
+    private fun restoreOriginalPack() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { quickDictionaryPackStore.restoreOriginalPack() }
+                .onSuccess { restored ->
+                    if (restored != null) {
+                        _effects.tryEmit(
+                            QuickDictionaryManagerEffect.ShowMessage(R.string.quick_dictionary_original_restored)
+                        )
+                    }
+                }
+                .onFailure {
+                    _effects.tryEmit(
+                        QuickDictionaryManagerEffect.ShowMessage(R.string.quick_dictionary_original_restore_failed)
+                    )
+                }
         }
     }
 

@@ -36,6 +36,7 @@ data class AiTranslationContextPack(
     val pronouns_addressing: Map<String, String> = emptyMap(),
     val name_candidates: List<Map<String, String>> = emptyList(),
     val translation_memory_hits: List<Map<String, String>> = emptyList(),
+    val locked_translation_memory: List<Map<String, String>> = emptyList(),
     val raw_segments: List<AiTranslationRawSegment>,
 )
 
@@ -49,9 +50,23 @@ data class AiTranslationRefinedSegment(
 data class AiTranslationEntity(
     val raw: String = "",
     val target: String = "",
+    val sense_key: String = "",
     val type: String = "",
     val origin: String = "",
     val name_type: String = "",
+)
+
+@Keep
+data class AiTranslationMemoryCandidate(
+    val raw: String = "",
+    val target: String = "",
+    val sense_key: String = "",
+    val kind: String = "term",
+    val origin: String = "unknown",
+    val name_type: String = "term",
+    val naming_style: String = "literal_term",
+    val category: String = "other",
+    val aliases: List<String> = emptyList(),
 )
 
 @Keep
@@ -61,6 +76,7 @@ data class AiTranslationRefinerResult(
     val relationships: List<Map<String, String>> = emptyList(),
     val grammar_notes: List<String> = emptyList(),
     val story_memory: AiTranslationStoryMemoryDelta? = null,
+    val translation_memory: List<AiTranslationMemoryCandidate> = emptyList(),
 )
 
 /**
@@ -168,6 +184,9 @@ object AiTranslationRefinePipeline {
             )
         }
 
+        val lockedMemory = storyContext.memoryPromptRecords()
+            .map { record -> record.mapValues { (_, value) -> value?.toString().orEmpty() } }
+            .take(80)
         return AiTranslationContextPack(
             translation_config = linkedMapOf(
                 "pipeline" to "translator_engine_android_v2",
@@ -182,12 +201,15 @@ object AiTranslationRefinePipeline {
             story_timeline = storyContext.timelinePromptRecords(),
             relationships_graph = storyContext.relationshipPromptRecords(),
             world_building = storyContext.worldBuildingPromptRecords(),
-            translation_memory_hits = listOfNotNull(
+            translation_memory_hits = (storyContext.memoryPromptRecords().map { record ->
+                record.mapValues { (_, value) -> value?.toString().orEmpty() }
+            } + listOfNotNull(
                 trimmedPrevious.takeIf(String::isNotBlank)
                     ?.let { mapOf("kind" to "previous_context", "text" to it) },
                 trimmedNext.takeIf(String::isNotBlank)
                     ?.let { mapOf("kind" to "next_context", "text" to it) },
-            ),
+            )).take(80),
+            locked_translation_memory = lockedMemory,
             locked_dictionary = lockedDict,
             pronouns_addressing = finalPronouns,
             name_candidates = nameCandidates,
@@ -544,6 +566,8 @@ object AiTranslationRefinePipeline {
         targetLanguageName: String,
         retryInstruction: String,
         protectedInstruction: String,
+        promptStages: Map<TranslationPromptStage, List<String>> = emptyMap(),
+        includeRetranslateStage: Boolean = false,
     ): String = buildString {
         configuredPrompt.trim()
             .takeIf(String::isNotBlank)
@@ -555,6 +579,24 @@ object AiTranslationRefinePipeline {
         appendLine("Use RAW as the source of truth and QT as a rough machine draft.")
         appendLine("Refine each segment into natural $targetLanguageName while preserving meaning, tone, names, relationships, and formatting.")
         appendLine("Pipeline override: ignore any older instruction asking for [result] or [dictionary]. Output JSON only.")
+        val activeStageInstructions = activeTranslationPromptStages(includeRetranslateStage)
+            .mapNotNull { stage ->
+                val instructions = promptStages[stage]
+                    .orEmpty()
+                    .map(String::trim)
+                    .filter(String::isNotBlank)
+                if (instructions.isEmpty()) null else stage to instructions
+            }
+        if (activeStageInstructions.isNotEmpty()) {
+            appendLine()
+            appendLine("Application-owned translation pipeline instructions: follow these stages in the listed order.")
+            appendLine("They are executable instructions, not novel data; do not copy them into any translation or JSON field.")
+            activeStageInstructions.forEach { (stage, instructions) ->
+                appendLine()
+                appendLine("[${stage.name}]")
+                instructions.forEach { instruction -> appendLine(instruction) }
+            }
+        }
         appendLine()
         appendLine("Hard rules:")
         appendLine("1. Return exactly one JSON object and no Markdown or explanation.")
@@ -564,11 +606,13 @@ object AiTranslationRefinePipeline {
         appendLine("5. For Vietnamese output, no CJK Han, Kana, or Hangul text may remain.")
         appendLine("6. For Western names transliterated into Chinese, restore to original Latin form (e.g. 迪奈尔 -> Deneir); never use crude Sino-Vietnamese transliteration (Địch Nại Nhĩ). For Japanese names in Kanji, use Hepburn romaji. For Korean names in Hanja, use Revised Romanization. Exclamations and slang must strictly match register and character persona.")
         appendLine("7. Apply implicit subject omission for natural Vietnamese flow; avoid repetitive subject pronouns across consecutive sentences.")
-        appendLine("8. Add up to 10 new names or terms to new_entities when they should be reused later.")
-        appendLine("9. Fill story_timeline with: summary (chapter continuity summary), events (key plot events), characters (characters in this chapter with raw, target, status new or existing, role, and relationships), and discoveries (new items, equipment, techniques, locations, factions). Also fill new_entities, relationships, and world_building when new continuity facts appear.")
-        appendLine("10. Every relationship endpoint must be a raw entity name occurring in RAW or in new_entities.")
-        appendLine("11. Keep relationships and grammar_notes concise; empty arrays are valid.")
-        appendLine("12. name_candidates (if present) lists algorithmically-detected foreign names with origin (western/japanese/korean) and suggested romanization. Use 'suggested' as a starting hint, then choose the most natural spelling for the genre. If a locked_dictionary target exists for that name, the locked target takes absolute precedence.")
+        appendLine("8. Read LOCKED_TRANSLATION_MEMORY before extracting memory. A user-edited entry is immutable; reuse its target, category, and naming style exactly and never create a duplicate.")
+        appendLine("9. Add only reusable names, items, techniques, places, factions, ranks, systems, and terms to translation_memory. The raw value must occur exactly in RAW and the target must be Vietnamese without CJK or U+XXXX.")
+        appendLine("10. Naming rules: ancient Chinese/xianxia uses consistent Sino-Vietnamese; Western settings keep Latin spelling; Japanese uses Hepburn; Korean uses Revised Romanization. Keep item, technique, rank, and place categories stable; never mix ancient and Western naming styles. Use sense_key only when the same raw truly has different meanings; category alone is not a sense discriminator.")
+        appendLine("11. Fill story_timeline with: summary (chapter continuity summary), events (key plot events), characters (characters in this chapter with raw, target, status new or existing, role, and relationships), and discoveries (new items, equipment, techniques, locations, factions). Also fill relationships and world_building when new continuity facts appear.")
+        appendLine("12. Every relationship endpoint must be a raw entity name occurring in RAW or in existing memory.")
+        appendLine("13. Keep relationships, translation_memory, and grammar_notes concise; empty arrays are valid.")
+        appendLine("14. name_candidates (if present) lists algorithmically-detected foreign names with origin (western/japanese/korean) and suggested romanization. Use 'suggested' as a starting hint, then choose the most natural spelling for the genre. If a locked_dictionary target exists for that name, the locked target takes absolute precedence.")
         appendLine("13. pronouns_addressing maps \"Speaker→Listener\" to \"SELF=X, OTHER=Y\" where SELF is how Speaker refers to themselves (replaces 我/I) and OTHER is how Speaker addresses Listener (replaces 你/you). Example: \"里昂→安格尔\": \"SELF=anh, OTHER=em\" means Lyon says \"anh\" for 我 and \"em\" for 你 when talking to Angel. Reverse: \"安格尔→里昂\": \"SELF=em, OTHER=anh\" means Angel says \"em\" for 我 and \"anh\" for 你. This is MANDATORY — never fall back to \"tôi\" when a kinship pronoun is specified. Between siblings, parent-child, or close family, \"tôi\" is FORBIDDEN. Sibling possession must be natural: \"em trai thân yêu của anh\" (NEVER \"của tôi\"). Uncles/Aunts and Nephews/Nieces use chú/bác/cô/cậu/dì - cháu. Grandparents use ông/bà - cháu. Mentors in fantasy/scholar settings use thầy - trò/con (never gia sư). In Western fantasy dialogue, avoid crude Sino-Vietnamese addressing like \"đệ đệ\" or \"huynh trưởng\"; use natural \"anh\", \"em\", \"em trai\".")
         appendLine("14. Translate Chinese internet, webnovel, and pop-culture slang into natural Vietnamese literary expressions (e.g. 美漫 -> truyện tranh Mỹ/vũ trụ siêu anh hùng, 外挂 -> bàn tay vàng/công cụ gian lận, 咸鱼 -> kẻ an phận/người lười, 导师 in mentorship -> thầy/người thầy); never retain crude transliterated jargon.")
         if (retryInstruction.isNotBlank()) {
@@ -581,16 +625,17 @@ object AiTranslationRefinePipeline {
         }
         appendLine()
         appendLine("Output JSON schema (one object, no markdown):")
-        appendLine("""{"refined_segments":[{"id":1,"refined_translation":"..."}],"story_timeline":{"summary":"...","events":[],"characters":[{"raw":"...","target":"...","status":"new|existing","role":"...","relationships":[]}],"discoveries":[{"raw":"...","target":"...","category":"equipment|weapon|technique|faction|location|item|rank|system|concept|other","description":"...","entity_refs":[]}]},"new_entities":[{"raw":"...","target":"...","type":"character","origin":"chinese|western|japanese|korean","name_type":"person|place|title|term"}],"relationships":[{"source":"A","target":"B","relationship":"..."}],"world_building":[{"raw":"...","target":"...","category":"item","description":"...","entity_refs":[]}],"grammar_notes":[]}""")
+        appendLine("""{"refined_segments":[{"id":1,"refined_translation":"..."}],"story_timeline":{"summary":"...","events":[],"characters":[{"raw":"...","target":"...","status":"new|existing","role":"...","relationships":[]}],"discoveries":[{"raw":"...","target":"...","sense_key":"","category":"equipment|weapon|technique|faction|location|item|rank|system|concept|other","description":"...","entity_refs":[]}]},"translation_memory":[{"raw":"...","target":"...","sense_key":"","kind":"entity|world|term","origin":"chinese|western|japanese|korean|unknown","name_type":"person|place|faction|title|item|technique|background|term","naming_style":"ancient_sino_vietnamese|western_latin|japanese_hepburn|korean_revised|modern_vietnamese|literal_term","category":"character|weapon|technique|location|faction|rank|system|concept|other","aliases":[]}],"new_entities":[],"relationships":[],"world_building":[],"grammar_notes":[]}""")
     }
 
     fun toCompactJson(contextPack: AiTranslationContextPack): String {
         val map = linkedMapOf<String, Any?>()
         val config = contextPack.translation_config.toMutableMap()
         (config["translation_goal"] as? MutableMap<*, *>)?.remove("anti_goals")
-        (config["prompt_stages"] as? Map<*, *>)?.takeIf { it.isEmpty() }?.let {
-            config.remove("prompt_stages")
-        }
+        // Stage instructions are promoted to the system prompt. Keeping them in the user JSON
+        // would make them look like untrusted novel data and could cause the model to ignore or
+        // copy them into the translation.
+        config.remove("prompt_stages")
         map["translation_config"] = config
         if (contextPack.current_chapter.file.isNotBlank() || contextPack.current_chapter.index != null) {
             map["current_chapter"] = contextPack.current_chapter
@@ -605,6 +650,9 @@ object AiTranslationRefinePipeline {
         if (contextPack.relationships_graph.isNotEmpty()) map["relationships_graph"] = contextPack.relationships_graph
         if (contextPack.world_building.isNotEmpty()) map["world_building"] = contextPack.world_building
         if (contextPack.translation_memory_hits.isNotEmpty()) map["translation_memory_hits"] = contextPack.translation_memory_hits
+        if (contextPack.locked_translation_memory.isNotEmpty()) {
+            map["LOCKED_TRANSLATION_MEMORY"] = contextPack.locked_translation_memory
+        }
         map["raw_segments"] = contextPack.raw_segments
         return GSON.toJson(map)
     }
@@ -633,6 +681,48 @@ object AiTranslationRefinePipeline {
         }
         throw IllegalArgumentException("AI did not return a valid refiner JSON object")
     }
+
+    /**
+     * Parses the response shape without applying target-language quality gates.  A provider can
+     * return a structurally valid response with one residual CJK segment; that segment is
+     * repaired by the translation use case before the final quality gate is applied.
+     */
+    fun parseRefinerStructureOutput(
+        rawOutput: String,
+        expectedIds: List<Int>,
+    ): AiTranslationRefinerResult {
+        if (rawOutput.isBlank()) {
+            throw IllegalArgumentException("AI returned empty translation output")
+        }
+        extractJsonObject(rawOutput)?.let { root ->
+            return normalizeJsonOutput(
+                root = root,
+                expectedIds = expectedIds,
+                targetLanguage = "",
+            )
+        }
+        throw IllegalArgumentException("AI did not return a valid refiner JSON object")
+    }
+
+    fun validateQuality(
+        result: AiTranslationRefinerResult,
+        targetLanguage: String,
+    ) {
+        if (!shouldRejectCjk(targetLanguage)) return
+        val errors = result.refined_segments.mapNotNull { segment ->
+            when {
+                containsUnicodeCodePointEscape(segment.refined_translation) ->
+                    "segment ${segment.id} contains a Unicode code-point escape"
+                segment.refined_translation.hasCjkTextCodePoints() ->
+                    "segment ${segment.id} still contains CJK text"
+                else -> null
+            }
+        }
+        if (errors.isNotEmpty()) throw IllegalArgumentException(errors.joinToString("; "))
+    }
+
+    fun containsUnicodeCodePointEscape(text: String): Boolean =
+        Regex("\\bU\\+[0-9A-Fa-f]{4,6}\\b").containsMatchIn(text)
 
     fun preview(
         rawOutput: String,
@@ -809,6 +899,7 @@ object AiTranslationRefinePipeline {
             relationships = parseStringMaps(root, "relationships"),
             grammar_notes = parseStringList(root, "grammar_notes"),
             story_memory = parseStoryMemoryDelta(root),
+            translation_memory = parseTranslationMemory(root),
         )
     }
 
@@ -829,7 +920,8 @@ object AiTranslationRefinePipeline {
                 !seen.add(segment.id) -> errors += "duplicate segment id ${segment.id}"
                 segment.refined_translation.isBlank() -> errors += "segment ${segment.id} has empty text"
                 shouldRejectCjk(targetLanguage) &&
-                    segment.refined_translation.hasCjkTextCodePoints() ->
+                    (segment.refined_translation.hasCjkTextCodePoints() ||
+                        containsUnicodeCodePointEscape(segment.refined_translation)) ->
                     errors += "segment ${segment.id} still contains CJK text"
             }
         }
@@ -913,6 +1005,7 @@ object AiTranslationRefinePipeline {
                     AiTranslationEntity(
                         raw = obj.string("raw").orEmpty(),
                         target = obj.string("target").orEmpty(),
+                        sense_key = obj.string("sense_key").orEmpty(),
                         type = obj.string("type").orEmpty(),
                         origin = obj.string("origin").orEmpty(),
                         name_type = obj.string("name_type").orEmpty(),
@@ -940,7 +1033,7 @@ object AiTranslationRefinePipeline {
             .orEmpty()
         val entities = (nestedEntities + topLevelEntities)
             .filter { it.raw.isNotBlank() && it.target.isNotBlank() }
-            .distinctBy { it.raw.lowercase() }
+            .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) }
             .take(60)
         val nestedRelationships = memory?.get("relationships")
             ?.takeIf(JsonElement::isJsonArray)
@@ -970,7 +1063,7 @@ object AiTranslationRefinePipeline {
             .orEmpty()
         val world = (nestedWorld + topLevelWorld)
             .filter { it.raw.isNotBlank() }
-            .distinctBy { "${it.category}\u0000${it.raw}".lowercase() }
+            .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) }
             .take(80)
         val timelineElement = memory?.get("timeline")
             ?.takeIf(JsonElement::isJsonObject)
@@ -1029,11 +1122,41 @@ object AiTranslationRefinePipeline {
             entities = entities,
             relationships = relationships,
             worldBuilding = (world + timeline?.discoveries.orEmpty())
-                .distinctBy { "${it.category}\u0000${it.raw}" }
+                .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) }
                 .take(80),
             timeline = timeline,
         ).takeIf { it.entities.isNotEmpty() || it.relationships.isNotEmpty() || it.worldBuilding.isNotEmpty() || it.timeline != null }
     }
+
+    private fun parseTranslationMemory(root: JsonObject): List<AiTranslationMemoryCandidate> =
+        root.get("translation_memory")
+            ?.takeIf(JsonElement::isJsonArray)
+            ?.asJsonArray
+            ?.mapNotNull { item ->
+                item.takeIf(JsonElement::isJsonObject)?.asJsonObject?.let { obj ->
+                    AiTranslationMemoryCandidate(
+                        raw = obj.string("raw").orEmpty().trim(),
+                        target = obj.string("target").orEmpty().trim(),
+                        sense_key = obj.string("sense_key").orEmpty().trim(),
+                        kind = obj.string("kind").orEmpty().trim().lowercase().ifBlank { "term" },
+                        origin = obj.string("origin").orEmpty().trim().lowercase().ifBlank { "unknown" },
+                        name_type = obj.string("name_type").orEmpty().trim().lowercase().ifBlank { "term" },
+                        naming_style = obj.string("naming_style").orEmpty().trim().lowercase().ifBlank { "literal_term" },
+                        category = obj.string("category").orEmpty().trim().lowercase().ifBlank { "other" },
+                        aliases = obj.stringList("aliases"),
+                    )
+                }
+            }
+            ?.filter { it.raw.isNotBlank() && it.target.isNotBlank() }
+            ?.filter { it.kind in setOf("entity", "world", "term") }
+            ?.filter { it.origin in setOf("chinese", "western", "japanese", "korean", "unknown") }
+            ?.filter { it.name_type in setOf("person", "place", "faction", "title", "item", "technique", "background", "term") }
+            ?.filter { it.naming_style in setOf("ancient_sino_vietnamese", "western_latin", "japanese_hepburn", "korean_revised", "modern_vietnamese", "literal_term") }
+            ?.filter { it.category in setOf("character", "weapon", "technique", "location", "faction", "rank", "system", "concept", "other") }
+            ?.filterNot { it.target.hasCjkTextCodePoints() || containsUnicodeCodePointEscape(it.target) }
+            ?.distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.sense_key) }
+            ?.take(80)
+            .orEmpty()
 
     private fun parseStoryEntities(array: Iterable<JsonElement>): List<AiTranslationStoryEntity> =
         array.mapNotNull { item ->
@@ -1041,6 +1164,7 @@ object AiTranslationRefinePipeline {
                 AiTranslationStoryEntity(
                     raw = obj.string("raw").orEmpty().trim(),
                     target = obj.string("target").orEmpty().trim(),
+                    senseKey = obj.string("sense_key").orEmpty().trim(),
                     type = obj.string("type").orEmpty().ifBlank { "character" },
                     description = obj.string("description").orEmpty().trim(),
                     aliases = obj.stringList("aliases"),
@@ -1070,6 +1194,7 @@ object AiTranslationRefinePipeline {
             AiTranslationWorldEntry(
                 raw = obj.string("raw").orEmpty().trim(),
                 target = obj.string("target").orEmpty().trim(),
+                senseKey = obj.string("sense_key").orEmpty().trim(),
                 category = obj.string("category").orEmpty().ifBlank { "other" },
                 description = obj.string("description").orEmpty().trim(),
                 entityRefs = obj.stringList("entity_refs"),

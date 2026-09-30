@@ -26,17 +26,28 @@ import io.legado.app.domain.model.AiTranslationStoryEntity
 import io.legado.app.domain.model.AiTranslationStoryMemoryPipeline
 import io.legado.app.domain.model.AiTranslationStoryMemorySnapshot
 import io.legado.app.domain.model.AiTranslationStoryMemoryDelta
+import io.legado.app.domain.model.AiTranslationMemoryCandidate
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
 import io.legado.app.domain.model.AiTranslationStoryRelationship
 import io.legado.app.domain.model.AiTranslationStoryTimeline
 import io.legado.app.domain.model.AiTranslationStoryWikiRecord
+import io.legado.app.domain.model.StoryWikiCharacterGraph
+import io.legado.app.domain.model.StoryWikiGraphEdge
+import io.legado.app.domain.model.StoryWikiGraphNode
+import io.legado.app.domain.model.StoryWikiRelationshipTag
+import io.legado.app.domain.model.StoryWikiSnapshot
 import io.legado.app.domain.model.AiTranslationStreamAccumulator
 import io.legado.app.domain.model.AiTranslationTokenBudget
 import io.legado.app.domain.model.AiTranslationRefinePipeline
 import io.legado.app.domain.model.AiTranslationWorldEntry
 import io.legado.app.domain.model.AiTranslationRefinerResult
+import io.legado.app.domain.model.CanonicalTranslationMemory
+import io.legado.app.domain.model.TranslationMemoryCanonicalizer
+import io.legado.app.domain.model.TranslationMemoryKind
+import io.legado.app.domain.model.TranslationMemorySource
 import io.legado.app.domain.model.ContentChunker
 import io.legado.app.domain.model.DictPair
+import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.ui.config.translation.TranslationConfig
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
@@ -99,12 +110,43 @@ class TranslationStoryMemoryUseCase(
         source: String,
         result: AiTranslationRefinerResult,
     ): Result<Int> {
-        val delta = result.story_memory ?: AiTranslationStoryMemoryDelta(
+        val extractedMemory = result.translation_memory.toStoryMemoryDelta(source)
+        val delta = result.story_memory?.let { existing ->
+            existing.copy(
+                    entities = (existing.entities + extractedMemory.entities)
+                        .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) },
+                    relationships = (existing.relationships + extractedMemory.relationships + result.relationships.mapNotNull { map ->
+                        AiTranslationStoryRelationship(
+                            source = map["source"].orEmpty(),
+                            target = map["target"].orEmpty(),
+                            relationship = map["relationship"].orEmpty(),
+                            description = map["description"].orEmpty(),
+                        ).takeIf { it.source.isNotBlank() && it.target.isNotBlank() && it.relationship.isNotBlank() }
+                    }).distinctBy { "${it.source}\u0000${it.target}\u0000${it.relationship}".lowercase() },
+                    worldBuilding = (existing.worldBuilding + extractedMemory.worldBuilding)
+                        .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) },
+            )
+        } ?: if (extractedMemory.entities.isNotEmpty() || extractedMemory.worldBuilding.isNotEmpty()) {
+            extractedMemory.copy(
+                relationships = result.relationships.mapNotNull { map ->
+                    AiTranslationStoryRelationship(
+                        source = map["source"].orEmpty(),
+                        target = map["target"].orEmpty(),
+                        relationship = map["relationship"].orEmpty(),
+                        description = map["description"].orEmpty(),
+                    ).takeIf {
+                        it.source.isNotBlank() && it.target.isNotBlank() && it.relationship.isNotBlank()
+                    }
+                },
+            )
+        } else AiTranslationStoryMemoryDelta(
             entities = result.new_entities.map { entity ->
                 AiTranslationStoryEntity(
                     raw = entity.raw,
                     target = entity.target,
+                    senseKey = entity.sense_key,
                     type = entity.type.ifBlank { "term" },
+                    origin = entity.origin.ifBlank { "unknown" },
                 )
             },
             relationships = result.relationships.mapNotNull { map ->
@@ -151,6 +193,7 @@ class TranslationStoryMemoryUseCase(
                             type = "unknown",
                             description = "Placeholder created from a relationship endpoint",
                             firstChapterIndex = chapter.index,
+                            lastChapterIndex = chapter.index,
                         )
                     }
                 val incomingTimeline = delta.timeline ?: AiTranslationStoryTimeline()
@@ -176,6 +219,7 @@ class TranslationStoryMemoryUseCase(
                     .filter { character ->
                         character.status.equals("new", ignoreCase = true) &&
                             character.raw.isNotBlank() &&
+                            source.contains(character.raw) &&
                             character.raw !in knownNames
                     }
                     .map { character ->
@@ -185,23 +229,20 @@ class TranslationStoryMemoryUseCase(
                             type = "character",
                             description = character.role.ifBlank { "Character from chapter timeline" },
                             firstChapterIndex = chapter.index,
+                            lastChapterIndex = chapter.index,
                         )
                     }
                 val analysis = AiTranslationStoryAnalysis(
                     chapterIndex = chapter.index,
                     chapterTitle = chapter.title,
                     entities = (normalizedEntities + placeholders + timelineCharactersAsEntities)
-                        .distinctBy { it.raw.lowercase() },
+                        .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) },
                     relationships = normalizedRelationships
                         .distinctBy { "${it.source}\u0000${it.target}\u0000${it.relationship}".lowercase() },
                     worldBuilding = delta.worldBuilding
-                        .filter { entry ->
-                            source.contains(entry.raw) ||
-                                knownNames.contains(entry.raw) ||
-                                (entry.target.isNotBlank() && knownNames.contains(entry.target))
-                        }
-                        .map { it.copy(chapterIndex = chapter.index) }
-                        .distinctBy { "${it.category}\u0000${it.raw}".lowercase() },
+                    .filter { entry -> source.contains(entry.raw) }
+                    .map { it.copy(chapterIndex = chapter.index, lastChapterIndex = chapter.index) }
+                        .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) },
                     timeline = timeline,
                 )
                 persistAnalysis(book.bookUrl, analysis, snapshot)
@@ -232,28 +273,29 @@ class TranslationStoryMemoryUseCase(
     suspend fun loadSnapshot(bookUrl: String): AiTranslationStoryMemorySnapshot {
         val memories = aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
         val snapshot = memories.toStorySnapshot()
-        healPoisonedEntities(bookUrl, memories, snapshot.entities)
+        healCanonicalGlossary(bookUrl, memories, snapshot)
         return snapshot
     }
 
-    private suspend fun healPoisonedEntities(
+    private suspend fun healCanonicalGlossary(
         bookUrl: String,
         memories: List<AiMemory>,
-        healedEntities: List<AiTranslationStoryEntity>,
+        snapshot: AiTranslationStoryMemorySnapshot,
     ) {
-        val memoryMap = memories
-            .filter { it.key.startsWith(ENTITY_PREFIX) }
-            .mapNotNull { memory ->
-                memory.decodeValue<AiTranslationStoryEntity>()?.let { memory.key to it }
-            }
-            .toMap()
-
-        healedEntities.forEach { healed ->
-            val key = entityKey(healed.raw)
-            val original = memoryMap[key]
-            if (original != null && (original.target != healed.target || original.raw != healed.raw)) {
-                runCatching {
-                    upsertEntity(bookUrl, healed)
+        val canonical = snapshot.canonicalMemory.associateBy { it.identity }
+        memories.forEach { memory ->
+            when {
+                memory.key.startsWith(ENTITY_PREFIX) -> memory.decodeValue<AiTranslationStoryEntity>()?.let { entity ->
+                    val entry = canonical[TranslationMemoryCanonicalizer.identity(entity.raw, entity.senseKey)]
+                    if (entry != null && entry.target.isNotBlank() && entity.target != entry.target) {
+                        runCatching { upsertBookMemory(bookUrl, memory.key, memory.type, entity.copy(target = entry.target)) }
+                    }
+                }
+                memory.key.startsWith(WORLD_PREFIX) -> memory.decodeValue<AiTranslationWorldEntry>()?.let { world ->
+                    val entry = canonical[TranslationMemoryCanonicalizer.identity(world.raw, world.senseKey)]
+                    if (entry != null && entry.target.isNotBlank() && world.target != entry.target) {
+                        runCatching { upsertBookMemory(bookUrl, memory.key, memory.type, world.copy(target = entry.target)) }
+                    }
                 }
             }
         }
@@ -409,12 +451,171 @@ class TranslationStoryMemoryUseCase(
             storyMemories.mapNotNull { memory -> memory.toWikiRecord(bookNames) }
         }
 
+    /**
+     * Builds the Wiki from canonical book snapshots. Relationship rows are deliberately not
+     * returned as glossary records: they are projected into tags and graph edges instead.
+     */
+    fun observeLibraryWikiSnapshots(): Flow<List<StoryWikiSnapshot>> =
+        aiMemoryGateway.observeAllByScope(AiMemory.SCOPE_BOOK).map { memories ->
+            memories.asSequence()
+                .filter { it.key.startsWith(STORY_MEMORY_PREFIX) }
+                .groupBy(AiMemory::scopeId)
+                .filterKeys(String::isNotBlank)
+                .map { (bookUrl, bookMemories) ->
+                    val snapshot = bookMemories.toStorySnapshot()
+                    val bookName = cachedChapterGateway.getBook(bookUrl)?.name
+                        ?.takeIf(String::isNotBlank) ?: bookUrl
+                    buildWikiSnapshot(bookUrl, bookName, snapshot)
+                }
+                .sortedBy { it.bookName.lowercase() }
+        }
+
+    private fun buildWikiSnapshot(
+        bookUrl: String,
+        bookName: String,
+        snapshot: AiTranslationStoryMemorySnapshot,
+    ): StoryWikiSnapshot {
+        val glossary = snapshot.canonicalMemory.map { entry ->
+            AiTranslationStoryWikiRecord(
+                id = "$bookUrl|glossary|${stableId(entry.identity)}",
+                bookUrl = bookUrl,
+                bookName = bookName,
+                kind = if (entry.kind == TranslationMemoryKind.ENTITY) {
+                    AiTranslationStoryMemoryKind.ENTITY
+                } else {
+                    AiTranslationStoryMemoryKind.WORLD_BUILDING
+                },
+                title = entry.target.ifBlank { entry.raw },
+                subtitle = listOfNotNull(
+                    entry.raw,
+                    entry.senseKey.takeIf(String::isNotBlank)?.let { "sense=$it" },
+                    entry.category.takeIf(String::isNotBlank),
+                    entry.description.takeIf(String::isNotBlank),
+                    chapterRange(entry.firstChapterIndex, entry.lastChapterIndex),
+                ).joinToString(" · "),
+                chapterIndex = entry.firstChapterIndex.takeIf { it >= 0 },
+                imagePath = entry.imagePath.takeIf(String::isNotBlank),
+                raw = entry.raw,
+                senseKey = entry.senseKey,
+                category = entry.category,
+                description = entry.description,
+            )
+        }
+        val timelines = snapshot.timelines
+            .groupBy { it.chapterIndex }
+            .map { (_, values) ->
+                val timeline = values.reduce { existing, incoming -> mergeTimeline(existing, incoming) }
+                AiTranslationStoryWikiRecord(
+                    id = "$bookUrl|timeline|${timeline.chapterIndex}",
+                    bookUrl = bookUrl,
+                    bookName = bookName,
+                    kind = AiTranslationStoryMemoryKind.TIMELINE,
+                    title = timeline.chapterTitle.ifBlank { "Chương ${timeline.chapterIndex + 1}" },
+                    subtitle = timeline.summary,
+                    chapterIndex = timeline.chapterIndex.takeIf { it >= 0 },
+                    raw = timeline.characters.joinToString(", ") { it.raw },
+                    description = timeline.events.joinToString(" · "),
+                )
+            }
+            .sortedBy { it.chapterIndex }
+        val canonicalByRaw = snapshot.canonicalMemory
+            .groupBy { TranslationMemoryCanonicalizer.normalizeRaw(it.raw) }
+            .mapValues { (_, values) -> values.firstOrNull { it.target.isNotBlank() } ?: values.first() }
+        val relationshipTags = snapshot.relationships
+            .filter { it.source.isNotBlank() && it.target.isNotBlank() && it.relationship.isNotBlank() }
+            .groupBy {
+                "${TranslationMemoryCanonicalizer.normalizeRaw(it.source)}\u0000" +
+                    "${TranslationMemoryCanonicalizer.normalizeRaw(it.target)}\u0000" +
+                    it.relationship.trim().lowercase()
+            }
+            .map { (id, values) ->
+                val relationship = values.maxByOrNull { it.chapterIndex } ?: values.first()
+                val sourceMemory = canonicalByRaw[TranslationMemoryCanonicalizer.normalizeRaw(relationship.source)]
+                val targetMemory = canonicalByRaw[TranslationMemoryCanonicalizer.normalizeRaw(relationship.target)]
+                StoryWikiRelationshipTag(
+                    id = "$bookUrl|relation|${stableId(id)}",
+                    bookUrl = bookUrl,
+                    sourceRaw = relationship.source,
+                    sourceTarget = sourceMemory?.target.orEmpty(),
+                    targetRaw = relationship.target,
+                    targetTarget = targetMemory?.target.orEmpty(),
+                    relation = relationship.relationship,
+                    chapterIndex = relationship.chapterIndex.takeIf { it >= 0 },
+                )
+            }
+        val graphNodeMap = linkedMapOf<String, StoryWikiGraphNode>()
+        snapshot.canonicalMemory
+            .filter { it.kind == TranslationMemoryKind.ENTITY }
+            .forEach { entry ->
+                graphNodeMap[TranslationMemoryCanonicalizer.normalizeRaw(entry.raw)] = StoryWikiGraphNode(
+                    id = "${bookUrl}|node|${stableId(entry.identity)}",
+                    raw = entry.raw,
+                    target = entry.target,
+                    category = entry.category,
+                    imagePath = entry.imagePath.takeIf(String::isNotBlank),
+                )
+            }
+        snapshot.timelines.flatMap { it.characters }.forEach { character ->
+            val key = TranslationMemoryCanonicalizer.normalizeRaw(character.raw)
+            if (key.isNotBlank() && key !in graphNodeMap) {
+                graphNodeMap[key] = StoryWikiGraphNode(
+                    id = "$bookUrl|temp-node|${stableId(key)}",
+                    raw = character.raw,
+                    target = character.target,
+                    category = character.role.ifBlank { "character" },
+                )
+            }
+        }
+        relationshipTags.forEach { tag ->
+            listOf(tag.sourceRaw to tag.sourceTarget, tag.targetRaw to tag.targetTarget).forEach { (raw, target) ->
+                val key = TranslationMemoryCanonicalizer.normalizeRaw(raw)
+                if (key.isNotBlank() && key !in graphNodeMap) {
+                    graphNodeMap[key] = StoryWikiGraphNode(
+                        id = "$bookUrl|temp-node|${stableId(key)}",
+                        raw = raw,
+                        target = target,
+                        category = "character",
+                    )
+                }
+            }
+        }
+        val graphEdges = relationshipTags.map { tag ->
+            val sourceId = graphNodeMap.getValue(TranslationMemoryCanonicalizer.normalizeRaw(tag.sourceRaw)).id
+            val targetId = graphNodeMap.getValue(TranslationMemoryCanonicalizer.normalizeRaw(tag.targetRaw)).id
+            StoryWikiGraphEdge(
+                id = tag.id,
+                sourceId = sourceId,
+                targetId = targetId,
+                relation = tag.relation,
+                chapterIndex = tag.chapterIndex,
+            )
+        }
+        return StoryWikiSnapshot(
+            bookUrl = bookUrl,
+            bookName = bookName,
+            glossaryRecords = glossary,
+            timelineRecords = timelines,
+            relationshipTags = relationshipTags,
+            characterGraph = StoryWikiCharacterGraph(graphNodeMap.values.toList(), graphEdges),
+        )
+    }
+
+    private fun chapterRange(first: Int, last: Int): String? = when {
+        first < 0 && last < 0 -> null
+        first >= 0 && last > first -> "ch.${first + 1}–${last + 1}"
+        first >= 0 -> "ch.${first + 1}"
+        else -> "ch.${last + 1}"
+    }
+
     private fun List<AiMemory>.toStorySnapshot(): AiTranslationStoryMemorySnapshot {
-        val rawEntities: List<AiTranslationStoryEntity> = decodeValues(ENTITY_PREFIX)
+        val entityMemories = filter { it.key.startsWith(ENTITY_PREFIX) }
+        val rawEntities: List<AiTranslationStoryEntity> = entityMemories.mapNotNull { it.decodeValue() }
         val sanitizedEntities = rawEntities.map { entity ->
             val cleanRaw = entity.raw.replace("?", "·").trim()
             val rawTarget = entity.target.trim()
-            val sanitizedTarget = if (rawTarget.isBlank() ||
+            val sanitizedTarget = if (entity.userEdited) {
+                rawTarget
+            } else if (rawTarget.isBlank() ||
                 rawTarget.equals(cleanRaw, ignoreCase = true) ||
                 AiTranslationRefinePipeline.hasCjkTextCodePoints(rawTarget)
             ) {
@@ -427,7 +628,9 @@ class TranslationStoryMemoryUseCase(
             } else {
                 sanitizeExtractedEntityTarget(cleanRaw, rawTarget)
             }
-            val finalTarget = if (sanitizedTarget.isNotBlank() &&
+            val finalTarget = if (entity.userEdited) {
+                sanitizedTarget
+            } else if (sanitizedTarget.isNotBlank() &&
                 (sanitizedTarget.equals(cleanRaw, ignoreCase = true) ||
                     AiTranslationRefinePipeline.hasCjkTextCodePoints(sanitizedTarget))
             ) {
@@ -437,9 +640,10 @@ class TranslationStoryMemoryUseCase(
             }
             entity.copy(raw = cleanRaw, target = finalTarget)
         }
-        val rawWorld: List<AiTranslationWorldEntry> = decodeValues(WORLD_PREFIX)
+        val worldMemories = filter { it.key.startsWith(WORLD_PREFIX) }
+        val rawWorld: List<AiTranslationWorldEntry> = worldMemories.mapNotNull { it.decodeValue() }
         val sanitizedWorld = rawWorld.map { entry ->
-            if (entry.target.isNotBlank() &&
+            if (!entry.userEdited && entry.target.isNotBlank() &&
                 (entry.target.equals(entry.raw, ignoreCase = true) ||
                     AiTranslationRefinePipeline.hasCjkTextCodePoints(entry.target))
             ) {
@@ -448,10 +652,70 @@ class TranslationStoryMemoryUseCase(
                 entry
             }
         }
+        val canonicalInput = entityMemories.mapNotNull { memory ->
+            memory.decodeValue<AiTranslationStoryEntity>()?.let { entity ->
+                CanonicalTranslationMemory(
+                    identity = TranslationMemoryCanonicalizer.identity(entity.raw, entity.senseKey),
+                    raw = entity.raw,
+                    target = sanitizedEntities.firstOrNull { it.raw == entity.raw }?.target ?: entity.target,
+                    senseKey = entity.senseKey,
+                    kind = TranslationMemoryKind.ENTITY,
+                    category = entity.category.ifBlank { entity.type },
+                    description = entity.description,
+                    aliases = entity.aliases,
+                    origin = entity.origin,
+                    namingStyle = entity.namingStyle,
+                    firstChapterIndex = entity.firstChapterIndex,
+                    lastChapterIndex = entity.lastChapterIndex,
+                    imagePath = entity.imagePath,
+                    userEdited = entity.userEdited,
+                    source = entity.source.toMemorySourceValue(),
+                    updatedAt = memory.updatedAt,
+                )
+            }
+        } + worldMemories.mapNotNull { memory ->
+            memory.decodeValue<AiTranslationWorldEntry>()?.let { entry ->
+                CanonicalTranslationMemory(
+                    identity = TranslationMemoryCanonicalizer.identity(entry.raw, entry.senseKey),
+                    raw = entry.raw,
+                    target = sanitizedWorld.firstOrNull { it.raw == entry.raw && it.senseKey == entry.senseKey }?.target
+                        ?: entry.target,
+                    senseKey = entry.senseKey,
+                    kind = TranslationMemoryKind.WORLD,
+                    category = entry.category,
+                    description = entry.description,
+                    aliases = entry.entityRefs,
+                    origin = entry.origin,
+                    namingStyle = entry.namingStyle,
+                    firstChapterIndex = entry.chapterIndex,
+                    lastChapterIndex = entry.lastChapterIndex,
+                    imagePath = entry.imagePath,
+                    userEdited = entry.userEdited,
+                    source = entry.source.toMemorySourceValue(),
+                    updatedAt = memory.updatedAt,
+                )
+            }
+        }
+        val canonicalMemory = TranslationMemoryCanonicalizer.canonicalize(canonicalInput)
+        val canonicalByIdentity = canonicalMemory.associateBy { it.identity }
+        val healedEntities = sanitizedEntities.map { entity ->
+            entity.copy(
+                target = canonicalByIdentity[
+                    TranslationMemoryCanonicalizer.identity(entity.raw, entity.senseKey)
+                ]?.target?.takeIf(String::isNotBlank) ?: entity.target,
+            )
+        }
+        val healedWorld = sanitizedWorld.map { entry ->
+            entry.copy(
+                target = canonicalByIdentity[
+                    TranslationMemoryCanonicalizer.identity(entry.raw, entry.senseKey)
+                ]?.target?.takeIf(String::isNotBlank) ?: entry.target,
+            )
+        }
         return AiTranslationStoryMemorySnapshot(
-            entities = sanitizedEntities,
+            entities = healedEntities,
             relationships = decodeValues(RELATIONSHIP_PREFIX),
-            worldBuilding = sanitizedWorld,
+            worldBuilding = healedWorld,
             timelines = decodeValues<AiTranslationStoryTimeline>(TIMELINE_PREFIX)
                 .sortedBy(AiTranslationStoryTimeline::chapterIndex),
             analyzedChapterIndices = asSequence()
@@ -464,12 +728,203 @@ class TranslationStoryMemoryUseCase(
                 .filter { it.startsWith(PENDING_PREFIX) }
                 .mapNotNull { it.removePrefix(PENDING_PREFIX).substringBefore(':').toIntOrNull() }
                 .toSet(),
+            canonicalMemory = canonicalMemory,
         )
     }
 
     suspend fun upsertEntity(bookUrl: String, entity: AiTranslationStoryEntity) {
         require(entity.raw.isNotBlank())
-        upsertBookMemory(bookUrl, entityKey(entity.raw), AiMemory.TYPE_GLOSSARY, entity)
+        withBookLock(bookUrl) { upsertEntityUnlocked(bookUrl, entity) }
+    }
+
+    /** Explicit QT opt-in path. A user-edited memory conflict is never overwritten silently. */
+    suspend fun addQuickDictionaryEntry(
+        book: Book,
+        raw: String,
+        target: String,
+        type: QuickDictionaryType,
+    ) {
+        if (type == QuickDictionaryType.PHONETIC || type == QuickDictionaryType.IGNORE) return
+        val cleanRaw = raw.trim()
+        val cleanTarget = target.trim()
+        require(cleanRaw.isNotBlank() && cleanTarget.isNotBlank())
+        val snapshot = loadSnapshot(book.bookUrl)
+        val existingEntity = snapshot.entities.firstOrNull { it.raw.equals(cleanRaw, ignoreCase = true) }
+        val existingWorld = snapshot.worldBuilding.firstOrNull { it.raw.equals(cleanRaw, ignoreCase = true) }
+        val existingTarget = existingEntity?.target ?: existingWorld?.target
+        if (existingEntity?.userEdited == true || existingWorld?.userEdited == true) {
+            if (existingTarget.orEmpty().isNotBlank() && !existingTarget.equals(cleanTarget, ignoreCase = true)) {
+                throw IllegalStateException("Translation memory already contains a user-edited target for $cleanRaw")
+            }
+            return
+        }
+        if (type == QuickDictionaryType.NAME) {
+            upsertEntity(
+                book.bookUrl,
+                AiTranslationStoryEntity(
+                    raw = cleanRaw,
+                    target = cleanTarget,
+                    type = "character",
+                    category = "character",
+                    userEdited = true,
+                    source = "QT",
+                ),
+            )
+        } else {
+            upsertWorldEntry(
+                book.bookUrl,
+                AiTranslationWorldEntry(
+                    raw = cleanRaw,
+                    target = cleanTarget,
+                    category = "term",
+                    userEdited = true,
+                    source = "QT",
+                ),
+            )
+        }
+    }
+
+    private suspend fun upsertEntityUnlocked(
+        bookUrl: String,
+        incoming: AiTranslationStoryEntity,
+    ) {
+        val entity = incoming.copy(
+            raw = incoming.raw.trim(),
+            senseKey = incoming.senseKey.trim(),
+            target = incoming.target.trim(),
+        )
+        val memories = aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
+        val identity = TranslationMemoryCanonicalizer.identity(entity.raw, entity.senseKey)
+        val matching = memories.filter { memory ->
+            when {
+                memory.key.startsWith(ENTITY_PREFIX) -> memory.decodeValue<AiTranslationStoryEntity>()
+                    ?.let { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) == identity } == true
+                memory.key.startsWith(WORLD_PREFIX) -> memory.decodeValue<AiTranslationWorldEntry>()
+                    ?.let { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) == identity } == true
+                else -> false
+            }
+        }
+        val lockedTarget = matching.asSequence()
+            .mapNotNull { memory ->
+                memory.decodeValue<AiTranslationStoryEntity>()?.takeIf { it.userEdited }?.target
+                    ?: memory.decodeValue<AiTranslationWorldEntry>()?.takeIf { it.userEdited }?.target
+            }
+            .firstOrNull(String::isNotBlank)
+        val target = when {
+            entity.userEdited -> entity.target
+            lockedTarget != null -> lockedTarget
+            entity.target.isNotBlank() -> entity.target
+            else -> matching.firstNotNullOfOrNull { memory ->
+                memory.decodeValue<AiTranslationStoryEntity>()?.target
+                    ?: memory.decodeValue<AiTranslationWorldEntry>()?.target
+            }.orEmpty()
+        }
+        val entityToWrite = entity.copy(target = target)
+        val existingEntity = matching.firstOrNull { it.key.startsWith(ENTITY_PREFIX) }
+        upsertBookMemory(
+            bookUrl,
+            existingEntity?.key ?: entityKey(entity.raw, entity.senseKey),
+            AiMemory.TYPE_GLOSSARY,
+            entityToWrite,
+        )
+        matching.filter { it.key.startsWith(WORLD_PREFIX) }.forEach { memory ->
+            memory.decodeValue<AiTranslationWorldEntry>()?.let { world ->
+                upsertBookMemory(
+                    bookUrl,
+                    memory.key,
+                    memory.type,
+                    world.copy(
+                        target = target,
+                        userEdited = world.userEdited || entity.userEdited,
+                        source = if (entity.userEdited) "USER" else world.source,
+                    ),
+                )
+            }
+        }
+    }
+
+    private suspend fun upsertWorldEntryUnlocked(
+        bookUrl: String,
+        incoming: AiTranslationWorldEntry,
+    ) {
+        val entry = incoming.copy(
+            raw = incoming.raw.trim(),
+            senseKey = incoming.senseKey.trim(),
+            target = incoming.target.trim(),
+        )
+        val memories = aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
+        val identity = TranslationMemoryCanonicalizer.identity(entry.raw, entry.senseKey)
+        val matching = memories.filter { memory ->
+            when {
+                memory.key.startsWith(ENTITY_PREFIX) -> memory.decodeValue<AiTranslationStoryEntity>()
+                    ?.let { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) == identity } == true
+                memory.key.startsWith(WORLD_PREFIX) -> memory.decodeValue<AiTranslationWorldEntry>()
+                    ?.let { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) == identity } == true
+                else -> false
+            }
+        }
+        val lockedTarget = matching.asSequence()
+            .mapNotNull { memory ->
+                memory.decodeValue<AiTranslationStoryEntity>()?.takeIf { it.userEdited }?.target
+                    ?: memory.decodeValue<AiTranslationWorldEntry>()?.takeIf { it.userEdited }?.target
+            }
+            .firstOrNull(String::isNotBlank)
+        val target = when {
+            entry.userEdited -> entry.target
+            lockedTarget != null -> lockedTarget
+            entry.target.isNotBlank() -> entry.target
+            else -> matching.firstNotNullOfOrNull { memory ->
+                memory.decodeValue<AiTranslationWorldEntry>()?.target
+                    ?: memory.decodeValue<AiTranslationStoryEntity>()?.target
+            }.orEmpty()
+        }
+        val worldToWrite = entry.copy(target = target)
+        val existingWorld = matching.firstOrNull { it.key.startsWith(WORLD_PREFIX) }
+        upsertBookMemory(
+            bookUrl,
+            existingWorld?.key ?: worldKey(entry),
+            AiMemory.TYPE_FACT,
+            worldToWrite,
+        )
+        matching.filter { it.key.startsWith(ENTITY_PREFIX) }.forEach { memory ->
+            memory.decodeValue<AiTranslationStoryEntity>()?.let { entity ->
+                upsertBookMemory(
+                    bookUrl,
+                    memory.key,
+                    memory.type,
+                    entity.copy(
+                        target = target,
+                        userEdited = entity.userEdited || entry.userEdited,
+                        source = if (entry.userEdited) "USER" else entity.source,
+                    ),
+                )
+            }
+        }
+    }
+
+    private suspend fun deleteGlossaryIdentity(bookUrl: String, raw: String, senseKey: String) {
+        val identity = TranslationMemoryCanonicalizer.identity(raw, senseKey)
+        aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
+            .filter { memory ->
+                when {
+                    memory.key.startsWith(ENTITY_PREFIX) -> memory.decodeValue<AiTranslationStoryEntity>()
+                        ?.let { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) == identity } == true
+                    memory.key.startsWith(WORLD_PREFIX) -> memory.decodeValue<AiTranslationWorldEntry>()
+                        ?.let { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) == identity } == true
+                    else -> false
+                }
+            }
+            .forEach { memory -> deleteBookMemory(bookUrl, memory.key) }
+    }
+
+    private suspend fun <T> withBookLock(bookUrl: String, block: suspend () -> T): T {
+        val lock = bookLocks.getOrPut(bookUrl) { Mutex() }
+        lock.lock()
+        return try {
+            block()
+        } finally {
+            lock.unlock()
+        }
     }
 
     suspend fun upsertRelationship(bookUrl: String, relationship: AiTranslationStoryRelationship) {
@@ -477,37 +932,43 @@ class TranslationStoryMemoryUseCase(
             relationship.source.isNotBlank() && relationship.target.isNotBlank() &&
                 relationship.relationship.isNotBlank()
         )
-        upsertBookMemory(
-            bookUrl,
-            relationshipKey(relationship),
-            AiMemory.TYPE_RELATIONSHIP,
-            relationship,
-        )
+        withBookLock(bookUrl) {
+            upsertBookMemory(
+                bookUrl,
+                relationshipKey(relationship),
+                AiMemory.TYPE_RELATIONSHIP,
+                relationship,
+            )
+        }
     }
 
     suspend fun upsertWorldEntry(bookUrl: String, entry: AiTranslationWorldEntry) {
         require(entry.raw.isNotBlank())
-        upsertBookMemory(bookUrl, worldKey(entry), AiMemory.TYPE_FACT, entry)
+        withBookLock(bookUrl) { upsertWorldEntryUnlocked(bookUrl, entry) }
     }
 
     suspend fun upsertTimeline(bookUrl: String, timeline: AiTranslationStoryTimeline) {
         require(timeline.chapterIndex >= 0 && timeline.summary.isNotBlank())
-        upsertBookMemory(
-            bookUrl,
-            timelineKey(timeline.chapterIndex),
-            AiMemory.TYPE_SUMMARY,
-            timeline,
-        )
+        withBookLock(bookUrl) {
+            upsertBookMemory(
+                bookUrl,
+                timelineKey(timeline.chapterIndex),
+                AiMemory.TYPE_SUMMARY,
+                timeline,
+            )
+        }
     }
 
-    suspend fun deleteEntity(bookUrl: String, raw: String) =
-        deleteBookMemory(bookUrl, entityKey(raw))
+    suspend fun deleteEntity(bookUrl: String, raw: String, senseKey: String = "") = withBookLock(bookUrl) {
+        deleteGlossaryIdentity(bookUrl, raw, senseKey)
+    }
 
     suspend fun deleteRelationship(bookUrl: String, relationship: AiTranslationStoryRelationship) =
         deleteBookMemory(bookUrl, relationshipKey(relationship))
 
-    suspend fun deleteWorldEntry(bookUrl: String, entry: AiTranslationWorldEntry) =
-        deleteBookMemory(bookUrl, worldKey(entry))
+    suspend fun deleteWorldEntry(bookUrl: String, entry: AiTranslationWorldEntry) = withBookLock(bookUrl) {
+        deleteGlossaryIdentity(bookUrl, entry.raw, entry.senseKey)
+    }
 
     suspend fun deleteTimeline(bookUrl: String, chapterIndex: Int) =
         deleteBookMemory(bookUrl, timelineKey(chapterIndex))
@@ -664,15 +1125,37 @@ class TranslationStoryMemoryUseCase(
         analysis: AiTranslationStoryAnalysis,
         previous: AiTranslationStoryMemorySnapshot,
     ) {
-        val existingEntities = previous.entities.associateBy { it.raw.lowercase() }
+        val existingEntities = previous.entities.associateBy {
+            TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey)
+        }
         val normalizedEntities = analysis.entities.map { discovered ->
-            val existing = existingEntities[discovered.raw.lowercase()]
+            val identity = TranslationMemoryCanonicalizer.identity(discovered.raw, discovered.senseKey)
+            val existing = existingEntities[identity]
+                ?: previous.worldBuilding.firstOrNull {
+                    TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) == identity
+                }?.let { world ->
+                    AiTranslationStoryEntity(
+                        raw = world.raw,
+                        target = world.target,
+                        senseKey = world.senseKey,
+                        category = world.category,
+                        description = world.description,
+                        aliases = world.entityRefs,
+                        userEdited = world.userEdited,
+                        source = world.source,
+                    )
+                }
             if (existing == null) {
                 discovered
             } else {
                 existing.copy(
-                    target = existing.target.ifBlank { discovered.target },
-                    type = existing.type.ifBlank { discovered.type },
+                    // A user-edited record is a lock. AI may enrich only missing descriptive
+                    // fields and must never replace its translation or classification.
+                    target = if (existing.userEdited) existing.target else existing.target.ifBlank { discovered.target },
+                    type = if (existing.userEdited) existing.type else existing.type.ifBlank { discovered.type },
+                    category = if (existing.userEdited) existing.category else existing.category.ifBlank { discovered.category },
+                    origin = if (existing.userEdited) existing.origin else existing.origin.ifBlank { discovered.origin },
+                    namingStyle = if (existing.userEdited) existing.namingStyle else existing.namingStyle.ifBlank { discovered.namingStyle },
                     description = discovered.description.ifBlank { existing.description },
                     aliases = (existing.aliases + discovered.aliases).distinct(),
                     gender = existing.gender.ifBlank { discovered.gender },
@@ -680,32 +1163,48 @@ class TranslationStoryMemoryUseCase(
                     firstChapterIndex = listOf(existing.firstChapterIndex, discovered.firstChapterIndex)
                         .filter { it >= 0 }
                         .minOrNull() ?: analysis.chapterIndex,
+                    lastChapterIndex = listOf(existing.lastChapterIndex, discovered.lastChapterIndex, analysis.chapterIndex)
+                        .filter { it >= 0 }
+                        .maxOrNull() ?: analysis.chapterIndex,
                 )
             }
         }
-        normalizedEntities.forEach { upsertEntity(bookUrl, it) }
-        analysis.relationships.forEach { upsertRelationship(bookUrl, it) }
-        val existingWorldEntries = previous.worldBuilding.associateBy(::worldKey)
+        normalizedEntities.forEach { upsertEntityUnlocked(bookUrl, it) }
+        analysis.relationships.forEach {
+            upsertBookMemory(bookUrl, relationshipKey(it), AiMemory.TYPE_RELATIONSHIP, it)
+        }
+        val existingWorldEntries = previous.worldBuilding.associateBy {
+            TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey)
+        }
         analysis.worldBuilding.forEach { discovered ->
-            val existing = existingWorldEntries[worldKey(discovered)]
-            upsertWorldEntry(
+            val existing = existingWorldEntries[
+                TranslationMemoryCanonicalizer.identity(discovered.raw, discovered.senseKey)
+            ]
+            upsertWorldEntryUnlocked(
                 bookUrl,
-                if (existing == null) {
-                    discovered
-                } else {
-                    discovered.copy(
-                        imagePath = existing.imagePath,
-                        imagePrompt = existing.imagePrompt,
-                        imageUpdatedAt = existing.imageUpdatedAt,
-                    )
-                }
+                if (existing == null) discovered else discovered.copy(
+                    target = if (existing.userEdited) existing.target else existing.target.ifBlank { discovered.target },
+                    category = if (existing.userEdited) existing.category else existing.category.ifBlank { discovered.category },
+                    origin = if (existing.userEdited) existing.origin else existing.origin.ifBlank { discovered.origin },
+                    namingStyle = if (existing.userEdited) existing.namingStyle else existing.namingStyle.ifBlank { discovered.namingStyle },
+                    userEdited = existing.userEdited,
+                    source = existing.source,
+                    lastChapterIndex = listOf(existing.lastChapterIndex, discovered.lastChapterIndex, analysis.chapterIndex)
+                        .filter { it >= 0 }
+                        .maxOrNull() ?: analysis.chapterIndex,
+                    imagePath = existing.imagePath,
+                    imagePrompt = existing.imagePrompt,
+                    imageUpdatedAt = existing.imageUpdatedAt,
+                ),
             )
         }
         val existingRaw = existingEntities.keys
         val incomingTimeline = analysis.timeline.copy(
             characters = analysis.timeline.characters.map { character ->
                 character.copy(
-                    status = if (character.raw.lowercase() in existingRaw) "existing" else "new"
+                    status = if (existingRaw.any {
+                            it.startsWith(TranslationMemoryCanonicalizer.normalizeRaw(character.raw) + "\u0000")
+                        }) "existing" else "new"
                 )
             }
         )
@@ -716,7 +1215,12 @@ class TranslationStoryMemoryUseCase(
             incoming = incomingTimeline,
         )
         if (normalizedTimeline.summary.isNotBlank() || normalizedTimeline.events.isNotEmpty()) {
-            upsertTimeline(bookUrl, normalizedTimeline)
+            upsertBookMemory(
+                bookUrl,
+                timelineKey(normalizedTimeline.chapterIndex),
+                AiMemory.TYPE_SUMMARY,
+                normalizedTimeline,
+            )
         }
     }
 
@@ -797,10 +1301,11 @@ class TranslationStoryMemoryUseCase(
             entity.copy(
                 raw = cleanRaw,
                 target = finalTarget,
-                firstChapterIndex = entity.firstChapterIndex.takeIf { it >= 0 } ?: chapterIndex
+                firstChapterIndex = entity.firstChapterIndex.takeIf { it >= 0 } ?: chapterIndex,
+                lastChapterIndex = entity.lastChapterIndex.takeIf { it >= 0 } ?: chapterIndex,
             )
         }
-        .distinctBy { it.raw.lowercase() }
+        .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) }
 
     fun sanitizeExtractedEntityTarget(raw: String, target: String): String {
         val cleanTarget = target.replace("?", "").replace(Regex(" {2,}"), " ").trim()
@@ -825,6 +1330,41 @@ class TranslationStoryMemoryUseCase(
             }
         }
         return cleanTarget
+    }
+
+    private fun List<AiTranslationMemoryCandidate>.toStoryMemoryDelta(source: String): AiTranslationStoryMemoryDelta {
+        val valid = filter {
+            it.raw.isNotBlank() &&
+                it.target.isNotBlank() &&
+                source.contains(it.raw)
+        }
+        return AiTranslationStoryMemoryDelta(
+            entities = valid.filter { it.kind == "entity" }.map { candidate ->
+                AiTranslationStoryEntity(
+                    raw = candidate.raw,
+                    target = candidate.target,
+                    senseKey = candidate.sense_key,
+                    type = candidate.category.ifBlank { candidate.name_type.ifBlank { "character" } },
+                    category = candidate.category.ifBlank { candidate.name_type.ifBlank { "character" } },
+                    aliases = candidate.aliases,
+                    origin = candidate.origin,
+                    namingStyle = candidate.naming_style,
+                    source = "AI",
+                )
+            },
+            worldBuilding = valid.filter { it.kind == "world" || it.kind == "term" }.map { candidate ->
+                AiTranslationWorldEntry(
+                    raw = candidate.raw,
+                    target = candidate.target,
+                    senseKey = candidate.sense_key,
+                    category = candidate.category.ifBlank { "other" },
+                    entityRefs = candidate.aliases,
+                    origin = candidate.origin,
+                    namingStyle = candidate.naming_style,
+                    source = "AI",
+                )
+            },
+        )
     }
 
     private fun pendingKey(
@@ -908,7 +1448,14 @@ class TranslationStoryMemoryUseCase(
         runCatching { GSON.fromJson(value, T::class.java) }.getOrNull()
 
     private fun AiTranslationStoryMemorySnapshot.toDictionaryPairs(): List<DictPair> =
-        AiTranslationStoryMemoryPipeline.selectContext(this, Int.MAX_VALUE, "")
+        AiTranslationStoryMemoryPipeline.selectContext(
+            snapshot = this,
+            chapterIndex = Int.MAX_VALUE,
+            source = buildString {
+                entities.forEach { append(it.raw).append('\n') }
+                worldBuilding.forEach { append(it.raw).append('\n') }
+            },
+        )
             .entityDictionary
 
     private fun MutableList<DictPair>.replaceWith(values: List<DictPair>) {
@@ -931,7 +1478,8 @@ class TranslationStoryMemoryUseCase(
         private const val ANALYSIS_PREFIX = "translation-story:analysis:"
         private const val PENDING_PREFIX = "translation-story:pending:"
 
-        fun entityKey(raw: String): String = ENTITY_PREFIX + stableId(raw.trim().lowercase())
+        fun entityKey(raw: String, senseKey: String = ""): String =
+            ENTITY_PREFIX + stableId(TranslationMemoryCanonicalizer.identity(raw, senseKey))
 
         fun relationshipKey(value: AiTranslationStoryRelationship): String =
             RELATIONSHIP_PREFIX + value.chapterIndex + ":" + stableId(
@@ -939,7 +1487,9 @@ class TranslationStoryMemoryUseCase(
             )
 
         fun worldKey(value: AiTranslationWorldEntry): String =
-            WORLD_PREFIX + value.chapterIndex + ":" + stableId("${value.category}\u0000${value.raw}")
+            WORLD_PREFIX + stableId(
+                TranslationMemoryCanonicalizer.identity(value.raw, value.senseKey)
+            )
 
         fun timelineKey(chapterIndex: Int): String =
             TIMELINE_PREFIX + chapterIndex.toString().padStart(8, '0')
@@ -962,3 +1512,9 @@ class TranslationStoryMemoryUseCase(
 }
 
 const val STORY_MEMORY_EXPORT_FORMAT = "legado-translation-story-memory-v1"
+
+private fun String.toMemorySourceValue(): TranslationMemorySource = when (trim().uppercase()) {
+    "USER" -> TranslationMemorySource.USER
+    "QT" -> TranslationMemorySource.QT
+    else -> TranslationMemorySource.AI
+}

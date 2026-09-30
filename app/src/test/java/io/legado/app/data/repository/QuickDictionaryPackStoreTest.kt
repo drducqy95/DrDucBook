@@ -294,6 +294,62 @@ class QuickDictionaryPackStoreTest {
         assertTrue(store.packs.value.isEmpty())
     }
 
+    @Test
+    fun startupSkipsMetadataWithNullIdInsteadOfCrashing() {
+        val id = "pack_${"1".repeat(32)}"
+        writePackFiles(id, """{
+            "id": null,
+            "name": "Broken",
+            "type": "VIETPHRASE",
+            "scope": "GLOBAL",
+            "scopeKey": ""
+        }""")
+
+        store = QuickDictionaryPackStore(root)
+
+        assertTrue(store.packs.value.isEmpty())
+    }
+
+    @Test
+    fun startupSkipsMalformedAndInvalidMetadataButKeepsValidPack() {
+        val malformedId = "pack_${"2".repeat(32)}"
+        writePackFiles(malformedId, "{not-json")
+
+        val invalidId = "pack_${"3".repeat(32)}"
+        writePackFiles(invalidId, """{
+            "id": "$invalidId",
+            "name": "Invalid",
+            "type": "NOT_A_DICTIONARY_TYPE",
+            "scope": "GLOBAL",
+            "scopeKey": ""
+        }""")
+
+        val validId = "pack_${"4".repeat(32)}"
+        writePackFiles(validId, """{
+            "id": "$validId",
+            "name": "Valid",
+            "type": "VIETPHRASE",
+            "scope": "GLOBAL",
+            "scopeKey": "",
+            "entryCount": 1,
+            "indexBytes": 1,
+            "sourceBytes": 1,
+            "enabled": true,
+            "createdAt": 1,
+            "updatedAt": 1
+        }""")
+
+        store = QuickDictionaryPackStore(root)
+
+        assertEquals(listOf(validId), store.packs.value.map { it.id })
+    }
+
+    private fun writePackFiles(id: String, metadata: String) {
+        File(root, "$id.json").writeText(metadata)
+        File(root, "$id.qtdict").writeText("placeholder")
+        File(root, "$id.source.txt").writeText("source=value")
+    }
+
     @Test(timeout = 900_000)
     fun fiveMillionLineImportAndWarmLookupPerformanceGate() {
         assumeTrue(System.getenv("QUICK_DICTIONARY_5M_TEST") == "1")

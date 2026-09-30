@@ -491,16 +491,19 @@ fun TranslationConfigScreen(
                         InputSettingItem(
                             title = stringResource(R.string.nmt_max_chars_per_chunk),
                             value = TranslationConfig.nmtMaxCharsPerChunk.toString(),
-                            defaultValue = "1000",
+                            defaultValue = "512",
                             description = stringResource(R.string.translation_chunk_input_summary),
                             onConfirm = { input ->
-                                parseTranslationChunkSize(input)?.let {
+                                input.trim().toIntOrNull()
+                                    ?.takeIf {
+                                        it in TranslationConfig.NMT_MIN_CHUNK_CHARS..TranslationConfig.NMT_MAX_CHUNK_CHARS
+                                    }?.let {
                                     TranslationConfig.nmtMaxCharsPerChunk = it
                                 } ?: context.toastOnUi(
                                     resources.getString(
                                         R.string.input_value_range,
-                                        TranslationConfig.MIN_CHUNK_CHARS,
-                                        TranslationConfig.MAX_CHUNK_CHARS,
+                                        TranslationConfig.NMT_MIN_CHUNK_CHARS,
+                                        TranslationConfig.NMT_MAX_CHUNK_CHARS,
                                     )
                                 )
                             },
@@ -508,9 +511,9 @@ fun TranslationConfigScreen(
                         SliderSettingItem(
                             title = stringResource(R.string.nmt_source_token_budget),
                             value = TranslationConfig.nmtSourceTokenBudget.toFloat(),
-                            defaultValue = 96f,
-                            valueRange = 32f..480f,
-                            steps = 27,
+                            defaultValue = 64f,
+                            valueRange = 32f..320f,
+                            steps = 17,
                             description = stringResource(
                                 R.string.nmt_source_token_budget_summary,
                                 TranslationConfig.nmtSourceTokenBudget,
@@ -520,9 +523,9 @@ fun TranslationConfigScreen(
                         SliderSettingItem(
                             title = stringResource(R.string.nmt_max_new_tokens),
                             value = TranslationConfig.nmtMaxNewTokens.toFloat(),
-                            defaultValue = 240f,
-                            valueRange = 32f..384f,
-                            steps = 21,
+                            defaultValue = 192f,
+                            valueRange = 32f..256f,
+                            steps = 15,
                             description = TranslationConfig.nmtMaxNewTokens.toString(),
                             onValueChange = { TranslationConfig.nmtMaxNewTokens = it.toInt() },
                         )

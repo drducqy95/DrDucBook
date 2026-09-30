@@ -840,6 +840,12 @@ private fun MediaPlayerSettingsSheet(
                     checked = state.resumePosition,
                     onCheckedChange = { onIntent(MediaPlayerIntent.SetResumePosition(it)) },
                 )
+                SettingsSwitchRow(
+                    title = stringResource(R.string.media_player_auto_pip_on_exit),
+                    description = stringResource(R.string.media_player_auto_pip_on_exit_summary),
+                    checked = state.autoEnterPipOnExit,
+                    onCheckedChange = { onIntent(MediaPlayerIntent.SetAutoEnterPipOnExit(it)) },
+                )
                 SeekSecondsSelector(
                     title = stringResource(R.string.media_player_seek_forward),
                     selectedSeconds = state.seekForwardSeconds,
@@ -986,6 +992,7 @@ private fun SettingsSection(
 @Composable
 private fun SettingsSwitchRow(
     title: String,
+    description: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -996,11 +1003,16 @@ private fun SettingsSwitchRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = title,
-            style = LegadoTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = LegadoTheme.typography.bodyLarge)
+            description?.let {
+                Text(
+                    text = it,
+                    style = LegadoTheme.typography.bodySmall,
+                    color = LegadoTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

@@ -5,6 +5,7 @@ import android.os.Build
 import com.google.gson.JsonObject
 import io.legado.app.data.dao.AiRouterDao
 import io.legado.app.data.entities.AiCredentialEntity
+import io.legado.app.data.entities.AiCredentialModelCapabilityEntity
 import io.legado.app.data.entities.AiModelProfile
 import io.legado.app.data.entities.AiRouteProfileEntity
 import io.legado.app.data.entities.AiRouteTargetEntity
@@ -14,6 +15,8 @@ import io.legado.app.domain.gateway.AiSecretStore
 import io.legado.app.domain.gateway.AiTextGateway
 import io.legado.app.domain.model.AiCredentialKind
 import io.legado.app.domain.model.AiCredentialStatus
+import io.legado.app.domain.model.AiCapabilityStatus
+import io.legado.app.domain.model.AiOutputContract
 import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiGenerationParams
 import io.legado.app.domain.model.AiAvailableModel
@@ -355,13 +358,22 @@ class AiOAuthRepository(
         }
     }
 
-    override suspend fun resolveAccessToken(credentialId: String): String {
+    override suspend fun resolveAccessToken(credentialId: String): String =
+        resolveAccessTokenInternal(credentialId, allowUnready = false)
+
+    private suspend fun resolveAccessTokenForProbe(credentialId: String): String =
+        resolveAccessTokenInternal(credentialId, allowUnready = true)
+
+    private suspend fun resolveAccessTokenInternal(
+        credentialId: String,
+        allowUnready: Boolean,
+    ): String {
         var credential = dao.getCredential(credentialId)
             ?: error("OAuth credential không còn tồn tại")
         require(credential.status != AiCredentialStatus.RELOGIN_REQUIRED) {
             "OAuth credential cần đăng nhập lại"
         }
-        require(AiCredentialStatus.isRouterEligible(credential.status)) {
+        require(allowUnready || AiCredentialStatus.isRouterEligible(credential.status)) {
             "OAuth credential chưa vượt qua inference probe"
         }
         val provider = credential.oauthProvider?.let(::providerConfig)
@@ -437,6 +449,22 @@ class AiOAuthRepository(
                     providerDataJson = GSON.toJson(updatedProviderData),
                     now = now,
                 )
+                dao.invalidateCredentialCapabilities(credentialId, now)
+                // Probe with the freshly issued token directly. Calling the public sync method
+                // here would re-enter expiry refresh for short-lived tokens.
+                val probeResult = syncModelsInternal(credentialId, accessToken)
+                probeResult.exceptionOrNull()?.let { probeError ->
+                    dao.updateCredentialStatus(
+                        credentialId,
+                        if (isOAuthCredentialRejected(probeError)) {
+                            AiCredentialStatus.RELOGIN_REQUIRED
+                        } else {
+                            AiCredentialStatus.AUTHENTICATED_NOT_READY
+                        },
+                        clock.millis(),
+                    )
+                }
+                Unit
             }.onFailure { error ->
                 val permanent = error.message.orEmpty().contains("invalid_grant", ignoreCase = true) ||
                     error.message.orEmpty().contains("refresh token", ignoreCase = true)
@@ -450,6 +478,12 @@ class AiOAuthRepository(
     }
 
     override suspend fun syncModels(credentialId: String): Result<List<AiAvailableModel>> =
+        syncModelsInternal(credentialId, accessTokenOverride = null)
+
+    private suspend fun syncModelsInternal(
+        credentialId: String,
+        accessTokenOverride: String?,
+    ): Result<List<AiAvailableModel>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val credential = dao.getCredential(credentialId)
@@ -457,7 +491,7 @@ class AiOAuthRepository(
                 val config = providerConfig(
                     credential.oauthProvider ?: error("Credential không phải OAuth")
                 )
-                val accessToken = resolveAccessToken(credentialId)
+                val accessToken = accessTokenOverride ?: resolveAccessTokenForProbe(credentialId)
                 val provider = profileGateway.getProvider(config.profileId)
                     ?: error("Provider OAuth chưa được cấu hình")
                 val accountData = credential.providerDataJson.toJsonObjectOrEmpty()
@@ -468,7 +502,20 @@ class AiOAuthRepository(
                             ?.let { key to it }
                     }
                     .toMap()
-                val configuredModels = config.models.mapIndexed { index, model ->
+                val discoveredModels = runCatching {
+                    aiTextGateway.fetchModels(
+                        profileGateway.toProviderConfig(provider).copy(apiKey = accessToken)
+                    ).getOrNull().orEmpty()
+                }.getOrDefault(emptyList())
+                val candidateModels = (config.models.map {
+                    AiAvailableModel(
+                        id = it.id,
+                        name = it.name,
+                        contextWindow = it.contextWindow,
+                        maxOutputTokens = it.maxOutputTokens,
+                    )
+                } + discoveredModels).distinctBy(AiAvailableModel::id)
+                val configuredModels = candidateModels.mapIndexed { index, model ->
                     profileGateway.saveModel(
                         AiModelDraft(
                             providerId = provider.id,
@@ -480,30 +527,70 @@ class AiOAuthRepository(
                         )
                     )
                 }
-                val availableModels = configuredModels.mapNotNull { model ->
-                    runCatching {
-                        runInferenceProbe(
-                            config = config,
-                            providerProfileId = provider.id,
-                            model = model,
-                            accessToken = accessToken,
-                            accountData = accountData,
-                        )
-                        AiAvailableModel(
-                            id = model.modelId,
-                            name = model.displayName,
-                            contextWindow = model.contextWindow,
-                            maxOutputTokens = model.maxOutputTokens,
-                        )
-                    }.getOrNull()
+                val capabilities = probeOAuthCredentialCapabilities(
+                    config = config,
+                    providerProfileId = provider.id,
+                    credentialId = credentialId,
+                    models = configuredModels,
+                    accessToken = accessToken,
+                    accountData = accountData,
+                )
+                val availableModels = configuredModels.filter { model ->
+                    capabilities.any {
+                        it.modelProfileId == model.id &&
+                            AiCapabilityStatus.isUsable(it.status, clock.millis(), it.cooldownUntil)
+                    }
+                }.map { model ->
+                    AiAvailableModel(
+                        id = model.modelId,
+                        name = model.displayName,
+                        contextWindow = model.contextWindow,
+                        maxOutputTokens = model.maxOutputTokens,
+                    )
                 }
                 require(availableModels.isNotEmpty()) {
                     "Không có model nào vượt qua kiểm tra với tài khoản này"
                 }
-                dao.updateCredentialStatus(
-                    credentialId,
-                    AiCredentialStatus.ACTIVE,
-                    clock.millis(),
+                val availableProfiles = configuredModels.filter { model ->
+                    availableModels.any { it.id == model.modelId }
+                }
+                val now = clock.millis()
+                bindOAuthRouteTargets(
+                    taskType = AiTaskType.CHAT,
+                    defaultRouteId = DEFAULT_OAUTH_CHAT_ROUTE_ID,
+                    defaultRouteName = "Default Chat",
+                    strategy = AiRouteStrategy.PRIORITY,
+                    maxAttempts = 3,
+                    stickySession = true,
+                    models = availableProfiles.filter { model ->
+                        capabilities.any {
+                            it.modelProfileId == model.id && it.taskType == AiTaskType.CHAT &&
+                                AiCapabilityStatus.isUsable(it.status, now, it.cooldownUntil)
+                        }
+                    },
+                    credentialId = credentialId,
+                    defaultTargetMaxConcurrency = 0,
+                    preferProvidedModelOrder = true,
+                    now = now,
+                )
+                bindOAuthRouteTargets(
+                    taskType = AiTaskType.TRANSLATE_CHAPTER,
+                    defaultRouteId = DEFAULT_OAUTH_TRANSLATION_ROUTE_ID,
+                    defaultRouteName = "Default Translation",
+                    strategy = AiRouteStrategy.ROUND_ROBIN,
+                    maxAttempts = 3,
+                    stickySession = true,
+                    models = availableProfiles.filter { model ->
+                        capabilities.any {
+                            it.modelProfileId == model.id &&
+                                it.taskType == AiTaskType.TRANSLATE_CHAPTER &&
+                                AiCapabilityStatus.isUsable(it.status, now, it.cooldownUntil)
+                        }
+                    },
+                    credentialId = credentialId,
+                    defaultTargetMaxConcurrency = 2,
+                    preferProvidedModelOrder = true,
+                    now = now,
                 )
                 availableModels
             }
@@ -863,7 +950,20 @@ class AiOAuthRepository(
                 customHeaders = config.customHeaders,
             )
         )
-        val savedModels = config.models.mapIndexed { index, model ->
+        val discoveredModels = runCatching {
+            aiTextGateway.fetchModels(
+                profileGateway.toProviderConfig(provider).copy(apiKey = accessToken)
+            ).getOrNull().orEmpty()
+        }.getOrDefault(emptyList())
+        val candidateModels = (config.models.map {
+            AiAvailableModel(
+                id = it.id,
+                name = it.name,
+                contextWindow = it.contextWindow,
+                maxOutputTokens = it.maxOutputTokens,
+            )
+        } + discoveredModels).distinctBy(AiAvailableModel::id)
+        val savedModels = candidateModels.mapIndexed { index, model ->
             profileGateway.saveModel(
                 AiModelDraft(
                     providerId = provider.id,
@@ -877,23 +977,6 @@ class AiOAuthRepository(
         }
         if (savedModels.isEmpty()) {
             error("OAuth provider không có model để tạo route")
-        }
-        runCatching {
-            profileGateway.syncDiscoveredModels(
-                providerId = provider.id,
-                discovered = config.models.map { model ->
-                    io.legado.app.domain.model.AiAvailableModel(
-                        id = model.id,
-                        name = model.name,
-                        contextWindow = model.contextWindow,
-                        maxOutputTokens = model.maxOutputTokens,
-                    )
-                },
-            )
-            if (config.id == AiOAuthProviderId.ANTIGRAVITY) {
-                val legacyModelProfileId = AiProfileRepository.stableModelId(provider.id, "gemini-3-flash-agent")
-                profileGateway.deleteModel(legacyModelProfileId)
-            }
         }
         val credentialId = stableCredentialId(config.id, account.id)
         val existing = dao.getCredential(credentialId)
@@ -932,22 +1015,50 @@ class AiOAuthRepository(
                 updatedAt = now,
             )
         )
-        val usableModel = verifyOAuthCredentialModels(
+        val capabilities = probeOAuthCredentialCapabilities(
+            config = config,
+            providerProfileId = provider.id,
+            credentialId = credentialId,
             models = savedModels,
-            updateStatus = { status ->
-                dao.updateCredentialStatus(credentialId, status, clock.millis())
-            },
-            probe = { model ->
-                runInferenceProbe(
-                    config = config,
-                    providerProfileId = provider.id,
-                    model = model,
-                    accessToken = accessToken,
-                    accountData = account.data,
-                )
-            },
+            accessToken = accessToken,
+            accountData = account.data,
         )
-        val routeModels = savedModels.preferModel(usableModel.id)
+        val chatModels = savedModels.filter { model ->
+            capabilities.any {
+                it.modelProfileId == model.id &&
+                    it.taskType == AiTaskType.CHAT &&
+                    AiCapabilityStatus.isUsable(it.status, clock.millis(), it.cooldownUntil)
+            }
+        }
+        val translationModels = savedModels.filter { model ->
+            capabilities.any {
+                it.modelProfileId == model.id &&
+                    it.taskType == AiTaskType.TRANSLATE_CHAPTER &&
+                    AiCapabilityStatus.isUsable(it.status, clock.millis(), it.cooldownUntil)
+            }
+        }
+        val rewriteModels = savedModels.filter { model ->
+            capabilities.any {
+                it.modelProfileId == model.id &&
+                    it.taskType == AiTaskType.REWRITE_TEXT &&
+                    AiCapabilityStatus.isUsable(it.status, clock.millis(), it.cooldownUntil)
+            }
+        }
+        val usableModel = (chatModels + translationModels + rewriteModels).firstOrNull()
+        if (usableModel == null) {
+            dao.updateCredentialStatus(
+                credentialId,
+                AiCredentialStatus.AUTHENTICATED_NOT_READY,
+                clock.millis(),
+            )
+            return OAuthSaveResult(
+                providerProfileId = provider.id,
+                modelProfileId = "",
+                credentialId = credentialId,
+                routeProfileId = "",
+                targetId = "",
+            )
+        }
         val chatBinding = bindOAuthRouteTargets(
             taskType = AiTaskType.CHAT,
             defaultRouteId = DEFAULT_OAUTH_CHAT_ROUTE_ID,
@@ -955,11 +1066,12 @@ class AiOAuthRepository(
             strategy = AiRouteStrategy.PRIORITY,
             maxAttempts = 3,
             stickySession = true,
-            models = routeModels,
+            models = chatModels,
+            credentialId = credentialId,
             defaultTargetMaxConcurrency = 0,
             preferProvidedModelOrder = true,
             now = now,
-        ).firstOrNull() ?: error("OAuth route target was not created")
+        ).firstOrNull()
         val translationBinding = bindOAuthRouteTargets(
             taskType = AiTaskType.TRANSLATE_CHAPTER,
             defaultRouteId = DEFAULT_OAUTH_TRANSLATION_ROUTE_ID,
@@ -967,15 +1079,30 @@ class AiOAuthRepository(
             strategy = AiRouteStrategy.ROUND_ROBIN,
             maxAttempts = 3,
             stickySession = true,
-            models = routeModels,
+            models = translationModels,
+            credentialId = credentialId,
             defaultTargetMaxConcurrency = 2,
             preferProvidedModelOrder = true,
             now = now,
-        ).firstOrNull() ?: error("OAuth translation route target was not created")
+        ).firstOrNull()
+        if (chatBinding == null && translationBinding == null && rewriteModels.isEmpty()) {
+            dao.updateCredentialStatus(
+                credentialId,
+                AiCredentialStatus.AUTHENTICATED_NOT_READY,
+                clock.millis(),
+            )
+            return OAuthSaveResult(
+                providerProfileId = provider.id,
+                modelProfileId = usableModel.id,
+                credentialId = credentialId,
+                routeProfileId = "",
+                targetId = "",
+            )
+        }
         ensureDefaultOAuthTaskPresets(
             modelProfileId = usableModel.id,
-            chatRouteId = chatBinding.routeId,
-            translationRouteId = translationBinding.routeId,
+            chatRouteId = chatBinding?.routeId.orEmpty(),
+            translationRouteId = translationBinding?.routeId.orEmpty(),
         )
         runCatching {
             ModelDiscoveryWorker.runOnce(appCtx)
@@ -984,14 +1111,143 @@ class AiOAuthRepository(
             providerProfileId = provider.id,
             modelProfileId = usableModel.id,
             credentialId = credentialId,
-            routeProfileId = chatBinding.routeId,
-            targetId = chatBinding.targetId,
+            routeProfileId = chatBinding?.routeId.orEmpty(),
+            targetId = chatBinding?.targetId.orEmpty(),
         )
     }
 
-    private fun List<AiModelProfile>.preferModel(modelProfileId: String): List<AiModelProfile> {
-        val selected = firstOrNull { it.id == modelProfileId } ?: return this
-        return listOf(selected) + filterNot { it.id == modelProfileId }
+    private suspend fun probeOAuthCredentialCapabilities(
+        config: OAuthProvider,
+        providerProfileId: String,
+        credentialId: String,
+        models: List<AiModelProfile>,
+        accessToken: String,
+        accountData: Map<String, String>,
+    ): List<AiCredentialModelCapabilityEntity> {
+        val probes = listOf(
+            AiTaskType.CHAT to AiOutputContract.CHAT_TEXT,
+            AiTaskType.TRANSLATE_CHAPTER to AiOutputContract.TRANSLATION_JSON,
+            AiTaskType.REWRITE_TEXT to AiOutputContract.REWRITE_TEXT,
+        )
+        val results = ArrayList<AiCredentialModelCapabilityEntity>(models.size * probes.size)
+        var credentialRejected = false
+        models.forEach { model ->
+            probes.forEach { (taskType, outputContract) ->
+                val startedAt = clock.millis()
+                val previous = dao.getCapability(
+                    credentialId = credentialId,
+                    modelProfileId = model.id,
+                    taskType = taskType,
+                    outputContract = outputContract,
+                )
+                dao.upsertCapability(
+                    AiCredentialModelCapabilityEntity(
+                        credentialId = credentialId,
+                        modelProfileId = model.id,
+                        taskType = taskType,
+                        outputContract = outputContract,
+                        status = AiCapabilityStatus.PROBING,
+                        lastProbeAt = startedAt,
+                        lastSuccessAt = previous?.lastSuccessAt,
+                        lastFailureAt = previous?.lastFailureAt,
+                        cooldownUntil = 0L,
+                        failureKind = null,
+                        failureMessage = null,
+                        latencyMs = null,
+                        contextWindow = model.contextWindow,
+                        maxOutputTokens = model.maxOutputTokens,
+                        providerFingerprint = "${config.protocol}:${config.baseUrl}".take(240),
+                        probeRevision = (previous?.probeRevision ?: 0L) + 1L,
+                        createdAt = previous?.createdAt ?: startedAt,
+                        updatedAt = startedAt,
+                    )
+                )
+                val result = runCatching {
+                    runInferenceProbe(
+                        config = config,
+                        providerProfileId = providerProfileId,
+                        model = model,
+                        accessToken = accessToken,
+                        accountData = accountData,
+                        taskType = taskType,
+                        outputContract = outputContract,
+                    )
+                }
+                val now = clock.millis()
+                val error = result.exceptionOrNull()
+                val status = when {
+                    result.isSuccess -> AiCapabilityStatus.AVAILABLE
+                    error != null && isOAuthCredentialRejected(error) -> {
+                        credentialRejected = true
+                        AiCapabilityStatus.AUTH_FAILED
+                    }
+                    error != null && isModelUnavailable(error) -> AiCapabilityStatus.MODEL_UNAVAILABLE
+                    error != null && isQuotaFailure(error) -> AiCapabilityStatus.QUOTA_EXHAUSTED
+                    else -> AiCapabilityStatus.CONTRACT_UNSUPPORTED
+                }
+                val capability = AiCredentialModelCapabilityEntity(
+                    credentialId = credentialId,
+                    modelProfileId = model.id,
+                    taskType = taskType,
+                    outputContract = outputContract,
+                    status = status,
+                    lastProbeAt = now,
+                    lastSuccessAt = if (result.isSuccess) now else previous?.lastSuccessAt,
+                    lastFailureAt = if (result.isFailure) now else previous?.lastFailureAt,
+                    cooldownUntil = 0L,
+                    failureKind = error?.let { status },
+                    failureMessage = error?.message?.take(240),
+                    latencyMs = (now - startedAt).coerceAtLeast(0L),
+                    contextWindow = model.contextWindow,
+                    maxOutputTokens = model.maxOutputTokens,
+                    providerFingerprint = "${config.protocol}:${config.baseUrl}".take(240),
+                    probeRevision = (previous?.probeRevision ?: 0L) + 1L,
+                    createdAt = previous?.createdAt ?: startedAt,
+                    updatedAt = now,
+                )
+                dao.upsertCapability(capability)
+                results += capability
+            }
+        }
+        if (credentialRejected) {
+            dao.updateCredentialStatus(
+                credentialId,
+                AiCredentialStatus.RELOGIN_REQUIRED,
+                clock.millis(),
+            )
+        } else {
+            dao.updateCredentialStatus(
+                credentialId,
+                if (results.any { AiCapabilityStatus.isUsable(it.status, clock.millis(), it.cooldownUntil) }) {
+                    AiCredentialStatus.ACTIVE
+                } else {
+                    AiCredentialStatus.AUTHENTICATED_NOT_READY
+                },
+                clock.millis(),
+            )
+        }
+        return results
+    }
+
+    private fun isModelUnavailable(error: Throwable): Boolean {
+        val text = generateSequence(error as Throwable?) { it.cause }
+            .take(8)
+            .mapNotNull(Throwable::message)
+            .joinToString(" ")
+            .lowercase()
+        return text.contains("404") ||
+            text.contains("unknown model") ||
+            text.contains("model not found") ||
+            text.contains("model_not_found")
+    }
+
+    private fun isQuotaFailure(error: Throwable): Boolean {
+        val text = generateSequence(error as Throwable?) { it.cause }
+            .take(8)
+            .mapNotNull(Throwable::message)
+            .joinToString(" ")
+            .lowercase()
+        return text.contains("402") || text.contains("quota") || text.contains("billing")
     }
 
     private suspend fun bindOAuthRouteTargets(
@@ -1002,6 +1258,7 @@ class AiOAuthRepository(
         maxAttempts: Int,
         stickySession: Boolean,
         models: List<AiModelProfile>,
+        credentialId: String,
         defaultTargetMaxConcurrency: Int,
         preferProvidedModelOrder: Boolean = false,
         now: Long,
@@ -1026,23 +1283,15 @@ class AiOAuthRepository(
         }
         val routeTargets = dao.getEnabledTargets(route.id).toMutableList()
         val bindings = models.mapIndexed { index, model ->
-            val existingPoolTarget = routeTargets.firstOrNull { target ->
-                target.modelProfileId == model.id && target.credentialId.isNullOrBlank()
+            val existingTarget = routeTargets.firstOrNull { target ->
+                target.modelProfileId == model.id && target.credentialId == credentialId
             }
-            val legacyBoundTargets = routeTargets.filter { target ->
-                target.modelProfileId == model.id && !target.credentialId.isNullOrBlank()
-            }
-            val targetId = existingPoolTarget?.id
-                ?: legacyBoundTargets.firstOrNull()?.id
-                ?: stableOAuthTargetId(route.id, model.id)
-            val existingTarget = existingPoolTarget
-                ?: legacyBoundTargets.firstOrNull()
-                ?: dao.getTarget(targetId)
+            val targetId = existingTarget?.id ?: stableOAuthTargetId(route.id, model.id, credentialId)
             val savedTarget = AiRouteTargetEntity(
                 id = targetId,
                 routeProfileId = route.id,
                 modelProfileId = model.id,
-                credentialId = null,
+                credentialId = credentialId,
                 priority = if (preferProvidedModelOrder) index else (existingTarget?.priority ?: index),
                 weight = existingTarget?.weight ?: 1,
                 maxConcurrency = existingTarget?.maxConcurrency ?: defaultTargetMaxConcurrency,
@@ -1058,12 +1307,6 @@ class AiOAuthRepository(
                 updatedAt = now,
             )
             dao.upsertTarget(savedTarget)
-            legacyBoundTargets
-                .filterNot { it.id == savedTarget.id }
-                .forEach { staleTarget ->
-                    dao.deleteTarget(staleTarget.id)
-                    routeTargets.removeAll { it.id == staleTarget.id }
-                }
             routeTargets.removeAll { it.id == savedTarget.id }
             routeTargets += savedTarget
             OAuthRouteBinding(route.id, targetId)
@@ -1136,6 +1379,8 @@ class AiOAuthRepository(
         model: AiModelProfile,
         accessToken: String,
         accountData: Map<String, String>,
+        taskType: String = AiTaskType.CHAT,
+        outputContract: String = AiOutputContract.CHAT_TEXT,
     ) {
         val runtimeMetadata = accountData.filterKeys { !it.isSensitiveProviderDataKey() }
         val runtimeBaseUrl = runtimeMetadata["resourceUrl"]
@@ -1143,6 +1388,13 @@ class AiOAuthRepository(
             ?.takeIf(String::isNotBlank)
             ?.let { "$it/v1" }
             ?: config.baseUrl
+        val probePrompt = when (outputContract) {
+            AiOutputContract.TRANSLATION_JSON ->
+                "Translate the value to Vietnamese. Return exactly one JSON object with a segments array containing id s1 and its translated text. No Markdown or explanation."
+            AiOutputContract.REWRITE_TEXT ->
+                "Rewrite this short sentence naturally in Vietnamese. Return plain text only: Hello world."
+            else -> "Reply with OK."
+        }
         val request = AiGenerateRequest(
             model = AiModelConfig(
                 id = model.id,
@@ -1169,7 +1421,7 @@ class AiOAuthRepository(
             messages = listOf(
                 AiMessage(
                     role = AiMessageRole.USER,
-                    content = "Reply with OK.",
+                    content = probePrompt,
                 )
             ),
             params = AiGenerationParams(
@@ -1178,6 +1430,8 @@ class AiOAuthRepository(
                 // probe incorrectly rejected valid OAuth accounts before routes were created.
                 maxOutputTokens = 512,
             ),
+            taskType = taskType,
+            outputContract = outputContract,
         )
         val response = aiTextGateway.generate(request).getOrElse { error ->
             throw IllegalStateException(
@@ -1187,6 +1441,19 @@ class AiOAuthRepository(
         }
         require(response.text.isNotBlank()) {
             "OAuth inference probe returned an empty response"
+        }
+        if (outputContract == AiOutputContract.TRANSLATION_JSON) {
+            val body = response.text.trim().removePrefix("```").removeSuffix("```").trim()
+            val root = runCatching { GSON.fromJson(body, JsonObject::class.java) }.getOrNull()
+                ?: error("OAuth translation probe returned invalid JSON")
+            val segments = root.get("segments")?.takeIf { it.isJsonArray }?.asJsonArray
+                ?: error("OAuth translation probe returned no segments")
+            require(segments.any { it.isJsonObject && it.asJsonObject.string("id") == "s1" }) {
+                "OAuth translation probe returned an invalid segment"
+            }
+        }
+        if (outputContract == AiOutputContract.REWRITE_TEXT && response.text.trimStart().startsWith("{")) {
+            error("OAuth rewrite probe returned a structured response")
         }
     }
 
@@ -1730,8 +1997,9 @@ private fun stableCredentialId(providerId: String, accountId: String): String {
 private fun stableOAuthTargetId(
     routeId: String,
     modelProfileId: String,
+    credentialId: String,
 ): String {
-    val uuid = UUID.nameUUIDFromBytes("oauth-target:$routeId:$modelProfileId".toByteArray())
+    val uuid = UUID.nameUUIDFromBytes("oauth-target:$routeId:$modelProfileId:$credentialId".toByteArray())
     return "target_${uuid.toString().replace("-", "")}"
 }
 

@@ -246,8 +246,19 @@ class TranslateChapterAiRetryTest {
             phoneticResidual = { it },
         )
 
-        assertEquals("Name U+31350 remains", repaired)
-        assertFalse(repaired.codePoints().anyMatch(::isCjkCodePointForTest))
+        assertEquals("Name $rareHan remains", repaired)
+        assertTrue(repaired.codePoints().anyMatch(::isCjkCodePointForTest))
+    }
+
+    @Test
+    fun unicodeEscapeIsRejectedAsResidualCjk() {
+        assertTrue(
+            hasUntranslatedCjkForVietnamese(
+                source = "叶",
+                translated = "U+53F6",
+                targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+            )
+        )
     }
 
     @Test
@@ -640,8 +651,11 @@ class TranslateChapterAiRetryTest {
                 onProgress = {},
                 onTranslateStarted = {},
             )
-            assertTrue(firstResult.isFailure)
-            assertEquals(2, textGateway.requests.size)
+            assertEquals(
+                "Diep Truong Sinh den.\nCua lon mo ra.",
+                firstResult.getOrThrow(),
+            )
+            assertEquals(3, textGateway.requests.size)
             assertEquals(
                 listOf(DictPair("\u53f6\u957f\u751f", "Diep Truong Sinh", QuickDictionaryType.NAME)),
                 dictionaryGateway.pairs,
@@ -1253,11 +1267,13 @@ private class RecordingTranslationCacheGateway : TranslationCacheGateway {
         targetLanguage: String,
         chunkIndex: Int,
         provider: String,
+        expectedContentHash: String?,
     ): TranslationCache? = savedChunks.lastOrNull {
         it.chunkIndex == chunkIndex && it.provider == provider
-    } ?: cachedChunk?.takeIf {
+    }?.takeIf { expectedContentHash == null || it.originalContentHash == expectedContentHash }
+        ?: cachedChunk?.takeIf {
         it.chunkIndex == chunkIndex && it.provider == provider
-    }
+    }?.takeIf { expectedContentHash == null || it.originalContentHash == expectedContentHash }
 
     override suspend fun saveChunk(
         book: Book,

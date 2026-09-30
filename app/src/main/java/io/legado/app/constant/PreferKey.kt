@@ -253,6 +253,7 @@ object PreferKey {
     const val bookshelfSortOrder = "bookshelfSortOrder"
     const val showBottomView = "showBottomView"
     const val useFloatingBottomBar = "useFloatingBottomBar"
+    const val floatingBottomBarDefaultMigrated = "floatingBottomBarDefaultMigrated"
     const val useFloatingBottomBarLiquidGlass = "useFloatingBottomBarLiquidGlass"
     const val mangaScrollMode = "mangaScrollMode"
     const val webtoonSidePaddingDp = "webtoonSidePaddingDp"
@@ -457,6 +458,7 @@ object PreferKey {
     // Media player
     const val mediaPlayerAutoPlay = "mediaPlayerAutoPlay"
     const val mediaPlayerAutoNext = "mediaPlayerAutoNext"
+    const val mediaPlayerAutoEnterPipOnExit = "mediaPlayerAutoEnterPipOnExit"
     const val mediaPlayerResumePosition = "mediaPlayerResumePosition"
     const val mediaPlayerSeekForwardSeconds = "mediaPlayerSeekForwardSeconds"
     const val mediaPlayerSeekBackwardSeconds = "mediaPlayerSeekBackwardSeconds"

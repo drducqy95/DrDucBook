@@ -168,10 +168,10 @@ object TranslationConfig {
     var nmtMaxCharsPerChunk: Int
         get() {
             migrateNmtTuning()
-            return storedNmtMaxCharsPerChunk.coerceIn(MIN_CHUNK_CHARS, MAX_CHUNK_CHARS)
+            return storedNmtMaxCharsPerChunk.coerceIn(NMT_MIN_CHUNK_CHARS, NMT_MAX_CHUNK_CHARS)
         }
         set(value) {
-            storedNmtMaxCharsPerChunk = value.coerceIn(MIN_CHUNK_CHARS, MAX_CHUNK_CHARS)
+            storedNmtMaxCharsPerChunk = value.coerceIn(NMT_MIN_CHUNK_CHARS, NMT_MAX_CHUNK_CHARS)
             nmtChunkTuningVersion = CURRENT_NMT_CHUNK_TUNING_VERSION
         }
 
@@ -182,10 +182,10 @@ object TranslationConfig {
     var nmtSourceTokenBudget: Int
         get() {
             migrateNmtTuning()
-            return storedNmtSourceTokenBudget.coerceIn(32, 480)
+            return storedNmtSourceTokenBudget.coerceIn(32, 320)
         }
         set(value) {
-            storedNmtSourceTokenBudget = value.coerceIn(32, 480)
+            storedNmtSourceTokenBudget = value.coerceIn(32, 320)
             nmtChunkTuningVersion = CURRENT_NMT_CHUNK_TUNING_VERSION
         }
 
@@ -201,10 +201,10 @@ object TranslationConfig {
     var nmtMaxNewTokens: Int
         get() {
             migrateNmtTuning()
-            return storedNmtMaxNewTokens.coerceIn(32, 384)
+            return storedNmtMaxNewTokens.coerceIn(32, 256)
         }
         set(value) {
-            storedNmtMaxNewTokens = value.coerceIn(32, 384)
+            storedNmtMaxNewTokens = value.coerceIn(32, 256)
             nmtChunkTuningVersion = CURRENT_NMT_CHUNK_TUNING_VERSION
         }
 
@@ -351,6 +351,8 @@ object TranslationConfig {
     const val OUTPUT_FORMAT = TranslationConstants.OUTPUT_FORMAT
     const val MIN_CHUNK_CHARS = 10
     const val MAX_CHUNK_CHARS = 10000
+    const val NMT_MIN_CHUNK_CHARS = 256
+    const val NMT_MAX_CHUNK_CHARS = 2000
     private const val LEGACY_AI_CHUNK_CHARS = 6000
     private const val OPTIMIZED_AI_CHUNK_CHARS = 1000
     private const val CURRENT_AI_CHUNK_TUNING_VERSION = 2
@@ -361,6 +363,9 @@ object TranslationConfig {
         if (storedNmtMaxCharsPerChunk == 1000) storedNmtMaxCharsPerChunk = 512
         if (storedNmtSourceTokenBudget == 96) storedNmtSourceTokenBudget = 64
         if (storedNmtMaxNewTokens == 240) storedNmtMaxNewTokens = 192
+        storedNmtMaxCharsPerChunk = storedNmtMaxCharsPerChunk.coerceIn(NMT_MIN_CHUNK_CHARS, NMT_MAX_CHUNK_CHARS)
+        storedNmtSourceTokenBudget = storedNmtSourceTokenBudget.coerceIn(32, 320)
+        storedNmtMaxNewTokens = storedNmtMaxNewTokens.coerceIn(32, 256)
         nmtChunkTuningVersion = CURRENT_NMT_CHUNK_TUNING_VERSION
     }
 }

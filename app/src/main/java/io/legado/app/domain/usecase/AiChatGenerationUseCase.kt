@@ -26,6 +26,7 @@ import io.legado.app.domain.model.AiMessage
 import io.legado.app.domain.model.AiMessagePart
 import io.legado.app.domain.model.AiMessageRole
 import io.legado.app.domain.model.AiReasoningLevel
+import io.legado.app.domain.model.AiOutputContract
 import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.AiToolApprovalState
 import io.legado.app.domain.model.AiToolCall
@@ -60,12 +61,18 @@ class AiChatGenerationUseCase(
     ): AiGenerateRequest {
         val preset = resolvePreset()
             ?: error("Please configure a default AI model first")
+        val availableTools = aiToolGateway.availableTools()
         return AiGenerateRequest(
             model = preset.model,
             messages = buildRequestMessages(userContent, history, conversationId),
             params = preset.params.copy(reasoningLevel = reasoningLevel),
-            tools = aiToolGateway.availableTools(),
+            tools = availableTools,
             taskType = AiTaskType.CHAT,
+            outputContract = if (availableTools.isNotEmpty()) {
+                AiOutputContract.AGENT_TOOL_CALL
+            } else {
+                AiOutputContract.CHAT_TEXT
+            },
             routeProfileId = preset.runtimeOptions.routeProfileId,
             routeSessionKey = conversationId,
         )
@@ -127,10 +134,29 @@ class AiChatGenerationUseCase(
                     toolTrace.append(event)
                     onToolTraceUpdate()
                 }
-                is AiStreamEvent.Citation,
-                is AiStreamEvent.Usage -> Unit
+                is AiStreamEvent.Citation -> {
+                    toolTrace.append(event)
+                    onToolTraceUpdate()
+                }
+                is AiStreamEvent.Usage -> {
+                    toolTrace.append(event)
+                    onToolTraceUpdate()
+                }
             }
         }
+    }
+
+    suspend fun validateToolCalls(toolCalls: List<AiToolCall>): String? {
+        val knownTools = aiToolGateway.availableTools().map { it.name }.toSet()
+        toolCalls.firstOrNull { it.name !in knownTools }?.let {
+            return "Unknown tool: ${it.name}"
+        }
+        toolCalls.firstOrNull {
+            runCatching { GSON.fromJson(it.arguments, JsonObject::class.java) }.getOrNull() == null
+        }?.let {
+            return "Malformed arguments for tool: ${it.name}"
+        }
+        return null
     }
 
     suspend fun executeToolCalls(
@@ -262,6 +288,7 @@ class AiChatGenerationUseCase(
         reasoning: String,
         toolTrace: ToolTraceBuilder
     ): List<AiMessagePart> {
+        toolTrace.ensureEstimatedUsage(text = text, reasoning = reasoning)
         return buildList {
             reasoning.takeIf { it.isNotBlank() }?.let { add(AiMessagePart.Reasoning(it)) }
             text.takeIf { it.isNotBlank() }?.let { add(AiMessagePart.Text(it)) }
@@ -433,6 +460,8 @@ class AiChatGenerationUseCase(
 class ToolTraceBuilder {
     private val calls = linkedMapOf<String, ToolCallTrace>()
     private val indexKeys = mutableMapOf<Int, String>()
+    private val citationParts = linkedSetOf<AiMessagePart.Citation>()
+    private var usagePart: AiMessagePart.Usage? = null
 
     fun beginResponse() {
         indexKeys.clear()
@@ -462,6 +491,51 @@ class ToolTraceBuilder {
     fun appendResult(id: String, result: String): String {
         calls[id]?.result = result
         return toString()
+    }
+
+    fun append(event: AiStreamEvent.Citation) {
+        citationParts += AiMessagePart.Citation(
+            uri = event.uri,
+            title = event.title,
+            snippet = event.snippet,
+            startIndex = event.startIndex,
+            endIndex = event.endIndex,
+        )
+    }
+
+    fun append(event: AiStreamEvent.Usage) {
+        usagePart = AiMessagePart.Usage(
+            promptTokens = event.promptTokens,
+            completionTokens = event.completionTokens,
+            totalTokens = event.totalTokens,
+            reasoningTokens = event.reasoningTokens,
+        )
+    }
+
+    fun ensureEstimatedUsage(text: String, reasoning: String) {
+        if (usagePart != null) return
+        val completionTokens = (text.length / 4).coerceAtLeast(text.takeIf(String::isNotBlank)?.let { 1 } ?: 0)
+        val reasoningTokens = (reasoning.length / 4).coerceAtLeast(reasoning.takeIf(String::isNotBlank)?.let { 1 } ?: 0)
+        usagePart = AiMessagePart.Usage(
+            completionTokens = completionTokens,
+            totalTokens = completionTokens + reasoningTokens,
+            reasoningTokens = reasoningTokens,
+            estimated = true,
+        )
+    }
+
+    fun validationError(): String? {
+        calls.values.firstOrNull { it.name.isBlank() }?.let {
+            return "Tool call is missing a tool name"
+        }
+        calls.values.firstOrNull {
+            runCatching {
+                GSON.fromJson(it.arguments.toString().ifBlank { "{}" }, JsonObject::class.java)
+            }.getOrNull() == null
+        }?.let {
+            return "Malformed arguments for tool call ${it.id}"
+        }
+        return null
     }
 
     fun pendingToolCalls(): List<AiToolCall> {
@@ -496,6 +570,8 @@ class ToolTraceBuilder {
                 }
             )
         }
+        parts += citationParts
+        usagePart?.let(parts::add)
         return parts
     }
 

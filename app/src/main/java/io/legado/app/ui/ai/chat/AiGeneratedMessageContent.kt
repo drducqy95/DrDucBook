@@ -187,6 +187,26 @@ fun AiGeneratedMessageContent(
             }
         }
 
+        val citations = message.parts.filterIsInstance<AiMessagePart.Citation>()
+        if (citations.isNotEmpty()) {
+            TracePanel(
+                title = "Nguồn tham chiếu",
+                content = citations.joinToString("\n") { citation ->
+                    listOf(citation.title, citation.uri, citation.snippet)
+                        .filter(String::isNotBlank)
+                        .joinToString(" — ")
+                },
+            )
+        }
+        message.parts.filterIsInstance<AiMessagePart.Usage>().lastOrNull()?.let { usage ->
+            TracePanel(
+                title = "Usage",
+                content = "prompt=${usage.promptTokens}, completion=${usage.completionTokens}, " +
+                    "reasoning=${usage.reasoningTokens}, total=${usage.totalTokens}" +
+                    if (usage.estimated) " (estimated)" else "",
+            )
+        }
+
         if (isAssistant && !isStreaming && (onCopy != null || onRegenerate != null)) {
             Spacer(modifier = Modifier.height(4.dp))
             Row(

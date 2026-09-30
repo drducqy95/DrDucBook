@@ -8,6 +8,7 @@ import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.EventBus
 import io.legado.app.domain.usecase.AppStartupMaintenanceUseCase
 import io.legado.app.domain.usecase.WebDavBackupUseCase
+import io.legado.app.domain.gateway.DownloadCenterGateway
 import io.legado.app.ui.config.themeConfig.ThemeConfig
 import io.legado.app.ui.main.my.PrefClickEvent
 import io.legado.app.utils.eventBus.FlowEventBus
@@ -24,6 +25,7 @@ class MainViewModel(
     application: Application,
     private val appStartupMaintenanceUseCase: AppStartupMaintenanceUseCase,
     private val webDavBackupUseCase: WebDavBackupUseCase,
+    private val downloadCenterGateway: DownloadCenterGateway,
 ) : BaseViewModel(application) {
 
     private val _uiState = MutableStateFlow(readMainUiState())
@@ -38,6 +40,17 @@ class MainViewModel(
                 readMainUiState()
             }.collect { newState ->
                 _uiState.value = newState
+            }
+        }
+        viewModelScope.launch {
+            downloadCenterGateway.observeAttention().collect { attention ->
+                _uiState.update {
+                    it.copy(
+                        downloadActiveCount = attention.activeCount,
+                        downloadRecoverableCount = attention.recoverableCount,
+                        downloadHasAttention = attention.hasAttention,
+                    )
+                }
             }
         }
         deleteNotShelfBook()
@@ -128,13 +141,17 @@ data class MainUiState(
     val destinations: ImmutableList<MainDestination> = MainDestination.mainDestinations,
     val defaultHomePage: String = "bookshelf",
     val showBottomView: Boolean = true,
-    val useFloatingBottomBar: Boolean = false,
+    val useFloatingBottomBar: Boolean = true,
     val useFloatingBottomBarLiquidGlass: Boolean = false,
     val labelVisibilityMode: String = "auto",
     val navExtended: Boolean = false,
+    val downloadActiveCount: Int = 0,
+    val downloadRecoverableCount: Int = 0,
+    val downloadHasAttention: Boolean = false,
 )
 
 private fun MainViewModel.readMainUiState(): MainUiState {
+    ThemeConfig.ensureFloatingBottomBarDefault()
     val destinations = MainDestination.ordered(ThemeConfig.mainNavigationOrder).toImmutableList()
     return MainUiState(
         destinations = destinations,

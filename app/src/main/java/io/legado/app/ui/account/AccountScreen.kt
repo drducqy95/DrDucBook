@@ -6,17 +6,23 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -46,6 +52,8 @@ import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.SearchBar
 import io.legado.app.ui.widget.components.SplicedColumnGroup
+import io.legado.app.ui.widget.components.card.NormalCard
+import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.settingItem.SettingItem
 import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
@@ -59,6 +67,11 @@ import java.text.DateFormat
 import java.util.Date
 import io.legado.app.domain.model.AccountQuotaKind
 import io.legado.app.domain.model.AccountRole
+
+enum class AccountAuthSheetMode {
+    SIGN_IN,
+    SIGN_UP,
+}
 
 @Composable
 fun AccountRouteScreen(
@@ -221,6 +234,9 @@ fun AccountScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
+                AccountProfileCard(state = state)
+            }
+            item {
                 AccountStatusSection(state = state, onIntent = onIntent)
             }
             if (state.session != null) {
@@ -271,6 +287,65 @@ fun AccountScreen(
 
     AccountRoleEditorDialog(state = state, onIntent = onIntent)
 
+}
+
+@Composable
+private fun AccountProfileCard(state: AccountUiState) {
+    val session = state.session
+    val identity = session?.email?.takeIf(String::isNotBlank) ?: session?.userId
+    val initials = identity
+        ?.trim()
+        ?.split(Regex("\\s+"))
+        ?.mapNotNull { it.firstOrNull()?.uppercase() }
+        ?.take(2)
+        ?.joinToString("")
+        ?.ifBlank { "DB" }
+        ?: "DB"
+
+    NormalCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                    .padding(18.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                AppText(
+                    text = initials,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                AppText(
+                    text = session?.email?.ifBlank { session.userId }
+                        ?: stringResource(R.string.account_anonymous_free),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                AppText(
+                    text = if (session == null) {
+                        stringResource(R.string.account_sign_in_or_create)
+                    } else if (session.emailVerified) {
+                        stringResource(R.string.account_email_verified)
+                    } else {
+                        stringResource(R.string.account_email_not_verified)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -839,6 +914,113 @@ fun AccountAuthSection(
                 }
             } else {
                 AppText(stringResource(R.string.account_google_unavailable))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AccountAuthSheet(
+    show: Boolean,
+    mode: AccountAuthSheetMode,
+    state: AccountUiState,
+    onIntent: (AccountIntent) -> Unit,
+    onDismissRequest: () -> Unit,
+    onSwitchMode: () -> Unit,
+) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var showPassword by rememberSaveable { mutableStateOf(false) }
+
+    AppModalBottomSheet(
+        show = show,
+        onDismissRequest = onDismissRequest,
+        title = stringResource(
+            if (mode == AccountAuthSheetMode.SIGN_IN) {
+                R.string.account_sign_in
+            } else {
+                R.string.account_sign_up
+            }
+        ),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (state.busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            AppTextField(
+                value = email,
+                onValueChange = { email = it },
+                enabled = state.configured && !state.busy,
+                label = stringResource(R.string.account_email),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            AppTextField(
+                value = password,
+                onValueChange = { password = it },
+                enabled = state.configured && !state.busy,
+                label = stringResource(R.string.account_password),
+                visualTransformation = if (showPassword) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                singleLine = true,
+                trailingIcon = {
+                    TextButton(onClick = { showPassword = !showPassword }) {
+                        AppText(
+                            if (showPassword) stringResource(R.string.hide)
+                            else stringResource(R.string.show)
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Button(
+                enabled = state.configured && !state.busy,
+                onClick = {
+                    if (mode == AccountAuthSheetMode.SIGN_IN) {
+                        onIntent(AccountIntent.SignInEmail(email, password))
+                    } else {
+                        onIntent(AccountIntent.SignUpEmail(email, password))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                AppText(
+                    stringResource(
+                        if (mode == AccountAuthSheetMode.SIGN_IN) {
+                            R.string.account_sign_in
+                        } else {
+                            R.string.account_sign_up
+                        }
+                    )
+                )
+            }
+            TextButton(
+                enabled = !state.busy,
+                onClick = onSwitchMode,
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+            ) {
+                AppText(
+                    stringResource(
+                        if (mode == AccountAuthSheetMode.SIGN_IN) {
+                            R.string.account_switch_to_sign_up
+                        } else {
+                            R.string.account_switch_to_sign_in
+                        }
+                    )
+                )
+            }
+            if (mode == AccountAuthSheetMode.SIGN_IN && state.googleSignInAvailable) {
+                OutlinedButton(
+                    enabled = state.configured && !state.busy,
+                    onClick = { onIntent(AccountIntent.RequestGoogleSignIn) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    AppText(stringResource(R.string.account_sign_in_google))
+                }
             }
         }
     }

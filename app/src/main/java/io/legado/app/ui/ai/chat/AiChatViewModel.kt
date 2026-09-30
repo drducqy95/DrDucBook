@@ -471,6 +471,12 @@ class AiChatViewModel(
                         parentMessageId = message.parentMessageId,
                         agentRun = activeRun,
                     )
+                    if (!waitingForToolConfirmation &&
+                        fullText.isBlank() &&
+                        toolTrace.pendingToolCalls().isEmpty()
+                    ) {
+                        error("AI returned reasoning without a final answer")
+                    }
                 } catch (e: CancellationException) {
                     wasCancelled = true
                     throw e
@@ -603,6 +609,12 @@ class AiChatViewModel(
                         parentMessageId = parentMessageId,
                         agentRun = activeRun,
                     )
+                    if (!waitingForToolConfirmation &&
+                        fullText.isBlank() &&
+                        toolTrace.pendingToolCalls().isEmpty()
+                    ) {
+                        error("AI returned reasoning without a final answer")
+                    }
                 } catch (e: CancellationException) {
                     wasCancelled = true
                     throw e
@@ -711,6 +723,12 @@ class AiChatViewModel(
                 parentMessageId = pending.parentMessageId,
                 agentRun = pending.agentRun,
             )
+            if (!waitingForToolConfirmation &&
+                fullText.isBlank() &&
+                pending.toolTrace.pendingToolCalls().isEmpty()
+            ) {
+                error("AI returned reasoning without a final answer")
+            }
         } catch (e: CancellationException) {
             wasCancelled = true
             throw e
@@ -785,8 +803,10 @@ class AiChatViewModel(
         var currentRound = startRound
         var currentAssistantTextStart = assistantTextStart
         while (true) {
+            toolTrace.validationError()?.let { error(it) }
             val toolCalls = toolTrace.pendingToolCalls()
             if (toolCalls.isEmpty()) return false
+            generationUseCase.validateToolCalls(toolCalls)?.let { error(it) }
             toolCalls.firstOrNull { activeToolLoopGuard.recordAndIsLoop(it) }?.let { repeated ->
                 error("Chatbot repeated tool call without progress: ${repeated.name}")
             }

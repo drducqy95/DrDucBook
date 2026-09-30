@@ -22,6 +22,7 @@ import io.legado.app.domain.model.AiTaskPresetConfig
 import io.legado.app.domain.model.AiTaskPresetDraft
 import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.domain.model.AiOAuthProviderId
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -194,6 +195,13 @@ class AiProfileRepository(
         // 2. Mark existing models for this provider not in discovered list as STALE
         if (discoveredIds.isNotEmpty()) {
             aiProfileDao.markModelsStale(providerId, discoveredIds.toList(), now)
+        }
+        if (providerId == AiOAuthProviderId.ANTIGRAVITY) {
+            aiProfileDao.deprecateModels(
+                providerId = providerId,
+                modelIds = listOf(ANTIGRAVITY_RETIRED_MODEL_ID),
+                now = now,
+            )
         }
 
         profiles

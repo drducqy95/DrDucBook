@@ -120,6 +120,26 @@ data class QuickDictionaryPack(
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
+enum class QuickDictionaryPackStatus {
+    NOT_INSTALLED,
+    DOWNLOADING,
+    VERIFYING,
+    READY,
+    EDITED,
+    FAILED,
+    OUTDATED,
+}
+
+data class QuickDictionaryPackState(
+    val status: QuickDictionaryPackStatus = QuickDictionaryPackStatus.NOT_INSTALLED,
+    val activePackId: String? = null,
+    val activeRevision: String? = null,
+    val pristineRevision: String? = null,
+    val entryCount: Int = 0,
+    val lastError: String? = null,
+    val lastVerifiedAt: Long? = null,
+)
+
 enum class QuickDictionaryImportPhase {
     ANALYZING,
     INDEXING,

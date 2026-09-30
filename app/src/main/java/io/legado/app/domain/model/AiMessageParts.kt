@@ -51,6 +51,28 @@ sealed interface AiMessagePart {
         val intro: String? = null
     ) : AiMessagePart
 
+    @Keep
+    @Serializable
+    @SerialName("citation")
+    data class Citation(
+        val uri: String,
+        val title: String = "",
+        val snippet: String = "",
+        val startIndex: Int? = null,
+        val endIndex: Int? = null,
+    ) : AiMessagePart
+
+    @Keep
+    @Serializable
+    @SerialName("usage")
+    data class Usage(
+        val promptTokens: Int = 0,
+        val completionTokens: Int = 0,
+        val totalTokens: Int = 0,
+        val reasoningTokens: Int = 0,
+        val estimated: Boolean = false,
+    ) : AiMessagePart
+
     // ---- Legacy parts (deprecated, kept for backward-compatible deserialization) ----
 
     @Deprecated("Use Tool instead — tool call and result are now a single part")

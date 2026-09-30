@@ -96,6 +96,7 @@ class AiTextFactoryUseCase(
                         referenceText = request.referenceText,
                     ),
                     toolContext = toolContext,
+                    outputContract = request.outputContract,
                 )
             }
             val output = if (partialOutputs.size == 1) {
@@ -106,6 +107,7 @@ class AiTextFactoryUseCase(
                     systemPrompt = systemPrompt,
                     userContent = buildMergeUserInput(partialOutputs),
                     toolContext = toolContext,
+                    outputContract = request.outputContract,
                 )
             }
             val now = System.currentTimeMillis()
@@ -185,6 +187,7 @@ class AiTextFactoryUseCase(
                 outputBuilder = outputBuilder,
                 reasoningBuilder = reasoningBuilder,
                 emitEvent = { emit(it) },
+                outputContract = request.outputContract,
             )
         } else {
             val partialOutputs = chunks.map { chunk ->
@@ -197,6 +200,7 @@ class AiTextFactoryUseCase(
                         referenceText = request.referenceText,
                     ),
                     toolContext = toolContext,
+                    outputContract = request.outputContract,
                 )
             }
             val merged = generate(
@@ -204,6 +208,7 @@ class AiTextFactoryUseCase(
                 systemPrompt = systemPrompt,
                 userContent = buildMergeUserInput(partialOutputs),
                 toolContext = toolContext,
+                outputContract = request.outputContract,
             )
             outputBuilder.append(merged)
             emit(StreamEvent.Content(merged))
@@ -301,6 +306,7 @@ class AiTextFactoryUseCase(
         systemPrompt: String,
         userContent: String,
         toolContext: AiToolContext?,
+        outputContract: String?,
     ): String {
         return aiToolAwareGenerationUseCase.generate(
             AiGenerateRequest(
@@ -312,6 +318,7 @@ class AiTextFactoryUseCase(
                 params = preset.params,
                 toolContext = toolContext,
                 taskType = preset.taskType,
+                outputContract = outputContract.orEmpty(),
                 routeProfileId = preset.runtimeOptions.routeProfileId,
                 routeSessionKey = toolContext?.bookUrl,
             )
@@ -326,6 +333,7 @@ class AiTextFactoryUseCase(
         outputBuilder: StringBuilder,
         reasoningBuilder: StringBuilder,
         emitEvent: suspend (StreamEvent) -> Unit,
+        outputContract: String?,
     ) {
         aiToolAwareGenerationUseCase.generateStream(
             AiGenerateRequest(
@@ -337,6 +345,7 @@ class AiTextFactoryUseCase(
                 params = preset.params,
                 toolContext = toolContext,
                 taskType = preset.taskType,
+                outputContract = outputContract.orEmpty(),
                 routeProfileId = preset.runtimeOptions.routeProfileId,
                 routeSessionKey = toolContext?.bookUrl,
             )

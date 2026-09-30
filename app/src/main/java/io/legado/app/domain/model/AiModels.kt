@@ -94,6 +94,9 @@ object AiPromptTemplate {
     const val DEFAULT_TEXT_FACTORY =
         "You are a fiction text processing assistant. Follow the user's instruction for the provided text. Preserve continuity, names, and important facts unless the user explicitly asks to change them. Return only the requested text, with no Markdown or explanations."
 
+    const val DEFAULT_REWRITE =
+        "You are a careful fiction editor. Rewrite the supplied text in the requested language while preserving meaning, paragraph breaks, names, placeholders, markup, URLs, and dialogue. Return only the rewritten text; never return JSON, Markdown fences, analysis, or explanations."
+
     const val DEFAULT_AUTHORING_DIRECTOR =
         "You are a story architect. Expand only from the user's idea and outline, keep cause and effect coherent, preserve the intended genre and theme, and never replace the user's creative direction with an unrelated story."
 
@@ -500,6 +503,12 @@ data class AiGenerateRequest(
     val routeRetryOffset: Int = 0,
     /** Semantic validation failure reported by the caller for the previously used route target. */
     val routeSemanticFailureKind: AiFailureKind? = null,
+    /**
+     * The response contract used by capability probing and routing. An empty value means that
+     * the router derives it from [taskType] and [tools]. Keeping the default empty is important
+     * because Kotlin's copy() retains the original default when a caller changes taskType.
+     */
+    val outputContract: String = "",
 )
 
 @Keep

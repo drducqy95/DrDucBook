@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -51,6 +53,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drducbook.app.R
 import coil.compose.AsyncImage
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
+import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.ui.translation.TranslationCaseControls
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBar
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
@@ -260,6 +264,8 @@ fun BookStoryMemoryScreen(
             onSave = { onIntent(BookStoryMemoryIntent.SaveEditor) },
             onDelete = { onIntent(BookStoryMemoryIntent.DeleteEditor) },
             onGenerateImage = { onIntent(BookStoryMemoryIntent.GenerateEditorImage) },
+            onRequestSuggestion = { provider -> onIntent(BookStoryMemoryIntent.RequestSuggestion(provider)) },
+            onApplySuggestion = { value -> onIntent(BookStoryMemoryIntent.ApplySuggestion(value)) },
             onDismiss = { onIntent(BookStoryMemoryIntent.DismissEditor) },
         )
     }
@@ -273,6 +279,8 @@ private fun StoryMemoryEditorDialog(
     onSave: () -> Unit,
     onDelete: () -> Unit,
     onGenerateImage: () -> Unit,
+    onRequestSuggestion: (String) -> Unit,
+    onApplySuggestion: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -301,6 +309,52 @@ private fun StoryMemoryEditorDialog(
                 if (draft.kind != AiTranslationStoryMemoryKind.TIMELINE) {
                     EditorField(draft.secondary, { onChange(draft.copy(secondary = it)) },
                         stringResource(R.string.story_memory_target))
+                    EditorField(
+                        draft.senseKey,
+                        { onChange(draft.copy(senseKey = it)) },
+                        stringResource(R.string.story_memory_sense_key),
+                    )
+                    TranslationCaseControls(
+                        value = draft.secondary,
+                        onValueChange = { onChange(draft.copy(secondary = it)) },
+                    )
+                    if (draft.kind in setOf(
+                            AiTranslationStoryMemoryKind.ENTITY,
+                            AiTranslationStoryMemoryKind.WORLD_BUILDING,
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.quick_dictionary_translation_provider),
+                        )
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TranslationConstants.providerValues
+                                .zip(TranslationConstants.providerDisplayNames)
+                                .forEach { (provider, label) ->
+                                    FilterChip(
+                                        selected = draft.selectedProvider == provider,
+                                        enabled = !draft.isSuggesting,
+                                        onClick = { onRequestSuggestion(provider) },
+                                        label = { Text(label) },
+                                    )
+                                }
+                        }
+                        if (draft.isSuggesting) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        if (draft.suggestions.isNotEmpty()) {
+                            Text(stringResource(R.string.quick_dictionary_suggestions))
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                draft.suggestions.forEach { suggestion ->
+                                    TextButton(
+                                        onClick = { onApplySuggestion(suggestion.text) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text("${suggestion.providerLabel}: ${suggestion.text}")
+                                    }
+                                }
+                            }
+                        }
+                    }
                     EditorField(draft.type, { onChange(draft.copy(type = it)) },
                         stringResource(R.string.story_memory_type))
                 }

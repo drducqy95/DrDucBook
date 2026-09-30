@@ -18,6 +18,7 @@ import io.legado.app.domain.gateway.AiPromptPresetGateway
 import io.legado.app.domain.gateway.LocalAiTranslationGateway
 import io.legado.app.domain.gateway.TranslationCacheGateway
 import io.legado.app.domain.model.AiGenerateRequest
+import io.legado.app.domain.model.AiOutputContract
 import io.legado.app.domain.model.AiCapability
 import io.legado.app.domain.model.AiFailureKind
 import io.legado.app.domain.model.AiMessage
@@ -30,6 +31,7 @@ import io.legado.app.domain.model.AiTranslationChunkContext
 import io.legado.app.domain.model.AiTranslationChunkPlanner
 import io.legado.app.domain.model.AiTranslationEntity
 import io.legado.app.domain.model.AiTranslationStoryContext
+import io.legado.app.domain.model.AiTranslationStoryMemoryPipeline
 import io.legado.app.domain.model.AiTranslationProtectionProtocol
 import io.legado.app.domain.model.AiTranslationRefinePipeline
 import io.legado.app.domain.model.AiTranslationRefinerResult
@@ -37,6 +39,7 @@ import io.legado.app.domain.model.AiTranslationTokenBudget
 import io.legado.app.domain.model.AiTranslationLayoutProtocol
 import io.legado.app.domain.model.AiTranslationStreamAccumulator
 import io.legado.app.domain.model.AiPromptCatalog
+import io.legado.app.domain.model.AiPromptTemplate
 import io.legado.app.domain.model.AiTaskPresetConfig
 import io.legado.app.domain.model.AiTaskRuntimeOptions
 import io.legado.app.domain.model.AiTaskType
@@ -50,6 +53,7 @@ import io.legado.app.domain.model.QuickTranslationPronounMode
 import io.legado.app.domain.model.RetryReason
 import io.legado.app.domain.model.TextChunk
 import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.domain.model.TranslationContentSanitizer
 import io.legado.app.domain.model.TranslationPromptStage
 import io.legado.app.domain.model.LocalAiTranslationBudgetPlanner
 import io.legado.app.domain.model.VietnameseTranslationPostProcessor
@@ -73,6 +77,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.IdentityHashMap
+import java.util.LinkedHashMap
 
 class TranslateChapterUseCase(
     private val aiTextGateway: AiTextGateway,
@@ -118,6 +124,12 @@ class TranslateChapterUseCase(
     }
 
     private val dictionaryLock = Any()
+    private val nmtProjectionCache = object : LinkedHashMap<String, List<DictPair>>(128, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, List<DictPair>>?,
+        ): Boolean = size > 128
+    }
+    private val nmtDictionaryIndexCache = IdentityHashMap<List<DictPair>, Map<Char, List<DictPair>>>()
 
     private sealed interface ChunkTranslationEvent {
         data class Partial(val chunkIndex: Int, val text: String) : ChunkTranslationEvent
@@ -204,9 +216,17 @@ class TranslateChapterUseCase(
                 .map { it.original }
             val source = removeQuickIgnoredTerms(text, ignoredTerms)
             val bookTerms = book?.let(dictionaryGateway::getBookDictionaries)?.pairs.orEmpty()
+            val memoryTerms = book?.let { currentBook ->
+                runCatching {
+                    val snapshot = translationStoryMemoryUseCase?.loadSnapshot(currentBook.bookUrl)
+                    snapshot?.let {
+                        AiTranslationStoryMemoryPipeline.selectContext(it, Int.MAX_VALUE, text).memoryDictionary
+                    }.orEmpty()
+                }.getOrDefault(emptyList())
+            }.orEmpty()
             val quickPronounMode = book?.getQuickTranslationPronounModeOverride()
             val dictionaries = mergeDictionaryTerms(
-                primaryTerms = bookTerms,
+                primaryTerms = memoryTerms + bookTerms,
                 fallbackTerms = quickTerms.filterNot {
                     it.translation == QUICK_DICTIONARY_IGNORE_TARGET
                 },
@@ -218,14 +238,12 @@ class TranslateChapterUseCase(
                     customPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() },
                     pronounMode = quickPronounMode,
                 )
-                TranslationConstants.PROVIDER_NMT -> try {
+                TranslationConstants.PROVIDER_NMT -> {
                     nmtTranslationGateway.translate(
                         text = source,
                         dictionary = dictionaries,
                         config = currentNmtDecodeConfig(),
                     ).text
-                } finally {
-                    nmtTranslationGateway.close()
                 }
                 TranslationConstants.PROVIDER_GOOGLE -> translateWithGoogle(source, targetLanguage)
                     .getOrThrow()
@@ -392,13 +410,44 @@ class TranslateChapterUseCase(
             val providerConfigRevision = providerConfigurationRevision(provider, book)
 
             val originalContent = BookHelp.getContent(book, bookChapter)
+                ?.let(TranslationContentSanitizer::sanitize)
+                ?.takeIf(String::isNotBlank)
                 ?: return@withContext Result.failure(Exception("Failed to read original content"))
-            onProgress(TranslationProgress(0, 0, stage = "SOURCE_READ chars=${originalContent.length}"))
+            onProgress(TranslationProgress(0, 1, stage = "SOURCE_READ chars=${originalContent.length}"))
             val quickPronounMode = book.getQuickTranslationPronounModeOverride()
             val quickTranslationPackVersion = quickTranslationGateway.packVersionFor(quickPronounMode)
             val dictionaryRevision = quickDictionaryGateway.getEffectiveRevision(
                 book = book,
                 context = originalContent,
+            )
+
+            // Story memory is a cache dependency, not merely optional prompt context. Load it
+            // before any cache lookup so a user-edited target immediately invalidates related
+            // chapter/chunk translations.
+            val bookDictionary = dictionaryGateway.getBookDictionaries(book)
+            val storyContext = try {
+                translationStoryMemoryUseCase?.prepareForTranslation(
+                    book = book,
+                    currentChapter = bookChapter,
+                    currentContent = originalContent,
+                    preset = preset,
+                    baseDictionary = bookDictionary.pairs,
+                ) ?: AiTranslationStoryContext()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                AiTranslationStoryContext()
+            }
+            var storyMemoryRevision = GSON.toJson(storyContext)
+            onProgress(
+                TranslationProgress(
+                    0,
+                    1,
+                    stage = "STORY_CONTEXT_LOADED entities=${storyContext.currentEntities.size} " +
+                        "relationships=${storyContext.currentRelationships.size} " +
+                        "world=${storyContext.currentWorldBuilding.size} " +
+                        "timelines=${storyContext.recentTimelines.size}",
+                )
             )
 
             val rawContentHash = translationCacheGateway.computeContentHash(originalContent)
@@ -412,7 +461,10 @@ class TranslateChapterUseCase(
                 contentHash = dictionaryContentHash,
                 providerConfigurationRevision = providerConfigRevision,
                 computeHash = translationCacheGateway::computeContentHash,
-            )
+            ).let { baseHash ->
+                if (storyMemoryRevision.isBlank()) baseHash
+                else "$baseHash|story-memory:${translationCacheGateway.computeContentHash(storyMemoryRevision)}"
+            }
 
             val protectedRevision = findPreferredProtectedRevision(
                 book = book,
@@ -501,36 +553,10 @@ class TranslateChapterUseCase(
                 }
             }
 
-            // Load book dictionary for consistent terminology
-            val bookDictionary = dictionaryGateway.getBookDictionaries(book)
-            val storyContext = try {
-                translationStoryMemoryUseCase?.prepareForTranslation(
-                    book = book,
-                    currentChapter = bookChapter,
-                    currentContent = originalContent,
-                    preset = preset,
-                    baseDictionary = bookDictionary.pairs,
-                ) ?: AiTranslationStoryContext()
-            } catch (error: CancellationException) {
-                throw error
-            } catch (_: Throwable) {
-                // Story memory enriches translation but must never block a chapter when it is
-                // absent, incomplete, or temporarily cannot be analyzed.
-                AiTranslationStoryContext()
-            }
-            val storyMemoryRevision = GSON.toJson(storyContext)
-            onProgress(
-                TranslationProgress(
-                    0,
-                    0,
-                    stage = "STORY_CONTEXT_LOADED entities=${storyContext.currentEntities.size} " +
-                        "relationships=${storyContext.currentRelationships.size} " +
-                        "world=${storyContext.currentWorldBuilding.size} " +
-                        "timelines=${storyContext.recentTimelines.size}",
-                )
-            )
             var activeStoryContext = storyContext
             val storyContextLock = Any()
+            var plannedChunkCount = 1
+            var completedChunkCount = 0
             val storyContextProvider: () -> AiTranslationStoryContext = {
                 synchronized(storyContextLock) { activeStoryContext }
             }
@@ -547,24 +573,14 @@ class TranslateChapterUseCase(
                 .map { it.original }
             val scopedQuickPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() }
             val dictionaries = mergeDictionaryTerms(
-                primaryTerms = bookDictionary.pairs + storyContext.entityDictionary,
+                primaryTerms = storyContext.memoryDictionary + bookDictionary.pairs,
                 fallbackTerms = scopedQuickTerms,
             )
                 .toMutableList()
 
-            // Callback to update dictionary pairs immediately (persist as soon as discovered)
-            val onDictionaryUpdate: (List<DictPair>) -> Unit = { newPairs ->
-                val merged = synchronized(dictionaryLock) {
-                    mergeDictionaryPairs(dictionaries, newPairs)
-                }
-                if (merged) {
-                    synchronized(dictionaryLock) {
-                        dictionaryGateway.updateBookDic(book, dictionaries.toList())
-                    }
-                }
-            }
-
-            val onStoryMemoryUpdate: suspend (AiTranslationRefinerResult, String) -> Unit = { result, source ->
+            // A successful chunk commits its staged dictionary/story-memory deltas before the
+            // next chunk starts. Failed attempts never mutate persistent state.
+            val commitStoryMemoryUpdate: suspend (AiTranslationRefinerResult, String) -> Unit = { result, source ->
                 val memoryResult = translationStoryMemoryUseCase?.persistRefinerResult(
                     book = book,
                     chapter = bookChapter,
@@ -579,6 +595,7 @@ class TranslateChapterUseCase(
                                 val refreshed = io.legado.app.domain.model.AiTranslationStoryMemoryPipeline
                                     .selectContext(snapshot, bookChapter.index, originalContent)
                                 synchronized(storyContextLock) { activeStoryContext = refreshed }
+                                storyMemoryRevision = GSON.toJson(refreshed)
                             }
                         }
                         "MEMORY_COMMITTED records=$count"
@@ -589,8 +606,8 @@ class TranslateChapterUseCase(
                 ) ?: "MEMORY_DISABLED"
                 onProgress(
                     TranslationProgress(
-                        currentChunk = 0,
-                        totalChunks = 0,
+                        currentChunk = completedChunkCount,
+                        totalChunks = plannedChunkCount,
                         stage = stage,
                     )
                 )
@@ -604,8 +621,9 @@ class TranslateChapterUseCase(
 
             val maxCharsPerChunk = when (provider) {
                 TranslationConstants.PROVIDER_LOCAL_AI -> {
+                    val localContextWindow = localAiTranslationGateway?.contextWindow() ?: 4_096
                     val budget = LocalAiTranslationBudgetPlanner.plan(
-                        contextWindow = 4_096,
+                        contextWindow = localContextWindow,
                         providerMaxOutputTokens = 4_096,
                         configuredMaxOutputTokens = null,
                         configuredMaxSourceChars = TranslationConfig.localAiMaxCharsPerChunk,
@@ -633,6 +651,7 @@ class TranslateChapterUseCase(
             if (chunks.isEmpty()) {
                 return@withContext Result.failure(Exception("Failed to chunk content"))
             }
+            plannedChunkCount = chunks.size
             onProgress(
                 TranslationProgress(
                     0,
@@ -702,11 +721,15 @@ class TranslateChapterUseCase(
                     targetLanguage,
                     chunk.index,
                     provider,
+                    // An explicit retranslation may display the previous chunk as a
+                    // temporary fallback while the replacement is running. It is never
+                    // selected as the new result because allowCachedChunk remains false.
+                    expectedContentHash = if (forceRetranslate) null else chunkContentHashes.getValue(chunk.index),
                 )
                 val cachedContent = cached?.translatedChunkContent
                 val hasUsableCachedContent = cached != null &&
                     cachedContent != null &&
-                    cached.isSuccess &&
+                    cached.isReadable &&
                     cached.originalChunkContent == chunk.content &&
                     isUsableCachedTranslation(
                         source = removeQuickIgnoredTerms(chunk.content, scopedQuickIgnoredTerms),
@@ -787,6 +810,8 @@ class TranslateChapterUseCase(
                     val events = Channel<ChunkTranslationEvent>(Channel.UNLIMITED)
                     group.forEach { chunk ->
                         launch {
+                            val stagedDictionary = mutableListOf<DictPair>()
+                            val stagedStoryMemory = mutableListOf<Pair<AiTranslationRefinerResult, String>>()
                             val result = try {
                                 translateAndCacheChunk(
                                     chunk = chunk,
@@ -798,7 +823,7 @@ class TranslateChapterUseCase(
                                     provider = provider,
                                     preset = preset,
                                     dictionaries = dictionaries,
-                                    onDictionaryUpdate = onDictionaryUpdate,
+                                    onDictionaryUpdate = { pairs -> stagedDictionary += pairs },
                                     promptStages = promptStages,
                                     allowCachedChunk = !forceRetranslate,
                                     quickPhonetics = scopedQuickPhonetics,
@@ -826,7 +851,9 @@ class TranslateChapterUseCase(
                                         else -> AiTranslationChunkContext()
                                     },
                                     storyContextProvider = storyContextProvider,
-                                    onStoryMemoryUpdate = onStoryMemoryUpdate,
+                                    onStoryMemoryUpdate = { memory, source ->
+                                        stagedStoryMemory += memory to source
+                                    },
                                     onStage = { stage ->
                                         onProgress(
                                             TranslationProgress(
@@ -846,11 +873,50 @@ class TranslateChapterUseCase(
                                             ChunkTranslationEvent.Partial(chunk.index, partial)
                                         )
                                     },
+                                    onNmtQuality = { report ->
+                                        if (provider == TranslationConstants.PROVIDER_NMT &&
+                                            report.status == io.legado.app.domain.gateway.NmtQualityStatus.DEGRADED
+                                        ) {
+                                            onProgress(
+                                                TranslationProgress(
+                                                    currentChunk = translatedChunks.size,
+                                                    totalChunks = chunks.size,
+                                                    mixedContent = stableDisplayChunks().let { displayChunks ->
+                                                        PartialTranslationAssembler.assemble(chunks, displayChunks)
+                                                    },
+                                                    translatedChunkIndices = stableDisplayChunks().keys.toSet(),
+                                                    stage = "NMT_QUALITY_DEGRADED missingTerms=${report.missingRequiredTerms.size}",
+                                                )
+                                            )
+                                        }
+                                    },
                                 )
                             } catch (error: CancellationException) {
                                 throw error
                             } catch (error: Throwable) {
                                 Result.failure(error)
+                            }
+                            if (result.isSuccess) {
+                                if (stagedDictionary.isNotEmpty()) {
+                                    val shouldPersist = synchronized(dictionaryLock) {
+                                        mergeDictionaryPairs(dictionaries, stagedDictionary)
+                                    }
+                                    if (shouldPersist) {
+                                        synchronized(nmtProjectionCache) {
+                                            nmtProjectionCache.clear()
+                                            nmtDictionaryIndexCache.clear()
+                                        }
+                                    }
+                                    if (shouldPersist && provider == TranslationConstants.PROVIDER_APP_AI) {
+                                        dictionaryGateway.updateBookDic(
+                                            book,
+                                            synchronized(dictionaryLock) { dictionaries.toList() },
+                                        )
+                                    }
+                                }
+                                stagedStoryMemory.forEach { (memory, source) ->
+                                    commitStoryMemoryUpdate(memory, source)
+                                }
                             }
                             events.send(ChunkTranslationEvent.Completed(chunk, result))
                         }
@@ -884,6 +950,7 @@ class TranslateChapterUseCase(
                                 streamingChunks.remove(event.chunk.index)
                                 if (event.result.isSuccess) {
                                     translatedChunks[event.chunk.index] = event.result.getOrThrow()
+                                    completedChunkCount = translatedChunks.size
                                     val displayChunks = stableDisplayChunks()
                                     val mixedContent = postProcessTranslation(
                                         PartialTranslationAssembler.assemble(
@@ -982,35 +1049,34 @@ class TranslateChapterUseCase(
      * Merge new pairs into existing list:
      * - If original exists, replace the translation
      * - If new, add to list
-     * - Keep at most MAX_DICTIONARY_PAIRS
+     * - Keep every persisted term; NMT applies its limit only to the per-chunk projection
      * @return true if any changes were made
      */
     private fun mergeDictionaryPairs(existing: MutableList<DictPair>, newPairs: List<DictPair>): Boolean {
         var changed = false
+        val positions = existing.withIndex().associate { indexed ->
+            dictionaryPairKey(indexed.value) to indexed.index
+        }.toMutableMap()
         for (newPair in newPairs) {
-            val existingIndex = existing.indexOfFirst { it.original == newPair.original }
-            if (existingIndex >= 0) {
+            val key = dictionaryPairKey(newPair)
+            val existingIndex = positions[key]
+            if (existingIndex != null) {
                 if (existing[existingIndex].translation != newPair.translation) {
                     existing[existingIndex] = newPair
                     changed = true
                 }
             } else {
                 existing.add(newPair)
+                positions[key] = existing.lastIndex
                 changed = true
             }
         }
 
-        // Keep early important names and the most recently discovered terms.
-        if (existing.size > MAX_DICTIONARY_PAIRS) {
-            val headCount = MAX_DICTIONARY_PAIRS / 2
-            val tailCount = MAX_DICTIONARY_PAIRS - headCount
-            val trimmed = existing.take(headCount) + existing.takeLast(tailCount)
-            existing.clear()
-            existing.addAll(trimmed)
-            changed = true
-        }
         return changed
     }
+
+    private fun dictionaryPairKey(pair: DictPair): String =
+        "${pair.type.name}\u0000${pair.original.trim().lowercase()}"
 
     private suspend fun translateAndCacheChunk(
         chunk: TextChunk,
@@ -1036,6 +1102,7 @@ class TranslateChapterUseCase(
         onStage: (String) -> Unit,
         routeSessionKey: String,
         onPartialTranslation: (String) -> Unit,
+        onNmtQuality: (io.legado.app.domain.gateway.NmtQualityReport) -> Unit = {},
     ): Result<String> {
         val sourceContent = removeQuickIgnoredTerms(chunk.content, quickIgnoredTerms)
         val existingCache =
@@ -1045,8 +1112,12 @@ class TranslateChapterUseCase(
                 targetLanguage,
                 chunk.index,
                 provider,
+                // Keep a readable previous chunk available to the explicit-retranslation
+                // fallback path. The cache is still not selected because allowCachedChunk is
+                // false; a successful replacement is saved with the new content hash.
+                expectedContentHash = if (isExplicitRetranslation) null else contentHash,
             )
-        if (allowCachedChunk && existingCache?.isSuccess == true &&
+        if (allowCachedChunk && existingCache?.isReadable == true &&
             existingCache.originalContentHash == contentHash &&
             existingCache.provider == provider &&
             existingCache.originalChunkContent == chunk.content &&
@@ -1061,6 +1132,7 @@ class TranslateChapterUseCase(
             return Result.success(existingCache.translatedChunkContent)
         }
 
+        var nmtQuality = io.legado.app.domain.gateway.NmtQualityReport()
         val result = translateChunkWithRetry(
             chunk,
             targetLanguage,
@@ -1080,15 +1152,26 @@ class TranslateChapterUseCase(
             onStage,
             routeSessionKey,
             onPartialTranslation,
+            onNmtQuality = { report ->
+                nmtQuality = report
+                onNmtQuality(report)
+            },
         )
         if (result.isSuccess) {
             translationCacheGateway.saveChunk(
                 book, bookChapter, targetLanguage,
                 chunk.index, chunk.content, cacheContentHash(),
                 provider,
-                TranslationCache.STATUS_SUCCESS, result.getOrThrow(), null
+                if (nmtQuality.status == io.legado.app.domain.gateway.NmtQualityStatus.DEGRADED) {
+                    TranslationCache.STATUS_DEGRADED
+                } else {
+                    TranslationCache.STATUS_SUCCESS
+                },
+                result.getOrThrow(),
+                nmtQuality.missingRequiredTerms.takeIf { it.isNotEmpty() }
+                    ?.joinToString(prefix = "NMT_QUALITY_DEGRADED missingTerms=", separator = ", "),
             )
-        } else if (existingCache?.isSuccess != true) {
+        } else if (existingCache?.isReadable != true) {
             val errorMessage = result.exceptionOrNull()?.message
                 ?: "Provider $provider did not report a failure reason"
             translationCacheGateway.saveChunk(
@@ -1121,6 +1204,7 @@ class TranslateChapterUseCase(
         routeSessionKey: String,
         onPartialTranslation: (String) -> Unit,
         splitDepth: Int = 0,
+        onNmtQuality: (io.legado.app.domain.gateway.NmtQualityReport) -> Unit = {},
     ): Result<String> {
         var lastError: Exception? = null
         var lastRetryReason: RetryReason? = null
@@ -1134,8 +1218,13 @@ class TranslateChapterUseCase(
             TranslationConfig.llmRetryCount
         }
         val pipelineAttempts = configuredRetryCount.coerceIn(0, 5) + 1
+            val dictSnapshot = synchronized(dictionaryLock) {
+                mergeDictionaryTerms(
+                    primaryTerms = storyContextProvider().memoryDictionary,
+                    fallbackTerms = dictionaries.toList(),
+                )
+            }
         for (pipelineAttempt in 1..pipelineAttempts) {
-            val dictSnapshot = synchronized(dictionaryLock) { dictionaries.toList() }
             val sourceContent = removeQuickIgnoredTerms(chunk.content, quickIgnoredTerms)
             val result = when (provider) {
                 TranslationConstants.PROVIDER_GOOGLE -> translateWithGoogle(sourceContent, targetLanguage)
@@ -1171,11 +1260,27 @@ class TranslateChapterUseCase(
                     }
                 }
                 TranslationConstants.PROVIDER_NMT -> runCatching {
-                    nmtTranslationGateway.translate(
+                    val selectedDictionary = selectNmtDictionaries(dictSnapshot, sourceContent)
+                    val dictionaryFingerprint = nmtDictionaryFingerprint(
+                        dictionary = selectedDictionary,
+                        memoryRevision = storyContextProvider().memoryRevision,
+                    )
+                    val nmtResult = nmtTranslationGateway.translate(
                         text = sourceContent,
-                        dictionary = dictSnapshot,
-                        config = currentNmtDecodeConfig(),
-                    ).text
+                        dictionary = selectedDictionary,
+                        config = currentNmtDecodeConfig().copy(
+                            dictionaryRevision = dictionaryFingerprint,
+                            constraintFingerprint = dictionaryFingerprint,
+                        ),
+                    )
+                    if (nmtResult.qualityReport.status == io.legado.app.domain.gateway.NmtQualityStatus.DEGRADED) {
+                        onNmtQuality(nmtResult.qualityReport)
+                        onStage(
+                            "NMT_QUALITY_DEGRADED missingTerms=" +
+                                nmtResult.qualityReport.missingRequiredTerms.size,
+                        )
+                    }
+                    nmtResult.text
                 }
                 TranslationConstants.PROVIDER_LOCAL_AI -> runCatching {
                     val gateway = localAiTranslationGateway
@@ -1240,6 +1345,13 @@ class TranslateChapterUseCase(
             }
             if (result.isSuccess) {
                 val translated = result.getOrThrow()
+                if (provider == TranslationConstants.PROVIDER_NMT) {
+                    nmtOutputQualityError(sourceContent, translated)?.let { qualityError ->
+                        lastError = qualityError
+                        lastRetryReason = RetryReason.PARSE_ERROR
+                        continue
+                    }
+                }
                 val qualityError = translationQualityError(
                     source = sourceContent,
                     translated = translated,
@@ -1375,6 +1487,7 @@ class TranslateChapterUseCase(
                         routeSessionKey = "$routeSessionKey:split:${splitDepth + 1}:${splitChunk.index}",
                         onPartialTranslation = {},
                         splitDepth = splitDepth + 1,
+                        onNmtQuality = onNmtQuality,
                     )
                     if (splitResult.isFailure) return splitResult
                     translatedSplitChunks += splitChunk.copy(
@@ -1448,7 +1561,7 @@ class TranslateChapterUseCase(
             ?.takeIf(String::isNotBlank)
             ?.let { return it }
 
-        return basePromptTemplate
+        return basePromptTemplate.ifBlank { AiPromptTemplate.DEFAULT_REWRITE }
     }
 
     private suspend fun resolveTranslationPreset(book: Book? = null): AiTaskPresetConfig? {
@@ -1468,8 +1581,8 @@ class TranslateChapterUseCase(
             ?: aiProfileGateway.getTaskPreset(AiTaskType.CHAT)?.copy(
                 taskType = AiTaskType.REWRITE_TEXT,
                 name = "Rewrite fallback",
-                promptTemplate = TranslationConstants.DEFAULT_PROMPT,
-            ) ?: resolveTranslationPreset(book)
+                promptTemplate = AiPromptTemplate.DEFAULT_REWRITE,
+            )
 
         if (basePreset == null) return null
 
@@ -1636,7 +1749,8 @@ class TranslateChapterUseCase(
             }
             GSON.toJson(
                 linkedMapOf(
-                    "pipeline" to AI_TRANSLATION_PIPELINE_REVISION,
+                    "pipeline" to AI_REWRITE_PIPELINE_REVISION,
+                    "contract" to AiOutputContract.REWRITE_TEXT,
                     "preset_id" to preset?.id.orEmpty(),
                     "model_id" to preset?.model?.modelId.orEmpty(),
                     "provider_id" to preset?.model?.provider?.id.orEmpty(),
@@ -1704,7 +1818,7 @@ class TranslateChapterUseCase(
                 targetLanguage = targetLanguage,
                 sourceLanguage = sourceLanguage,
                 dictionaries = dictionaries,
-                quickPhonetics = quickPhonetics,
+                quickPhonetics = emptyList(),
             )
         return buildList(paragraphParts.size) {
             for (paragraph in paragraphParts) {
@@ -1792,6 +1906,115 @@ class TranslateChapterUseCase(
         return parts.takeIf { it.size == expectedCount }
     }
 
+    private suspend fun rewriteWithAiGateway(
+        text: String,
+        targetLanguage: String,
+        preset: AiTaskPresetConfig,
+        context: AiTranslationChunkContext,
+        retryReason: RetryReason?,
+        layoutChunk: TextChunk?,
+        routeSessionKey: String?,
+        routeRetryOffset: Int,
+        onStage: (String) -> Unit,
+        onPartial: (String) -> Unit,
+    ): Result<String> {
+        val protectedText = AiTranslationProtectionProtocol.protect(text)
+        val languageName = getLanguageDisplayName(targetLanguage)
+        val retryInstruction = buildRetryInstruction(
+            retryReason = retryReason,
+            lastErrorMessage = null,
+            targetLanguageName = languageName,
+        )
+        val systemPrompt = buildString {
+            append(preset.promptTemplate.ifBlank { AiPromptTemplate.DEFAULT_REWRITE })
+            append("\nTarget language: ").append(languageName).append('.')
+            append("\nPreserve the exact paragraph count and protected tokens.")
+            append(buildProtectedTokenInstruction(protectedText))
+            if (retryInstruction.isNotBlank()) append("\n").append(retryInstruction)
+        }
+        val userPrompt = buildString {
+            if (context.previous.isNotBlank()) {
+                append("Previous context (reference only):\n")
+                    .append(context.previous.takeLast(400))
+                    .append("\n\n")
+            }
+            append("Rewrite this text in ").append(languageName).append(". Return plain text only:\n")
+            append(protectedText.value)
+            if (context.next.isNotBlank()) {
+                append("\n\nFollowing context (reference only):\n")
+                    .append(context.next.take(400))
+            }
+        }
+        val reasoningModel = AiCapability.REASONING in preset.model.capabilities ||
+            AiCapability.REASONING in AiModelRegistry.inferCapabilities(preset.model.modelId)
+        val params = preset.params.copy(
+            temperature = preset.params.temperature
+                ?: preset.model.defaultParams.temperature
+                ?: TranslationConstants.DEFAULT_TEMPERATURE,
+            maxOutputTokens = AiTranslationTokenBudget.forSourceChars(
+                sourceChars = text.length,
+                configuredLimit = preset.params.maxOutputTokens,
+                providerLimit = preset.model.maxOutputTokens,
+                reasoningModel = reasoningModel,
+                structuredJson = false,
+            ),
+        )
+        val request = AiGenerateRequest(
+            model = preset.model,
+            messages = listOf(
+                AiMessage(AiMessageRole.SYSTEM, systemPrompt),
+                AiMessage(AiMessageRole.USER, userPrompt),
+            ),
+            params = params,
+            taskType = AiTaskType.REWRITE_TEXT,
+            outputContract = AiOutputContract.REWRITE_TEXT,
+            routeProfileId = preset.runtimeOptions.routeProfileId,
+            routeSessionKey = routeSessionKey,
+            routeRetryOffset = routeRetryOffset,
+            routeSemanticFailureKind = if (retryReason == RetryReason.PARSE_ERROR) {
+                AiFailureKind.PARSE_ERROR
+            } else null,
+        )
+        val output = AiTranslationStreamAccumulator()
+        var lastPreviewLength = 0
+        try {
+            onStage("AI_STAGE=rewrite_stream_started")
+            aiTextGateway.generateStream(request).collect { event ->
+                if (event is AiStreamEvent.Content) {
+                    output.append(event.text)
+                    val restored = protectedText.restore(output.toString())
+                    if (restored.length - lastPreviewLength >= STREAM_PREVIEW_MIN_CHARS) {
+                        onPartial(
+                            layoutChunk?.let { ContentChunker.previewWithLayout(it, restored) } ?: restored
+                        )
+                        lastPreviewLength = restored.length
+                    }
+                }
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            onStage("AI_STAGE=rewrite_provider_error ${error.message ?: error::class.java.simpleName}")
+            return Result.failure(error)
+        }
+        val raw = output.toString().trim()
+        if (raw.isBlank()) return Result.failure(Exception("Empty rewrite result"))
+        if (raw.trimStart().startsWith("{") || raw.contains("```")) {
+            return Result.failure(TranslationLayoutException("Rewrite output must be plain text"))
+        }
+        val restored = protectedText.restore(raw)
+        val tokenViolations = protectedText.integrityViolations(restored)
+        if (tokenViolations.isNotEmpty()) {
+            return Result.failure(
+                TranslationLayoutException("Rewrite changed protected token layout: ${tokenViolations.first()}")
+            )
+        }
+        if (layoutChunk != null && ContentChunker.restoreLayout(layoutChunk, restored) == null) {
+            return Result.failure(TranslationLayoutException("Rewrite changed paragraph count"))
+        }
+        return Result.success(restored)
+    }
+
     private suspend fun translateWithAiGateway(
         text: String,
         targetLanguage: String,
@@ -1811,6 +2034,20 @@ class TranslateChapterUseCase(
         routeRetryOffset: Int = 0,
         lastErrorMessage: String? = null,
     ): Result<String> {
+        if (preset.taskType == AiTaskType.REWRITE_TEXT) {
+            return rewriteWithAiGateway(
+                text = text,
+                targetLanguage = targetLanguage,
+                preset = preset,
+                context = context,
+                retryReason = retryReason,
+                layoutChunk = layoutChunk,
+                routeSessionKey = routeSessionKey,
+                routeRetryOffset = routeRetryOffset,
+                onStage = onStage,
+                onPartial = onPartial,
+            )
+        }
         if (targetLanguage == "en" && isMostlyEnglish(text)) {
             return Result.success(text)
         }
@@ -1858,6 +2095,8 @@ class TranslateChapterUseCase(
             targetLanguageName = targetLanguageName,
             retryInstruction = retryInstruction,
             protectedInstruction = protectedInstruction,
+            promptStages = promptStages,
+            includeRetranslateStage = includeRetranslateStage,
         )
         val userPrompt = AiTranslationRefinePipeline.buildUserPrompt(contextPack)
         val outputTokenBudget = AiTranslationTokenBudget.forSourceChars(
@@ -1892,6 +2131,7 @@ class TranslateChapterUseCase(
             ),
             params = params,
             taskType = AiTaskType.TRANSLATE_CHAPTER,
+            outputContract = AiOutputContract.TRANSLATION_JSON,
             routeProfileId = preset.runtimeOptions.routeProfileId,
             routeSessionKey = routeSessionKey,
             routeRetryOffset = routeRetryOffset,
@@ -1941,10 +2181,9 @@ class TranslateChapterUseCase(
             return Result.failure(Exception("Empty translation result"))
         }
         val refinerResult = runCatching {
-            AiTranslationRefinePipeline.parseRefinerOutput(
+            AiTranslationRefinePipeline.parseRefinerStructureOutput(
                 rawOutput = completedContent,
                 expectedIds = expectedIds,
-                targetLanguage = targetLanguage,
             )
         }.getOrElse { error ->
             val outputDescription = AiTranslationRefinePipeline.describeJsonOutput(completedContent)
@@ -1966,7 +2205,31 @@ class TranslateChapterUseCase(
                 "world=${refinerResult.story_memory?.worldBuilding?.size ?: 0} " +
                 "timeline=${refinerResult.story_memory?.timeline != null}",
         )
-        val assembledText = AiTranslationRefinePipeline.assemble(refinerResult)
+        val repairedResult = runCatching {
+            repairAiResidualSegments(
+                result = refinerResult,
+                targetLanguage = targetLanguage,
+                preset = preset,
+                dictionaries = promptDictionaries,
+                quickPhonetics = emptyList(),
+                routeSessionKey = routeSessionKey,
+                routeRetryOffset = routeRetryOffset,
+                onStage = onStage,
+            ).also { repaired ->
+                AiTranslationRefinePipeline.validateQuality(repaired, targetLanguage)
+            }
+        }.getOrElse { error ->
+            onStage(
+                "AI_STAGE=quality_error kind=RESIDUAL_CJK " +
+                    (error.message ?: error::class.java.simpleName),
+            )
+            return Result.failure(
+                TranslationLayoutException(
+                    "Translation quality error: ${error.message ?: "residual CJK text"}",
+                )
+            )
+        }
+        val assembledText = AiTranslationRefinePipeline.assemble(repairedResult)
         val finalText = when (targetLanguage) {
             TranslationConstants.TARGET_VIETNAMESE -> normalizeCjkPunctuation(assembledText)
             "zh" -> filterHighEnglishAiParagraphs(assembledText)
@@ -1989,14 +2252,125 @@ class TranslateChapterUseCase(
                 )
             )
         }
-        val extractedPairs = refinerResult.new_entities
+        val extractedPairs = repairedResult.new_entities
             .mapNotNull { entity -> entity.toDictionaryPair(promptDictionaries) }
             .take(10)
         if (extractedPairs.isNotEmpty()) {
             onUpdate?.invoke(extractedPairs)
         }
-        onStoryMemoryUpdate(refinerResult, text)
+        onStoryMemoryUpdate(repairedResult, text)
         return Result.success(restoredText)
+    }
+
+    private suspend fun repairAiResidualSegments(
+        result: AiTranslationRefinerResult,
+        targetLanguage: String,
+        preset: AiTaskPresetConfig,
+        dictionaries: List<DictPair>,
+        quickPhonetics: List<DictPair>,
+        routeSessionKey: String?,
+        routeRetryOffset: Int,
+        onStage: (String) -> Unit,
+    ): AiTranslationRefinerResult {
+        if (targetLanguage != TranslationConstants.TARGET_VIETNAMESE) return result
+        val repairedSegments = result.refined_segments.map { segment ->
+            val current = segment.refined_translation
+            if (!current.hasCjkSourceCodePoints() &&
+                !AiTranslationRefinePipeline.containsUnicodeCodePointEscape(current)
+            ) {
+                return@map segment
+            }
+            val locallyRepaired = repairResidualCjkForVietnamese(
+                text = current,
+                targetLanguage = targetLanguage,
+                translateResidual = { residual ->
+                    quickTranslationGateway.translate(
+                        text = residual,
+                        projectTerms = dictionaries,
+                        customPhonetics = quickPhonetics,
+                    )
+                },
+                phoneticResidual = { residual ->
+                    quickTranslationGateway.hanViet(residual, quickPhonetics)
+                },
+            )
+            if (!locallyRepaired.hasCjkSourceCodePoints() &&
+                !AiTranslationRefinePipeline.containsUnicodeCodePointEscape(locallyRepaired)
+            ) {
+                onStage("AI_STAGE=segment_cjk_repaired id=${segment.id} method=local")
+                return@map segment.copy(refined_translation = locallyRepaired)
+            }
+
+            val targeted = requestAiResidualSegment(
+                segment = segment,
+                targetLanguage = targetLanguage,
+                preset = preset,
+                routeSessionKey = routeSessionKey,
+                routeRetryOffset = routeRetryOffset,
+            )
+            val targetedText = targeted?.refined_segments
+                ?.singleOrNull { it.id == segment.id }
+                ?.refined_translation
+                ?.trim()
+            if (!targetedText.isNullOrBlank()) {
+                onStage("AI_STAGE=segment_cjk_repaired id=${segment.id} method=targeted_ai")
+                segment.copy(refined_translation = targetedText)
+            } else {
+                segment.copy(refined_translation = locallyRepaired)
+            }
+        }
+        return result.copy(refined_segments = repairedSegments)
+    }
+
+    private suspend fun requestAiResidualSegment(
+        segment: io.legado.app.domain.model.AiTranslationRefinedSegment,
+        targetLanguage: String,
+        preset: AiTaskPresetConfig,
+        routeSessionKey: String?,
+        routeRetryOffset: Int,
+    ): AiTranslationRefinerResult? {
+        val languageName = getLanguageDisplayName(targetLanguage)
+        val request = AiGenerateRequest(
+            model = preset.model,
+            messages = listOf(
+                AiMessage(
+                    AiMessageRole.SYSTEM,
+                    "Translate the supplied segment into $languageName. Return exactly one JSON object " +
+                        "with refined_segments containing id ${segment.id}. Do not output CJK characters, " +
+                        "Unicode code-point escapes, Markdown, or explanations.",
+                ),
+                AiMessage(
+                    AiMessageRole.USER,
+                    "{\"refined_segments\":[{\"id\":${segment.id},\"refined_translation\":${GSON.toJson(segment.refined_translation)}," +
+                        "\"instruction\":\"Translate every remaining CJK character naturally.\"}]}",
+                ),
+            ),
+            params = preset.params.copy(
+                maxOutputTokens = AiTranslationTokenBudget.forSourceChars(
+                    sourceChars = segment.refined_translation.length,
+                    configuredLimit = preset.params.maxOutputTokens,
+                    providerLimit = preset.model.maxOutputTokens,
+                    reasoningModel = false,
+                    structuredJson = true,
+                ),
+            ),
+            taskType = AiTaskType.TRANSLATE_CHAPTER,
+            outputContract = AiOutputContract.TRANSLATION_JSON,
+            routeProfileId = preset.runtimeOptions.routeProfileId,
+            routeSessionKey = routeSessionKey,
+            routeRetryOffset = routeRetryOffset + 1,
+            routeSemanticFailureKind = AiFailureKind.PARSE_ERROR,
+        )
+        val output = AiTranslationStreamAccumulator()
+        return runCatching {
+            aiTextGateway.generateStream(request).collect { event ->
+                if (event is AiStreamEvent.Content) output.append(event.text)
+            }
+            AiTranslationRefinePipeline.parseRefinerStructureOutput(
+                rawOutput = output.toString(),
+                expectedIds = listOf(segment.id),
+            )
+        }.getOrNull()
     }
 
     private fun AiTranslationEntity.toDictionaryPair(
@@ -2046,6 +2420,87 @@ class TranslateChapterUseCase(
             .take(maxPairs)
             .toList()
     }
+
+    /** Keeps the Messenger payload and Hachimi lexical search bounded per source chunk. */
+    private fun selectNmtDictionaries(
+        dictionaries: List<DictPair>,
+        source: String,
+    ): List<DictPair> {
+        if (dictionaries.isEmpty() || source.isBlank()) return emptyList()
+        val cacheKey = "${System.identityHashCode(dictionaries)}:${source.hashCode()}"
+        synchronized(nmtProjectionCache) {
+            nmtProjectionCache[cacheKey]?.let { return it }
+        }
+        val indexedCandidates = synchronized(nmtProjectionCache) {
+            val index = nmtDictionaryIndexCache.getOrPut(dictionaries) {
+                dictionaries.asSequence()
+                    .filter { it.original.isNotBlank() }
+                    .groupBy { it.original.trim().lowercase().first() }
+            }
+            source.lowercase()
+                .asSequence()
+                .filterNot(Char::isWhitespace)
+                .distinct()
+                .flatMap { index[it].orEmpty().asSequence() }
+                .distinct()
+                .toList()
+        }
+        val candidates = indexedCandidates.asSequence()
+            .filter { pair ->
+                pair.original.isNotBlank() &&
+                    pair.translation.isNotBlank() &&
+                    pair.translation != pair.original &&
+                    pair.type != QuickDictionaryType.PHONETIC &&
+                    pair.type != QuickDictionaryType.IGNORE &&
+                    source.contains(pair.original, ignoreCase = true) &&
+                    !(targetLanguageRejectsCjkForNmt(pair.translation))
+            }
+            // Memory is merged before QT, so the first raw occurrence is canonical. Do not let
+            // a lower-priority QT row with another semantic type re-enter the NMT payload.
+            .distinctBy { it.original.trim().lowercase() }
+            .sortedWith(
+                compareByDescending<DictPair> {
+                    when (it.type) {
+                        QuickDictionaryType.NAME,
+                        QuickDictionaryType.PRONOUN -> 2
+                        QuickDictionaryType.TERM -> 1
+                        else -> 0
+                    }
+                }.thenByDescending { it.original.length }
+                    .thenBy { it.original.lowercase() }
+                    .thenBy { it.type.name },
+            )
+            .toList()
+        val hard = candidates.filter {
+            it.type == QuickDictionaryType.NAME ||
+                it.type == QuickDictionaryType.PRONOUN
+        }.take(16)
+        val hardKeys = hard.map { it.original.trim().lowercase() }.toSet()
+        val soft = candidates
+            .filterNot { it.original.trim().lowercase() in hardKeys }
+            .take(48)
+        return (hard + soft).also { selected ->
+            synchronized(nmtProjectionCache) {
+                nmtProjectionCache[cacheKey] = selected
+            }
+        }
+    }
+
+    private fun nmtDictionaryFingerprint(
+        dictionary: List<DictPair>,
+        memoryRevision: String = "",
+    ): String =
+        dictionary.asSequence()
+            .map { "${it.type.name}\u0000${it.original.trim().lowercase()}\u0000${it.translation.trim()}" }
+            .sorted()
+            .joinToString("\u0001") + "|memory:" + memoryRevision
+            .hashCode()
+            .toUInt()
+            .toString(16)
+
+    private fun targetLanguageRejectsCjkForNmt(target: String): Boolean =
+        AiTranslationRefinePipeline.hasCjkTextCodePoints(target) ||
+            AiTranslationRefinePipeline.containsUnicodeCodePointEscape(target)
 
     private fun buildRetryInstruction(
         retryReason: RetryReason?,
@@ -2118,9 +2573,10 @@ class TranslateChapterUseCase(
         targetLanguage: String,
         isRewrite: Boolean = false,
     ): String {
+        val sanitizedText = TranslationContentSanitizer.sanitize(text)
         return if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
             val cleanedNames = VietnameseTranslationPostProcessor.cleanRogueNameQuestionMarks(
-                normalizeCjkPunctuation(text)
+                normalizeCjkPunctuation(sanitizedText)
             )
             val fixedDialogue = VietnameseTranslationPostProcessor.fixContradictoryDialoguePronouns(cleanedNames)
             val fixedForeign = VietnameseTranslationPostProcessor.fixRogueForeignHanVietNames(fixedDialogue)
@@ -2135,7 +2591,7 @@ class TranslateChapterUseCase(
                 capitalized
             }
         } else {
-            text
+            sanitizedText
         }
     }
 
@@ -2148,7 +2604,7 @@ class TranslateChapterUseCase(
         return if (hasUntranslatedCjkForVietnamese(source, translated, targetLanguage)) {
             val translatedCjk = translated.countCjkSourceCodePoints()
             TranslationQualityException(
-                "Translation changed source language: ${translatedCjk} CJK chars remain"
+                "Translation changed source language: ${translatedCjk} CJK chars or Unicode escapes remain"
             )
         } else {
             null
@@ -2162,6 +2618,13 @@ class TranslateChapterUseCase(
         provider: String,
     ): Boolean {
         if (translationQualityError(source, translated, targetLanguage) != null) return false
+        if (provider == TranslationConstants.PROVIDER_REWRITE &&
+            (translated.trimStart().startsWith("{") || translated.contains("```"))
+        ) {
+            // Rewrite has a plain-text contract. Do not resurrect old translation JSON or
+            // fenced model output from a cache created before the split pipeline.
+            return false
+        }
         if (provider == TranslationConstants.PROVIDER_APP_AI &&
             (AiTranslationLayoutProtocol.containsMarker(translated) ||
                 containsLegacyAiTranslationContract(translated))
@@ -2188,6 +2651,23 @@ class TranslateChapterUseCase(
             it in '一'..'鿿' || it in chinesePunctuation
         }
         return chineseChars.toDouble() / text.length > 0.8
+    }
+
+    private fun nmtOutputQualityError(source: String, translated: String): Exception? {
+        val normalizedSource = source.trim()
+        val normalizedOutput = translated.trim()
+        if (normalizedOutput.isEmpty()) return Exception("NMT returned empty output")
+        if (normalizedSource.length > 24 && normalizedSource == normalizedOutput) {
+            return Exception("NMT returned source text unchanged")
+        }
+        val sentences = normalizedOutput
+            .split(Regex("(?<=[.!?。！？])\\s+"))
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+        if (sentences.size >= 3 && sentences.zipWithNext().count { (left, right) -> left == right } >= 2) {
+            return Exception("NMT returned repeated output")
+        }
+        return null
     }
 
     private fun parseRetryReason(error: Exception?): RetryReason? {
@@ -2272,6 +2752,8 @@ internal fun mergeDictionaryTerms(
 
 private const val AI_TRANSLATION_PIPELINE_REVISION =
     "translator-engine-android-v5-structured-split-fallback"
+private const val AI_REWRITE_PIPELINE_REVISION =
+    "rewrite-engine-android-v1-plain-text-contract"
 
 internal fun aiTranslationFallbackSplitMaxChars(
     contentLength: Int,
@@ -2324,11 +2806,11 @@ internal fun chunkTranslationDependencyHash(
         append(configuredSourceHash)
         append("|qt-chunk:").append(computeHash(relevantDictionarySignature))
         append(":").append(quickTranslationPackVersion)
+        if (storyMemoryRevision.isNotBlank()) {
+            append("|story-memory:").append(computeHash(storyMemoryRevision))
+        }
         if (provider == TranslationConstants.PROVIDER_APP_AI) {
             append("|ai-pipeline:").append(AI_TRANSLATION_PIPELINE_REVISION)
-            if (storyMemoryRevision.isNotBlank()) {
-                append("|story-memory:").append(computeHash(storyMemoryRevision))
-            }
         }
     }
 }
@@ -2348,11 +2830,16 @@ internal fun hasUntranslatedCjkForVietnamese(
     translated: String,
     targetLanguage: String,
 ): Boolean {
-    if (targetLanguage != TranslationConstants.TARGET_VIETNAMESE || source.isBlank()) return false
+    if (targetLanguage != TranslationConstants.TARGET_VIETNAMESE) return false
+    if (containsCjkUnicodeEscape(translated)) return true
+    if (source.isBlank()) return false
     val sourceCjk = source.countCjkSourceCodePoints()
     if (sourceCjk <= 0) return false
-    return translated.hasCjkSourceCodePoints()
+    return translated.hasCjkSourceCodePoints() || containsCjkUnicodeEscape(translated)
 }
+
+internal fun containsCjkUnicodeEscape(text: String): Boolean =
+    Regex("\\bU\\+[0-9A-Fa-f]{4,6}\\b").containsMatchIn(text)
 
 internal fun repairResidualCjkForVietnamese(
     text: String,
@@ -2379,7 +2866,7 @@ internal fun repairResidualCjkForVietnamese(
                                 .getOrNull()
                                 ?.trim()
                                 ?.takeIf { it.isNotBlank() && !it.hasCjkSourceCodePoints() }
-                                ?: "U+${source.codePointAt(0).toString(16).uppercase()}"
+                                ?: unresolved.value
                         }
                 }
             }

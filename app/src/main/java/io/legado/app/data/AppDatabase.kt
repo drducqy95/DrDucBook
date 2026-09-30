@@ -73,6 +73,7 @@ import io.legado.app.data.entities.AiModelProfile
 import io.legado.app.data.entities.AiPromptPreset
 import io.legado.app.data.entities.AiProviderProfile
 import io.legado.app.data.entities.AiCredentialEntity
+import io.legado.app.data.entities.AiCredentialModelCapabilityEntity
 import io.legado.app.data.entities.AiRouteAttemptEntity
 import io.legado.app.data.entities.AiRouteProfileEntity
 import io.legado.app.data.entities.AiRouteTargetEntity
@@ -126,7 +127,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 111,
+    version = 112,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -141,6 +142,7 @@ val appDb by lazy {
         HighlightTagRule::class, TagGroupRule::class,
         BookContentProcess::class, AiPromptPreset::class, QuickDictionaryEntryEntity::class,
         QuickDictionaryUniverseEntity::class, AiCredentialEntity::class,
+        AiCredentialModelCapabilityEntity::class,
         AiRouteProfileEntity::class, AiRouteTargetEntity::class, AiRouteAttemptEntity::class,
         AiAgentRun::class, AiAgentTrace::class, AiAgentProposal::class, AiAgentAudit::class,
         AiSkill::class, AiSkillVersion::class, BookSourceHealth::class,

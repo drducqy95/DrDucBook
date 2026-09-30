@@ -84,6 +84,7 @@ import io.legado.app.domain.usecase.GenerateChapterSummaryUseCase
 import io.legado.app.domain.usecase.GetReadingProgressUseCase
 import io.legado.app.domain.usecase.SaveBookContentProcessUseCase
 import io.legado.app.domain.usecase.UploadReadingProgressUseCase
+import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.DefaultData
 import io.legado.app.help.importFontFile
@@ -237,6 +238,7 @@ class ReadBookViewModel(
     private val quickTranslationGateway: QuickTranslationGateway,
     private val accountEntitlementUseCase: AccountEntitlementUseCase,
     private val translationCacheGateway: TranslationCacheGateway,
+    private val translationStoryMemoryUseCase: TranslationStoryMemoryUseCase,
 ) : BaseViewModel(application), ReadBook.CallBack {
 
     // --- MVI State ---
@@ -652,6 +654,9 @@ class ReadBookViewModel(
             }
             is ReadBookIntent.SetQuickDictionaryContextMarkers -> updateQuickDictionary {
                 copy(contextMarkers = intent.value)
+            }
+            is ReadBookIntent.SetQuickDictionarySaveToTranslationMemory -> updateQuickDictionary {
+                copy(saveToTranslationMemory = intent.value)
             }
             is ReadBookIntent.SaveQuickDictionary -> saveQuickDictionary()
             is ReadBookIntent.OpenEntityAnalyzer -> {
@@ -6914,6 +6919,14 @@ class ReadBookViewModel(
                         scopeKey = form.scope.keyFor(book, universeKey),
                     )
                 )
+                if (form.saveToTranslationMemory) {
+                    translationStoryMemoryUseCase.addQuickDictionaryEntry(
+                        book = book,
+                        raw = form.raw,
+                        target = form.target,
+                        type = form.type,
+                    )
+                }
             }.onSuccess {
                 _uiState.update { it.copy(activeSheet = null, quickDictionary = QuickDictionaryUiState()) }
                 observedQuickDictionaryRevision = quickDictionaryGateway.currentRevision

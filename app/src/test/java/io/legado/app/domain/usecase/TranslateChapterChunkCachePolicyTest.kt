@@ -94,6 +94,22 @@ class TranslateChapterChunkCachePolicyTest {
     }
 
     @Test
+    fun relatedStoryMemoryRevisionInvalidatesNmtChunkCache() {
+        val source = "叶长生进入大殿。"
+        fun hash(memoryRevision: String) = chunkTranslationDependencyHash(
+            sourceContent = source,
+            provider = TranslationConstants.PROVIDER_NMT,
+            dictionaryTerms = listOf(DictPair("叶长生", "Diệp Trường Sinh")),
+            quickTranslationPackVersion = "pack",
+            storyMemoryRevision = memoryRevision,
+            computeHash = { it.hashCodeString() },
+        )
+
+        assertNotEquals(hash("memory-v1"), hash("memory-v2"))
+        assertEquals(hash("memory-v1"), hash("memory-v1"))
+    }
+
+    @Test
     fun mlKitDictionaryChangeInvalidatesOnlyChunkContainingChangedTerm() {
         val affected = "叶长生 enters the hall."
         val unrelated = "大梦学宫 opens its gate."

@@ -48,6 +48,10 @@ class MediaDownloadRepository(
     override suspend fun enqueue(request: MediaDownloadRequest): String {
         val now = System.currentTimeMillis()
         val taskId = stableId(request.bookUrl)
+        val existing = dao.getItemByIdentity(taskId, request.chapterIndex, request.variant.id)
+        if (existing != null && existing.status != MediaDownloadState.CANCELED.name) {
+            return taskId
+        }
         dao.insertTask(
             MediaDownloadTaskEntity(
                 id = taskId,

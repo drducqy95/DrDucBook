@@ -340,6 +340,7 @@ dependencies {
     implementation(libs.markwon.image.glide)
     implementation(libs.markwon.ext.tables)
     implementation(libs.markwon.html)
+    implementation(libs.poi.scratchpad)
     implementation(libs.quick.chinese.transfer.core)
     implementation(libs.hutool.crypto)
     implementation(libs.mlkit.language.id)

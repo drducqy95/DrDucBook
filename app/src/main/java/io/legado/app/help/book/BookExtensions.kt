@@ -76,6 +76,10 @@ val Book.isMobi: Boolean
             originName.endsWith(".azw3", true) ||
             originName.endsWith(".azw", true))
 
+val Book.isExternalDocument: Boolean
+    get() = isLocal && originName.substringAfterLast('.', "").lowercase() in
+        setOf("html", "htm", "md", "markdown", "docx", "doc")
+
 val Book.isOnLineTxt: Boolean
     get() = !isLocal && isType(BookType.text)
 
@@ -106,6 +110,7 @@ fun Book.getBookTypeName(): String {
         isUmd        -> "UMD"
         isPdf        -> "PDF"
         isMobi       -> "MOBI"
+        isExternalDocument -> originName.substringAfterLast('.', "").uppercase()
         isVideo      -> "Video"
         isAudio      -> "有声书"
         isImage      -> "漫画"

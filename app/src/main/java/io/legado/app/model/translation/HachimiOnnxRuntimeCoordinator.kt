@@ -20,5 +20,11 @@ internal object HachimiOnnxRuntimeCoordinator {
         }
     }
 
+    /** A successful reinstall invalidates existing sessions even when the model id is unchanged. */
+    fun activateInstalledModel(modelId: String) {
+        activeModelId = modelId
+        markModelChanged()
+    }
+
     fun markModelChanged(): Long = modelGeneration.incrementAndGet()
 }

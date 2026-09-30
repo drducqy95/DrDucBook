@@ -14,6 +14,8 @@ import io.legado.app.domain.model.QuickTranslationPronounMode
 import io.legado.app.domain.model.TranslationTextToken
 import io.legado.app.domain.model.TranslationTextTokenizer
 import io.legado.app.domain.model.normalizedForRuntime
+import io.legado.app.domain.model.toQuickPhoneticPair
+import io.legado.app.domain.model.toQuickTranslationPair
 import io.legado.app.utils.getPrefString
 import com.huaban.analysis.jieba.JiebaSegmenter
 import splitties.init.appCtx
@@ -36,7 +38,9 @@ import java.util.concurrent.atomic.AtomicReference
  * remain authoritative. Within one tier the longest source match wins. Unknown Han characters fall
  * back to their Hán-Việt reading.
  */
-class QuickTranslationRepository : QuickTranslationGateway {
+class QuickTranslationRepository(
+    private val externalPackStore: QuickDictionaryPackStore? = null,
+) : QuickTranslationGateway {
 
     private val jiebaTokenizer by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         val activityManager = appCtx.getSystemService(ActivityManager::class.java)
@@ -87,7 +91,8 @@ class QuickTranslationRepository : QuickTranslationGateway {
 
     override fun packVersionFor(pronounMode: QuickTranslationPronounMode?): String =
         versionWithPronounMode(
-            version = cachedPack.get()?.version ?: detectedPackVersion,
+            version = (cachedPack.get()?.version ?: detectedPackVersion) +
+                "|external:${externalPackStore?.versionToken() ?: "none"}",
             mode = resolvedPronounMode(pronounMode),
         )
 
@@ -114,8 +119,17 @@ class QuickTranslationRepository : QuickTranslationGateway {
     ): String {
         if (text.isEmpty()) return text
         if (text.codePoints().noneMatch(::isCjk)) return text
-        val safeProjectTerms = projectTerms.map(DictPair::normalizedForRuntime)
-        val safeCustomPhonetics = customPhonetics.map(DictPair::normalizedForRuntime)
+        val externalEntries = externalPackStore?.matchEntries(
+            context = text,
+            projectKey = "",
+            activeUniverseKey = "",
+        ).orEmpty()
+        val safeProjectTerms = (
+            projectTerms + externalEntries.mapNotNull { it.toQuickTranslationPair() }
+            ).map(DictPair::normalizedForRuntime)
+        val safeCustomPhonetics = (
+            customPhonetics + externalEntries.mapNotNull { it.toQuickPhoneticPair() }
+            ).map(DictPair::normalizedForRuntime)
         val pack = pack()
         val resolvedPronounMode = resolvedPronounMode(pronounMode)
         val projectRuntime = projectRuntimeFor(safeProjectTerms, pack)
@@ -193,8 +207,17 @@ class QuickTranslationRepository : QuickTranslationGateway {
             )
         }
 
-        val safeProjectTerms = projectTerms.map(DictPair::normalizedForRuntime)
-        val safeCustomPhonetics = customPhonetics.map(DictPair::normalizedForRuntime)
+        val externalEntries = externalPackStore?.matchEntries(
+            context = text,
+            projectKey = "",
+            activeUniverseKey = "",
+        ).orEmpty()
+        val safeProjectTerms = (
+            projectTerms + externalEntries.mapNotNull { it.toQuickTranslationPair() }
+            ).map(DictPair::normalizedForRuntime)
+        val safeCustomPhonetics = (
+            customPhonetics + externalEntries.mapNotNull { it.toQuickPhoneticPair() }
+            ).map(DictPair::normalizedForRuntime)
         val pack = pack()
         val resolvedPronounMode = resolvedPronounMode(pronounMode)
         val projectRuntime = projectRuntimeFor(safeProjectTerms, pack)

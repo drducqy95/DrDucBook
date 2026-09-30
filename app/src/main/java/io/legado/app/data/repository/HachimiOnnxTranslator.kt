@@ -7,6 +7,8 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.extensions.OrtxPackage
 import android.app.ActivityManager
 import android.content.Context
+import android.os.SystemClock
+import io.legado.app.domain.gateway.NmtPerformanceMetrics
 import io.legado.app.model.translation.HachimiOnnxModelRegistry
 import io.legado.app.model.translation.HachimiOnnxRuntimeCoordinator
 import io.legado.app.model.translation.NmtModelDescriptor
@@ -23,6 +25,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import java.text.Normalizer
+import java.util.LinkedHashMap
 
 data class HachimiLexicalConstraint(
     /** One or more source forms which activate this target only for the current segment. */
@@ -49,7 +52,7 @@ data class HachimiLexicalConstraint(
 data class HachimiDecodePolicy(
     /** Source-conditioned canonical terms. Constraints from unrelated segments are never applied. */
     val lexicalConstraints: List<HachimiLexicalConstraint> = emptyList(),
-    val maxNewTokens: Int = 240,
+    val maxNewTokens: Int = 192,
     val repetitionPenalty: Float = 1.2f,
     val noRepeatNgramSize: Int = 2,
     /** Retry only segments which lost a required project term, using stricter lexical decoding. */
@@ -64,10 +67,12 @@ data class HachimiDecodePolicy(
     val maxSourceChars: Int = DEFAULT_SOURCE_CHAR_BUDGET,
     /** Source-side model prefix. This is intentionally independent from the AI system prompt. */
     val sourcePrompt: String = "",
+    val dictionaryRevision: String = "",
+    val constraintFingerprint: String = "",
 ) {
     companion object {
-        const val DEFAULT_SOURCE_TOKEN_BUDGET = 96
-        const val DEFAULT_SOURCE_CHAR_BUDGET = 1000
+        const val DEFAULT_SOURCE_TOKEN_BUDGET = 64
+        const val DEFAULT_SOURCE_CHAR_BUDGET = 512
     }
 }
 
@@ -76,7 +81,11 @@ data class HachimiTranslationResult(
     val sourceSegments: Int,
     val generatedTokens: Int,
     val missingRequiredTerms: List<String> = emptyList(),
-    val attribution: String = HachimiOnnxTranslator.ATTRIBUTION
+    val attribution: String = HachimiOnnxTranslator.ATTRIBUTION,
+    val metrics: NmtPerformanceMetrics = NmtPerformanceMetrics(
+        generatedTokens = generatedTokens,
+        sourceSegments = sourceSegments,
+    )
 )
 
 /**
@@ -122,6 +131,7 @@ class HachimiOnnxTranslator(
             )
             val currentModelId = HachimiOnnxRuntimeCoordinator.currentModelId()
             val modelGeneration = HachimiOnnxRuntimeCoordinator.currentGeneration()
+            val modelLoadStarted = SystemClock.elapsedRealtime()
             val loaded = try {
                 runtime?.takeIf { runtimeGeneration == modelGeneration && runtimeModelId == currentModelId } ?: run {
                     runtime?.close()
@@ -134,6 +144,7 @@ class HachimiOnnxTranslator(
             } catch (error: OutOfMemoryError) {
                 throw releaseRuntimeAfterMemoryFailure(error)
             }
+            val modelLoadMs = SystemClock.elapsedRealtime() - modelLoadStarted
             val sourcePrompt = safePolicy.sourcePrompt.trim()
             val promptTokens = sourcePrompt.takeIf(String::isNotEmpty)
                 ?.let(loaded::sourceTokenCount)
@@ -148,10 +159,24 @@ class HachimiOnnxTranslator(
                 requestedTokenBudget = segmentTokenBudget,
                 requestedCharBudget = safePolicy.maxSourceChars,
             )
-            val constraints = loaded.encodeConstraints(policy.lexicalConstraints)
+            val constraintEncodingStarted = SystemClock.elapsedRealtime()
+            val constraints = loaded.encodeConstraints(
+                constraints = policy.lexicalConstraints,
+                cacheKey = policy.constraintFingerprint.ifBlank { policy.dictionaryRevision },
+            )
+            val constraintEncodingMs = SystemClock.elapsedRealtime() - constraintEncodingStarted
             var generatedTokens = 0
+            var sourceTokenizationMs = 0L
+            var encoderMs = 0L
+            var decoderMs = 0L
+            var strictRetryCount = 0
+            var strictRetryMs = 0L
+            var detokenizerMs = 0L
             val translated = StringBuilder(text.length + text.length / 3)
             val missingRequiredTerms = linkedSetOf<String>()
+            val translationStarted = SystemClock.elapsedRealtime()
+            var firstSegmentMs = 0L
+            var lastProgressAt = 0L
             segments.forEachIndexed { index, segment ->
                 val relevantConstraints = constraints.asSequence()
                     .filter { it.appliesTo(segment.source) }
@@ -173,6 +198,12 @@ class HachimiOnnxTranslator(
                 }
                 generatedTokens += result.tokens.size
                 missingRequiredTerms += result.missingRequiredTargets
+                sourceTokenizationMs += result.sourceTokenizationMs
+                encoderMs += result.encoderMs
+                decoderMs += result.decoderMs
+                strictRetryCount += result.strictRetryCount
+                strictRetryMs += result.strictRetryMs
+                detokenizerMs += result.detokenizerMs
                 val canonicalOutput = canonicalizeHachimiNameOutputs(
                     source = segment.source,
                     translated = result.text,
@@ -181,15 +212,16 @@ class HachimiOnnxTranslator(
                 translated.append(segment.prefixBefore)
                 translated.append(restoreHachimiQuoteSkeleton(segment.source, canonicalOutput))
                 translated.append(segment.separatorAfter)
-                val mixedText = buildString(text.length + text.length / 3) {
-                    append(translated)
-                    segments.subList(index + 1, segments.size).forEach { remaining ->
-                        append(remaining.prefixBefore)
-                        append(remaining.source)
-                        append(remaining.separatorAfter)
-                    }
+                val now = SystemClock.elapsedRealtime()
+                if (firstSegmentMs == 0L) firstSegmentMs = now - translationStarted
+                if (index == segments.lastIndex || now - lastProgressAt >= PROGRESS_INTERVAL_MS) {
+                    lastProgressAt = now
+                    onProgress(
+                        index + 1,
+                        segments.size,
+                        translated.toString().take(MAX_PROGRESS_PREVIEW_CHARS),
+                    )
                 }
-                onProgress(index + 1, segments.size, mixedText)
             }
             val chapterOutput = canonicalizeHachimiNameOutputs(
                 source = text,
@@ -204,6 +236,24 @@ class HachimiOnnxTranslator(
                 generatedTokens = generatedTokens,
                 missingRequiredTerms = missingRequiredTerms.toList(),
                 attribution = loaded.descriptor.attribution,
+                metrics = NmtPerformanceMetrics(
+                    modelLoadMs = modelLoadMs,
+                    totalMs = SystemClock.elapsedRealtime() - translationStarted,
+                    sourceTokenizationMs = sourceTokenizationMs,
+                    constraintEncodingMs = constraintEncodingMs,
+                    encoderMs = encoderMs,
+                    decoderMs = decoderMs,
+                    strictRetryCount = strictRetryCount,
+                    strictRetryMs = strictRetryMs,
+                    detokenizerMs = detokenizerMs,
+                    timeToFirstSegmentMs = firstSegmentMs,
+                    generatedTokens = generatedTokens,
+                    sourceSegments = segments.size,
+                    tokensPerSecond = generatedTokens.toFloat() /
+                        ((SystemClock.elapsedRealtime() - translationStarted).coerceAtLeast(1L) / 1000f),
+                    candidateConstraintCount = policy.lexicalConstraints.size,
+                    sentConstraintCount = constraints.size,
+                ),
             )
             scheduleIdleUnload()
             result
@@ -246,6 +296,16 @@ class HachimiOnnxTranslator(
         private val encoder: OrtSession,
         private val decoder: OrtSession,
     ) : AutoCloseable {
+        private val encodedConstraintCache = object : LinkedHashMap<String, List<EncodedConstraint>>(
+            128,
+            0.75f,
+            true,
+        ) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<String, List<EncodedConstraint>>?,
+            ): Boolean = size > 128
+        }
+
         data class SourceSegment(
             val source: String,
             val separatorAfter: String,
@@ -274,11 +334,26 @@ class HachimiOnnxTranslator(
         data class SegmentResult(
             val text: String,
             val tokens: List<Int>,
-            val missingRequiredTargets: List<String> = emptyList()
+            val missingRequiredTargets: List<String> = emptyList(),
+            val sourceTokenizationMs: Long = 0L,
+            val encoderMs: Long = 0L,
+            val decoderMs: Long = 0L,
+            val strictRetryCount: Int = 0,
+            val strictRetryMs: Long = 0L,
+            val detokenizerMs: Long = 0L,
         )
 
-        fun encodeConstraints(constraints: List<HachimiLexicalConstraint>): List<EncodedConstraint> =
-            constraints.asSequence()
+        fun encodeConstraints(
+            constraints: List<HachimiLexicalConstraint>,
+            cacheKey: String = "",
+        ): List<EncodedConstraint> {
+            val fingerprint = cacheKey.ifBlank {
+                constraints.joinToString("\u0001") { constraint -> constraint.toString() }
+            }
+            synchronized(encodedConstraintCache) {
+                encodedConstraintCache[fingerprint]?.let { return it }
+            }
+            val encoded = constraints.asSequence()
                 .filter { it.sourceKeys.any(String::isNotBlank) && it.target.isNotBlank() }
                 .distinctBy { it.target.trim().lowercase() to it.sourceKeys.map(String::trim) }
                 .take(MAX_CONSTRAINTS)
@@ -305,6 +380,11 @@ class HachimiOnnxTranslator(
                     }
                 }
                 .toList()
+            synchronized(encodedConstraintCache) {
+                encodedConstraintCache[fingerprint] = encoded
+            }
+            return encoded
+        }
 
         fun segment(
             text: String,
@@ -357,13 +437,17 @@ class HachimiOnnxTranslator(
             } else {
                 policy
             }
+            val sourceTokenizationStarted = SystemClock.elapsedRealtime()
             runTokenizer(sourceTokenizer, source).use { tokenized ->
+                val sourceTokenizationMs = SystemClock.elapsedRealtime() - sourceTokenizationStarted
+                val encoderStarted = SystemClock.elapsedRealtime()
                 encoder.run(
                     mapOf(
                         "input_ids" to tokenized.ids,
                         "attention_mask" to tokenized.attentionMask
                     )
                 ).use { encoderResult ->
+                    val encoderMs = SystemClock.elapsedRealtime() - encoderStarted
                     val hidden = encoderResult.tensor("last_hidden_state", fallbackIndex = 0)
                     val first = decode(
                         attentionMask = tokenized.attentionMask,
@@ -376,15 +460,27 @@ class HachimiOnnxTranslator(
                         effectivePolicy.retryMissingRequiredTerms &&
                         first.missingRequiredTargets.isNotEmpty()
                     ) {
-                        decode(
+                        val strictStarted = SystemClock.elapsedRealtime()
+                        val strict = decode(
                             attentionMask = tokenized.attentionMask,
                             encoderHidden = hidden,
                             policy = effectivePolicy,
                             constraints = constraints,
                             strictConstraints = true
                         )
+                        strict.copy(
+                            sourceTokenizationMs = sourceTokenizationMs,
+                            encoderMs = encoderMs,
+                            decoderMs = first.decoderMs + strict.decoderMs,
+                            strictRetryCount = 1,
+                            strictRetryMs = SystemClock.elapsedRealtime() - strictStarted,
+                            detokenizerMs = first.detokenizerMs + strict.detokenizerMs,
+                        )
                     } else {
-                        first
+                        first.copy(
+                            sourceTokenizationMs = sourceTokenizationMs,
+                            encoderMs = encoderMs,
+                        )
                     }
                 }
             }
@@ -397,6 +493,7 @@ class HachimiOnnxTranslator(
             constraints: List<EncodedConstraint>,
             strictConstraints: Boolean
         ): SegmentResult {
+            val decoderStarted = SystemClock.elapsedRealtime()
             val generated = mutableListOf(DECODER_START_TOKEN_ID)
             var currentResult: OrtSession.Result? = null
             var initialResult: OrtSession.Result? = null
@@ -468,7 +565,16 @@ class HachimiOnnxTranslator(
                     .filterNot { isSatisfied(generated, it.tokens, it.requiredOccurrences) }
                     .map(EncodedConstraint::target)
                     .toList()
-                return SegmentResult(detokenize(visible), visible, missing)
+                val detokenizerStarted = SystemClock.elapsedRealtime()
+                val output = detokenize(visible)
+                val detokenizerMs = SystemClock.elapsedRealtime() - detokenizerStarted
+                return SegmentResult(
+                    text = output,
+                    tokens = visible,
+                    missingRequiredTargets = missing,
+                    decoderMs = SystemClock.elapsedRealtime() - decoderStarted,
+                    detokenizerMs = detokenizerMs,
+                )
             } finally {
                 currentResult?.close()
                 initialResult?.close()
@@ -704,6 +810,7 @@ class HachimiOnnxTranslator(
             }.toMap()
 
         override fun close() {
+            synchronized(encodedConstraintCache) { encodedConstraintCache.clear() }
             decoder.close()
             encoder.close()
             detokenizer.close()
@@ -896,6 +1003,8 @@ class HachimiOnnxTranslator(
         private const val MIN_SOURCE_TOKENS = 32
         private const val MAX_SOURCE_TOKENS = 480
         private const val MAX_SAFE_SOURCE_TOKENS = 320
+        private const val PROGRESS_INTERVAL_MS = 250L
+        private const val MAX_PROGRESS_PREVIEW_CHARS = 4_096
         private val SENTENCE = Regex("[^。！？!?…\\n]+(?:[。！？!?…]+[”’」』\\\"]*|$)")
         // Preserve every source line boundary. Treating only two newlines as a paragraph made
         // NMT's post-processing join EPUB lines with spaces and changed the reader layout.

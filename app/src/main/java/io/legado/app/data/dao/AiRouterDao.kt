@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import io.legado.app.data.entities.AiCredentialEntity
+import io.legado.app.data.entities.AiCredentialModelCapabilityEntity
 import io.legado.app.data.entities.AiRouteAttemptEntity
 import io.legado.app.data.entities.AiRouteProfileEntity
 import io.legado.app.data.entities.AiRouteTargetEntity
@@ -26,6 +27,14 @@ interface AiRouterDao {
     @Query("SELECT * FROM ai_route_attempts ORDER BY createdAt DESC, id DESC LIMIT :limit")
     fun observeRecentAttempts(limit: Int = 100): Flow<List<AiRouteAttemptEntity>>
 
+    @Query(
+        """
+        SELECT * FROM ai_credential_model_capabilities
+        ORDER BY credentialId, modelProfileId, taskType, outputContract
+        """
+    )
+    fun observeCapabilities(): Flow<List<AiCredentialModelCapabilityEntity>>
+
     @Query("SELECT * FROM ai_credentials WHERE id = :id")
     suspend fun getCredential(id: String): AiCredentialEntity?
 
@@ -37,6 +46,66 @@ interface AiRouterDao {
         """
     )
     suspend fun getCredentialsForProvider(providerId: String): List<AiCredentialEntity>
+
+    @Query(
+        """
+        SELECT * FROM ai_credential_model_capabilities
+        WHERE credentialId = :credentialId
+        ORDER BY modelProfileId, taskType, outputContract
+        """
+    )
+    suspend fun getCapabilitiesForCredential(
+        credentialId: String,
+    ): List<AiCredentialModelCapabilityEntity>
+
+    @Query(
+        """
+        SELECT * FROM ai_credential_model_capabilities
+        WHERE credentialId = :credentialId
+          AND modelProfileId = :modelProfileId
+          AND taskType = :taskType
+          AND outputContract = :outputContract
+        LIMIT 1
+        """
+    )
+    suspend fun getCapability(
+        credentialId: String,
+        modelProfileId: String,
+        taskType: String,
+        outputContract: String,
+    ): AiCredentialModelCapabilityEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCapability(entity: AiCredentialModelCapabilityEntity)
+
+    @Query("DELETE FROM ai_credential_model_capabilities WHERE credentialId = :credentialId")
+    suspend fun deleteCapabilitiesForCredential(credentialId: String)
+
+    @Query(
+        """
+        UPDATE ai_credential_model_capabilities SET
+            status = 'unknown',
+            cooldownUntil = 0,
+            failureKind = NULL,
+            failureMessage = NULL,
+            updatedAt = :now
+        WHERE credentialId = :credentialId
+        """
+    )
+    suspend fun invalidateCredentialCapabilities(credentialId: String, now: Long)
+
+    @Query(
+        """
+        UPDATE ai_credential_model_capabilities SET
+            cooldownUntil = 0,
+            status = CASE WHEN lastSuccessAt IS NULL THEN 'unknown' ELSE 'available' END,
+            failureKind = NULL,
+            failureMessage = NULL,
+            updatedAt = :now
+        WHERE :credentialId IS NULL OR credentialId = :credentialId
+        """
+    )
+    suspend fun resetCapabilityHealth(credentialId: String?, now: Long)
 
     @Query("SELECT * FROM ai_route_profiles WHERE id = :id")
     suspend fun getRoute(id: String): AiRouteProfileEntity?
@@ -243,6 +312,7 @@ interface AiRouterDao {
     @Transaction
     suspend fun removeCredential(id: String) {
         clearCredentialFromTargets(id)
+        deleteCapabilitiesForCredential(id)
         deleteCredential(id)
     }
 }

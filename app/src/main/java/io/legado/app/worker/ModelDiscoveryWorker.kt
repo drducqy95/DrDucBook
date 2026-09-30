@@ -14,11 +14,13 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.legado.app.di.RAW_AI_TEXT_GATEWAY
 import io.legado.app.domain.gateway.AiProfileGateway
+import io.legado.app.domain.gateway.AiRouterGateway
 import io.legado.app.domain.gateway.AiTextGateway
 import io.legado.app.utils.NetworkUtils
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.qualifier.named
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 
 class ModelDiscoveryWorker(
@@ -27,6 +29,7 @@ class ModelDiscoveryWorker(
 ) : CoroutineWorker(appContext, params), KoinComponent {
 
     private val aiProfileGateway: AiProfileGateway by inject()
+    private val aiRouterGateway: AiRouterGateway by inject()
     private val rawAiTextGateway: AiTextGateway by inject(named(RAW_AI_TEXT_GATEWAY))
 
     override suspend fun doWork(): Result {
@@ -38,8 +41,18 @@ class ModelDiscoveryWorker(
         var totalFailed = 0
 
         return try {
+            val snapshot = aiRouterGateway.observeSnapshot().first()
+            snapshot.credentials.filter { it.enabled && it.hasSecret }.forEach { credential ->
+                aiRouterGateway.probeCredential(credential.id)
+                    .onSuccess { totalDiscovered++ }
+                    .onFailure { error ->
+                        totalFailed++
+                        timber.log.Timber.w(error, "Credential capability probe failed for ${credential.id}")
+                    }
+            }
             val providers = aiProfileGateway.getEnabledProviders()
             for (provider in providers) {
+                if (snapshot.credentials.any { it.providerId == provider.id }) continue
                 try {
                     val config = aiProfileGateway.toProviderConfig(provider)
                     val result = rawAiTextGateway.fetchModels(config)
@@ -53,8 +66,6 @@ class ModelDiscoveryWorker(
                     timber.log.Timber.w(e, "Model discovery failed for provider ${provider.name}")
                 }
             }
-
-            aiProfileGateway.deprecateStaleModels()
 
             Result.success(
                 workDataOf(

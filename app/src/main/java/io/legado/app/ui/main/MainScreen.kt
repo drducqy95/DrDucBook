@@ -15,6 +15,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -36,9 +37,12 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -96,6 +100,7 @@ import io.legado.app.ui.main.my.PrefClickEvent
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.ThemeResolver
 import io.legado.app.ui.widget.components.AppScaffold
+import io.legado.app.ui.widget.components.FloatingBottomBarAction
 import io.legado.app.ui.widget.components.FloatingBottomBar
 import io.legado.app.ui.widget.components.FloatingBottomBarItem
 import io.legado.app.ui.widget.components.GlassDefaults
@@ -226,6 +231,7 @@ fun MainScreen(
     )
     var bookshelfScrollToTopRequest by remember { mutableLongStateOf(0L) }
     var homeOverflowMenuRequest by remember { mutableLongStateOf(0L) }
+    var showQuickActions by remember { mutableStateOf(false) }
     fun requestBookshelfScrollToTop() {
         bookshelfScrollToTopRequest++
     }
@@ -411,6 +417,7 @@ fun MainScreen(
                                 NavigationIcon(
                                     destination = destination,
                                     selected = selected,
+                                    downloadBadgeCount = mainUiState.downloadActiveCount + mainUiState.downloadRecoverableCount,
                                     modifier = if (destination == MainDestination.Bookshelf) {
                                         Modifier.combinedClickable(
                                             interactionSource = remember { MutableInteractionSource() },
@@ -473,7 +480,8 @@ fun MainScreen(
                                 m3Icon = {
                                     NavigationIcon(
                                         destination = destination,
-                                        selected = selected
+                                        selected = selected,
+                                        downloadBadgeCount = mainUiState.downloadActiveCount + mainUiState.downloadRecoverableCount,
                                     )
                                 },
                                 m3IndicatorColor = GlassDefaults.glassColor(
@@ -653,25 +661,27 @@ fun MainScreen(
                         destinations.size > 5 -> 40.dp
                         else -> 76.dp
                     }
-                    Box(modifier = Modifier
+                    Row(
+                        modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .padding(
+                            bottom = 12.dp + WindowInsets.navigationBars
+                                .asPaddingValues()
+                                .calculateBottomPadding()
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         FloatingBottomBar(
                             modifier = Modifier
-                                .align(Alignment.BottomCenter)
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                     onClick = {}
                                 )
-                                .padding(
-                                    start = 16.dp,
-                                    end = 16.dp,
-                                    bottom = 12.dp + WindowInsets.navigationBars
-                                        .asPaddingValues()
-                                        .calculateBottomPadding()
-                                ),
+                                .padding(horizontal = 16.dp),
+                            widthFraction = 0.66f,
                             selectedIndex = { pagerState.targetPage },
                             onSelected = { index ->
                                 destinations.getOrNull(index)?.let { destination ->
@@ -692,7 +702,6 @@ fun MainScreen(
                         ) {
                             destinations.forEachIndexed { index, destination ->
                                 val selected = pagerState.targetPage == index
-                                val hasCustomIcon = destination.customIconPath.isNotEmpty()
                                 val destinationLabel = stringResource(destination.labelId)
                                 FloatingBottomBarItem(
                                     onClick = {
@@ -706,17 +715,53 @@ fun MainScreen(
                                 ) {
                                     NavigationIcon(
                                         destination = destination,
-                                        selected = selected
+                                        selected = selected,
+                                        downloadBadgeCount = mainUiState.downloadActiveCount + mainUiState.downloadRecoverableCount,
                                     )
-                                    if (!hasCustomIcon && showLabel && (alwaysShowLabel || selected)) {
-                                        AppText(
-                                            text = stringResource(destination.labelId),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
                                 }
+                            }
+                        }
+                        Box(
+                            modifier = Modifier
+                                .padding(start = 8.dp),
+                        ) {
+                            FloatingBottomBarAction(
+                                modifier = Modifier.semantics(mergeDescendants = true) {},
+                                onClick = { showQuickActions = true },
+                                backdrop = floatingBarBackdrop,
+                                isBlurEnabled = useLiquidGlass,
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = stringResource(R.string.quick_actions),
+                                    tint = LegadoTheme.colorScheme.primary,
+                                )
+                            }
+                            RoundDropdownMenu(
+                                expanded = showQuickActions,
+                                onDismissRequest = { showQuickActions = false },
+                            ) { dismiss ->
+                                RoundDropdownMenuItem(
+                                    text = stringResource(R.string.search),
+                                    onClick = {
+                                        dismiss()
+                                        onNavigateToSearch(null)
+                                    },
+                                )
+                                RoundDropdownMenuItem(
+                                    text = stringResource(R.string.import_book),
+                                    onClick = {
+                                        dismiss()
+                                        onNavigateToLocalImport()
+                                    },
+                                )
+                                RoundDropdownMenuItem(
+                                    text = stringResource(R.string.ai_chat),
+                                    onClick = {
+                                        dismiss()
+                                        onNavigateToChat()
+                                    },
+                                )
                             }
                         }
                     }
@@ -827,6 +872,7 @@ private fun BookshelfRailGroupMenu(
 private fun NavigationIcon(
     destination: MainDestination,
     selected: Boolean,
+    downloadBadgeCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
     val customIconPath = destination.customIconPath
@@ -844,29 +890,37 @@ private fun NavigationIcon(
         )
         .padding(((spec?.paddingPercent ?: 0) * 0.4f).dp)
         .scale((spec?.scale ?: 1f).coerceIn(0.5f, 1f))
-    if (customIconPath.isNotEmpty()) {
-        if (customIconPath.startsWith("bundled://")) {
-            Icon(
-                imageVector = when (customIconPath.removePrefix("bundled://")) {
-                    "sparkles" -> Icons.Default.AutoAwesome
-                    "rss" -> Icons.Default.RssFeed
-                    else -> Icons.Default.AutoStories
-                },
-                contentDescription = null,
-                modifier = iconModifier,
-                tint = spec?.tintColor?.let(::Color) ?: LegadoTheme.colorScheme.primary,
-            )
+    BadgedBox(
+        badge = {
+            if (destination == MainDestination.Downloads && downloadBadgeCount > 0) {
+                Badge { AppText(downloadBadgeCount.coerceAtMost(99).toString()) }
+            }
+        },
+    ) {
+        if (customIconPath.isNotEmpty()) {
+            if (customIconPath.startsWith("bundled://")) {
+                Icon(
+                    imageVector = when (customIconPath.removePrefix("bundled://")) {
+                        "sparkles" -> Icons.Default.AutoAwesome
+                        "rss" -> Icons.Default.RssFeed
+                        else -> Icons.Default.AutoStories
+                    },
+                    contentDescription = null,
+                    modifier = iconModifier,
+                    tint = spec?.tintColor?.let(::Color) ?: LegadoTheme.colorScheme.primary,
+                )
+            } else {
+                AsyncImage(
+                    model = customIconPath,
+                    contentDescription = null,
+                    modifier = iconModifier,
+                    colorFilter = spec?.tintColor?.let { ColorFilter.tint(Color(it)) },
+                )
+            }
         } else {
-            AsyncImage(
-                model = customIconPath,
-                contentDescription = null,
-                modifier = iconModifier,
-                colorFilter = spec?.tintColor?.let { ColorFilter.tint(Color(it)) },
-            )
+            val icon = AppIcons.mainDestination(destination, selected)
+            AppIcon(icon, contentDescription = null, modifier = modifier)
         }
-    } else {
-        val icon = AppIcons.mainDestination(destination, selected)
-        AppIcon(icon, contentDescription = null, modifier = modifier)
     }
 }
 

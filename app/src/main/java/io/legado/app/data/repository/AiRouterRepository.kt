@@ -2,6 +2,7 @@ package io.legado.app.data.repository
 
 import io.legado.app.data.dao.AiRouterDao
 import io.legado.app.data.entities.AiCredentialEntity
+import io.legado.app.data.entities.AiCredentialModelCapabilityEntity
 import io.legado.app.data.entities.AiRouteAttemptEntity
 import io.legado.app.data.entities.AiRouteProfileEntity
 import io.legado.app.data.entities.AiRouteTargetEntity
@@ -13,6 +14,7 @@ import io.legado.app.domain.gateway.AiStreamEvent
 import io.legado.app.domain.gateway.AiTextGateway
 import io.legado.app.domain.model.AiAvailableModel
 import io.legado.app.domain.model.AiCapability
+import io.legado.app.domain.model.AiCapabilityStatus
 import io.legado.app.domain.model.AiCredentialConfig
 import io.legado.app.domain.model.AiCredentialDraft
 import io.legado.app.domain.model.AiCredentialKind
@@ -20,6 +22,9 @@ import io.legado.app.domain.model.AiCredentialStatus
 import io.legado.app.domain.model.AiFailureKind
 import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiGenerateResponse
+import io.legado.app.domain.model.AiGenerationParams
+import io.legado.app.domain.model.AiMessage
+import io.legado.app.domain.model.AiMessageRole
 import io.legado.app.domain.model.AiModelRegistry
 import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiProviderException
@@ -34,14 +39,18 @@ import io.legado.app.domain.model.AiRouteTargetConfig
 import io.legado.app.domain.model.AiRouteTargetDraft
 import io.legado.app.domain.model.AiRouterSnapshot
 import io.legado.app.domain.model.AiTaskType
+import io.legado.app.domain.model.AiOutputContract
+import io.legado.app.domain.model.toConfig
 import io.legado.app.domain.model.AiTranslationTokenBudget
 import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.usecase.AiRouteSelector
 import io.legado.app.domain.usecase.AiRouterPolicy
 import io.legado.app.worker.ModelDiscoveryWorker
+import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -70,12 +79,14 @@ class AiRouterRepository(
 
     override fun observeSnapshot(): Flow<AiRouterSnapshot> = combine(
         dao.observeCredentials(),
+        dao.observeCapabilities(),
         dao.observeRoutes(),
         dao.observeTargets(),
         dao.observeRecentAttempts(),
-    ) { credentials, routes, targets, attempts ->
+    ) { credentials, capabilities, routes, targets, attempts ->
         AiRouterSnapshot(
             credentials = credentials.map { it.toConfig(secretStore.get(it.secretRef) != null) },
+            capabilities = capabilities.map(AiCredentialModelCapabilityEntity::toConfig),
             routes = routes.map(AiRouteProfileEntity::toConfig),
             targets = targets.map(AiRouteTargetEntity::toConfig),
             attempts = attempts.map(AiRouteAttemptEntity::toConfig),
@@ -92,6 +103,8 @@ class AiRouterRepository(
             else -> error("API key or access token is required")
         }
         val now = clock.millis()
+        val shouldProbe = draft.kind != AiCredentialKind.OAUTH_ACCESS_TOKEN &&
+            profileGateway.getProvider(draft.providerId) != null
         val entity = AiCredentialEntity(
             id = existing?.id
                 ?: draft.id?.takeIf(String::isNotBlank)
@@ -115,12 +128,33 @@ class AiRouterRepository(
             accountLabel = existing?.accountLabel,
             expiresAt = existing?.expiresAt,
             scopes = existing?.scopes,
-            status = existing?.status ?: io.legado.app.domain.model.AiCredentialStatus.ACTIVE,
+            status = if (!shouldProbe) {
+                existing?.status ?: io.legado.app.domain.model.AiCredentialStatus.ACTIVE
+            } else {
+                AiCredentialStatus.VERIFYING
+            },
             providerDataJson = existing?.providerDataJson,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
         )
         dao.upsertCredential(entity)
+        if (shouldProbe) {
+            runCatching {
+                probeApiCredentialCapabilities(
+                    credential = entity,
+                    secret = secretStore.get(secretRef).orEmpty(),
+                )
+            }.onFailure { error ->
+                dao.updateCredentialStatus(
+                    entity.id,
+                    when {
+                        isCredentialAuthFailure(error) -> AiCredentialStatus.RELOGIN_REQUIRED
+                        else -> AiCredentialStatus.AUTHENTICATED_NOT_READY
+                    },
+                    clock.millis(),
+                )
+            }
+        }
         return entity.toConfig(hasSecret = true)
     }
 
@@ -129,6 +163,16 @@ class AiRouterRepository(
         return secretStore.get(credential.secretRef)
             ?.takeIf(String::isNotBlank)
             ?: error("Không đọc được API key/token đã lưu")
+    }
+
+    override suspend fun probeCredential(id: String): Result<Unit> = runCatching {
+        val credential = dao.getCredential(id) ?: error("Credential không tồn tại")
+        val secret = resolveCredentialSecret(id)
+        if (credential.kind == AiCredentialKind.OAUTH_ACCESS_TOKEN) {
+            oauthGateway.syncModels(id).getOrThrow()
+        } else {
+            probeApiCredentialCapabilities(credential, secret)
+        }
     }
 
     override suspend fun deleteCredential(id: String) {
@@ -215,9 +259,13 @@ class AiRouterRepository(
             targetId == null && credentialId == null -> {
                 dao.resetTargetHealth(null, now)
                 dao.resetCredentialHealth(null, now)
+                dao.resetCapabilityHealth(null, now)
             }
             targetId != null -> dao.resetTargetHealth(targetId, now)
-            credentialId != null -> dao.resetCredentialHealth(credentialId, now)
+            credentialId != null -> {
+                dao.resetCredentialHealth(credentialId, now)
+                dao.resetCapabilityHealth(credentialId, now)
+            }
         }
         credentialId?.let { id ->
             dao.getCredential(id)
@@ -395,6 +443,18 @@ class AiRouterRepository(
             dao.getActiveRoute(taskType)?.toConfig() ?: return null
         }
         val now = clock.millis()
+        val outputContract = request.outputContract.ifBlank {
+            AiOutputContract.forTask(profile.taskType, request.tools.isNotEmpty())
+        }
+        require(
+            AiOutputContract.isCompatibleWithTask(
+                taskType = profile.taskType,
+                outputContract = outputContract,
+                hasTools = request.tools.isNotEmpty(),
+            )
+        ) {
+            "AI output contract does not match task ${profile.taskType}"
+        }
         val entities = normalizeLegacyGeneratedTranslationTargets(
             profile = profile,
             targets = dao.getEnabledTargets(profile.id),
@@ -407,11 +467,24 @@ class AiRouterRepository(
         val eligibleTargets = entities.filter { entity ->
             val credential = entity.credentialId?.let(credentials::get)
             entity.cooldownUntil <= now &&
+                (entity.credentialId == null || credential != null) &&
                 (credential == null || (
                     credential.enabled &&
                         credential.cooldownUntil <= now &&
                         AiCredentialStatus.isRouterEligible(credential.status)
                     ))
+                && capabilityAllowsTarget(
+                    entity = entity,
+                    model = profileGateway.getModelConfig(entity.modelProfileId),
+                    credentials = if (credential != null) listOf(credential) else {
+                        dao.getCredentialsForProvider(
+                            profileGateway.getModelConfig(entity.modelProfileId)?.provider?.id.orEmpty()
+                        )
+                    },
+                    taskType = profile.taskType,
+                    outputContract = outputContract,
+                    now = now,
+                )
         }
         val ordered = selector.order(
             profile = profile,
@@ -432,6 +505,8 @@ class AiRouterRepository(
                 target = selectedTarget,
                 model = model,
                 explicitCredential = credential,
+                taskType = profile.taskType,
+                outputContract = outputContract,
                 now = now,
             )
         }
@@ -458,13 +533,57 @@ class AiRouterRepository(
         return RouteContext(profile, candidates)
     }
 
+    private suspend fun capabilityAllowsTarget(
+        entity: AiRouteTargetEntity,
+        model: io.legado.app.domain.model.AiModelConfig?,
+        credentials: List<AiCredentialEntity?>,
+        taskType: String,
+        outputContract: String,
+        now: Long,
+    ): Boolean {
+        if (model == null) return false
+        if (entity.credentialId == null &&
+            (model.provider.authType == AiProviderAuthType.NONE || model.provider.apiKey.isNotBlank())
+        ) return true
+        val usableCredentials = credentials.filterNotNull().filter { it.enabled }
+        if (usableCredentials.isEmpty()) return false
+        val capabilities = usableCredentials.mapNotNull { credential ->
+            dao.getCapability(
+                credentialId = credential.id,
+                modelProfileId = entity.modelProfileId,
+                taskType = taskType,
+                outputContract = outputContract,
+            )
+        }
+        // Existing installations may have credentials created before the capability table.
+        // They remain compatible until the first probe writes an explicit UNKNOWN/failed row.
+        if (capabilities.size < usableCredentials.size) return true
+        return capabilities.any {
+            AiCapabilityStatus.isUsable(it.status, now, it.cooldownUntil)
+        }
+    }
+
     private suspend fun resolveCandidatesForTarget(
         target: AiRouteTargetConfig,
         model: io.legado.app.domain.model.AiModelConfig,
         explicitCredential: AiCredentialEntity?,
+        taskType: String,
+        outputContract: String,
         now: Long,
     ): List<RouteCandidate> {
         if (explicitCredential != null) {
+            val capability = dao.getCapability(
+                credentialId = explicitCredential.id,
+                modelProfileId = target.modelProfileId,
+                taskType = taskType,
+                outputContract = outputContract,
+            )
+            if (capability != null && !AiCapabilityStatus.isUsable(
+                    capability.status,
+                    now,
+                    capability.cooldownUntil,
+                )
+            ) return emptyList()
             val secret = resolveCredentialSecret(explicitCredential)
             if (secret.isNullOrBlank()) return emptyList()
             return listOf(
@@ -473,6 +592,8 @@ class AiRouterRepository(
                     model = model.withCredential(secret, explicitCredential.runtimeMetadata()),
                     credential = explicitCredential,
                     usesProviderCredentialPool = false,
+                    taskType = taskType,
+                    outputContract = outputContract,
                 )
             )
         }
@@ -485,6 +606,8 @@ class AiRouterRepository(
                 model = model,
                 credential = null,
                 usesProviderCredentialPool = false,
+                taskType = taskType,
+                outputContract = outputContract,
             )
         } else {
             null
@@ -504,6 +627,18 @@ class AiRouterRepository(
             targetId = target.id,
             credentials = credentials,
         ).mapNotNull { credential ->
+            val capability = dao.getCapability(
+                credentialId = credential.id,
+                modelProfileId = target.modelProfileId,
+                taskType = taskType,
+                outputContract = outputContract,
+            )
+            if (capability != null && !AiCapabilityStatus.isUsable(
+                    capability.status,
+                    now,
+                    capability.cooldownUntil,
+                )
+            ) return@mapNotNull null
             val secret = try {
                 resolveCredentialSecret(credential)
             } catch (error: Throwable) {
@@ -524,6 +659,8 @@ class AiRouterRepository(
                 model = model.withCredential(secret, credential.runtimeMetadata()),
                 credential = credential,
                 usesProviderCredentialPool = true,
+                taskType = taskType,
+                outputContract = outputContract,
             )
         }
         return if (credentialCandidates.isEmpty()) {
@@ -532,6 +669,179 @@ class AiRouterRepository(
             credentialCandidates + listOfNotNull(directCandidate)
         }
     }
+
+    private suspend fun probeApiCredentialCapabilities(
+        credential: AiCredentialEntity,
+        secret: String,
+    ) {
+        val providerProfile = profileGateway.getProvider(credential.providerId) ?: return
+        val provider = profileGateway.toProviderConfig(providerProfile).copy(apiKey = secret)
+        val discovered = delegate.fetchModels(provider).getOrNull().orEmpty()
+        val discoveredProfiles = discovered.mapIndexed { index, model ->
+            profileGateway.saveModel(
+                io.legado.app.domain.model.AiModelDraft(
+                    providerId = credential.providerId,
+                    modelName = model.name,
+                    modelId = model.id,
+                    contextWindow = model.contextWindow,
+                    maxOutputTokens = model.maxOutputTokens,
+                    sortNumber = index,
+                )
+            )
+        }
+        val existingProfiles = profileGateway.observeModels().first()
+            .filter { it.providerId == credential.providerId && it.enabled }
+        val models = (existingProfiles + discoveredProfiles).distinctBy { it.id }
+        if (models.isEmpty()) {
+            dao.updateCredentialStatus(
+                credential.id,
+                AiCredentialStatus.AUTHENTICATED_NOT_READY,
+                clock.millis(),
+            )
+            return
+        }
+        val probes = listOf(
+            AiTaskType.CHAT to AiOutputContract.CHAT_TEXT,
+            AiTaskType.TRANSLATE_CHAPTER to AiOutputContract.TRANSLATION_JSON,
+            AiTaskType.REWRITE_TEXT to AiOutputContract.REWRITE_TEXT,
+        )
+        var anyAvailable = false
+        var credentialRejected = false
+        models.forEach { profile ->
+            val modelConfig = profileGateway.getModelConfig(profile.id)
+                ?.copy(provider = provider)
+                ?: return@forEach
+            probes.forEach { (taskType, outputContract) ->
+                val startedAt = clock.millis()
+                val previous = dao.getCapability(credential.id, profile.id, taskType, outputContract)
+                val revision = (previous?.probeRevision ?: 0L) + 1L
+                dao.upsertCapability(
+                    AiCredentialModelCapabilityEntity(
+                        credentialId = credential.id,
+                        modelProfileId = profile.id,
+                        taskType = taskType,
+                        outputContract = outputContract,
+                        status = AiCapabilityStatus.PROBING,
+                        lastProbeAt = startedAt,
+                        lastSuccessAt = previous?.lastSuccessAt,
+                        lastFailureAt = previous?.lastFailureAt,
+                        contextWindow = profile.contextWindow,
+                        maxOutputTokens = profile.maxOutputTokens,
+                        providerFingerprint = "${provider.protocol}:${provider.baseUrl}".take(240),
+                        probeRevision = revision,
+                        createdAt = previous?.createdAt ?: startedAt,
+                        updatedAt = startedAt,
+                    )
+                )
+                val result = runCatching {
+                    val prompt = when (outputContract) {
+                        AiOutputContract.TRANSLATION_JSON ->
+                            "Translate the value to Vietnamese. Return exactly JSON with segments containing id s1 and its text. No Markdown."
+                        AiOutputContract.REWRITE_TEXT ->
+                            "Rewrite this sentence naturally in Vietnamese and return plain text only: Hello world."
+                        else -> "Reply with OK."
+                    }
+                    val response = delegate.generate(
+                        AiGenerateRequest(
+                            model = modelConfig,
+                            messages = listOf(AiMessage(AiMessageRole.USER, prompt)),
+                            params = AiGenerationParams(temperature = 0f, maxOutputTokens = 512),
+                            taskType = taskType,
+                            outputContract = outputContract,
+                        )
+                    ).getOrThrow()
+                    require(response.text.isNotBlank()) { "Credential probe returned empty output" }
+                    if (outputContract == AiOutputContract.TRANSLATION_JSON) {
+                        val body = response.text.trim().removePrefix("```").removeSuffix("```").trim()
+                        val parsed = runCatching { GSON.fromJson(body, Map::class.java) }.getOrNull()
+                        require(parsed?.containsKey("segments") == true && body.contains("s1")) {
+                            "Credential probe returned invalid translation JSON"
+                        }
+                    }
+                    if (outputContract == AiOutputContract.REWRITE_TEXT) {
+                        require(!response.text.trimStart().startsWith("{")) {
+                            "Credential probe returned structured rewrite output"
+                        }
+                    }
+                }
+                val now = clock.millis()
+                val error = result.exceptionOrNull()
+                val status = when {
+                    result.isSuccess -> {
+                        anyAvailable = true
+                        AiCapabilityStatus.AVAILABLE
+                    }
+                    error != null && isCredentialAuthFailure(error) -> {
+                        credentialRejected = true
+                        AiCapabilityStatus.AUTH_FAILED
+                    }
+                    error != null && isModelCapabilityUnavailable(error) -> AiCapabilityStatus.MODEL_UNAVAILABLE
+                    error != null && isCredentialQuotaFailure(error) -> AiCapabilityStatus.QUOTA_EXHAUSTED
+                    else -> AiCapabilityStatus.CONTRACT_UNSUPPORTED
+                }
+                dao.upsertCapability(
+                    AiCredentialModelCapabilityEntity(
+                        credentialId = credential.id,
+                        modelProfileId = profile.id,
+                        taskType = taskType,
+                        outputContract = outputContract,
+                        status = status,
+                        lastProbeAt = now,
+                        lastSuccessAt = if (result.isSuccess) now else previous?.lastSuccessAt,
+                        lastFailureAt = if (result.isFailure) now else previous?.lastFailureAt,
+                        failureKind = error?.let { status },
+                        failureMessage = error?.message?.take(240),
+                        latencyMs = (now - startedAt).coerceAtLeast(0L),
+                        contextWindow = profile.contextWindow,
+                        maxOutputTokens = profile.maxOutputTokens,
+                        providerFingerprint = "${provider.protocol}:${provider.baseUrl}".take(240),
+                        probeRevision = revision,
+                        createdAt = previous?.createdAt ?: startedAt,
+                        updatedAt = now,
+                    )
+                )
+            }
+        }
+        dao.updateCredentialStatus(
+            credential.id,
+            when {
+                credentialRejected -> AiCredentialStatus.RELOGIN_REQUIRED
+                anyAvailable -> AiCredentialStatus.ACTIVE
+                else -> AiCredentialStatus.AUTHENTICATED_NOT_READY
+            },
+            clock.millis(),
+        )
+    }
+
+    private fun isCredentialAuthFailure(error: Throwable): Boolean =
+        generateSequence(error as Throwable?) { it.cause }
+            .take(8)
+            .mapNotNull(Throwable::message)
+            .joinToString(" ")
+            .lowercase()
+            .let { text ->
+                text.contains("401") || text.contains("unauthorized") ||
+                    text.contains("invalid api key") || text.contains("authentication")
+            }
+
+    private fun isModelCapabilityUnavailable(error: Throwable): Boolean =
+        generateSequence(error as Throwable?) { it.cause }
+            .take(8)
+            .mapNotNull(Throwable::message)
+            .joinToString(" ")
+            .lowercase()
+            .let { text ->
+                text.contains("404") || text.contains("unknown model") ||
+                    text.contains("model not found") || text.contains("model_not_found")
+            }
+
+    private fun isCredentialQuotaFailure(error: Throwable): Boolean =
+        generateSequence(error as Throwable?) { it.cause }
+            .take(8)
+            .mapNotNull(Throwable::message)
+            .joinToString(" ")
+            .lowercase()
+            .let { text -> text.contains("402") || text.contains("quota") || text.contains("billing") }
 
     private suspend fun resolveCredentialSecret(credential: AiCredentialEntity): String? =
         if (credential.kind == AiCredentialKind.OAUTH_ACCESS_TOKEN) {
@@ -581,12 +891,34 @@ class AiRouterRepository(
                     credential.cooldownUntil <= now &&
                     AiCredentialStatus.isRouterEligible(credential.status)
             }
-            .ifEmpty {
-                dao.getCredentialsForProvider(provider.id).filter { it.enabled }
-            }
-        val bestCredential = credentials.minByOrNull { it.sortNumber } ?: return request.copy(
+        val taskType = request.taskType ?: AiTaskType.CHAT
+        val outputContract = request.outputContract.ifBlank {
+            AiOutputContract.forTask(taskType, request.tools.isNotEmpty())
+        }
+        val modelProfileId = profileGateway.getModelConfig(request.model.id)?.let { request.model.id }
+            ?: request.model.id
+        val capabilityCredentials = credentials.filter { credential ->
+            val capability = dao.getCapability(
+                credentialId = credential.id,
+                modelProfileId = modelProfileId,
+                taskType = taskType,
+                outputContract = outputContract,
+            )
+            capability == null || AiCapabilityStatus.isUsable(
+                capability.status,
+                now,
+                capability.cooldownUntil,
+            )
+        }
+        val orderedCredentials = orderProviderCredentials(
+            providerId = provider.id,
+            targetId = "direct:${request.model.id}",
+            credentials = capabilityCredentials,
+        )
+        val bestCredential = orderedCredentials.firstOrNull() ?: return request.copy(
             model = request.model.copy(provider = provider.copy(baseUrl = effectiveBaseUrl))
         )
+        credentialCursors["${provider.id}:direct:${request.model.id}"]?.incrementAndGet()
         val secret = try {
             resolveCredentialSecret(bestCredential)
         } catch (_: Throwable) {
@@ -765,6 +1097,7 @@ class AiRouterRepository(
         val now = clock.millis()
         dao.markTargetSuccess(candidate.target.id, now)
         candidate.credential?.let { dao.markCredentialSuccess(it.id, now) }
+        updateCapabilityAfterSuccess(candidate, now)
         recordAttempt(profile, candidate, true, null, startedAt, firstEventAt, now)
     }
 
@@ -790,6 +1123,7 @@ class AiRouterRepository(
             ?.let {
                 dao.markCredentialFailure(it.id, failure.failure.kind.name, cooldown, now)
             }
+        updateCapabilityAfterFailure(candidate, failure, cooldown, now)
         recordAttempt(
             profile,
             candidate,
@@ -806,6 +1140,73 @@ class AiRouterRepository(
         ) {
             runCatching { ModelDiscoveryWorker.runOnce(appCtx) }
         }
+    }
+
+    private suspend fun updateCapabilityAfterSuccess(
+        candidate: RouteCandidate,
+        now: Long,
+    ) {
+        val credential = candidate.credential ?: return
+        val previous = dao.getCapability(
+            credentialId = credential.id,
+            modelProfileId = candidate.target.modelProfileId,
+            taskType = candidate.taskType,
+            outputContract = candidate.outputContract,
+        ) ?: return
+        dao.upsertCapability(
+            previous.copy(
+                status = AiCapabilityStatus.AVAILABLE,
+                lastSuccessAt = now,
+                lastFailureAt = previous.lastFailureAt,
+                cooldownUntil = 0L,
+                failureKind = null,
+                failureMessage = null,
+                latencyMs = (now - (previous.lastProbeAt ?: now)).coerceAtLeast(0L),
+                updatedAt = now,
+            )
+        )
+    }
+
+    private suspend fun updateCapabilityAfterFailure(
+        candidate: RouteCandidate,
+        failure: AiProviderException,
+        cooldownUntil: Long,
+        now: Long,
+    ) {
+        val credential = candidate.credential ?: return
+        val previous = dao.getCapability(
+            credentialId = credential.id,
+            modelProfileId = candidate.target.modelProfileId,
+            taskType = candidate.taskType,
+            outputContract = candidate.outputContract,
+        ) ?: return
+        val status = when {
+            failure.failure.kind == AiFailureKind.AUTHENTICATION -> AiCapabilityStatus.AUTH_FAILED
+            failure.failure.kind == AiFailureKind.QUOTA -> AiCapabilityStatus.QUOTA_EXHAUSTED
+            failure.failure.statusCode == 404 ||
+                failure.failure.technicalDetail.contains("unknown model", true) ||
+                failure.failure.technicalDetail.contains("model not found", true) ->
+                AiCapabilityStatus.MODEL_UNAVAILABLE
+            failure.failure.kind in setOf(
+                AiFailureKind.PARSE_ERROR,
+                AiFailureKind.PROTOCOL,
+                AiFailureKind.EMPTY_OUTPUT,
+            ) -> if (previous.lastSuccessAt != null) AiCapabilityStatus.DEGRADED
+            else AiCapabilityStatus.CONTRACT_UNSUPPORTED
+            failure.failure.kind == AiFailureKind.RATE_LIMIT -> AiCapabilityStatus.COOLDOWN
+            else -> if (previous.lastSuccessAt != null) AiCapabilityStatus.DEGRADED
+            else AiCapabilityStatus.COOLDOWN
+        }
+        dao.upsertCapability(
+            previous.copy(
+                status = status,
+                lastFailureAt = now,
+                cooldownUntil = cooldownUntil,
+                failureKind = failure.failure.kind.name,
+                failureMessage = failure.failure.technicalDetail.take(240),
+                updatedAt = now,
+            )
+        )
     }
 
     private suspend fun recordAttempt(
@@ -922,6 +1323,20 @@ class AiRouterRepository(
             ) {
                 throw RouteCandidateUnavailableException()
             }
+            val capability = dao.getCapability(
+                credentialId = credential.id,
+                modelProfileId = candidate.target.modelProfileId,
+                taskType = candidate.taskType,
+                outputContract = candidate.outputContract,
+            )
+            if (capability != null && !AiCapabilityStatus.isUsable(
+                    capability.status,
+                    now,
+                    capability.cooldownUntil,
+                )
+            ) {
+                throw RouteCandidateUnavailableException()
+            }
         }
     }
 
@@ -935,6 +1350,8 @@ class AiRouterRepository(
         val model: io.legado.app.domain.model.AiModelConfig,
         val credential: AiCredentialEntity?,
         val usesProviderCredentialPool: Boolean,
+        val taskType: String,
+        val outputContract: String,
     )
 
     private data class TargetSemaphore(

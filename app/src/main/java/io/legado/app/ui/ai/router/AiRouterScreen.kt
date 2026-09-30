@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.domain.model.AiCredentialKind
+import io.legado.app.domain.model.AiCapabilityStatus
 import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.model.AiRouteStrategy
 import io.legado.app.domain.model.AiProviderAuthType
@@ -465,12 +466,31 @@ private fun AiRouterOAuthAccountsSection(
                 onClick = { onOpenProvider(provider.id) },
             )
             accounts.forEach { credential ->
-                val modelCount = state.models.count { it.providerId == credential.providerId }
+                val taskCounts = credential.capabilities
+                    .filter { it.status == "available" || it.status == "degraded" }
+                    .groupBy { it.taskType }
+                    .mapValues { (_, values) -> values.map { it.modelProfileId }.distinct().size }
                 ClickableSettingItem(
                     title = "↳ ${credential.accountLabel ?: credential.label}",
                     description = buildString {
                         append(credential.label)
-                        append("\n").append(modelCount).append(" model đã đồng bộ")
+                        credential.accountId?.takeIf(String::isNotBlank)?.let {
+                            append(" · ").append(it)
+                        }
+                        append("\nModel khả dụng: ")
+                            .append(credential.availableModelCount)
+                            .append("/")
+                            .append(credential.totalModelCount)
+                        append(" · Chat ").append(taskCounts["chat"] ?: 0)
+                        append(" · Dịch ").append(taskCounts["translate_chapter"] ?: 0)
+                        append(" · Viết lại ").append(taskCounts["rewrite_text"] ?: 0)
+                        append("\nTrạng thái: ").append(credentialStatusOption(credential))
+                        credential.lastProbeAt?.let {
+                            append(" · Probe ").append(formatCredentialExpiry(it))
+                        }
+                        credential.capabilities.firstOrNull { it.failureMessage != null }?.let {
+                            append("\nLỗi gần nhất: ").append(it.failureMessage)
+                        }
                         credential.expiresAt?.let {
                             append(" · token hết hạn ").append(formatCredentialExpiry(it))
                         }
@@ -578,10 +598,18 @@ private fun credentialStatusOption(credential: AiRouterCredentialUi): String = w
     !credential.enabled -> "Tắt"
     credential.status == "relogin_required" -> "Cần đăng nhập"
     credential.status == "refreshing" -> "Đang làm mới"
+    credential.status == "authenticated_not_ready" -> "Đã đăng nhập · chưa có model dùng được"
     !credential.hasSecret -> "Thiếu token"
     credential.lastFailureKind != null -> credential.lastFailureKind
+    credential.availableModelCount == 0 && credential.capabilities.isEmpty() ->
+        "Đã đăng nhập · chưa kiểm tra model"
+    credential.availableModelCount == 0 -> "Đã xác thực · chưa có model dùng được"
+    credential.availableModelCount > 0 -> "Có model dùng được"
     else -> "Sẵn sàng"
 }
+
+private fun AiRouterCapabilityUi.isUsableForUi(): Boolean =
+    status == AiCapabilityStatus.AVAILABLE || status == AiCapabilityStatus.DEGRADED
 
 private fun AiRouterTab.label(): String = when (this) {
     AiRouterTab.OVERVIEW -> "Tổng quan"
@@ -663,16 +691,27 @@ private fun ProviderCredentialPoolEditor(
             )
         } else {
             credentials.forEach { credential ->
-                val modelCount = models.count { it.providerId == credential.providerId }
                 ClickableSettingItem(
                     title = credential.accountLabel ?: credential.label,
                     description = buildString {
                         append(credential.kind)
+                        append(" · model khả dụng ")
+                            .append(credential.availableModelCount)
+                            .append("/")
+                            .append(credential.totalModelCount)
+                        credential.accountId?.takeIf(String::isNotBlank)?.let {
+                            append(" · ").append(it)
+                        }
+                        credential.expiresAt?.let {
+                            append("\nToken hết hạn: ").append(formatCredentialExpiry(it))
+                        }
                         if (credential.oauthProvider != null) {
-                            append(" · OAuth · ").append(modelCount).append(" model")
-                            credential.expiresAt?.let {
-                                append("\nToken hết hạn: ").append(formatCredentialExpiry(it))
-                            }
+                            append("\nOAuth · Chat ")
+                                .append(credential.capabilities.count { it.taskType == "chat" && it.isUsableForUi() })
+                                .append(" · Dịch ")
+                                .append(credential.capabilities.count { it.taskType == "translate_chapter" && it.isUsableForUi() })
+                                .append(" · Viết lại ")
+                                .append(credential.capabilities.count { it.taskType == "rewrite_text" && it.isUsableForUi() })
                             append("\nHạn mức: provider không cung cấp số dư qua API")
                         }
                         if (credential.consecutiveFailures > 0) {
@@ -682,10 +721,10 @@ private fun ProviderCredentialPoolEditor(
                     option = credentialStatusOption(credential),
                     onClick = { onOpenCredential(credential.id) },
                 )
-                if (credential.oauthProvider != null) {
+                if (credential.hasSecret) {
                     ClickableSettingItem(
-                        title = "↳ Kiểm tra tài khoản và đồng bộ model",
-                        description = "Gửi yêu cầu nhỏ để xác nhận từng model thực sự dùng được.",
+                        title = "↳ Kiểm tra credential và model",
+                        description = "Dùng đúng token/key này để xác nhận model thực sự dùng được.",
                         onClick = { onSyncOAuth(credential.id) },
                     )
                 }
@@ -710,7 +749,6 @@ private fun CredentialEditor(
 ) {
     val credential = editor.id?.let { id -> state.credentials.firstOrNull { it.id == id } }
     if (editor.kind == AiCredentialKind.OAUTH_ACCESS_TOKEN && credential != null) {
-        val modelCount = state.models.count { it.providerId == credential.providerId }
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingItem(
                 title = credential.accountLabel ?: credential.label,
@@ -718,14 +756,14 @@ private fun CredentialEditor(
                     credential.providerName,
                     "Trạng thái: ${credentialStatusOption(credential)}",
                     credential.expiresAt?.let { "Token hết hạn: ${formatCredentialExpiry(it)}" },
-                    "$modelCount model đã đồng bộ",
+                    "Model khả dụng: ${credential.availableModelCount}/${credential.totalModelCount}",
                     "Hạn mức: provider không cung cấp số dư qua API",
                 ).filterNotNull().joinToString("\n"),
             )
             onSyncOAuth?.let { sync ->
                 ClickableSettingItem(
-                    title = "Kiểm tra tài khoản và đồng bộ model",
-                    description = "Làm mới token và thử các model bằng một yêu cầu ngắn.",
+                    title = "Kiểm tra credential và đồng bộ model",
+                    description = "Dùng đúng token/key này để thử model bằng contract thật.",
                     onClick = sync,
                 )
             }

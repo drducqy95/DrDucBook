@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import io.legado.app.domain.model.AiCredentialKind
 import io.legado.app.domain.model.AiCredentialStatus
 import io.legado.app.domain.model.AiConnectionStatus
+import io.legado.app.domain.model.AiCapabilityStatus
 import io.legado.app.domain.model.AiProviderAuthType
 import io.legado.app.domain.model.AiRouteStrategy
 import io.legado.app.domain.model.AiTaskType
@@ -172,6 +173,29 @@ data class AiRouterCredentialUi(
     val expiresAt: Long? = null,
     val status: String = AiCredentialStatus.ACTIVE,
     val hasRefreshToken: Boolean = false,
+    val accountId: String? = null,
+    val readinessStatus: String = AiCapabilityStatus.UNKNOWN,
+    val availableModelCount: Int = 0,
+    val totalModelCount: Int = 0,
+    val lastProbeAt: Long? = null,
+    val lastSuccessAt: Long? = null,
+    val capabilities: ImmutableList<AiRouterCapabilityUi> = persistentListOf(),
+)
+
+@Stable
+data class AiRouterCapabilityUi(
+    val modelProfileId: String,
+    val modelId: String,
+    val modelLabel: String,
+    val taskType: String,
+    val outputContract: String,
+    val status: String,
+    val lastProbeAt: Long? = null,
+    val lastSuccessAt: Long? = null,
+    val cooldownUntil: Long = 0L,
+    val failureKind: String? = null,
+    val failureMessage: String? = null,
+    val latencyMs: Long? = null,
 )
 
 @Stable

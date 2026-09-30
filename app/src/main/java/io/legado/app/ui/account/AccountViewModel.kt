@@ -195,20 +195,39 @@ class AccountViewModel(
         AccountEffect.ShowMessage("Đã làm mới phiên đăng nhập")
     }
 
-    private fun signInEmail(email: String, password: String) = launchAuthAction {
-        accountAuthUseCase.signInWithEmail(email, password)
-        AccountEffect.ShowMessage("Đăng nhập thành công")
+    private fun signInEmail(email: String, password: String) {
+        if (!validateEmailCredentials(email, password)) return
+        launchAuthAction {
+            accountAuthUseCase.signInWithEmail(email.trim(), password)
+            AccountEffect.ShowMessage("Đăng nhập thành công")
+        }
     }
 
-    private fun signUpEmail(email: String, password: String) = launchAuthAction {
-        when (val result = accountAuthUseCase.signUpWithEmail(email, password)) {
-            is AccountAuthResult.EmailVerificationRequired ->
-                AccountEffect.ShowMessage("Hãy kiểm tra ${result.email} để xác minh tài khoản")
-            is AccountAuthResult.SignedIn ->
-                AccountEffect.ShowMessage("Đã tạo tài khoản Premium dùng thử 7 ngày")
-            AccountAuthResult.SignedOut ->
-                AccountEffect.ShowMessage("Đã đăng xuất")
+    private fun signUpEmail(email: String, password: String) {
+        if (!validateEmailCredentials(email, password)) return
+        launchAuthAction {
+            when (val result = accountAuthUseCase.signUpWithEmail(email.trim(), password)) {
+                is AccountAuthResult.EmailVerificationRequired ->
+                    AccountEffect.ShowMessage("Hãy kiểm tra ${result.email} để xác minh tài khoản")
+                is AccountAuthResult.SignedIn ->
+                    AccountEffect.ShowMessage("Đã tạo tài khoản Premium dùng thử 7 ngày")
+                AccountAuthResult.SignedOut ->
+                    AccountEffect.ShowMessage("Đã đăng xuất")
+            }
         }
+    }
+
+    private fun validateEmailCredentials(email: String, password: String): Boolean {
+        val normalizedEmail = email.trim()
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(normalizedEmail).matches()) {
+            _effects.tryEmit(AccountEffect.ShowMessage("Vui lòng nhập email hợp lệ"))
+            return false
+        }
+        if (password.length < 8) {
+            _effects.tryEmit(AccountEffect.ShowMessage("Mật khẩu phải có ít nhất 8 ký tự"))
+            return false
+        }
+        return true
     }
 
     private fun sendPasswordReset(email: String) = launchAuthAction {

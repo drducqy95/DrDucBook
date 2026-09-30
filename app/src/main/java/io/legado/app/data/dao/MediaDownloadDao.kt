@@ -50,6 +50,9 @@ interface MediaDownloadDao {
     @Query("SELECT * FROM media_download_items WHERE taskId = :taskId")
     suspend fun getItems(taskId: String): List<MediaDownloadItemEntity>
 
+    @Query("SELECT * FROM media_download_items WHERE taskId = :taskId AND chapterIndex = :chapterIndex AND variantId = :variantId LIMIT 1")
+    suspend fun getItemByIdentity(taskId: String, chapterIndex: Int, variantId: String): MediaDownloadItemEntity?
+
     @Query("SELECT * FROM media_download_items WHERE status IN (:states)")
     suspend fun getItemsByState(states: List<String>): List<MediaDownloadItemEntity>
 

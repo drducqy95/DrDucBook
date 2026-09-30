@@ -13,6 +13,8 @@ import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiGenerateResponse
 import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiTranslationRefinePipeline
+import io.legado.app.domain.model.AiTranslationStoryRelationship
+import io.legado.app.domain.model.AiTranslationStoryTimeline
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
 import io.legado.app.domain.model.AiTranslationWorldEntry
 import io.legado.app.domain.model.CachedChapterSnapshot
@@ -256,6 +258,199 @@ class TranslationStoryMemoryUseCaseTest {
         val medvedevMemory = updatedMemories.find { it.key == TranslationStoryMemoryUseCase.entityKey("梅杰夫") }
         assertTrue(medvedevMemory?.value?.contains("Medvedev") == true)
         assertTrue(medvedevMemory?.value?.contains("Mai Kiệt Phu") == false)
+    }
+
+    @Test
+    fun userEditedMemoryIsNotOverwrittenByLaterAiExtraction() = runBlocking {
+        val book = Book(bookUrl = "test://user-lock", name = "Locked", author = "test")
+        val chapter = BookChapter(url = "ch-1", title = "Ch 1", bookUrl = book.bookUrl, index = 0)
+        val gateway = InMemoryAiMemoryGateway()
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = gateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+        useCase.upsertEntity(
+            book.bookUrl,
+            io.legado.app.domain.model.AiTranslationStoryEntity(
+                raw = "叶长生",
+                target = "Tên người dùng",
+                type = "character",
+                userEdited = true,
+                source = "USER",
+            ),
+        )
+        val result = AiTranslationRefinePipeline.parseRefinerOutput(
+            rawOutput = """
+                {"refined_segments":[{"id":1,"refined_translation":"Ban dich."}],"new_entities":[{"raw":"叶长生","target":"Ten AI","type":"character"}],"story_timeline":{"summary":"Tiep tuc."}}
+            """.trimIndent(),
+            expectedIds = listOf(1),
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+        )
+        useCase.persistRefinerResult(book, chapter, "叶长生出现", result).getOrThrow()
+
+        assertEquals("Tên người dùng", useCase.loadSnapshot(book.bookUrl).entities.single().target)
+    }
+
+    @Test
+    fun translationMemoryRequiresExactSourceRawAndKeepsOneWorldEntryAcrossChapters() = runBlocking {
+        val book = Book(bookUrl = "test://translation-memory-schema", name = "Memory", author = "test")
+        val gateway = InMemoryAiMemoryGateway()
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = gateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+
+        fun resultFor(target: String) = AiTranslationRefinePipeline.parseRefinerOutput(
+            rawOutput = """
+                {
+                  "refined_segments":[{"id":1,"refined_translation":"$target"}],
+                  "translation_memory":[
+                    {"raw":"叶长生","target":"Diep Truong Sinh","kind":"entity","origin":"chinese","name_type":"person","naming_style":"ancient_sino_vietnamese","category":"character"},
+                    {"raw":"青锋剑","target":"Thanh Phong Kiem","kind":"world","origin":"chinese","name_type":"item","naming_style":"ancient_sino_vietnamese","category":"weapon"},
+                    {"raw":"不存在","target":"Khong Ton Tai","kind":"term","origin":"unknown","name_type":"term","naming_style":"literal_term","category":"other"},
+                    {"raw":"叶长生","target":"错误","kind":"entity","origin":"chinese","name_type":"person","naming_style":"ancient_sino_vietnamese","category":"character"}
+                  ]
+                }
+            """.trimIndent(),
+            expectedIds = listOf(1),
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+        )
+
+        useCase.persistRefinerResult(
+            book = book,
+            chapter = BookChapter(url = "ch-1", title = "Ch 1", bookUrl = book.bookUrl, index = 0),
+            source = "叶长生拔出青锋剑",
+            result = resultFor("Diep Truong Sinh rut kiem."),
+        ).getOrThrow()
+        useCase.persistRefinerResult(
+            book = book,
+            chapter = BookChapter(url = "ch-2", title = "Ch 2", bookUrl = book.bookUrl, index = 1),
+            source = "叶长生再次握住青锋剑",
+            result = resultFor("Diep Truong Sinh nam chat kiem."),
+        ).getOrThrow()
+
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        assertEquals(listOf("叶长生"), snapshot.entities.map { it.raw })
+        assertEquals(0, snapshot.entities.single().firstChapterIndex)
+        assertEquals(1, snapshot.entities.single().lastChapterIndex)
+        assertEquals(listOf("青锋剑"), snapshot.worldBuilding.map { it.raw })
+        assertEquals(1, snapshot.worldBuilding.single().lastChapterIndex)
+        assertFalse(snapshot.entities.any { it.raw == "不存在" })
+    }
+
+    @Test
+    fun entityAndWorldWithSameRawShareUserEditedTarget() = runBlocking {
+        val book = Book(bookUrl = "test://canonical-shared", name = "Shared", author = "test")
+        val gateway = InMemoryAiMemoryGateway()
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = gateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+        useCase.upsertWorldEntry(
+            book.bookUrl,
+            AiTranslationWorldEntry(raw = "青锋剑", target = "Thanh Phong Kiếm", category = "weapon"),
+        )
+        useCase.upsertEntity(
+            book.bookUrl,
+            io.legado.app.domain.model.AiTranslationStoryEntity(
+                raw = "青锋剑",
+                target = "Thanh Phong Kiếm chuẩn",
+                type = "item",
+                userEdited = true,
+                source = "USER",
+            ),
+        )
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        assertEquals("Thanh Phong Kiếm chuẩn", snapshot.entities.single().target)
+        assertEquals("Thanh Phong Kiếm chuẩn", snapshot.worldBuilding.single().target)
+        assertEquals(1, snapshot.canonicalMemory.count { it.raw == "青锋剑" })
+    }
+
+    @Test
+    fun wikiSeparatesBooksAndProjectsTimelineRelationshipsWithoutGlossaryDuplicates() = runBlocking {
+        val firstBook = Book(bookUrl = "test://wiki-first", name = "First", author = "test")
+        val secondBook = Book(bookUrl = "test://wiki-second", name = "Second", author = "test")
+        val gateway = InMemoryAiMemoryGateway()
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = gateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(firstBook),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+        useCase.upsertEntity(
+            firstBook.bookUrl,
+            io.legado.app.domain.model.AiTranslationStoryEntity(
+                raw = "叶长生",
+                target = "Diệp Trường Sinh",
+                category = "character",
+                userEdited = true,
+                source = "USER",
+            ),
+        )
+        useCase.upsertEntity(
+            firstBook.bookUrl,
+            io.legado.app.domain.model.AiTranslationStoryEntity(
+                raw = "林月",
+                target = "Lâm Nguyệt",
+                category = "character",
+            ),
+        )
+        useCase.upsertWorldEntry(
+            firstBook.bookUrl,
+            AiTranslationWorldEntry(raw = "叶长生", target = "Bản khác", category = "weapon"),
+        )
+        useCase.upsertWorldEntry(
+            firstBook.bookUrl,
+            AiTranslationWorldEntry(raw = "青锋剑", target = "Thanh Phong Kiếm", category = "weapon"),
+        )
+        useCase.upsertRelationship(
+            firstBook.bookUrl,
+            AiTranslationStoryRelationship("叶长生", "林月", "đồng minh", chapterIndex = 0),
+        )
+        useCase.upsertRelationship(
+            firstBook.bookUrl,
+            AiTranslationStoryRelationship("林月", "叶长生", "đồng minh", chapterIndex = 0),
+        )
+        useCase.upsertTimeline(
+            firstBook.bookUrl,
+            AiTranslationStoryTimeline(
+                chapterIndex = 0,
+                chapterTitle = "Chương 1",
+                summary = "Hai nhân vật gặp nhau.",
+                events = listOf("Gặp nhau"),
+                discoveries = listOf(
+                    AiTranslationWorldEntry(raw = "青锋剑", target = "Thanh Phong Kiếm", category = "weapon"),
+                ),
+            ),
+        )
+        useCase.upsertEntity(
+            secondBook.bookUrl,
+            io.legado.app.domain.model.AiTranslationStoryEntity(
+                raw = "叶长生",
+                target = "Diệp Trường Sinh khác",
+                category = "character",
+            ),
+        )
+
+        val wiki = useCase.observeLibraryWikiSnapshots().first()
+        assertEquals(setOf(firstBook.bookUrl, secondBook.bookUrl), wiki.map { it.bookUrl }.toSet())
+        val first = wiki.single { it.bookUrl == firstBook.bookUrl }
+        assertEquals(1, first.glossaryRecords.count { it.raw == "叶长生" })
+        assertEquals(1, first.glossaryRecords.count { it.raw == "青锋剑" })
+        assertTrue(first.glossaryRecords.single { it.raw == "叶长生" }.kind == AiTranslationStoryMemoryKind.ENTITY)
+        assertEquals(1, first.timelineRecords.size)
+        assertEquals(2, first.relationshipTags.size)
+        assertEquals(2, first.characterGraph.nodes.size)
+        assertEquals(2, first.characterGraph.edges.size)
+        assertEquals("Diệp Trường Sinh", first.glossaryRecords.single { it.raw == "叶长生" }.title)
+        assertEquals("Diệp Trường Sinh khác", wiki.single { it.bookUrl == secondBook.bookUrl }
+            .glossaryRecords.single { it.raw == "叶长生" }.title)
     }
 }
 

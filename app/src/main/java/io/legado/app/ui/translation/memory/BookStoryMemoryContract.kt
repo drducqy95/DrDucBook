@@ -3,6 +3,8 @@ package io.legado.app.ui.translation.memory
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Stable
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
+import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.ui.translation.TranslationCaseTransform
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
@@ -24,9 +26,11 @@ data class StoryMemoryEditorDraft(
     val kind: AiTranslationStoryMemoryKind = AiTranslationStoryMemoryKind.ENTITY,
     val primary: String = "",
     val secondary: String = "",
+    val senseKey: String = "",
     val type: String = "",
     val description: String = "",
     val chapterIndexText: String = "",
+    val lastChapterIndex: Int = -1,
     val aliasesOrRefsText: String = "",
     val gender: String = "",
     val rank: String = "",
@@ -36,6 +40,16 @@ data class StoryMemoryEditorDraft(
     val imagePath: String = "",
     val imagePrompt: String = "",
     val imageUpdatedAt: Long = 0L,
+    val selectedProvider: String = TranslationConstants.PROVIDER_QUICK_TRANSLATOR,
+    val suggestions: ImmutableList<TranslationSuggestionUi> = persistentListOf(),
+    val isSuggesting: Boolean = false,
+)
+
+@Stable
+data class TranslationSuggestionUi(
+    val provider: String,
+    val providerLabel: String,
+    val text: String,
 )
 
 @Stable
@@ -56,6 +70,9 @@ sealed interface BookStoryMemoryIntent {
     data class Edit(val item: StoryMemoryItemUi) : BookStoryMemoryIntent
     data class Add(val kind: AiTranslationStoryMemoryKind) : BookStoryMemoryIntent
     data class UpdateEditor(val value: StoryMemoryEditorDraft) : BookStoryMemoryIntent
+    data class RequestSuggestion(val provider: String) : BookStoryMemoryIntent
+    data class ApplySuggestion(val value: String) : BookStoryMemoryIntent
+    data class ApplyCaseTransform(val transform: TranslationCaseTransform) : BookStoryMemoryIntent
     data object DismissEditor : BookStoryMemoryIntent
     data object SaveEditor : BookStoryMemoryIntent
     data object DeleteEditor : BookStoryMemoryIntent

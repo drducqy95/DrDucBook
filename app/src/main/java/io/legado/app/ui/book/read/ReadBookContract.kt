@@ -546,6 +546,7 @@ sealed interface ReadBookIntent {
     data class SelectQuickDictionaryUniverse(val key: String) : ReadBookIntent
     data class SetQuickDictionaryUniverseName(val value: String) : ReadBookIntent
     data class SetQuickDictionaryContextMarkers(val value: String) : ReadBookIntent
+    data class SetQuickDictionarySaveToTranslationMemory(val value: Boolean) : ReadBookIntent
     data object SaveQuickDictionary : ReadBookIntent
     data object OpenEntityAnalyzer : ReadBookIntent
     data object OpenChapterSummary : ReadBookIntent

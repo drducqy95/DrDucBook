@@ -39,6 +39,7 @@ class MediaPlayerViewModel(
     private var handledEndedKey: Pair<String, Int>? = null
     private var speedBeforeBoost = 1f
     private var resolveJob: Job? = null
+    private var stopExitRequested = false
 
     init {
         syncConfigToState()
@@ -61,6 +62,7 @@ class MediaPlayerViewModel(
         return copy(
             autoPlay = config.autoPlay,
             autoNext = config.autoNext,
+            autoEnterPipOnExit = config.autoEnterPipOnExit,
             resumePosition = config.resumePosition,
             seekForwardSeconds = config.seekForwardSeconds,
             seekBackwardSeconds = config.seekBackwardSeconds,
@@ -87,7 +89,10 @@ class MediaPlayerViewModel(
         when (intent) {
             is MediaPlayerIntent.Initialize -> initialize(intent.bookUrl, intent.chapterIndex)
             MediaPlayerIntent.Retry -> reload()
-            MediaPlayerIntent.Back -> _effects.tryEmit(MediaPlayerEffect.Exit)
+            MediaPlayerIntent.Back -> handleBack()
+            MediaPlayerIntent.PictureInPictureEntered -> Unit
+            MediaPlayerIntent.PictureInPictureRequestFailed -> stopAndExit()
+            MediaPlayerIntent.PictureInPictureClosed -> stopAndExit()
             MediaPlayerIntent.TogglePlayback -> togglePlayback()
             MediaPlayerIntent.Previous -> loadAdjacent(previous = true)
             MediaPlayerIntent.Next -> loadAdjacent(previous = false)
@@ -129,6 +134,9 @@ class MediaPlayerViewModel(
             }
             is MediaPlayerIntent.SetAutoNext -> updateConfig {
                 MediaPlayerConfig.autoNext = intent.enabled
+            }
+            is MediaPlayerIntent.SetAutoEnterPipOnExit -> updateConfig {
+                MediaPlayerConfig.autoEnterPipOnExit = intent.enabled
             }
             is MediaPlayerIntent.SetResumePosition -> updateConfig {
                 MediaPlayerConfig.resumePosition = intent.enabled
@@ -210,7 +218,33 @@ class MediaPlayerViewModel(
         val key = bookUrl to chapterIndex
         if (initializedKey == key) return
         initializedKey = key
+        stopExitRequested = false
         load(bookUrl, chapterIndex, playWhenReady = MediaPlayerConfig.autoPlay)
+    }
+
+    private fun handleBack() {
+        val state = _uiState.value
+        if (state.isVideo && state.isPlaying && state.autoEnterPipOnExit) {
+            _effects.tryEmit(MediaPlayerEffect.EnterPictureInPicture)
+        } else {
+            stopAndExit()
+        }
+    }
+
+    private fun stopAndExit() {
+        if (stopExitRequested) return
+        stopExitRequested = true
+        viewModelScope.launch {
+            runCatching { playbackGateway.stop() }
+                .onFailure { error ->
+                    _effects.tryEmit(
+                        MediaPlayerEffect.ShowMessage(
+                            error.localizedMessage.orEmpty().ifBlank { "Không thể dừng trình phát" }
+                        )
+                    )
+                }
+            _effects.tryEmit(MediaPlayerEffect.ExitAfterStop)
+        }
     }
 
     private fun reload() {

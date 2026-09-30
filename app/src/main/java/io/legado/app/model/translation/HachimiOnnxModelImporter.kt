@@ -205,7 +205,7 @@ object HachimiOnnxModelImporter {
     internal fun installAndActivateAtomically(root: File, staging: File): String {
         val modelId = resolveModelId(staging)
         installAtomically(root, staging, modelId)
-        HachimiOnnxRuntimeCoordinator.setActiveModelId(modelId)
+        HachimiOnnxRuntimeCoordinator.activateInstalledModel(modelId)
         return modelId
     }
 

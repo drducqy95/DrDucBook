@@ -2,6 +2,7 @@ package io.legado.app.data.repository
 
 import io.legado.app.data.dao.AiRouterDao
 import io.legado.app.data.entities.AiCredentialEntity
+import io.legado.app.data.entities.AiCredentialModelCapabilityEntity
 import io.legado.app.data.entities.AiModelProfile
 import io.legado.app.data.entities.AiProviderProfile
 import io.legado.app.data.entities.AiRouteAttemptEntity
@@ -14,6 +15,7 @@ import io.legado.app.domain.gateway.AiSecretStore
 import io.legado.app.domain.gateway.AiStreamEvent
 import io.legado.app.domain.gateway.AiTextGateway
 import io.legado.app.domain.model.AiAvailableModel
+import io.legado.app.domain.model.AiCapabilityStatus
 import io.legado.app.domain.model.AiCredentialKind
 import io.legado.app.domain.model.AiCredentialStatus
 import io.legado.app.domain.model.AiFailureKind
@@ -28,6 +30,7 @@ import io.legado.app.domain.model.AiOAuthAuthorization
 import io.legado.app.domain.model.AiOAuthEvent
 import io.legado.app.domain.model.AiOAuthProviderConfig
 import io.legado.app.domain.model.AiOAuthProviderId
+import io.legado.app.domain.model.AiOutputContract
 import io.legado.app.domain.model.AiProfileDraft
 import io.legado.app.domain.model.AiProviderAuthType
 import io.legado.app.domain.model.AiProviderConfig
@@ -253,6 +256,96 @@ class AiRouterRepositoryTest {
             dao.attempts.map { it.credentialLabel },
         )
         assertEquals(0, dao.targets.getValue("target_api").consecutiveFailures)
+    }
+
+    @Test
+    fun modelOnlyTargetUsesCapabilityOfTheActualOauthAccount() = runBlocking {
+        val dao = FakeAiRouterDao()
+        dao.routes["route_chat"] = chatRoute().copy(maxAttempts = 1)
+        dao.credentials["credential_a"] = oauthCredential().copy(
+            id = "credential_a",
+            label = "Codex account A",
+            sortNumber = 0,
+        )
+        dao.credentials["credential_b"] = oauthCredential().copy(
+            id = "credential_b",
+            label = "Codex account B",
+            sortNumber = 1,
+        )
+        dao.targets["target_codex"] = AiRouteTargetEntity(
+            id = "target_codex",
+            routeProfileId = "route_chat",
+            modelProfileId = "model_codex",
+            credentialId = null,
+        )
+        dao.upsertCapability(
+            capability("credential_a", AiCapabilityStatus.MODEL_UNAVAILABLE)
+        )
+        dao.upsertCapability(
+            capability("credential_b", AiCapabilityStatus.AVAILABLE)
+        )
+        val profileGateway = FakeAiProfileGateway().apply {
+            modelConfigs["model_codex"] = oauthModel()
+        }
+        val delegate = RecordingAiTextGateway()
+        val repository = repository(
+            dao = dao,
+            profileGateway = profileGateway,
+            oauthGateway = FakeAiOAuthGateway { credentialId -> "token-$credentialId" },
+            delegate = delegate,
+        )
+
+        repository.generate(chatRequest()).getOrThrow()
+
+        assertEquals("token-credential_b", delegate.lastRequest?.model?.provider?.apiKey)
+        assertEquals(listOf("Codex account B"), dao.attempts.map { it.credentialLabel })
+    }
+
+    @Test
+    fun directRequestRotatesCapabilityEligibleApiKeysUsingSharedSelector() = runBlocking {
+        val dao = FakeAiRouterDao()
+        dao.credentials["credential_a"] = AiCredentialEntity(
+            id = "credential_a",
+            providerId = "provider_api",
+            label = "API key A",
+            kind = AiCredentialKind.API_KEY,
+            secretRef = "secret_a",
+            sortNumber = 0,
+        )
+        dao.credentials["credential_b"] = AiCredentialEntity(
+            id = "credential_b",
+            providerId = "provider_api",
+            label = "API key B",
+            kind = AiCredentialKind.API_KEY,
+            secretRef = "secret_b",
+            sortNumber = 1,
+        )
+        val profileGateway = FakeAiProfileGateway().apply {
+            modelConfigs["model_api"] = apiKeyModel()
+        }
+        val delegate = RecordingAiTextGateway()
+        val repository = repository(
+            dao = dao,
+            profileGateway = profileGateway,
+            secretStore = FakeAiSecretStore(
+                linkedMapOf("secret_a" to "api-key-a", "secret_b" to "api-key-b")
+            ),
+            oauthGateway = FakeAiOAuthGateway { "unused" },
+            delegate = delegate,
+        )
+        val request = AiGenerateRequest(
+            model = apiKeyModel(),
+            messages = listOf(AiMessage(AiMessageRole.USER, "Xin chào")),
+            taskType = AiTaskType.CHAT,
+        )
+
+        repository.generate(request).getOrThrow()
+        repository.generate(request).getOrThrow()
+
+        assertEquals(
+            listOf("api-key-a", "api-key-b"),
+            delegate.generateRequests.map { it.model.provider.apiKey },
+        )
     }
 
     @Test
@@ -1104,6 +1197,17 @@ class AiRouterRepositoryTest {
         taskType = AiTaskType.TRANSLATE_CHAPTER,
         routeSessionKey = "book:chapter",
     )
+
+    private fun capability(
+        credentialId: String,
+        status: String,
+    ) = AiCredentialModelCapabilityEntity(
+        credentialId = credentialId,
+        modelProfileId = "model_codex",
+        taskType = AiTaskType.CHAT,
+        outputContract = AiOutputContract.CHAT_TEXT,
+        status = status,
+    )
 }
 
 private class FakeAiRouterDao : AiRouterDao {
@@ -1111,6 +1215,7 @@ private class FakeAiRouterDao : AiRouterDao {
     val routes = linkedMapOf<String, AiRouteProfileEntity>()
     val targets = linkedMapOf<String, AiRouteTargetEntity>()
     val attempts = mutableListOf<AiRouteAttemptEntity>()
+    val capabilities = linkedMapOf<String, AiCredentialModelCapabilityEntity>()
 
     override fun observeCredentials(): Flow<List<AiCredentialEntity>> =
         flowOf(credentials.values.toList())
@@ -1124,12 +1229,79 @@ private class FakeAiRouterDao : AiRouterDao {
     override fun observeRecentAttempts(limit: Int): Flow<List<AiRouteAttemptEntity>> =
         flowOf(attempts.take(limit))
 
+    override fun observeCapabilities(): Flow<List<AiCredentialModelCapabilityEntity>> =
+        flowOf(capabilities.values.toList())
+
     override suspend fun getCredential(id: String): AiCredentialEntity? = credentials[id]
 
     override suspend fun getCredentialsForProvider(providerId: String): List<AiCredentialEntity> =
         credentials.values
             .filter { it.providerId == providerId }
             .sortedWith(compareBy<AiCredentialEntity> { it.sortNumber }.thenBy { it.createdAt })
+
+    override suspend fun getCapabilitiesForCredential(
+        credentialId: String,
+    ): List<AiCredentialModelCapabilityEntity> = capabilities.values
+        .filter { it.credentialId == credentialId }
+
+    override suspend fun getCapability(
+        credentialId: String,
+        modelProfileId: String,
+        taskType: String,
+        outputContract: String,
+    ): AiCredentialModelCapabilityEntity? = capabilities.values.firstOrNull {
+        it.credentialId == credentialId &&
+            it.modelProfileId == modelProfileId &&
+            it.taskType == taskType &&
+            it.outputContract == outputContract
+    }
+
+    override suspend fun upsertCapability(entity: AiCredentialModelCapabilityEntity) {
+        capabilities[
+            listOf(
+                entity.credentialId,
+                entity.modelProfileId,
+                entity.taskType,
+                entity.outputContract,
+            ).joinToString("\u0000")
+        ] = entity
+    }
+
+    override suspend fun deleteCapabilitiesForCredential(credentialId: String) {
+        capabilities.entries.removeIf { it.value.credentialId == credentialId }
+    }
+
+    override suspend fun invalidateCredentialCapabilities(credentialId: String, now: Long) {
+        capabilities.replaceAll { _, capability ->
+            if (capability.credentialId == credentialId) {
+                capability.copy(
+                    status = "unknown",
+                    cooldownUntil = 0L,
+                    failureKind = null,
+                    failureMessage = null,
+                    updatedAt = now,
+                )
+            } else {
+                capability
+            }
+        }
+    }
+
+    override suspend fun resetCapabilityHealth(credentialId: String?, now: Long) {
+        capabilities.replaceAll { _, capability ->
+            if (credentialId == null || capability.credentialId == credentialId) {
+                capability.copy(
+                    cooldownUntil = 0L,
+                    status = if (capability.lastSuccessAt == null) "unknown" else "available",
+                    failureKind = null,
+                    failureMessage = null,
+                    updatedAt = now,
+                )
+            } else {
+                capability
+            }
+        }
+    }
 
     override suspend fun getRoute(id: String): AiRouteProfileEntity? = routes[id]
 
@@ -1179,6 +1351,7 @@ private class FakeAiRouterDao : AiRouterDao {
 
     override suspend fun deleteCredential(id: String) {
         credentials.remove(id)
+        deleteCapabilitiesForCredential(id)
     }
 
     override suspend fun clearCredentialFromTargets(credentialId: String) {

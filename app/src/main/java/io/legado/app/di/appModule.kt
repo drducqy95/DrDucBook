@@ -63,6 +63,7 @@ import io.legado.app.data.repository.MangaTranslationExportRepository
 import io.legado.app.data.repository.MediaResolverRepository
 import io.legado.app.data.repository.MediaDownloadRepository
 import io.legado.app.data.repository.EntitledMediaDownloadGateway
+import io.legado.app.data.repository.DownloadCenterRepository
 import io.legado.app.data.repository.AudiobookImportRepository
 import io.legado.app.data.repository.AssetDeliveryRepository
 import io.legado.app.data.repository.AssetDeliveryImportRepository
@@ -154,6 +155,7 @@ import io.legado.app.domain.gateway.LocalAiTranslationGateway
 import io.legado.app.domain.gateway.LocalTtsModelGateway
 import io.legado.app.domain.gateway.MediaResolverGateway
 import io.legado.app.domain.gateway.MediaDownloadGateway
+import io.legado.app.domain.gateway.DownloadCenterGateway
 import io.legado.app.domain.gateway.AudiobookImportGateway
 import io.legado.app.domain.gateway.AssetDeliveryGateway
 import io.legado.app.domain.gateway.AssetDeliveryImportGateway
@@ -311,6 +313,7 @@ import io.legado.app.ui.config.otherConfig.OtherConfigViewModel
 import io.legado.app.ui.config.readConfig.ReadConfigViewModel
 import io.legado.app.ui.config.themeConfig.ThemeConfigViewModel
 import io.legado.app.ui.config.themeManage.ThemeManageViewModel
+import io.legado.app.ui.config.media.MediaPlayerConfigViewModel
 import io.legado.app.ui.personalization.PersonalizationViewModel
 import io.legado.app.ui.dict.DictViewModel
 import io.legado.app.ui.dict.rule.DictRuleViewModel
@@ -328,6 +331,7 @@ import io.legado.app.ui.main.my.MyViewModel
 import io.legado.app.ui.main.rss.RssViewModel
 import io.legado.app.ui.media.player.MediaPlayerViewModel
 import io.legado.app.ui.media.download.MediaDownloadsViewModel
+import io.legado.app.ui.download.center.DownloadCenterViewModel
 import io.legado.app.ui.media.audiobook.AudiobookImportViewModel
 import io.legado.app.ui.quickdict.QuickDictionaryEditorViewModel
 import io.legado.app.ui.replace.ReplaceEditRoute
@@ -434,6 +438,7 @@ val appModule = module {
         AssetDeliveryImportRepository(
             context = androidContext(),
             quickDictionaryGateway = get(),
+            quickDictionaryPackStore = get(),
             localAiEngineGateway = get(),
         )
     }
@@ -458,8 +463,8 @@ val appModule = module {
 
     single<UploadRepository> { DirectLinkUploadRepository() }
     single<TranslationCacheGateway> { TranslationCacheRepositoryImpl() }
-    single<QuickTranslationGateway> { QuickTranslationRepository() }
     single { QuickDictionaryPackStore() }
+    single<QuickTranslationGateway> { QuickTranslationRepository(get()) }
     single<QuickDictionaryGateway> { QuickDictionaryRepository(get(), get(), get()) }
       single<NmtTranslationGateway> { NmtTranslationRepository(androidContext()) }
     single<MlKitTranslationGateway> { MlKitTranslationRepository() }
@@ -577,6 +582,7 @@ val appModule = module {
     single<MediaDownloadGateway> {
         EntitledMediaDownloadGateway(get<MediaDownloadRepository>(), get())
     }
+    single<DownloadCenterGateway> { DownloadCenterRepository(get(), get()) }
     single<AudiobookImportGateway> { AudiobookImportRepository(get(), get()) }
     single { MediaPlaybackConnection(get()) }
     single<MediaPlaybackGateway> { get<MediaPlaybackConnection>() }
@@ -665,6 +671,7 @@ val appModule = module {
             storyIllustrationUseCase = get(),
             cachedChapterGateway = get(),
             aiProfileGateway = get(),
+            translateChapterUseCase = get(),
         )
     }
     viewModelOf(::HomeViewModel)
@@ -719,7 +726,9 @@ val appModule = module {
     viewModelOf(::EbookEditorViewModel)
     viewModelOf(::EbookPreviewViewModel)
     viewModelOf(::MediaPlayerViewModel)
+    viewModelOf(::MediaPlayerConfigViewModel)
     viewModelOf(::MediaDownloadsViewModel)
+    viewModelOf(::DownloadCenterViewModel)
     viewModelOf(::AudiobookImportViewModel)
     viewModel { (providerId: String?) ->
         AiProviderEditViewModel(
@@ -772,6 +781,7 @@ val appModule = module {
             quickTranslationGateway = get(),
             accountEntitlementUseCase = get(),
             translationCacheGateway = get(),
+            translationStoryMemoryUseCase = get(),
         )
     }
     viewModelOf(::ChangeCoverViewModel)

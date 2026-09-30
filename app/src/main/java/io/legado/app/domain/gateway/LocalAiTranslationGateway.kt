@@ -15,6 +15,9 @@ interface LocalAiTranslationGateway {
     val isAvailable: Boolean
     val loadedModelName: String?
 
+    /** Runtime-selected context budget; implementations may use model/device metadata. */
+    suspend fun contextWindow(): Int = 4_096
+
     suspend fun translate(
         text: String,
         targetLanguage: String,

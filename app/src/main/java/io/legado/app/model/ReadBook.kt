@@ -18,6 +18,7 @@ import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.TranslationCacheGateway
 import io.legado.app.domain.model.ReaderContentMode
 import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.domain.model.TranslationContentSanitizer
 import io.legado.app.domain.model.displaysTranslationProvider
 import io.legado.app.domain.model.toQuickPhoneticPair
 import io.legado.app.domain.model.toQuickTranslationPair
@@ -1034,6 +1035,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         if (book.config.detectedSourceLanguage == null && originalContent.isNotBlank()) {
             book.detectAndCacheSourceLanguage(originalContent.take(500))
         }
+        val translationSource = TranslationContentSanitizer.sanitize(originalContent)
         val fallbackMode = when (TranslationConfig.llmProvider) {
             TranslationConstants.PROVIDER_GOOGLE -> ReaderContentMode.GOOGLE
             TranslationConstants.PROVIDER_ML_KIT -> ReaderContentMode.ML_KIT
@@ -1054,10 +1056,10 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             ReaderContentMode.HAN_VIET -> resolveLocalReaderContent(
                 book = book,
                 chapter = chapter,
-                originalContent = originalContent,
+                originalContent = translationSource,
                 provider = TranslationConstants.PROVIDER_HAN_VIET,
                 translate = { source ->
-                    val phonetics = quickDictionaryGateway.getEffectiveEntries(book, originalContent)
+                    val phonetics = quickDictionaryGateway.getEffectiveEntries(book, translationSource)
                         .mapNotNull { it.toQuickPhoneticPair() }
                     quickTranslationGateway.hanViet(source, phonetics)
                 },
@@ -1066,13 +1068,13 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             ReaderContentMode.QUICK_TRANSLATOR -> resolveLocalReaderContent(
                 book = book,
                 chapter = chapter,
-                originalContent = originalContent,
+                originalContent = translationSource,
                 provider = TranslationConstants.PROVIDER_QUICK_TRANSLATOR,
                 quickTranslationPackVersion = quickTranslationGateway.packVersionFor(
                     book.getQuickTranslationPronounModeOverride(),
                 ),
                 translate = { source ->
-                    val scopedEntries = quickDictionaryGateway.getEffectiveEntries(book, originalContent)
+                    val scopedEntries = quickDictionaryGateway.getEffectiveEntries(book, translationSource)
                     val scopedTerms = scopedEntries.mapNotNull { it.toQuickTranslationPair() }
                     val scopedPhonetics = scopedEntries.mapNotNull { it.toQuickPhoneticPair() }
                     quickTranslationGateway.translate(
@@ -1139,12 +1141,13 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         quickTranslationPackVersion: String = quickTranslationGateway.packVersion,
         translate: suspend (String) -> String,
     ): String {
+        val translationSource = TranslationContentSanitizer.sanitize(originalContent)
         val contentHash = dictionaryAwareContentHash(
-            originalContentHash = translationCacheGateway.computeContentHash(originalContent),
+            originalContentHash = translationCacheGateway.computeContentHash(translationSource),
             provider = provider,
             dictionaryRevision = quickDictionaryGateway.getEffectiveRevision(
                 book = book,
-                context = originalContent,
+                context = translationSource,
             ),
             quickTranslationPackVersion = quickTranslationPackVersion,
         )
@@ -1154,8 +1157,8 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             targetLanguage = VIETNAMESE_LANGUAGE,
             originalContentHash = contentHash,
             provider = provider,
-        )?.let { return it }
-        val translated = translate(originalContent)
+        )?.let { return TranslationContentSanitizer.sanitize(it) }
+        val translated = TranslationContentSanitizer.sanitize(translate(translationSource))
         translationCacheGateway.writeTranslation(
             book = book,
             bookChapter = chapter,

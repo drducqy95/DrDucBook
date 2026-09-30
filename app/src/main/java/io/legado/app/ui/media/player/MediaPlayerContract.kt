@@ -37,6 +37,7 @@ data class MediaPlayerUiState(
     val showSettingsSheet: Boolean = false,
     val autoPlay: Boolean = true,
     val autoNext: Boolean = true,
+    val autoEnterPipOnExit: Boolean = false,
     val resumePosition: Boolean = true,
     val seekForwardSeconds: Int = 10,
     val seekBackwardSeconds: Int = 10,
@@ -82,6 +83,9 @@ sealed interface MediaPlayerIntent {
 
     data object Retry : MediaPlayerIntent
     data object Back : MediaPlayerIntent
+    data object PictureInPictureEntered : MediaPlayerIntent
+    data object PictureInPictureRequestFailed : MediaPlayerIntent
+    data object PictureInPictureClosed : MediaPlayerIntent
     data object TogglePlayback : MediaPlayerIntent
     data object Previous : MediaPlayerIntent
     data object Next : MediaPlayerIntent
@@ -104,6 +108,7 @@ sealed interface MediaPlayerIntent {
     data object ToggleFullscreen : MediaPlayerIntent
     data class SetAutoPlay(val enabled: Boolean) : MediaPlayerIntent
     data class SetAutoNext(val enabled: Boolean) : MediaPlayerIntent
+    data class SetAutoEnterPipOnExit(val enabled: Boolean) : MediaPlayerIntent
     data class SetResumePosition(val enabled: Boolean) : MediaPlayerIntent
     data class SetSeekForwardSeconds(val seconds: Int) : MediaPlayerIntent
     data class SetSeekBackwardSeconds(val seconds: Int) : MediaPlayerIntent
@@ -136,6 +141,7 @@ sealed interface MediaPlayerIntent {
 sealed interface MediaPlayerEffect {
     data object Exit : MediaPlayerEffect
     data object EnterPictureInPicture : MediaPlayerEffect
+    data object ExitAfterStop : MediaPlayerEffect
     data object StartDownloadService : MediaPlayerEffect
     data object OpenDownloads : MediaPlayerEffect
     data class ShowMessage(val message: String) : MediaPlayerEffect

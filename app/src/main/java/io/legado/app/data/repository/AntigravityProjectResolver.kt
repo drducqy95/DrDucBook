@@ -8,6 +8,7 @@ internal const val ANTIGRAVITY_PRODUCTION_BASE_URL = "https://cloudcode-pa.googl
 internal const val ANTIGRAVITY_IDE_BASE_URL = "https://daily-cloudcode-pa.googleapis.com"
 internal const val ANTIGRAVITY_IDE_USER_AGENT = "antigravity/ide/2.9.1 darwin/arm64"
 internal const val ANTIGRAVITY_OAUTH_USES_PKCE = false
+internal const val ANTIGRAVITY_RETIRED_MODEL_ID = "gemini-3.1-flash-lite"
 
 internal const val ANTIGRAVITY_DEFAULT_SYSTEM =
     "You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.\n" +
@@ -104,7 +105,6 @@ val ANTIGRAVITY_SUPPORTED_MODELS: List<io.legado.app.domain.model.AiAvailableMod
     // Gemini 3.1 Pro
     io.legado.app.domain.model.AiAvailableModel("gemini-pro-agent", "Gemini 3.1 Pro (High)", 1_000_000, 64_000),
     io.legado.app.domain.model.AiAvailableModel("gemini-3.1-pro-low", "Gemini 3.1 Pro (Low)", 1_000_000, 64_000),
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite", 1_000_000, 64_000),
 
     // Claude (via Antigravity backend)
     io.legado.app.domain.model.AiAvailableModel("claude-opus-4-6-thinking", "Claude Opus 4.6 (Thinking)", 1_000_000, 64_000),

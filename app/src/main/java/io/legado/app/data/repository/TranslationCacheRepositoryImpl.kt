@@ -457,7 +457,7 @@ class TranslationCacheRepositoryImpl(
             .filter {
                 it.originalContentHash == contentHash &&
                     it.provider == provider &&
-                    it.isSuccess
+                    it.isReadable
             }
             .sortedBy(TranslationCache::chunkIndex)
     }
@@ -468,8 +468,10 @@ class TranslationCacheRepositoryImpl(
         targetLanguage: String,
         chunkIndex: Int,
         provider: String,
+        expectedContentHash: String?,
     ): TranslationCache? = withContext(Dispatchers.IO) {
         readAllChunks(book, bookChapter, targetLanguage, provider)[chunkIndex]
+            ?.takeIf { expectedContentHash == null || it.originalContentHash == expectedContentHash }
     }
 
     override suspend fun saveChunk(

@@ -14,6 +14,7 @@ internal object NmtOnnxIpc {
     const val KEY_REQUEST_ID = "request_id"
     const val KEY_TEXT = "text"
     const val KEY_DICTIONARY_JSON = "dictionary_json"
+    const val KEY_DICTIONARY_FINGERPRINT = "dictionary_fingerprint"
     const val KEY_CONFIG_JSON = "config_json"
     const val KEY_RESULT_JSON = "result_json"
     const val KEY_ERROR_CLASS = "error_class"

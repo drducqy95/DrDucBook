@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -21,7 +22,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -49,6 +52,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
@@ -105,8 +109,65 @@ fun RowScope.FloatingBottomBarItem(
 }
 
 @Composable
+fun FloatingBottomBarAction(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    backdrop: Backdrop,
+    isBlurEnabled: Boolean = true,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val isInLightTheme = !LegadoTheme.isDark
+    val containerBaseColor = GlassDefaults.secondaryColorOr {
+        LegadoTheme.colorScheme.surfaceContainer
+    }
+    val containerColor = if (isBlurEnabled) {
+        containerBaseColor.copy(alpha = ThemeConfig.bottomBarBlurAlpha / 100f)
+    } else {
+        containerBaseColor
+    }
+
+    Box(
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .size(40.dp)
+            .clickable(
+                interactionSource = null,
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { CircleShape },
+                effects = {
+                    if (isBlurEnabled) {
+                        vibrancy()
+                        blur(ThemeConfig.bottomBarBlurRadius.toFloat().dp.toPx())
+                        lens(
+                            ThemeConfig.bottomBarLensRadius.dp.toPx(),
+                            ThemeConfig.bottomBarLensRadius.dp.toPx()
+                        )
+                    }
+                },
+                highlight = {
+                    Highlight.Default.copy(alpha = if (isBlurEnabled) 1f else 0f)
+                },
+                shadow = {
+                    Shadow.Default.copy(
+                        color = Color.Black.copy(if (isInLightTheme) 0.1f else 0.2f)
+                    )
+                },
+                onDrawSurface = { drawRect(containerColor) }
+            ),
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
+}
+
+@Composable
 fun FloatingBottomBar(
     modifier: Modifier = Modifier,
+    widthFraction: Float = 1f,
     selectedIndex: () -> Int,
     onSelected: (index: Int) -> Unit,
     onReselected: (index: Int) -> Unit = {},
@@ -242,7 +303,9 @@ fun FloatingBottomBar(
         }
 
     Box(
-        modifier = if (tabsCount > 5) {
+        modifier = if (widthFraction < 1f) {
+            modifier.fillMaxWidth(widthFraction.coerceIn(0.1f, 1f))
+        } else if (tabsCount > 5) {
             modifier.fillMaxWidth()
         } else {
             modifier.width(IntrinsicSize.Min)

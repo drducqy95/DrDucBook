@@ -369,8 +369,14 @@ fun ImportBookScreen(
             selectBookFiles.launch(
                 arrayOf(
                     "text/plain",
+                    "text/html",
+                    "application/xhtml+xml",
+                    "text/markdown",
+                    "text/x-markdown",
                     "application/epub+zip",
                     "application/pdf",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/msword",
                     "application/x-mobipocket-ebook",
                     "application/vnd.amazon.ebook",
                     "application/zip",

@@ -146,6 +146,7 @@ interface TranslationCacheGateway {
         targetLanguage: String,
         chunkIndex: Int,
         provider: String,
+        expectedContentHash: String? = null,
     ): TranslationCache?
 
     suspend fun saveChunk(

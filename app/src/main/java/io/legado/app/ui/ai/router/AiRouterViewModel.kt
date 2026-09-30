@@ -10,6 +10,7 @@ import io.legado.app.domain.gateway.LocalAiEngineGateway
 import io.legado.app.data.entities.AiModelProfile
 import io.legado.app.domain.model.AiConnectionStatus
 import io.legado.app.domain.model.AiCredentialKind
+import io.legado.app.domain.model.AiCredentialStatus
 import io.legado.app.domain.model.AiOAuthEvent
 import io.legado.app.domain.model.AiAvailableModel
 import io.legado.app.domain.model.AiModelDraft
@@ -26,6 +27,7 @@ import io.legado.app.domain.model.AiRouteProfileDraft
 import io.legado.app.domain.model.AiRouteStrategy
 import io.legado.app.domain.model.AiRouteTargetDraft
 import io.legado.app.domain.model.AiTaskType
+import io.legado.app.domain.model.AiCapabilityStatus
 import io.legado.app.domain.model.AiTaskPresetDraft
 import io.legado.app.domain.model.ExternalAssetCatalog
 import io.legado.app.domain.usecase.TestAiProviderDraftUseCase
@@ -163,6 +165,31 @@ class AiRouterViewModel(
                         )
                     }.toImmutableList(),
                     credentials = snapshot.credentials.map { credential ->
+                        val capabilityConfigs = snapshot.capabilities
+                            .filter { it.credentialId == credential.id }
+                        val now = System.currentTimeMillis()
+                        val availableCapabilities = capabilityConfigs.filter {
+                            AiCapabilityStatus.isUsable(it.status, now, it.cooldownUntil)
+                        }
+                        val capabilityUi = capabilityConfigs.map { capability ->
+                            AiRouterCapabilityUi(
+                                modelProfileId = capability.modelProfileId,
+                                modelId = models.firstOrNull { it.id == capability.modelProfileId }
+                                    ?.modelId.orEmpty(),
+                                modelLabel = modelLabelById[capability.modelProfileId]
+                                    .orEmpty()
+                                    .ifBlank { capability.modelProfileId },
+                                taskType = capability.taskType,
+                                outputContract = capability.outputContract,
+                                status = capability.status,
+                                lastProbeAt = capability.lastProbeAt,
+                                lastSuccessAt = capability.lastSuccessAt,
+                                cooldownUntil = capability.cooldownUntil,
+                                failureKind = capability.failureKind,
+                                failureMessage = capability.failureMessage,
+                                latencyMs = capability.latencyMs,
+                            )
+                        }.toImmutableList()
                         AiRouterCredentialUi(
                             id = credential.id,
                             providerId = credential.providerId,
@@ -179,6 +206,28 @@ class AiRouterViewModel(
                             expiresAt = credential.expiresAt,
                             status = credential.status,
                             hasRefreshToken = credential.hasRefreshToken,
+                            accountId = credential.accountId,
+                            readinessStatus = when {
+                                credential.status == AiCredentialStatus.AUTHENTICATED_NOT_READY ->
+                                    AiCapabilityStatus.UNKNOWN
+                                availableCapabilities.isNotEmpty() -> AiCapabilityStatus.AVAILABLE
+                                capabilityConfigs.isNotEmpty() -> capabilityConfigs
+                                    .firstOrNull()?.status ?: AiCapabilityStatus.UNKNOWN
+                                else -> AiCapabilityStatus.UNKNOWN
+                            },
+                            availableModelCount = availableCapabilities
+                                .map { it.modelProfileId }
+                                .distinct()
+                                .size,
+                            totalModelCount = capabilityConfigs
+                                .map { it.modelProfileId }
+                                .distinct()
+                                .size,
+                            lastProbeAt = capabilityConfigs.maxOfOrNull { it.lastProbeAt ?: 0L }
+                                ?.takeIf { it > 0L },
+                            lastSuccessAt = capabilityConfigs.maxOfOrNull { it.lastSuccessAt ?: 0L }
+                                ?.takeIf { it > 0L },
+                            capabilities = capabilityUi,
                         )
                     }.toImmutableList(),
                     routes = snapshot.routes.map { route ->
@@ -1045,11 +1094,11 @@ class AiRouterViewModel(
         if (_uiState.value.saving) return
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(saving = true) }
-            oauthGateway.syncModels(credentialId)
-                .onSuccess { models ->
+            routerGateway.probeCredential(credentialId)
+                .onSuccess {
                     _effects.emit(
                         AiRouterEffect.ShowMessage(
-                            "Đã xác thực tài khoản và đồng bộ ${models.size} model khả dụng"
+                            "Đã xác thực tài khoản và đồng bộ capability của các model"
                         )
                     )
                 }

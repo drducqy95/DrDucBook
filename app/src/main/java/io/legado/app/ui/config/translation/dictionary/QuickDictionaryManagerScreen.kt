@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drducbook.app.R
 import io.legado.app.domain.model.QuickDictionaryScope
+import io.legado.app.domain.model.QuickDictionaryPackStatus
 import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.adaptiveContentPadding
@@ -257,6 +258,59 @@ fun QuickDictionaryManagerScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            item {
+                val originalState = state.originalPack
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    tonalElevation = 2.dp,
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        AppText(
+                            text = stringResource(R.string.quick_dictionary_original_title),
+                            style = LegadoTheme.typography.titleMediumEmphasized,
+                        )
+                        AppText(
+                            text = when (originalState.status) {
+                                QuickDictionaryPackStatus.NOT_INSTALLED -> stringResource(R.string.quick_dictionary_original_not_installed)
+                                QuickDictionaryPackStatus.DOWNLOADING -> stringResource(R.string.quick_dictionary_original_downloading)
+                                QuickDictionaryPackStatus.VERIFYING -> stringResource(R.string.quick_dictionary_original_verifying)
+                                QuickDictionaryPackStatus.READY -> stringResource(R.string.quick_dictionary_original_ready, originalState.entryCount)
+                                QuickDictionaryPackStatus.EDITED -> stringResource(R.string.quick_dictionary_original_edited)
+                                QuickDictionaryPackStatus.FAILED -> stringResource(R.string.quick_dictionary_original_failed)
+                                QuickDictionaryPackStatus.OUTDATED -> stringResource(R.string.quick_dictionary_original_outdated)
+                            },
+                        )
+                        originalState.lastError?.takeIf(String::isNotBlank)?.let { error ->
+                            AppText(text = error, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (originalState.status == QuickDictionaryPackStatus.NOT_INSTALLED ||
+                                originalState.status == QuickDictionaryPackStatus.FAILED ||
+                                originalState.status == QuickDictionaryPackStatus.OUTDATED
+                            ) {
+                                Button(
+                                    onClick = { onIntent(QuickDictionaryManagerIntent.RetryOriginalPack) },
+                                    enabled = originalState.status != QuickDictionaryPackStatus.DOWNLOADING,
+                                ) {
+                                    AppText(stringResource(R.string.quick_dictionary_original_retry))
+                                }
+                            }
+                            if (originalState.status == QuickDictionaryPackStatus.READY ||
+                                originalState.status == QuickDictionaryPackStatus.EDITED
+                            ) {
+                                OutlinedButton(
+                                    onClick = { onIntent(QuickDictionaryManagerIntent.RestoreOriginalPack) },
+                                ) {
+                                    AppText(stringResource(R.string.quick_dictionary_original_restore))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 AppText(
                     text = stringResource(R.string.quick_dictionary_bundled),

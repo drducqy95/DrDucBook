@@ -11,13 +11,17 @@ import io.legado.app.domain.model.AiTranslationStoryTimeline
 import io.legado.app.domain.model.AiTranslationTimelineCharacter
 import io.legado.app.domain.model.AiTranslationWorldEntry
 import io.legado.app.domain.model.AiTaskType
+import io.legado.app.domain.model.TranslationConstants
 import io.legado.app.domain.gateway.AiProfileGateway
 import io.legado.app.domain.gateway.CachedChapterGateway
 import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
 import io.legado.app.domain.usecase.StoryIllustrationUseCase
+import io.legado.app.domain.usecase.TranslateChapterUseCase
+import io.legado.app.ui.translation.applyTranslationCaseTransform
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -25,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 class BookStoryMemoryViewModel(
     private val bookUrl: String,
@@ -32,6 +37,7 @@ class BookStoryMemoryViewModel(
     private val storyIllustrationUseCase: StoryIllustrationUseCase,
     private val cachedChapterGateway: CachedChapterGateway,
     private val aiProfileGateway: AiProfileGateway,
+    private val translateChapterUseCase: TranslateChapterUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BookStoryMemoryUiState())
@@ -41,6 +47,7 @@ class BookStoryMemoryViewModel(
     val effects = _effects.asSharedFlow()
 
     private var snapshot = AiTranslationStoryMemorySnapshot()
+    private var suggestionJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -65,7 +72,16 @@ class BookStoryMemoryViewModel(
             is BookStoryMemoryIntent.Add -> _uiState.update {
                 it.copy(editor = StoryMemoryEditorDraft(kind = intent.kind))
             }
-            is BookStoryMemoryIntent.UpdateEditor -> _uiState.update { it.copy(editor = intent.value) }
+            is BookStoryMemoryIntent.UpdateEditor -> updateEditor(intent.value)
+            is BookStoryMemoryIntent.RequestSuggestion -> requestSuggestion(intent.provider)
+            is BookStoryMemoryIntent.ApplySuggestion -> _uiState.update { state ->
+                state.copy(editor = state.editor?.copy(secondary = intent.value))
+            }
+            is BookStoryMemoryIntent.ApplyCaseTransform -> _uiState.update { state ->
+                state.copy(editor = state.editor?.let { draft ->
+                    draft.copy(secondary = applyTranslationCaseTransform(draft.secondary, intent.transform))
+                })
+            }
             BookStoryMemoryIntent.DismissEditor -> _uiState.update { it.copy(editor = null) }
             BookStoryMemoryIntent.SaveEditor -> saveEditor()
             BookStoryMemoryIntent.DeleteEditor -> deleteEditor()
@@ -80,13 +96,72 @@ class BookStoryMemoryViewModel(
         }
     }
 
+    private fun updateEditor(value: StoryMemoryEditorDraft) {
+        val previous = _uiState.value.editor
+        if (previous?.primary?.trim() != value.primary.trim()) {
+            suggestionJob?.cancel()
+            _uiState.update {
+                it.copy(
+                    editor = value.copy(suggestions = kotlinx.collections.immutable.persistentListOf(), isSuggesting = false),
+                )
+            }
+        } else {
+            _uiState.update { it.copy(editor = value) }
+        }
+    }
+
+    private fun requestSuggestion(provider: String) {
+        val kind = _uiState.value.editor?.kind ?: return
+        if (kind !in setOf(AiTranslationStoryMemoryKind.ENTITY, AiTranslationStoryMemoryKind.WORLD_BUILDING)) return
+        if (provider !in TranslationConstants.providerValues) return
+        val raw = _uiState.value.editor?.primary?.trim().orEmpty()
+        if (raw.isBlank()) return
+        suggestionJob?.cancel()
+        _uiState.update { state ->
+            state.copy(editor = state.editor?.copy(selectedProvider = provider, isSuggesting = true))
+        }
+        suggestionJob = viewModelScope.launch(Dispatchers.IO) {
+            translateChapterUseCase.executeSuggestion(
+                text = raw,
+                provider = provider,
+                book = cachedChapterGateway.getBook(bookUrl),
+            ).onSuccess { translated ->
+                _uiState.update { state ->
+                    val current = state.editor
+                    if (current == null || current.primary.trim() != raw || current.selectedProvider != provider) {
+                        state
+                    } else {
+                        state.copy(
+                            editor = current.copy(
+                                isSuggesting = false,
+                                suggestions = (current.suggestions.filterNot { it.provider == provider } +
+                                    TranslationSuggestionUi(provider, providerLabel(provider), translated))
+                                    .toImmutableList(),
+                            )
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                _uiState.update { state ->
+                    val current = state.editor
+                    if (current == null || current.primary.trim() != raw || current.selectedProvider != provider) state
+                    else state.copy(editor = current.copy(isSuggesting = false), errorMessage = error.localizedMessage)
+                }
+            }
+        }
+    }
+
+    private fun providerLabel(provider: String): String =
+        TranslationConstants.providerValues.zip(TranslationConstants.providerDisplayNames)
+            .firstOrNull { it.first == provider }?.second ?: provider
+
     private fun publishItems() {
         val selectedKind = _uiState.value.selectedKind
         val items = buildList {
             snapshot.entities.forEach { entity ->
                 add(
                     StoryMemoryItemUi(
-                        id = TranslationStoryMemoryUseCase.entityKey(entity.raw),
+                        id = TranslationStoryMemoryUseCase.entityKey(entity.raw, entity.senseKey),
                         kind = AiTranslationStoryMemoryKind.ENTITY,
                         title = entity.target.ifBlank { entity.raw },
                         subtitle = listOf(entity.raw, entity.type, entity.description)
@@ -181,7 +256,7 @@ class BookStoryMemoryViewModel(
     private fun openEditor(item: StoryMemoryItemUi) {
         val draft = when (item.kind) {
             AiTranslationStoryMemoryKind.ENTITY -> snapshot.entities
-                .firstOrNull { TranslationStoryMemoryUseCase.entityKey(it.raw) == item.id }
+                .firstOrNull { TranslationStoryMemoryUseCase.entityKey(it.raw, it.senseKey) == item.id }
                 ?.toDraft(item.id)
             AiTranslationStoryMemoryKind.RELATIONSHIP -> snapshot.relationships
                 .firstOrNull { TranslationStoryMemoryUseCase.relationshipKey(it) == item.id }
@@ -201,7 +276,7 @@ class BookStoryMemoryViewModel(
         val newId = when (draft.kind) {
             AiTranslationStoryMemoryKind.ENTITY -> draft.toEntity().also {
                 storyMemoryUseCase.upsertEntity(bookUrl, it)
-            }.let { TranslationStoryMemoryUseCase.entityKey(it.raw) }
+            }.let { TranslationStoryMemoryUseCase.entityKey(it.raw, it.senseKey) }
             AiTranslationStoryMemoryKind.RELATIONSHIP -> draft.toRelationship().also {
                 storyMemoryUseCase.upsertRelationship(bookUrl, it)
             }.let(TranslationStoryMemoryUseCase::relationshipKey)
@@ -239,7 +314,7 @@ class BookStoryMemoryViewModel(
         when (draft.kind) {
             AiTranslationStoryMemoryKind.ENTITY -> {
                 val entity = snapshot.entities.firstOrNull {
-                    TranslationStoryMemoryUseCase.entityKey(it.raw) == originalId
+                    TranslationStoryMemoryUseCase.entityKey(it.raw, it.senseKey) == originalId
                 } ?: error("Entity not found")
                 storyIllustrationUseCase.generateEntity(bookUrl, entity.raw, force = true)
             }
@@ -308,7 +383,7 @@ class BookStoryMemoryViewModel(
     private suspend fun deleteById(kind: AiTranslationStoryMemoryKind, id: String) {
         when (kind) {
             AiTranslationStoryMemoryKind.ENTITY -> snapshot.entities
-                .firstOrNull { TranslationStoryMemoryUseCase.entityKey(it.raw) == id }
+                .firstOrNull { TranslationStoryMemoryUseCase.entityKey(it.raw, it.senseKey) == id }
                 ?.let { storyMemoryUseCase.deleteEntity(bookUrl, it.raw) }
             AiTranslationStoryMemoryKind.RELATIONSHIP -> snapshot.relationships
                 .firstOrNull { TranslationStoryMemoryUseCase.relationshipKey(it) == id }
@@ -327,9 +402,11 @@ class BookStoryMemoryViewModel(
         kind = AiTranslationStoryMemoryKind.ENTITY,
         primary = raw,
         secondary = target,
+        senseKey = senseKey,
         type = type,
         description = description,
         chapterIndexText = firstChapterIndex.takeIf { it >= 0 }?.toString().orEmpty(),
+        lastChapterIndex = lastChapterIndex,
         aliasesOrRefsText = aliases.joinToString("\n"),
         gender = gender,
         rank = rank,
@@ -353,9 +430,11 @@ class BookStoryMemoryViewModel(
         kind = AiTranslationStoryMemoryKind.WORLD_BUILDING,
         primary = raw,
         secondary = target,
+        senseKey = senseKey,
         type = category,
         description = description,
         chapterIndexText = chapterIndex.takeIf { it >= 0 }?.toString().orEmpty(),
+        lastChapterIndex = lastChapterIndex,
         aliasesOrRefsText = entityRefs.joinToString("\n"),
         imagePath = imagePath,
         imagePrompt = imagePrompt,
@@ -382,15 +461,20 @@ class BookStoryMemoryViewModel(
     private fun StoryMemoryEditorDraft.toEntity() = AiTranslationStoryEntity(
         raw = primary.trim().also { require(it.isNotEmpty()) },
         target = secondary.trim().also { require(it.isNotEmpty()) },
+        senseKey = senseKey.trim(),
         type = type.trim().ifBlank { "character" },
         description = description.trim(),
         aliases = aliasesOrRefsText.lines().map(String::trim).filter(String::isNotBlank).distinct(),
         gender = gender.trim(),
         rank = rank.trim(),
         firstChapterIndex = chapterIndexText.toIntOrNull() ?: -1,
+        lastChapterIndex = lastChapterIndex,
         imagePath = imagePath,
         imagePrompt = imagePrompt,
         imageUpdatedAt = imageUpdatedAt,
+        category = type.trim().ifBlank { "character" },
+        userEdited = true,
+        source = "USER",
     )
 
     private fun StoryMemoryEditorDraft.toRelationship() = AiTranslationStoryRelationship(
@@ -404,13 +488,17 @@ class BookStoryMemoryViewModel(
     private fun StoryMemoryEditorDraft.toWorldEntry() = AiTranslationWorldEntry(
         raw = primary.trim().also { require(it.isNotEmpty()) },
         target = secondary.trim(),
+        senseKey = senseKey.trim(),
         category = type.trim().ifBlank { "other" },
         description = description.trim(),
         entityRefs = aliasesOrRefsText.lines().map(String::trim).filter(String::isNotBlank).distinct(),
         chapterIndex = chapterIndexText.toIntOrNull() ?: -1,
+        lastChapterIndex = lastChapterIndex,
         imagePath = imagePath,
         imagePrompt = imagePrompt,
         imageUpdatedAt = imageUpdatedAt,
+        userEdited = true,
+        source = "USER",
     )
 
     private fun StoryMemoryEditorDraft.toTimeline(): AiTranslationStoryTimeline {

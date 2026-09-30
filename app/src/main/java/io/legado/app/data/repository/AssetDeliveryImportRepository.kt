@@ -23,6 +23,7 @@ import java.util.zip.ZipFile
 class AssetDeliveryImportRepository(
     private val context: Context,
     private val quickDictionaryGateway: QuickDictionaryGateway,
+    private val quickDictionaryPackStore: QuickDictionaryPackStore,
     private val localAiEngineGateway: LocalAiEngineGateway,
 ) : AssetDeliveryImportGateway {
 
@@ -68,13 +69,19 @@ class AssetDeliveryImportRepository(
         val extracted = File.createTempFile("asset-qt-", ".txt", context.cacheDir)
         try {
             extractDictionaryText(source, extracted)
-            quickDictionaryGateway.importPack(
+            quickDictionaryPackStore.markOriginalDownloading()
+            val result = quickDictionaryGateway.importPack(
                 localPath = extracted.absolutePath,
                 displayName = displayName,
                 type = QuickDictionaryType.VIETPHRASE,
                 scope = QuickDictionaryScope.GLOBAL,
                 scopeKey = "",
             )
+            result.pack?.let { quickDictionaryPackStore.registerOriginalPack(it, extracted) }
+                ?: error("Gói QT không có dữ liệu hợp lệ")
+        } catch (error: Throwable) {
+            quickDictionaryPackStore.markOriginalFailure(error.message ?: "Không thể cài gói QT")
+            throw error
         } finally {
             extracted.delete()
         }

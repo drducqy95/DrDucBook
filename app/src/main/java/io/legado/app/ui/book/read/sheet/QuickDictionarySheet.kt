@@ -56,6 +56,9 @@ fun QuickDictionarySheet(
             onContextMarkersChange = {
                 onIntent(ReadBookIntent.SetQuickDictionaryContextMarkers(it))
             },
+            onSaveToTranslationMemoryChange = {
+                onIntent(ReadBookIntent.SetQuickDictionarySaveToTranslationMemory(it))
+            },
             onSave = { onIntent(ReadBookIntent.SaveQuickDictionary) },
             modifier = Modifier
                 .fillMaxWidth()

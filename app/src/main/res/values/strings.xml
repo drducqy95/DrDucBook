@@ -2003,6 +2003,7 @@
     <string name="quick_dictionary_required_error">Enter the original text and at least a Hán-Việt reading or translation.</string>
     <string name="quick_dictionary_saved">QT dictionary entry saved.</string>
     <string name="quick_dictionary_save">Save entry</string>
+    <string name="quick_dictionary_save_to_translation_memory">Also save to translation memory</string>
     <string name="quick_dictionary_saving">Saving…</string>
     <string name="quick_dictionary_selection_tools">Adjust selected phrase</string>
     <string name="quick_dictionary_expand_left">Expand left</string>
@@ -3381,6 +3382,18 @@
     <string name="quick_dictionary_import_file">Import dictionary file</string>
     <string name="quick_dictionary_download_catalog">Download QT clean pack</string>
     <string name="quick_dictionary_download_catalog_summary">Download the ZIP through Supabase/HuggingFace, then import it here as a large QT dictionary pack.</string>
+    <string name="quick_dictionary_original_restored">Original QT dictionary restored.</string>
+    <string name="quick_dictionary_original_restore_failed">Could not restore the original QT dictionary.</string>
+    <string name="quick_dictionary_original_title">Original QT dictionary</string>
+    <string name="quick_dictionary_original_not_installed">Original QT pack is not installed.</string>
+    <string name="quick_dictionary_original_downloading">Downloading original QT pack…</string>
+    <string name="quick_dictionary_original_verifying">Verifying and building the index…</string>
+    <string name="quick_dictionary_original_ready">Ready · %1$d entries</string>
+    <string name="quick_dictionary_original_edited">Edited · the original can be restored</string>
+    <string name="quick_dictionary_original_failed">Original QT pack download failed.</string>
+    <string name="quick_dictionary_original_outdated">QT pack needs an update.</string>
+    <string name="quick_dictionary_original_retry">Retry download</string>
+    <string name="quick_dictionary_original_restore">Restore original QT</string>
     <string name="quick_dictionary_deleted">Dictionary entry deleted.</string>
     <string name="quick_dictionary_scope_required">Select a Project or Universe before importing.</string>
     <string name="quick_dictionary_select_scope">Select scope</string>
@@ -3531,6 +3544,11 @@
     <string name="media_download_notification_title">Downloading media</string>
     <string name="media_download_notification_progress">%1$d of %2$d episodes completed</string>
     <string name="media_downloads_title">Downloads</string>
+    <string name="quick_actions">Quick actions</string>
+    <string name="import_book">Import book</string>
+    <string name="download_center_summary">%1$d active · %2$d needs attention · %3$d completed</string>
+    <string name="download_center_item_count">%1$d groups</string>
+    <string name="download_center_empty">No downloads match this filter.</string>
     <string name="media_download_current">Download this episode</string>
     <string name="media_downloads_empty">No media downloads yet.</string>
     <string name="media_download_start_queue">Start download queue</string>
@@ -3585,6 +3603,9 @@
     <string name="media_player_auto_play">Autoplay</string>
     <string name="media_player_auto_next">Auto next episode</string>
     <string name="media_player_resume_position">Resume from previous position</string>
+    <string name="media_player_auto_pip_on_exit">Automatically use PiP when leaving video</string>
+    <string name="media_player_auto_pip_on_exit_summary">Continue video in a floating window when you leave the player.</string>
+    <string name="media_player_pip_not_supported">This device does not support Picture-in-Picture.</string>
     <string name="media_player_seek_forward">Forward seek</string>
     <string name="media_player_seek_backward">Backward seek</string>
     <string name="media_player_seconds">%1$d seconds</string>
@@ -3784,6 +3805,7 @@
     <string name="story_memory_exported">Translation memory exported</string>
     <string name="story_memory_raw">Source name or term</string>
     <string name="story_memory_target">Canonical translation</string>
+    <string name="story_memory_sense_key">Qualifier / sense key</string>
     <string name="story_memory_type">Type, category, or relationship</string>
     <string name="story_memory_description">Description or chapter summary</string>
     <string name="story_memory_chapter_index">Chapter index (starts at 0)</string>
@@ -3882,6 +3904,9 @@
     <string name="account_password">Password</string>
     <string name="account_sign_in">Sign in</string>
     <string name="account_sign_up">Create account</string>
+    <string name="account_sign_in_or_create">Sign in or create an account to sync your library.</string>
+    <string name="account_switch_to_sign_up">Need an account? Sign up</string>
+    <string name="account_switch_to_sign_in">Already have an account? Sign in</string>
     <string name="account_sign_in_google">Continue with Google</string>
     <string name="account_link_google">Link Google</string>
     <string name="account_reset_password">Send password reset</string>

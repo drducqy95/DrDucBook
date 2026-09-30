@@ -37,4 +37,22 @@ class TranslationPromptStageTest {
         )
         assertEquals(TranslationPromptStage.entries, retranslating)
     }
+
+    @Test
+    fun everyStageHasACompleteDefaultInstruction() {
+        TranslationPromptStage.entries.forEach { stage ->
+            val instruction = TranslationPromptStage.defaultInstruction(stage)
+            assertTrue("${stage.name} must have a nonblank instruction", instruction.isNotBlank())
+            assertTrue("${stage.name} must be more complete than its legacy prompt", instruction.length > TranslationPromptStage.legacyInstruction(stage).length)
+        }
+    }
+
+    @Test
+    fun defaultInstructionsContainStageSpecificGuardrails() {
+        assertTrue(TranslationPromptStage.defaultInstruction(TranslationPromptStage.PREPARE).contains("RAW"))
+        assertTrue(TranslationPromptStage.defaultInstruction(TranslationPromptStage.FILTER).contains("boilerplate"))
+        assertTrue(TranslationPromptStage.defaultInstruction(TranslationPromptStage.DICTIONARY).contains("locked_dictionary"))
+        assertTrue(TranslationPromptStage.defaultInstruction(TranslationPromptStage.TRANSLATE).contains("refined_segments"))
+        assertTrue(TranslationPromptStage.defaultInstruction(TranslationPromptStage.RETRANSLATE).contains("previous attempt"))
+    }
 }

@@ -10,6 +10,7 @@ import io.legado.app.domain.model.AiProviderException
 import io.legado.app.domain.model.AiProviderFailure
 import io.legado.app.domain.model.RevisionStatus
 import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.domain.model.TranslationContentSanitizer
 import io.legado.app.domain.model.TranslationRevision
 import io.legado.app.domain.model.dictionaryAwareContentHash
 import io.legado.app.domain.model.protectsMachineTranslation
@@ -113,7 +114,10 @@ object TranslationManager : KoinComponent {
         provider: String = TranslationConfig.llmProvider,
         targetLanguage: String = currentTargetLanguage(),
     ): String? {
-        val originalContent = BookHelp.getContent(book, chapter) ?: return null
+        val originalContent = BookHelp.getContent(book, chapter)
+            ?.let(TranslationContentSanitizer::sanitize)
+            ?.takeIf(String::isNotBlank)
+            ?: return null
         val rawContentHash = translationCacheGateway.computeContentHash(originalContent)
         getCurrentRevision(
             book = book,
@@ -122,7 +126,7 @@ object TranslationManager : KoinComponent {
             targetLanguage = targetLanguage,
             rawContentHash = rawContentHash,
         )?.takeIf { it.protectsMachineTranslation }
-            ?.let { return it.content }
+            ?.let { return TranslationContentSanitizer.sanitize(it.content) }
         val dictionaryRevision = quickDictionaryGateway.getEffectiveRevision(book, originalContent)
         val dictionaryContentHash = dictionaryAwareContentHash(
             originalContentHash = rawContentHash,
@@ -146,7 +150,7 @@ object TranslationManager : KoinComponent {
             provider = provider,
         )
         if (!validatedContent.isNullOrBlank()) {
-            return validatedContent
+            return TranslationContentSanitizer.sanitize(validatedContent)
         }
         // Fallback: Read any existing translation file on disk for this provider (relaxed lookup)
         return translationCacheGateway.readTranslation(
@@ -154,7 +158,7 @@ object TranslationManager : KoinComponent {
             bookChapter = chapter,
             targetLanguage = targetLanguage,
             provider = provider,
-        )
+        )?.let(TranslationContentSanitizer::sanitize)
     }
 
     suspend fun listProviderCachesForChapter(
@@ -162,7 +166,10 @@ object TranslationManager : KoinComponent {
         chapter: BookChapter,
         targetLanguage: String = currentTargetLanguage(),
     ): List<ProviderCacheInfo> {
-        val originalContent = BookHelp.getContent(book, chapter) ?: return emptyList()
+        val originalContent = BookHelp.getContent(book, chapter)
+            ?.let(TranslationContentSanitizer::sanitize)
+            ?.takeIf(String::isNotBlank)
+            ?: return emptyList()
         val rawContentHash = translationCacheGateway.computeContentHash(originalContent)
         val dictionaryRevision = quickDictionaryGateway.getEffectiveRevision(book, originalContent)
         val revisions = translationCacheGateway.listProviderCaches(book, chapter, targetLanguage)
@@ -205,7 +212,10 @@ object TranslationManager : KoinComponent {
         chapter: BookChapter,
         targetLanguage: String = currentTargetLanguage(),
     ): ResolvedTranslationContent? {
-        val originalContent = BookHelp.getContent(book, chapter) ?: return null
+        val originalContent = BookHelp.getContent(book, chapter)
+            ?.let(TranslationContentSanitizer::sanitize)
+            ?.takeIf(String::isNotBlank)
+            ?: return null
         val rawContentHash = translationCacheGateway.computeContentHash(originalContent)
         val identities = TranslationConstants.preferredContentProviders(targetLanguage)
         val protectedRevision = identities
@@ -233,7 +243,7 @@ object TranslationManager : KoinComponent {
             val identity = protectedRevision.first.second
             val revision = protectedRevision.second
             return ResolvedTranslationContent(
-                content = revision.content,
+                content = TranslationContentSanitizer.sanitize(revision.content),
                 provider = identity.provider,
                 targetLanguage = identity.targetLanguage,
                 revision = revision,
@@ -295,6 +305,7 @@ object TranslationManager : KoinComponent {
         rawContentHash: String? = null,
     ): TranslationRevision? {
         val resolvedRawHash = rawContentHash ?: BookHelp.getContent(book, chapter)
+            ?.let(TranslationContentSanitizer::sanitize)
             ?.let(translationCacheGateway::computeContentHash)
             ?: return null
         return translationCacheGateway.getCurrentRevision(

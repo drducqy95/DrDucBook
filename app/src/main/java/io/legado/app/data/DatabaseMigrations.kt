@@ -23,7 +23,7 @@ object DatabaseMigrations {
             migration_82_83, migration_99_100, migration_100_101, migration_101_102,
             migration_102_103, migration_103_104, migration_104_105,
             migration_105_106, migration_106_107, migration_107_108,
-            migration_108_109, migration_109_110, migration_110_111,
+            migration_108_109, migration_109_110, migration_110_111, migration_111_112,
         )
     }
 
@@ -35,6 +35,72 @@ object DatabaseMigrations {
             db.execSQL(
                 "ALTER TABLE `ai_model_profiles` ADD COLUMN `lastSeenAt` INTEGER NOT NULL DEFAULT 0"
             )
+        }
+    }
+
+    private val migration_111_112 = object : Migration(111, 112) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `ai_credential_model_capabilities` (
+                    `credentialId` TEXT NOT NULL,
+                    `modelProfileId` TEXT NOT NULL,
+                    `taskType` TEXT NOT NULL,
+                    `outputContract` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `lastProbeAt` INTEGER,
+                    `lastSuccessAt` INTEGER,
+                    `lastFailureAt` INTEGER,
+                    `cooldownUntil` INTEGER NOT NULL,
+                    `failureKind` TEXT,
+                    `failureMessage` TEXT,
+                    `latencyMs` INTEGER,
+                    `contextWindow` INTEGER,
+                    `maxOutputTokens` INTEGER,
+                    `capabilitiesJson` TEXT,
+                    `providerFingerprint` TEXT,
+                    `probeRevision` INTEGER NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`credentialId`, `modelProfileId`, `taskType`, `outputContract`)
+                )
+                """.trimIndent()
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_ai_credential_model_capabilities_credentialId` " +
+                    "ON `ai_credential_model_capabilities` (`credentialId`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_ai_credential_model_capabilities_modelProfileId` " +
+                    "ON `ai_credential_model_capabilities` (`modelProfileId`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_ai_credential_model_capabilities_taskType_outputContract_status` " +
+                    "ON `ai_credential_model_capabilities` (`taskType`, `outputContract`, `status`)"
+            )
+            db.execSQL(
+                "CREATE INDEX IF NOT EXISTS `index_ai_credential_model_capabilities_cooldownUntil` " +
+                    "ON `ai_credential_model_capabilities` (`cooldownUntil`)"
+            )
+            val now = System.currentTimeMillis()
+            listOf<Pair<String, String>>(
+                "chat" to "chat_text",
+                "translate_chapter" to "translation_json",
+                "rewrite_text" to "rewrite_text",
+            ).forEach { (taskType, outputContract) ->
+                db.execSQL(
+                    """
+                    INSERT OR IGNORE INTO `ai_credential_model_capabilities`(
+                        credentialId, modelProfileId, taskType, outputContract, status,
+                        cooldownUntil, probeRevision, createdAt, updatedAt
+                    )
+                    SELECT c.id, m.id, ?, ?, 'unknown', 0, 0, ?, ?
+                    FROM ai_credentials c
+                    INNER JOIN ai_model_profiles m ON m.providerId = c.providerId
+                    """.trimIndent(),
+                    arrayOf<Any>(taskType, outputContract, now, now),
+                )
+            }
         }
     }
 

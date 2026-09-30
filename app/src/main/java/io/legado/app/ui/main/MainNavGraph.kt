@@ -89,6 +89,7 @@ import io.legado.app.ui.config.themeConfig.ThemeConfigScreen
 import io.legado.app.ui.config.themeManage.ThemeManageScreen
 import io.legado.app.ui.personalization.PersonalizationRouteScreen
 import io.legado.app.ui.config.translation.TranslationConfigScreen
+import io.legado.app.ui.config.media.MediaPlayerConfigScreen
 import io.legado.app.ui.config.translation.dictionary.QuickDictionaryManagerRouteScreen
 import io.legado.app.ui.config.translation.mlkit.MlKitModelsRouteScreen
 import io.legado.app.ui.vbook.importer.VbookImportRouteScreen
@@ -291,7 +292,8 @@ fun MainActivity.mainEntryProvider(
             onNavigateToAi = { backStack.add(MainRouteSettingsAi) },
             onNavigateToDownloadCache = { backStack.add(MainRouteSettingsDownloadCache) },
             onNavigateToTranslation = { backStack.add(MainRouteSettingsTranslation) },
-            onNavigateToLab = { backStack.add(MainRouteSettingsLabConfig) }
+            onNavigateToLab = { backStack.add(MainRouteSettingsLabConfig) },
+            onNavigateToMediaPlayer = { backStack.add(MainRouteSettingsMediaPlayer) },
         )
     }
 
@@ -346,6 +348,10 @@ fun MainActivity.mainEntryProvider(
 
     entry<MainRouteSettingsAccount> {
         AccountRouteScreen(onBackClick = { onNavigateBack() })
+    }
+
+    entry<MainRouteSettingsMediaPlayer> {
+        MediaPlayerConfigScreen(onBackClick = { onNavigateBack() })
     }
 
     entry<MainRouteAssetDelivery> { route ->

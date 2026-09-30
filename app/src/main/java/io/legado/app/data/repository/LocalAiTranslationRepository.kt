@@ -6,6 +6,7 @@ import io.legado.app.domain.gateway.LocalAiEmptyOutputException
 import io.legado.app.domain.gateway.LocalAiEngineGateway
 import io.legado.app.domain.gateway.LocalAiTranslationGateway
 import io.legado.app.domain.gateway.LocalAiTranslationResult
+import io.legado.app.domain.gateway.LocalAiModelMetadata
 import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiGenerationParams
 import io.legado.app.domain.model.AiMessage
@@ -27,11 +28,27 @@ class LocalAiTranslationRepository(
     private val localAiEngineGateway: LocalAiEngineGateway,
 ) : LocalAiTranslationGateway {
 
+    @Volatile
+    private var cachedMetadata: LocalAiModelMetadata? = null
+
     override val isAvailable: Boolean
         get() = localAiEngineGateway.nativeRuntimeAvailable && resolveModelPath().isNotBlank()
 
     override val loadedModelName: String?
         get() = resolveModelPath().takeIf { it.isNotBlank() }?.let { File(it).nameWithoutExtension }
+
+    override suspend fun contextWindow(): Int {
+        val path = resolveModelPath()
+        if (path.isBlank()) return 4_096
+        val file = File(path)
+        val cached = cachedMetadata
+        if (cached?.path == file.absolutePath && cached.sizeBytes == file.length()) {
+            return cached.contextWindow.coerceAtLeast(1_024)
+        }
+        val metadata = localAiEngineGateway.inspectModel(path).getOrNull()
+        if (metadata != null) cachedMetadata = metadata
+        return (metadata?.contextWindow ?: 4_096).coerceAtLeast(1_024)
+    }
 
     override suspend fun translate(
         text: String,
@@ -79,7 +96,7 @@ class LocalAiTranslationRepository(
             provider = dummyProvider,
             displayName = modelFile.name,
             modelId = modelFile.name,
-            contextWindow = 4_096,
+            contextWindow = contextWindow(),
             maxOutputTokens = generationParams.maxOutputTokens ?: 4_096,
             defaultParams = generationParams,
         )
@@ -163,7 +180,7 @@ class LocalAiTranslationRepository(
             provider = dummyProvider,
             displayName = modelFile.name,
             modelId = modelFile.name,
-            contextWindow = 4_096,
+            contextWindow = contextWindow(),
             maxOutputTokens = generationParams.maxOutputTokens ?: 4_096,
             defaultParams = generationParams,
         )

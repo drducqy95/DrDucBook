@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Stable
 import io.legado.app.domain.model.QuickDictionaryCatalog
 import io.legado.app.domain.model.QuickDictionaryEntry
+import io.legado.app.domain.model.QuickDictionaryPackState
 import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.domain.model.QuickDictionaryUniverse
@@ -76,6 +77,7 @@ data class QuickDictionaryManagerUiState(
     val importProcessedBytes: Long = 0,
     val importTotalBytes: Long = 0,
     val importDuplicates: Int = 0,
+    val originalPack: QuickDictionaryPackState = QuickDictionaryPackState(),
 )
 
 sealed interface QuickDictionaryManagerIntent {
@@ -108,6 +110,8 @@ sealed interface QuickDictionaryManagerIntent {
     data class UpdateSelection(val start: Int, val end: Int) : QuickDictionaryManagerIntent
     data object AddSelection : QuickDictionaryManagerIntent
     data object CloseSelection : QuickDictionaryManagerIntent
+    data object RetryOriginalPack : QuickDictionaryManagerIntent
+    data object RestoreOriginalPack : QuickDictionaryManagerIntent
 }
 
 sealed interface QuickDictionaryManagerEffect {

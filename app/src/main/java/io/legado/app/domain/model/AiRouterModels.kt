@@ -38,6 +38,7 @@ object AiCredentialStatus {
     const val REFRESHING = "refreshing"
     const val VERIFICATION_FAILED = "verification_failed"
     const val RELOGIN_REQUIRED = "relogin_required"
+    const val AUTHENTICATED_NOT_READY = "authenticated_not_ready"
 
     fun isRouterEligible(status: String): Boolean =
         status == ACTIVE || status == REFRESHING
@@ -155,6 +156,7 @@ data class AiRouteAttemptConfig(
 @Keep
 data class AiRouterSnapshot(
     val credentials: List<AiCredentialConfig> = emptyList(),
+    val capabilities: List<AiCredentialModelCapabilityConfig> = emptyList(),
     val routes: List<AiRouteProfileConfig> = emptyList(),
     val targets: List<AiRouteTargetConfig> = emptyList(),
     val attempts: List<AiRouteAttemptConfig> = emptyList(),

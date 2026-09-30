@@ -7,6 +7,7 @@ import io.legado.app.ui.config.prefDelegate
 data class MediaPlayerConfigSnapshot(
     val autoPlay: Boolean,
     val autoNext: Boolean,
+    val autoEnterPipOnExit: Boolean,
     val resumePosition: Boolean,
     val seekForwardSeconds: Int,
     val seekBackwardSeconds: Int,
@@ -28,6 +29,7 @@ object MediaPlayerConfig {
 
     var autoPlay by prefDelegate(PreferKey.mediaPlayerAutoPlay, true)
     var autoNext by prefDelegate(PreferKey.mediaPlayerAutoNext, true)
+    var autoEnterPipOnExit by prefDelegate(PreferKey.mediaPlayerAutoEnterPipOnExit, false)
     var resumePosition by prefDelegate(PreferKey.mediaPlayerResumePosition, true)
     var seekForwardSeconds by prefDelegate(PreferKey.mediaPlayerSeekForwardSeconds, 10)
     var seekBackwardSeconds by prefDelegate(PreferKey.mediaPlayerSeekBackwardSeconds, 10)
@@ -50,6 +52,7 @@ object MediaPlayerConfig {
     fun snapshot() = MediaPlayerConfigSnapshot(
         autoPlay = autoPlay,
         autoNext = autoNext,
+        autoEnterPipOnExit = autoEnterPipOnExit,
         resumePosition = resumePosition,
         seekForwardSeconds = normalizeSeekSeconds(seekForwardSeconds),
         seekBackwardSeconds = normalizeSeekSeconds(seekBackwardSeconds),

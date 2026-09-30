@@ -14,6 +14,8 @@ interface AiRouterGateway {
 
     suspend fun saveCredential(draft: AiCredentialDraft): AiCredentialConfig
     suspend fun resolveCredentialSecret(id: String): String
+    suspend fun probeCredential(id: String): Result<Unit> =
+        Result.failure(UnsupportedOperationException("Credential probing is not available"))
     suspend fun deleteCredential(id: String)
 
     suspend fun saveRoute(draft: AiRouteProfileDraft): AiRouteProfileConfig

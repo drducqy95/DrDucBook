@@ -149,6 +149,15 @@ interface AiProfileDao {
     )
     suspend fun markModelsStale(providerId: String, activeModelIds: List<String>, now: Long)
 
+    @Query(
+        """
+        UPDATE ai_model_profiles
+        SET status = 'deprecated', enabled = 0, updatedAt = :now
+        WHERE providerId = :providerId AND modelId IN (:modelIds)
+        """
+    )
+    suspend fun deprecateModels(providerId: String, modelIds: List<String>, now: Long)
+
     /** Cập nhật lastSeenAt và reset status về ACTIVE cho các model discovered. */
     @Query(
         """

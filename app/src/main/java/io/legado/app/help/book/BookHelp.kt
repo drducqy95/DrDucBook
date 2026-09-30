@@ -13,6 +13,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import io.legado.app.model.localBook.ExternalDocumentFile
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.localBook.TextFile
 import io.legado.app.ui.config.otherConfig.OtherConfig
@@ -639,6 +640,12 @@ object BookHelp {
      * 读取章节内容
      */
     fun getContent(book: Book, bookChapter: BookChapter): String? {
+        // HTML/Markdown/Word files used to be routed through TextFile and their raw markup was
+        // written into the chapter cache. Always reparse these formats so an existing cache from
+        // an older app version cannot feed tags such as <usehtml> into the reader or NMT.
+        if (book.isLocal && ExternalDocumentFile.supports(book)) {
+            return LocalBook.getContent(book, bookChapter)
+        }
         val file = downloadDir.getFile(
             cacheFolderName,
             book.getFolderName(),

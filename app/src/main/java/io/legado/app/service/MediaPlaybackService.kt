@@ -157,7 +157,7 @@ class MediaPlaybackService : BaseService(), Player.Listener,
             ACTION_NEXT -> prepareAdjacent(previous = false)
         }
         super.onStartCommand(intent, flags, startId)
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     fun prepare(request: MediaPlaybackRequest) {
@@ -250,6 +250,12 @@ class MediaPlaybackService : BaseService(), Player.Listener,
     fun stopPlayback() {
         persistProgress()
         resolvedPlayer.player.stop()
+        currentRequest = null
+        resumeAfterFocusGain = false
+        @Suppress("DEPRECATION")
+        audioManager.abandonAudioFocus(this)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        notificationManager.cancel(NotificationId.MediaPlaybackService)
         stopSelf()
     }
 
@@ -511,7 +517,7 @@ class MediaPlaybackService : BaseService(), Player.Listener,
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         persistProgress()
-        if (!resolvedPlayer.player.isPlaying) stopSelf()
+        stopPlayback()
         super.onTaskRemoved(rootIntent)
     }
 

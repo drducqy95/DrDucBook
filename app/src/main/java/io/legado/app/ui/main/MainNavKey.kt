@@ -40,6 +40,9 @@ data object MainRouteSettingsBackup : MainRoute
 data object MainRouteSettingsAccount : MainRoute
 
 @Serializable
+data object MainRouteSettingsMediaPlayer : MainRoute
+
+@Serializable
 data class MainRouteAssetDelivery(
     val rawUri: String,
 ) : MainRoute

@@ -1,11 +1,15 @@
 package io.legado.app.data.repository
 
+import com.google.gson.JsonElement
+import com.google.gson.JsonParser
 import io.legado.app.domain.model.QUICK_DICTIONARY_IGNORE_TARGET
 import io.legado.app.domain.model.QuickDictionaryEntry
 import io.legado.app.domain.model.QuickDictionaryImportPhase
 import io.legado.app.domain.model.QuickDictionaryImportProgress
 import io.legado.app.domain.model.QuickDictionaryImportResult
 import io.legado.app.domain.model.QuickDictionaryPack
+import io.legado.app.domain.model.QuickDictionaryPackState
+import io.legado.app.domain.model.QuickDictionaryPackStatus
 import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.utils.GSON
@@ -46,7 +50,13 @@ class QuickDictionaryPackStore(
     }
     private val _packs = MutableStateFlow(loadMetadata())
     val packs = _packs.asStateFlow()
+    private val _originalPackState = MutableStateFlow(loadOriginalPackState())
+    val originalPackState = _originalPackState.asStateFlow()
     private val mappedIndexes = ConcurrentHashMap<String, MappedDictionaryIndex>()
+
+    fun versionToken(): String = _packs.value
+        .joinToString("|") { "${it.id}:${it.updatedAt}:${it.entryCount}:${it.enabled}" }
+        .ifBlank { "none" }
 
     fun importPack(
         sourceFile: File,
@@ -127,9 +137,120 @@ class QuickDictionaryPackStore(
         File(root, "$safeId.source.txt").delete()
         File(root, "$safeId.json").delete()
         _packs.value = _packs.value.filterNot { it.id == safeId }
+        if (_originalPackState.value.activePackId == safeId) {
+            _originalPackState.value = _originalPackState.value.copy(
+                status = QuickDictionaryPackStatus.NOT_INSTALLED,
+                activePackId = null,
+                activeRevision = null,
+                entryCount = 0,
+            )
+            persistOriginalPackState()
+        }
     }
 
     fun getPack(id: String): QuickDictionaryPack? = _packs.value.firstOrNull { it.id == id }
+
+    /** True only when the downloaded original pack has a verified active copy. */
+    fun hasOriginalPack(): Boolean {
+        val state = _originalPackState.value
+        return state.status == QuickDictionaryPackStatus.READY ||
+            state.status == QuickDictionaryPackStatus.EDITED ||
+            state.status == QuickDictionaryPackStatus.OUTDATED
+    }
+
+    fun markOriginalDownloading() {
+        _originalPackState.value = _originalPackState.value.copy(
+            status = QuickDictionaryPackStatus.DOWNLOADING,
+            lastError = null,
+        )
+        persistOriginalPackState()
+    }
+
+    fun markOriginalVerifying() {
+        _originalPackState.value = _originalPackState.value.copy(
+            status = QuickDictionaryPackStatus.VERIFYING,
+            lastError = null,
+        )
+        persistOriginalPackState()
+    }
+
+    fun markOriginalFailure(message: String) {
+        _originalPackState.value = _originalPackState.value.copy(
+            status = QuickDictionaryPackStatus.FAILED,
+            lastError = message.take(MAX_STATE_ERROR_LENGTH),
+        )
+        persistOriginalPackState()
+    }
+
+    fun markOriginalEdited() {
+        if (!hasOriginalPack()) return
+        _originalPackState.value = _originalPackState.value.copy(
+            status = QuickDictionaryPackStatus.EDITED,
+            activeRevision = "${_originalPackState.value.pristineRevision}:edited:${System.currentTimeMillis()}",
+            lastError = null,
+        )
+        persistOriginalPackState()
+    }
+
+    /**
+     * Records a downloaded pack as the active original pack and keeps an immutable source copy.
+     * The source is written to a temporary file first so an interrupted install cannot replace the
+     * last known-good pristine dictionary.
+     */
+    fun registerOriginalPack(pack: QuickDictionaryPack, sourceFile: File) {
+        require(sourceFile.isFile && sourceFile.length() > 0L) {
+            "Original dictionary source is missing"
+        }
+        markOriginalVerifying()
+        val pristine = File(root, ORIGINAL_PRISTINE_SOURCE)
+        val temporary = File(root, "$ORIGINAL_PRISTINE_SOURCE.tmp")
+        try {
+            sourceFile.copyTo(temporary, overwrite = true)
+            atomicReplace(temporary, pristine)
+            val revision = fileRevision(pristine)
+            _originalPackState.value = QuickDictionaryPackState(
+                status = QuickDictionaryPackStatus.READY,
+                activePackId = pack.id,
+                activeRevision = revision,
+                pristineRevision = revision,
+                entryCount = pack.entryCount,
+                lastVerifiedAt = System.currentTimeMillis(),
+            )
+            persistOriginalPackState()
+        } catch (error: Throwable) {
+            temporary.delete()
+            markOriginalFailure(error.message ?: "Không thể lưu bản QT gốc")
+            throw error
+        }
+    }
+
+    /** Restores the active original pack from the immutable source and rebuilds its index. */
+    fun restoreOriginalPack(): QuickDictionaryPack? {
+        val state = _originalPackState.value
+        val pristine = File(root, ORIGINAL_PRISTINE_SOURCE)
+        if (!pristine.isFile || pristine.length() == 0L) {
+            markOriginalFailure("Không tìm thấy bản QT gốc")
+            return null
+        }
+        markOriginalVerifying()
+        state.activePackId?.let { deletePack(it) }
+        val restored = runCatching {
+            importPack(
+                sourceFile = pristine,
+                displayName = ORIGINAL_DISPLAY_NAME,
+                type = QuickDictionaryType.VIETPHRASE,
+                scope = QuickDictionaryScope.GLOBAL,
+                scopeKey = "",
+                onProgress = {},
+            ).pack
+        }.getOrNull()
+        if (restored == null) {
+            markOriginalFailure("Không thể khôi phục bản QT gốc")
+            return null
+        }
+        registerOriginalPack(restored, pristine)
+        return restored
+    }
 
     fun containsEntry(
         type: QuickDictionaryType,
@@ -205,17 +326,102 @@ class QuickDictionaryPackStore(
     private fun loadMetadata(): List<QuickDictionaryPack> {
         return root.listFiles { file -> file.isFile && file.extension == "json" }
             .orEmpty()
-            .mapNotNull { file ->
-                runCatching {
-                    GSON.fromJson(file.readText(Charsets.UTF_8), QuickDictionaryPack::class.java)
-                }.getOrNull()
-            }
+            .mapNotNull(::readMetadataPack)
             .filter { pack ->
-                PACK_ID.matches(pack.id) &&
-                    File(root, "${pack.id}.qtdict").isFile &&
+                File(root, "${pack.id}.qtdict").isFile &&
                     File(root, "${pack.id}.source.txt").isFile
             }
             .sortedWith(compareBy<QuickDictionaryPack> { it.scope }.thenBy { it.name })
+    }
+
+    /**
+     * Gson can instantiate Kotlin data classes without calling their constructor. A malformed or
+     * old metadata file can therefore contain null in a property declared non-null in Kotlin.
+     * Validate the JSON object before deserializing so startup never reaches Regex.matches (or
+     * sorting) with an invalid pack.
+     */
+    private fun readMetadataPack(file: File): QuickDictionaryPack? {
+        return runCatching {
+            val json = JsonParser.parseString(file.readText(Charsets.UTF_8))
+                .takeIf(JsonElement::isJsonObject)
+                ?.asJsonObject
+                ?: return@runCatching null
+            val id = json.stringValue("id")?.takeIf(PACK_ID::matches) ?: return@runCatching null
+            val name = json.stringValue("name")?.takeIf(String::isNotBlank)
+                ?: return@runCatching null
+            val type = json.stringValue("type")
+                ?.let { value -> QuickDictionaryType.entries.firstOrNull { it.name == value } }
+                ?: return@runCatching null
+            val scope = json.stringValue("scope")
+                ?.let { value -> QuickDictionaryScope.entries.firstOrNull { it.name == value } }
+                ?: return@runCatching null
+            if (json.stringValue("scopeKey") == null) return@runCatching null
+
+            GSON.fromJson(json, QuickDictionaryPack::class.java)?.takeIf { pack ->
+                // Keep the values captured from the validated JSON as the final guard against a
+                // future Gson adapter returning a partially initialized object.
+                pack.id == id &&
+                    pack.name == name &&
+                    pack.type == type &&
+                    pack.scope == scope
+            }
+        }.getOrNull()
+    }
+
+    private fun com.google.gson.JsonObject.stringValue(name: String): String? {
+        val value = get(name) ?: return null
+        if (!value.isJsonPrimitive || !value.asJsonPrimitive.isString) return null
+        return value.asString
+    }
+
+    private fun loadOriginalPackState(): QuickDictionaryPackState {
+        val state = runCatching {
+            val file = File(root, ORIGINAL_STATE_FILE)
+            if (!file.isFile) null else GSON.fromJson(
+                file.readText(Charsets.UTF_8),
+                QuickDictionaryPackState::class.java,
+            )
+        }.getOrNull() ?: return QuickDictionaryPackState()
+        val activeId = state.activePackId
+        if (activeId != null && getPack(activeId) == null) {
+            return state.copy(
+                status = QuickDictionaryPackStatus.NOT_INSTALLED,
+                activePackId = null,
+            )
+        }
+        return state
+    }
+
+    private fun persistOriginalPackState() {
+        val file = File(root, ORIGINAL_STATE_FILE)
+        val temporary = File(root, "$ORIGINAL_STATE_FILE.tmp")
+        runCatching {
+            temporary.writeText(GSON.toJson(_originalPackState.value), Charsets.UTF_8)
+            atomicReplace(temporary, file)
+        }.onFailure { temporary.delete() }
+    }
+
+    private fun fileRevision(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().buffered().use { input ->
+            val buffer = ByteArray(32 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count <= 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        return digest.digest().joinToString("") { byte -> "%02x".format(byte) }
+    }
+
+    private fun atomicReplace(source: File, target: File) {
+        if (target.exists() && !target.delete()) {
+            throw IllegalStateException("Cannot replace dictionary file")
+        }
+        if (!source.renameTo(target)) {
+            source.copyTo(target, overwrite = true)
+            source.delete()
+        }
     }
 
     private fun cleanupIncompletePacks() {
@@ -236,6 +442,10 @@ class QuickDictionaryPackStore(
 
     private companion object {
         const val DIRECTORY_NAME = "quick_dictionary_packs"
+        const val ORIGINAL_STATE_FILE = "qt-original-state.json"
+        const val ORIGINAL_PRISTINE_SOURCE = "qt-original-pristine.source.txt"
+        const val ORIGINAL_DISPLAY_NAME = "QT gốc"
+        const val MAX_STATE_ERROR_LENGTH = 300
         val PACK_ID = Regex("pack_[a-f0-9]{32}")
         val PACK_FILE = Regex("^(pack_[a-f0-9]{32})\\.(?:qtdict|source\\.txt|json)$")
 

@@ -79,9 +79,15 @@ import io.legado.app.utils.isDebuggable
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.worker.BookSourceHealthWorker
 import io.legado.app.worker.ModelDiscoveryWorker
+import io.legado.app.worker.QuickDictionaryBootstrapWorker
 import io.legado.app.worker.SourceHealthRetentionWorker
 import io.legado.app.domain.gateway.AppearanceGateway
+import io.legado.app.domain.usecase.AccountAuthUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collectLatest
 import org.chromium.base.ThreadUtils
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
@@ -95,6 +101,8 @@ import java.util.concurrent.TimeUnit
 import java.util.logging.Level
 
 open class App : Application(), ImageLoaderFactory {
+
+    private val authBootstrapScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private lateinit var oldConfig: Configuration
 
@@ -179,6 +187,11 @@ open class App : Application(), ImageLoaderFactory {
             }
         }
         super.onCreate()
+        authBootstrapScope.launch {
+            get<AccountAuthUseCase>().observeSession().collectLatest { session ->
+                if (session != null) QuickDictionaryBootstrapWorker.schedule(this@App)
+            }
+        }
         Coroutine.async {
             runCatching { get<QuickTranslationGateway>().warmUp() }
                 .onFailure { LogUtils.e("App", "QT warm-up failed: ${it.message}") }
@@ -244,6 +257,7 @@ open class App : Application(), ImageLoaderFactory {
             createNotificationChannels()
             BookshelfAutomationScheduler.applyConfig(this@App)
             ModelDiscoveryWorker.schedule(this@App, AppConfig.modelDiscoveryIntervalHours)
+            ModelDiscoveryWorker.runOnce(this@App)
             if (FeatureFlags.sourceDailyHealth) {
                 BookSourceHealthWorker.schedulePeriodic(this@App)
                 SourceHealthRetentionWorker.schedulePeriodic(this@App)

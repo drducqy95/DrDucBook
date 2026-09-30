@@ -13,9 +13,12 @@ import io.legado.app.data.repository.HachimiDecodePolicy
 import io.legado.app.data.repository.HachimiLexicalConstraint
 import io.legado.app.data.repository.HachimiOnnxTranslator
 import io.legado.app.domain.gateway.NmtDecodeConfig
+import io.legado.app.domain.gateway.NmtQualityReport
+import io.legado.app.domain.gateway.NmtQualityStatus
 import io.legado.app.domain.gateway.NmtTranslationResult
 import io.legado.app.model.translation.HachimiOnnxRuntimeCoordinator
 import io.legado.app.domain.model.DictPair
+import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import kotlinx.coroutines.CancellationException
@@ -25,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.util.LinkedHashMap
 
 /**
  * Hosts the ONNX NMT runtime outside the UI/application process.
@@ -39,6 +43,11 @@ class NmtOnnxService : Service() {
     private val translator by lazy { HachimiOnnxTranslator(applicationContext) }
     private var activeRequestId: Long = 0L
     private var activeJob: Job? = null
+    private val dictionaryCache = object : LinkedHashMap<String, List<DictPair>>(128, 0.75f, true) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<String, List<DictPair>>?,
+        ): Boolean = size > 128
+    }
 
     override fun onBind(intent: Intent?): IBinder = messenger.binder
 
@@ -106,9 +115,15 @@ class NmtOnnxService : Service() {
         receiver: ResultReceiver,
     ) {
         try {
-            val dictionary = GSON.fromJsonArray<DictPair>(
-                data.getString(NmtOnnxIpc.KEY_DICTIONARY_JSON)
-            ).getOrElse { emptyList() }
+            val dictionaryFingerprint = data.getString(NmtOnnxIpc.KEY_DICTIONARY_FINGERPRINT).orEmpty()
+            val dictionary = synchronized(dictionaryCache) {
+                dictionaryCache[dictionaryFingerprint]
+                    ?: data.getString(NmtOnnxIpc.KEY_DICTIONARY_JSON)?.let { json ->
+                        GSON.fromJsonArray<DictPair>(json).getOrElse { emptyList() }
+                            .also { dictionaryCache[dictionaryFingerprint] = it }
+                    }
+                    ?: emptyList()
+            }
             val config = data.getString(NmtOnnxIpc.KEY_CONFIG_JSON)
                 ?.let { GSON.fromJson(it, NmtDecodeConfig::class.java) }
                 ?: NmtDecodeConfig()
@@ -121,8 +136,9 @@ class NmtOnnxService : Service() {
                     HachimiLexicalConstraint(
                         sourceKeys = listOf(pair.original.trim()),
                         target = pair.translation.trim(),
-                        required = true,
-                        matchEverySourceOccurrence = true,
+                        required = pair.type == QuickDictionaryType.NAME ||
+                            pair.type == QuickDictionaryType.PRONOUN,
+                        matchEverySourceOccurrence = pair.type == QuickDictionaryType.NAME,
                         canonicalizeSourceName = false,
                     )
                 }
@@ -131,13 +147,15 @@ class NmtOnnxService : Service() {
                 text = text,
                 policy = HachimiDecodePolicy(
                     lexicalConstraints = constraints,
-                    maxNewTokens = config.maxNewTokens.coerceIn(32, 384),
+                    maxNewTokens = config.maxNewTokens.coerceIn(32, 256),
                     repetitionPenalty = config.repetitionPenalty.coerceIn(1f, 2f),
                     noRepeatNgramSize = config.noRepeatNgramSize,
                     retryMissingRequiredTerms = config.retryMissingRequiredTerms,
-                    maxSourceTokens = config.maxSourceTokens.coerceIn(32, 480),
-                    maxSourceChars = config.maxSourceChars.coerceIn(10, 10_000),
+                    maxSourceTokens = config.maxSourceTokens.coerceIn(32, 320),
+                    maxSourceChars = config.maxSourceChars.coerceIn(256, 2_000),
                     sourcePrompt = config.sourcePrompt.trim(),
+                    dictionaryRevision = config.dictionaryRevision,
+                    constraintFingerprint = config.constraintFingerprint.ifBlank { dictionaryFingerprint },
                 ),
                 onProgress = { completed, total, mixed ->
                     receiver.send(
@@ -158,12 +176,23 @@ class NmtOnnxService : Service() {
                     putString(
                         NmtOnnxIpc.KEY_RESULT_JSON,
                         GSON.toJson(
-                            NmtTranslationResult(
+                        NmtTranslationResult(
                                 text = result.text,
                                 sourceSegments = result.sourceSegments,
                                 generatedTokens = result.generatedTokens,
                                 missingRequiredTerms = result.missingRequiredTerms,
                                 attribution = result.attribution,
+                            qualityReport = NmtQualityReport(
+                                status = if (result.missingRequiredTerms.isEmpty()) {
+                                    NmtQualityStatus.PASS
+                                } else {
+                                    NmtQualityStatus.DEGRADED
+                                },
+                                missingRequiredTerms = result.missingRequiredTerms.take(16),
+                            ),
+                            dictionaryRevision = config.dictionaryRevision,
+                            constraintFingerprint = config.constraintFingerprint.ifBlank { dictionaryFingerprint },
+                            metrics = result.metrics,
                             )
                         )
                     )

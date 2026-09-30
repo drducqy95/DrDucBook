@@ -1443,6 +1443,9 @@
     <string name="account_password">Mật khẩu</string>
     <string name="account_sign_in">Đăng nhập</string>
     <string name="account_sign_up">Tạo tài khoản</string>
+    <string name="account_sign_in_or_create">Đăng nhập hoặc tạo tài khoản để đồng bộ thư viện.</string>
+    <string name="account_switch_to_sign_up">Chưa có tài khoản? Đăng ký</string>
+    <string name="account_switch_to_sign_in">Đã có tài khoản? Đăng nhập</string>
     <string name="account_sign_in_google">Tiếp tục với Google</string>
     <string name="account_link_google">Liên kết tài khoản Google</string>
     <string name="account_reset_password">Gửi email đặt lại mật khẩu</string>
@@ -2088,6 +2091,7 @@
     <string name="quick_dictionary_required_error">Hãy nhập văn bản gốc và ít nhất một giá trị Hán Việt hoặc bản dịch.</string>
     <string name="quick_dictionary_saved">Đã lưu mục từ QT.</string>
     <string name="quick_dictionary_save">Lưu mục từ</string>
+    <string name="quick_dictionary_save_to_translation_memory">Đồng thời lưu vào bộ nhớ dịch</string>
     <string name="quick_dictionary_saving">Đang lưu…</string>
     <string name="quick_dictionary_selection_tools">Điều chỉnh cụm đã chọn</string>
     <string name="quick_dictionary_expand_left">Mở trái</string>
@@ -3457,6 +3461,18 @@
     <string name="quick_dictionary_import_file">Nhập từ điển từ file</string>
     <string name="quick_dictionary_download_catalog">Tải gói QT clean</string>
     <string name="quick_dictionary_download_catalog_summary">Tải ZIP qua Supabase/HuggingFace, rồi nhập tại đây như gói từ điển QT lớn.</string>
+    <string name="quick_dictionary_original_restored">Đã khôi phục từ điển QT gốc.</string>
+    <string name="quick_dictionary_original_restore_failed">Không thể khôi phục từ điển QT gốc.</string>
+    <string name="quick_dictionary_original_title">Từ điển QT gốc</string>
+    <string name="quick_dictionary_original_not_installed">Chưa tải gói QT gốc.</string>
+    <string name="quick_dictionary_original_downloading">Đang tải gói QT gốc…</string>
+    <string name="quick_dictionary_original_verifying">Đang kiểm tra và xây chỉ mục…</string>
+    <string name="quick_dictionary_original_ready">Sẵn sàng · %1$d mục</string>
+    <string name="quick_dictionary_original_edited">Đã chỉnh sửa · có thể khôi phục bản gốc</string>
+    <string name="quick_dictionary_original_failed">Tải gói QT gốc thất bại.</string>
+    <string name="quick_dictionary_original_outdated">Gói QT cần cập nhật.</string>
+    <string name="quick_dictionary_original_retry">Tải lại</string>
+    <string name="quick_dictionary_original_restore">Khôi phục QT gốc</string>
     <string name="quick_dictionary_deleted">Đã xóa mục từ.</string>
     <string name="quick_dictionary_scope_required">Hãy chọn Dự án hoặc Vũ trụ trước khi nhập.</string>
     <string name="quick_dictionary_select_scope">Chọn phạm vi áp dụng</string>
@@ -3607,6 +3623,11 @@
     <string name="media_download_notification_title">Đang tải media</string>
     <string name="media_download_notification_progress">Đã xong %1$d/%2$d tập</string>
     <string name="media_downloads_title">Tải media</string>
+    <string name="quick_actions">Thao tác nhanh</string>
+    <string name="import_book">Nhập sách</string>
+    <string name="download_center_summary">%1$d đang tải · %2$d cần xử lý · %3$d hoàn tất</string>
+    <string name="download_center_item_count">%1$d nhóm</string>
+    <string name="download_center_empty">Không có mục tải xuống phù hợp.</string>
     <string name="media_download_current">Tải tập này</string>
     <string name="media_downloads_empty">Chưa có media tải xuống.</string>
     <string name="media_download_start_queue">Chạy hàng đợi tải</string>
@@ -3642,6 +3663,9 @@
     <string name="media_player_auto_play">Tự động phát</string>
     <string name="media_player_auto_next">Tự động chuyển tập</string>
     <string name="media_player_resume_position">Tự động tiếp tục từ vị trí trước</string>
+    <string name="media_player_auto_pip_on_exit">Tự động chuyển sang PiP khi thoát video</string>
+    <string name="media_player_auto_pip_on_exit_summary">Tiếp tục phát video trong cửa sổ nổi khi rời trình phát.</string>
+    <string name="media_player_pip_not_supported">Thiết bị không hỗ trợ Picture-in-Picture.</string>
     <string name="media_player_seek_forward">Tua tới</string>
     <string name="media_player_seek_backward">Tua lùi</string>
     <string name="media_player_seconds">%1$d giây</string>
@@ -3834,6 +3858,7 @@
     <string name="story_memory_exported">Đã xuất bộ nhớ dịch</string>
     <string name="story_memory_raw">Tên hoặc thuật ngữ gốc</string>
     <string name="story_memory_target">Bản dịch chuẩn</string>
+    <string name="story_memory_sense_key">Ngữ cảnh phân biệt (sense key)</string>
     <string name="story_memory_type">Loại, phân loại hoặc quan hệ</string>
     <string name="story_memory_description">Mô tả hoặc tóm tắt chương</string>
     <string name="story_memory_chapter_index">Chỉ số chương (bắt đầu từ 0)</string>

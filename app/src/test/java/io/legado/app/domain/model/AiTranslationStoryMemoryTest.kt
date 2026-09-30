@@ -111,4 +111,34 @@ class AiTranslationStoryMemoryTest {
         assertTrue(prompt.contains("equipment|weapon|technique|faction"))
         assertTrue(prompt.contains("status new/existing"))
     }
+
+    @Test
+    fun nmtMemoryMarksCanonicalNamesHardBeforeWorldTerms() {
+        val snapshot = AiTranslationStoryMemorySnapshot(
+            entities = listOf(
+                AiTranslationStoryEntity(
+                    raw = "大梦学宫",
+                    target = "Đại Mộng Học Cung",
+                    type = "faction",
+                    category = "faction",
+                ),
+            ),
+            worldBuilding = listOf(
+                AiTranslationWorldEntry(
+                    raw = "青锋剑",
+                    target = "Thanh Phong Kiem",
+                    category = "weapon",
+                ),
+            ),
+        )
+
+        val pairs = AiTranslationStoryMemoryPipeline.selectContext(
+            snapshot = snapshot,
+            chapterIndex = 1,
+            source = "大梦学宫使用青锋剑",
+        ).entityDictionary
+
+        assertEquals(QuickDictionaryType.NAME, pairs.first { it.original == "大梦学宫" }.type)
+        assertEquals(QuickDictionaryType.TERM, pairs.first { it.original == "青锋剑" }.type)
+    }
 }

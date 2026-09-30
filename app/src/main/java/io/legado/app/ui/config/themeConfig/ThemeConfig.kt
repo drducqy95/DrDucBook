@@ -230,12 +230,29 @@ object ThemeConfig {
 
     var showBottomView by prefDelegate(PreferKey.showBottomView, true)
 
-    var useFloatingBottomBar by prefDelegate(PreferKey.useFloatingBottomBar, false)
+    var useFloatingBottomBar by prefDelegate(PreferKey.useFloatingBottomBar, true)
+
+    private var floatingBottomBarDefaultMigrated by prefDelegate(
+        PreferKey.floatingBottomBarDefaultMigrated,
+        false,
+    )
 
     var useFloatingBottomBarLiquidGlass by prefDelegate(
         PreferKey.useFloatingBottomBarLiquidGlass,
         false
     )
+
+    /**
+     * The floating bottom bar is the default navigation surface in the current UI.
+     * Existing installs may still have the old implicit false value, so migrate that
+     * value once while preserving any choice made after the migration.
+     */
+    fun ensureFloatingBottomBarDefault() {
+        if (!floatingBottomBarDefaultMigrated) {
+            useFloatingBottomBar = true
+            floatingBottomBarDefaultMigrated = true
+        }
+    }
 
     var tabletInterface by prefDelegate(PreferKey.tabletInterface, "auto")
 

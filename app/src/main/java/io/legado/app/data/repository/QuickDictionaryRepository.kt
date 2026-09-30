@@ -124,6 +124,9 @@ class QuickDictionaryRepository(
         }
         val previous = normalized.id.takeIf { it > 0 }?.let { dao.getEntry(it) }
         dao.upsert(normalized.toEntity())
+        if (normalized.scope == QuickDictionaryScope.GLOBAL) {
+            packStore.markOriginalEdited()
+        }
         bumpRevision(
             buildSet {
                 add(normalized.scope to normalized.scopeKey)
@@ -150,6 +153,9 @@ class QuickDictionaryRepository(
             .chunked(MAX_ROOM_IN_ARGS)
             .forEach { ids -> previous += dao.getEntries(ids) }
         dao.upsertAll(valid.map { it.toEntity() })
+        if (valid.any { it.scope == QuickDictionaryScope.GLOBAL }) {
+            packStore.markOriginalEdited()
+        }
         bumpRevision(
             buildSet {
                 valid.forEach { add(it.scope to it.scopeKey) }
@@ -210,6 +216,9 @@ class QuickDictionaryRepository(
         require(id > 0) { "Only user dictionary entries can be deleted" }
         val entry = dao.getEntry(id) ?: return
         dao.deleteEntry(id)
+        if (entry.scope == QuickDictionaryScope.GLOBAL.name) {
+            packStore.markOriginalEdited()
+        }
         bumpRevision(
             setOf(QuickDictionaryScope.valueOf(entry.scope) to entry.scopeKey)
         )

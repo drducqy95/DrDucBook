@@ -140,6 +140,10 @@ object LocalBook {
                 MobiFile.getChapterList(book)
             }
 
+            ExternalDocumentFile.supports(book) -> {
+                ExternalDocumentFile.getChapterList(book)
+            }
+
             else -> {
                 TextFile.getChapterList(book)
             }
@@ -182,6 +186,10 @@ object LocalBook {
 
                 book.isMobi -> {
                     MobiFile.getContent(book, chapter)
+                }
+
+                ExternalDocumentFile.supports(book) -> {
+                    ExternalDocumentFile.getContent(book, chapter)
                 }
 
                 else -> {
@@ -274,6 +282,7 @@ object LocalBook {
             book.isUmd -> UmdFile.upBookInfo(book)
             book.isPdf -> PdfFile.upBookInfo(book)
             book.isMobi -> MobiFile.upBookInfo(book)
+            ExternalDocumentFile.supports(book) -> ExternalDocumentFile.upBookInfo(book)
         }
     }
 

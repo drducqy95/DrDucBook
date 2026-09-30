@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -17,7 +18,9 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -40,12 +43,17 @@ import androidx.compose.material.icons.filled.Source
 import androidx.compose.material.icons.filled.Web
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -55,7 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drducbook.app.R
 import com.drducbook.app.auth.GoogleCredentialBridge
-import io.legado.app.ui.account.AccountAuthSection
+import io.legado.app.ui.account.AccountAuthSheet
+import io.legado.app.ui.account.AccountAuthSheetMode
 import io.legado.app.ui.account.AccountEffect
 import io.legado.app.ui.account.AccountIntent
 import io.legado.app.ui.account.AccountViewModel
@@ -69,6 +78,7 @@ import io.legado.app.ui.theme.adaptiveContentPadding
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.SplicedColumnGroup
+import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.series.SmallPlainButton
 import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
@@ -101,6 +111,11 @@ fun MyScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
+    var authSheetMode by remember { mutableStateOf<AccountAuthSheetMode?>(null) }
+
+    LaunchedEffect(accountState.session) {
+        if (accountState.session != null) authSheetMode = null
+    }
 
     LaunchedEffect(accountViewModel, context) {
         accountViewModel.effects.collectLatest { effect ->
@@ -170,12 +185,12 @@ fun MyScreen(
                     )
                 )
         ) {
-            if (accountState.session == null) {
-                AccountAuthSection(
-                    state = accountState,
-                    onIntent = accountViewModel::onIntent,
-                )
-            }
+            MyAccountCard(
+                state = accountState,
+                onSignIn = { authSheetMode = AccountAuthSheetMode.SIGN_IN },
+                onSignUp = { authSheetMode = AccountAuthSheetMode.SIGN_UP },
+                onOpenAccount = onOpenAccount,
+            )
 
             if (uiState.webServiceAllowed) {
                 SplicedColumnGroup(
@@ -261,14 +276,6 @@ fun MyScreen(
                     }
                 )
                 ClickableSettingItem(
-                    title = stringResource(R.string.account_title),
-                    description = accountState.session?.email
-                        ?.takeIf(String::isNotBlank)
-                        ?: stringResource(R.string.account_anonymous_free),
-                    imageVector = Icons.Default.AccountCircle,
-                    onClick = onOpenAccount,
-                )
-                ClickableSettingItem(
                     title = stringResource(R.string.bookmark),
                     imageVector = Icons.Default.Bookmark,
                     onClick = {
@@ -310,6 +317,104 @@ fun MyScreen(
                         onNavigate(PrefClickEvent.ExitApp)
                     }
                 )
+            }
+        }
+    }
+
+    AccountAuthSheet(
+        show = authSheetMode != null,
+        mode = authSheetMode ?: AccountAuthSheetMode.SIGN_IN,
+        state = accountState,
+        onIntent = accountViewModel::onIntent,
+        onDismissRequest = { authSheetMode = null },
+        onSwitchMode = {
+            authSheetMode = if (authSheetMode == AccountAuthSheetMode.SIGN_IN) {
+                AccountAuthSheetMode.SIGN_UP
+            } else {
+                AccountAuthSheetMode.SIGN_IN
+            }
+        },
+    )
+}
+
+@Composable
+private fun MyAccountCard(
+    state: io.legado.app.ui.account.AccountUiState,
+    onSignIn: () -> Unit,
+    onSignUp: () -> Unit,
+    onOpenAccount: () -> Unit,
+) {
+    val session = state.session
+    val identity = session?.email?.takeIf(String::isNotBlank) ?: session?.userId
+    val initials = identity
+        ?.trim()
+        ?.split(Regex("\\s+"))
+        ?.mapNotNull { it.firstOrNull()?.uppercase() }
+        ?.take(2)
+        ?.joinToString("")
+        ?.ifBlank { "DB" }
+        ?: "DB"
+
+    NormalCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primaryContainer, CircleShape)
+                    .padding(16.dp),
+                contentAlignment = androidx.compose.ui.Alignment.Center,
+            ) {
+                AppText(
+                    text = initials,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                AppText(
+                    text = session?.email?.ifBlank { session.userId }
+                        ?: stringResource(R.string.account_anonymous_free),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                AppText(
+                    text = if (session == null) {
+                        stringResource(R.string.account_sign_in_or_create)
+                    } else if (session.emailVerified) {
+                        stringResource(R.string.account_email_verified)
+                    } else {
+                        stringResource(R.string.account_email_not_verified)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 18.dp, end = 18.dp, bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (session == null) {
+                Button(onClick = onSignIn, modifier = Modifier.weight(1f)) {
+                    AppText(stringResource(R.string.account_sign_in))
+                }
+                OutlinedButton(onClick = onSignUp, modifier = Modifier.weight(1f)) {
+                    AppText(stringResource(R.string.account_sign_up))
+                }
+            } else {
+                Button(onClick = onOpenAccount, modifier = Modifier.fillMaxWidth()) {
+                    AppText(stringResource(R.string.account_title))
+                }
             }
         }
     }

@@ -116,15 +116,19 @@ class AiTranslationRefinePipelineTest {
     }
 
     @Test
-    fun rejectsCjkInVietnameseOutput() {
-        val error = runCatching {
-            AiTranslationRefinePipeline.parseRefinerOutput(
+    fun parsesCjkBeforeQualityValidation() {
+        val result = AiTranslationRefinePipeline.parseRefinerStructureOutput(
                 rawOutput = """{"refined_segments":[{"id":1,"refined_translation":"Diep \u957f Sinh"}]}""",
                 expectedIds = listOf(1),
-                targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+            )
+
+        assertEquals(1, result.refined_segments.size)
+        val error = runCatching {
+            AiTranslationRefinePipeline.validateQuality(
+                result,
+                TranslationConstants.TARGET_VIETNAMESE,
             )
         }.exceptionOrNull()
-
         assertTrue(error?.message.orEmpty().contains("CJK"))
     }
 
@@ -201,6 +205,67 @@ class AiTranslationRefinePipelineTest {
         assertTrue(prompt.contains("\"story_timeline\""))
         assertTrue(prompt.contains("\"world_building\""))
         assertFalse(prompt.contains("\"story_memory\""))
+        assertFalse(prompt.contains("Application-owned translation pipeline instructions"))
+    }
+
+    @Test
+    fun systemPromptPromotesConfiguredStagesInPipelineOrder() {
+        val prompt = AiTranslationRefinePipeline.buildSystemPrompt(
+            configuredPrompt = "",
+            targetLanguageName = "Vietnamese",
+            retryInstruction = "",
+            protectedInstruction = "",
+            promptStages = mapOf(
+                TranslationPromptStage.TRANSLATE to listOf("TRANSLATE_STAGE_MARKER"),
+                TranslationPromptStage.PREPARE to listOf("PREPARE_STAGE_MARKER"),
+                TranslationPromptStage.FILTER to listOf("FILTER_STAGE_MARKER"),
+                TranslationPromptStage.DICTIONARY to listOf("DICTIONARY_STAGE_MARKER"),
+                TranslationPromptStage.RETRANSLATE to listOf("RETRANSLATE_STAGE_MARKER"),
+            ),
+            includeRetranslateStage = true,
+        )
+
+        assertTrue(prompt.contains("Application-owned translation pipeline instructions"))
+        assertTrue(prompt.indexOf("PREPARE_STAGE_MARKER") < prompt.indexOf("FILTER_STAGE_MARKER"))
+        assertTrue(prompt.indexOf("FILTER_STAGE_MARKER") < prompt.indexOf("DICTIONARY_STAGE_MARKER"))
+        assertTrue(prompt.indexOf("DICTIONARY_STAGE_MARKER") < prompt.indexOf("TRANSLATE_STAGE_MARKER"))
+        assertTrue(prompt.indexOf("TRANSLATE_STAGE_MARKER") < prompt.indexOf("RETRANSLATE_STAGE_MARKER"))
+    }
+
+    @Test
+    fun systemPromptDoesNotIncludeRetranslateStageOutsideRetry() {
+        val prompt = AiTranslationRefinePipeline.buildSystemPrompt(
+            configuredPrompt = "",
+            targetLanguageName = "Vietnamese",
+            retryInstruction = "",
+            protectedInstruction = "",
+            promptStages = mapOf(
+                TranslationPromptStage.TRANSLATE to listOf("TRANSLATE_STAGE_MARKER"),
+                TranslationPromptStage.RETRANSLATE to listOf("RETRANSLATE_STAGE_MARKER"),
+            ),
+            includeRetranslateStage = false,
+        )
+
+        assertTrue(prompt.contains("TRANSLATE_STAGE_MARKER"))
+        assertFalse(prompt.contains("RETRANSLATE_STAGE_MARKER"))
+    }
+
+    @Test
+    fun buildUserPromptDoesNotTreatStageInstructionsAsNovelData() {
+        val pack = AiTranslationRefinePipeline.buildContextPack(
+            text = "Source.",
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+            targetLanguageName = "Vietnamese",
+            context = AiTranslationChunkContext(),
+            dictionaries = emptyList(),
+            promptStages = mapOf(
+                TranslationPromptStage.TRANSLATE to listOf("TRANSLATE_STAGE_MARKER"),
+            ),
+            includeRetranslateStage = false,
+            quickDraft = { "" },
+        )
+
+        assertFalse(AiTranslationRefinePipeline.buildUserPrompt(pack).contains("TRANSLATE_STAGE_MARKER"))
     }
 
     @Test

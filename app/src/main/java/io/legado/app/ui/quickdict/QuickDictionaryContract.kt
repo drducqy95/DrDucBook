@@ -6,6 +6,8 @@ import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.domain.model.QuickDictionaryUniverse
 import io.legado.app.domain.model.MappedDisplayText
 import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.ui.translation.TranslationCaseTransform
+import io.legado.app.ui.translation.applyTranslationCaseTransform
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -56,6 +58,7 @@ data class QuickDictionaryUiState(
     val errorMessage: String? = null,
     val selectionAlternatives: ImmutableList<QuickDictionarySelectionAlternativeUi> = persistentListOf(),
     val showSelectionChooser: Boolean = false,
+    val saveToTranslationMemory: Boolean = false,
 )
 
 enum class QuickDictionarySelectionAction {
@@ -65,41 +68,14 @@ enum class QuickDictionarySelectionAction {
     SHRINK_RIGHT,
 }
 
-enum class QuickDictionaryCaseTransform(val label: String) {
-    LOWERCASE("aa"),
-    CAPITALIZE_ONE("Aa¹"),
-    CAPITALIZE_TWO("Aa²"),
-    CAPITALIZE_THREE("Aa³"),
-    CAPITALIZE_ALL("Aa"),
-    UPPERCASE("AA"),
-}
+typealias QuickDictionaryCaseTransform = TranslationCaseTransform
 
 internal fun applyQuickDictionaryCaseTransform(
     value: String,
     transform: QuickDictionaryCaseTransform,
 ): String = when (transform) {
-    QuickDictionaryCaseTransform.LOWERCASE -> value.lowercase()
-    QuickDictionaryCaseTransform.UPPERCASE -> value.uppercase()
-    QuickDictionaryCaseTransform.CAPITALIZE_ONE -> value.capitalizeWords(limit = 1)
-    QuickDictionaryCaseTransform.CAPITALIZE_TWO -> value.capitalizeWords(limit = 2)
-    QuickDictionaryCaseTransform.CAPITALIZE_THREE -> value.capitalizeWords(limit = 3)
-    QuickDictionaryCaseTransform.CAPITALIZE_ALL -> value.capitalizeWords(limit = Int.MAX_VALUE)
+    else -> applyTranslationCaseTransform(value, transform)
 }
-
-private fun String.capitalizeWords(limit: Int): String {
-    if (isEmpty() || limit <= 0) return this
-    var transformed = 0
-    return QUICK_DICTIONARY_WORD_PATTERN.replace(this) { match ->
-        if (transformed >= limit) {
-            match.value
-        } else {
-            transformed += 1
-            match.value.replaceFirstChar { it.titlecaseChar() }
-        }
-    }
-}
-
-private val QUICK_DICTIONARY_WORD_PATTERN = Regex("\\p{L}[\\p{L}\\p{M}]*")
 
 @Stable
 data class QuickDictionaryRequest(
@@ -129,6 +105,7 @@ sealed interface QuickDictionaryEditorIntent {
     data class SelectUniverse(val key: String) : QuickDictionaryEditorIntent
     data class SetUniverseName(val value: String) : QuickDictionaryEditorIntent
     data class SetContextMarkers(val value: String) : QuickDictionaryEditorIntent
+    data class SetSaveToTranslationMemory(val value: Boolean) : QuickDictionaryEditorIntent
     data class SelectMappingAlternative(val index: Int) : QuickDictionaryEditorIntent
     data object DismissMappingAlternatives : QuickDictionaryEditorIntent
     data object Save : QuickDictionaryEditorIntent

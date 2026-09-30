@@ -22,9 +22,12 @@ data class TranslationCache(
         const val STATUS_TRANSLATING = 1
         const val STATUS_SUCCESS = 2
         const val STATUS_FAILED = 3
+        const val STATUS_DEGRADED = 4
     }
 
     val isSuccess: Boolean get() = status == STATUS_SUCCESS
+    val isDegraded: Boolean get() = status == STATUS_DEGRADED
+    val isReadable: Boolean get() = isSuccess || isDegraded
     val isFailed: Boolean get() = status == STATUS_FAILED
     val isPending: Boolean get() = status == STATUS_PENDING
 }

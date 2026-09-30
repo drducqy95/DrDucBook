@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.drducbook.app.R
 import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.model.QuickDictionaryType
+import io.legado.app.ui.translation.TranslationCaseControls
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.text.AppText
@@ -63,6 +65,7 @@ fun QuickDictionaryForm(
     onSelectUniverse: (String) -> Unit,
     onUniverseNameChange: (String) -> Unit,
     onContextMarkersChange: (String) -> Unit,
+    onSaveToTranslationMemoryChange: (Boolean) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -204,7 +207,7 @@ fun QuickDictionaryForm(
             label = { AppText(stringResource(R.string.quick_dictionary_target)) },
             singleLine = true,
         )
-        TargetCaseControls(
+        TranslationCaseControls(
             value = state.target,
             onValueChange = onTargetChange,
         )
@@ -329,6 +332,13 @@ fun QuickDictionaryForm(
                     style = LegadoTheme.typography.bodySmall,
                     color = LegadoTheme.colorScheme.onSurfaceVariant,
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = state.saveToTranslationMemory,
+                        onCheckedChange = onSaveToTranslationMemoryChange,
+                    )
+                    AppText(stringResource(R.string.quick_dictionary_save_to_translation_memory))
+                }
             }
         }
 
@@ -346,38 +356,6 @@ fun QuickDictionaryForm(
                     else R.string.quick_dictionary_save
                 )
             )
-        }
-    }
-}
-
-@Composable
-private fun TargetCaseControls(
-    value: String,
-    onValueChange: (String) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        QuickDictionaryCaseTransform.entries.forEach { transform ->
-            val description = stringResource(transform.descriptionResource())
-            TextButton(
-                onClick = {
-                    onValueChange(applyQuickDictionaryCaseTransform(value, transform))
-                },
-                enabled = value.any(Char::isLetter),
-                modifier = Modifier
-                    .weight(1f)
-                    .defaultMinSize(minWidth = 0.dp, minHeight = 40.dp)
-                    .semantics { contentDescription = description },
-                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
-            ) {
-                AppText(
-                    text = transform.label,
-                    style = LegadoTheme.typography.labelLarge,
-                    maxLines = 1,
-                )
-            }
         }
     }
 }
@@ -437,15 +415,6 @@ private fun QuickDictionaryScope.labelResource(): Int = when (this) {
     QuickDictionaryScope.GLOBAL -> R.string.quick_dictionary_scope_global
     QuickDictionaryScope.UNIVERSE -> R.string.quick_dictionary_scope_universe
     QuickDictionaryScope.PROJECT -> R.string.quick_dictionary_scope_project
-}
-
-private fun QuickDictionaryCaseTransform.descriptionResource(): Int = when (this) {
-    QuickDictionaryCaseTransform.LOWERCASE -> R.string.quick_dictionary_case_lowercase
-    QuickDictionaryCaseTransform.CAPITALIZE_ONE -> R.string.quick_dictionary_case_capitalize_one
-    QuickDictionaryCaseTransform.CAPITALIZE_TWO -> R.string.quick_dictionary_case_capitalize_two
-    QuickDictionaryCaseTransform.CAPITALIZE_THREE -> R.string.quick_dictionary_case_capitalize_three
-    QuickDictionaryCaseTransform.CAPITALIZE_ALL -> R.string.quick_dictionary_case_capitalize_all
-    QuickDictionaryCaseTransform.UPPERCASE -> R.string.quick_dictionary_case_uppercase
 }
 
 internal data class QuickDictionaryContextPreview(

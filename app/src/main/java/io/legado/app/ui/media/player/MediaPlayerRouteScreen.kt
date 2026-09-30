@@ -69,11 +69,7 @@ fun MediaPlayerRouteScreen(
     var isInPipMode by remember {
         mutableStateOf(activity?.isInPictureInPictureMode == true)
     }
-
-    DisposableEffect(playbackConnection) {
-        playbackConnection.connect()
-        onDispose { playbackConnection.disconnect() }
-    }
+    var pipRequestPending by remember { mutableStateOf(false) }
 
     DisposableEffect(activity) {
         val componentActivity = activity as? ComponentActivity
@@ -90,10 +86,11 @@ fun MediaPlayerRouteScreen(
         val componentActivity = activity as? ComponentActivity
         val listener = Runnable {
             val current = viewModel.uiState.value
-            if (current.isVideo && current.isPlaying) {
+            if (current.isVideo && current.isPlaying && current.autoEnterPipOnExit) {
+                pipRequestPending = true
                 runCatching {
                     componentActivity?.enterPictureInPictureMode(
-                        buildPipParams(context, current.isPlaying, current.isVideo)
+                        buildPipParams(context, current.isPlaying, current.isVideo, false)
                     )
                 }
             }
@@ -106,7 +103,12 @@ fun MediaPlayerRouteScreen(
         if (activity != null && state.isVideo) {
             runCatching {
                 activity.setPictureInPictureParams(
-                    buildPipParams(context, state.isPlaying, state.isVideo)
+                    buildPipParams(
+                        context,
+                        state.isPlaying,
+                        state.isVideo,
+                        state.autoEnterPipOnExit,
+                    )
                 )
             }
         }
@@ -117,8 +119,8 @@ fun MediaPlayerRouteScreen(
             if (event == Lifecycle.Event.ON_STOP) {
                 val pipActive = activity?.isInPictureInPictureMode == true
                 val current = viewModel.uiState.value
-                if (current.isVideo && current.isPlaying && !pipActive) {
-                    viewModel.onIntent(MediaPlayerIntent.TogglePlayback)
+                if (current.isPlaying && !pipActive && !pipRequestPending) {
+                    viewModel.onIntent(MediaPlayerIntent.PictureInPictureClosed)
                 }
             }
         }
@@ -134,11 +136,20 @@ fun MediaPlayerRouteScreen(
         viewModel.effects.collectLatest { effect ->
             when (effect) {
                 MediaPlayerEffect.Exit -> onBack()
+                MediaPlayerEffect.ExitAfterStop -> onBack()
                 MediaPlayerEffect.EnterPictureInPicture -> {
-                    runCatching {
+                    pipRequestPending = true
+                    val entered = runCatching {
                         activity?.enterPictureInPictureMode(
-                            buildPipParams(context, state.isPlaying, state.isVideo)
-                        )
+                            buildPipParams(context, state.isPlaying, state.isVideo, false)
+                        ) == true
+                    }.getOrDefault(false)
+                    if (entered) {
+                        pipRequestPending = false
+                        viewModel.onIntent(MediaPlayerIntent.PictureInPictureEntered)
+                    } else {
+                        pipRequestPending = false
+                        viewModel.onIntent(MediaPlayerIntent.PictureInPictureRequestFailed)
                     }
                 }
                 MediaPlayerEffect.StartDownloadService -> MediaDownloadService.start(context)
@@ -224,12 +235,23 @@ fun MediaPlayerRouteScreen(
             )
         },
     )
+
+    DisposableEffect(viewModel, activity, playbackConnection) {
+        playbackConnection.connect()
+        onDispose {
+            if (activity?.isInPictureInPictureMode != true) {
+                viewModel.onIntent(MediaPlayerIntent.PictureInPictureClosed)
+            }
+            playbackConnection.disconnect()
+        }
+    }
 }
 
 private fun buildPipParams(
     context: Context,
     isPlaying: Boolean,
     isVideo: Boolean,
+    autoEnter: Boolean,
 ): PictureInPictureParams {
     val playPauseIntent = Intent(context, MediaPlaybackService::class.java).apply {
         action = if (isPlaying) MediaPlaybackService.ACTION_PAUSE else MediaPlaybackService.ACTION_PLAY
@@ -257,7 +279,7 @@ private fun buildPipParams(
         .setActions(listOf(playPauseAction))
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        builder.setAutoEnterEnabled(isVideo && isPlaying)
+        builder.setAutoEnterEnabled(autoEnter && isVideo && isPlaying)
     }
 
     return builder.build()

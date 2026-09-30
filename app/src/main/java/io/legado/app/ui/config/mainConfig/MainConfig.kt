@@ -8,7 +8,7 @@ object MainConfig {
     var showDiscovery by prefDelegate(PreferKey.showDiscovery, true)
     var showRSS by prefDelegate(PreferKey.showRss, true)
     var showBottomView by prefDelegate(PreferKey.showBottomView, true)
-    var useFloatingBottomBar by prefDelegate(PreferKey.useFloatingBottomBar, false)
+    var useFloatingBottomBar by prefDelegate(PreferKey.useFloatingBottomBar, true)
     var useFloatingBottomBarLiquidGlass by prefDelegate(
         PreferKey.useFloatingBottomBarLiquidGlass,
         false

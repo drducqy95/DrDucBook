@@ -34,7 +34,7 @@ class TranslationPromptConfigViewModel(
     fun onIntent(intent: TranslationPromptConfigIntent) {
         when (intent) {
             is TranslationPromptConfigIntent.Add -> {
-                _uiState.update { it.copy(editor = TranslationPromptEditorUi(stage = intent.stage)) }
+                _uiState.update { it.copy(editor = newEditor(intent.stage)) }
             }
             is TranslationPromptConfigIntent.Edit -> {
                 _uiState.update {
@@ -49,7 +49,7 @@ class TranslationPromptConfigViewModel(
                 }
             }
             is TranslationPromptConfigIntent.Toggle -> toggle(intent.item, intent.enabled)
-            is TranslationPromptConfigIntent.UpdateStage -> updateEditor { copy(stage = intent.stage) }
+            is TranslationPromptConfigIntent.UpdateStage -> selectStage(intent.stage)
             is TranslationPromptConfigIntent.UpdateName -> updateEditor { copy(name = intent.value) }
             is TranslationPromptConfigIntent.UpdateInstruction -> updateEditor { copy(instruction = intent.value) }
             TranslationPromptConfigIntent.SaveEditor -> saveEditor()
@@ -62,8 +62,24 @@ class TranslationPromptConfigViewModel(
 
     private fun load() {
         viewModelScope.launch {
-            if (!TranslationConfig.promptPipelineInitialized) {
-                gateway.savePresets(defaultPresets())
+            val existing = gateway.getByTaskTypePrefix(TranslationPromptStage.TASK_TYPE_PREFIX)
+            val defaults = defaultPresets()
+            val existingById = existing.associateBy { it.id }
+            val presetsToInstall = defaults.mapNotNull { default ->
+                val current = existingById[default.id]
+                when {
+                    current == null -> default
+                    current.instruction.trim() == TranslationPromptStage.legacyInstruction(
+                        TranslationPromptStage.fromTaskType(current.taskType) ?: return@mapNotNull null,
+                    ).trim() -> default.copy(
+                        createdAt = current.createdAt,
+                        updatedAt = System.currentTimeMillis(),
+                    )
+                    else -> null
+                }
+            }
+            if (presetsToInstall.isNotEmpty()) {
+                gateway.savePresets(presetsToInstall)
                 TranslationConfig.promptPipelineInitialized = true
             }
             refresh()
@@ -94,6 +110,21 @@ class TranslationPromptConfigViewModel(
             state.copy(editor = state.editor?.update()?.copy(errorMessage = null))
         }
     }
+
+    private fun selectStage(stage: TranslationPromptStage) {
+        val current = _uiState.value.editor ?: return
+        if (current.stage == stage) return
+
+        val nextEditor = translationPromptEditorForStage(
+            stage = stage,
+            currentId = current.id,
+            items = _uiState.value.items,
+        )
+        _uiState.update { it.copy(editor = nextEditor) }
+    }
+
+    private fun newEditor(stage: TranslationPromptStage): TranslationPromptEditorUi =
+        translationPromptEditorForStage(stage = stage, currentId = null, items = emptyList())
 
     private fun saveEditor() {
         val editor = _uiState.value.editor ?: return
@@ -154,23 +185,47 @@ class TranslationPromptConfigViewModel(
     }
 
     private fun defaultPresets(): List<AiPromptPreset> {
-        val defaults = listOf(
-            TranslationPromptStage.PREPARE to "Read the complete supplied excerpt before translating. Preserve paragraph order, dialogue boundaries, names, numbers, and markup tokens.",
-            TranslationPromptStage.FILTER to "Treat navigation labels, advertisements, duplicated headers, and unrelated boilerplate as noise; never invent replacements for removed noise.",
-            TranslationPromptStage.DICTIONARY to "Use the supplied terminology exactly. Extract only recurring names, places, titles, or setting terms that are useful in later chunks.",
-            TranslationPromptStage.TRANSLATE to "Produce complete literary prose in the target language without summaries, commentary, censorship, or omitted sentences. When translating from machine/convert text, convert awkward Sino-Vietnamese sentence patterns into fluent, natural Vietnamese.",
-            TranslationPromptStage.RETRANSLATE to "Correct the specific failure reported for the previous attempt while retaining all valid terminology and paragraph structure. Restructure awkward convert patterns, stiff repeated pronouns, and mechanical idioms into smooth Vietnamese prose.",
-        )
-        return defaults.mapIndexed { index, (stage, instruction) ->
+        return TranslationPromptStage.entries.mapIndexed { index, stage ->
             AiPromptPreset(
                 id = "translation-${stage.storageKey}",
                 taskType = stage.taskType,
                 name = stage.storageKey.replaceFirstChar(Char::uppercase),
-                instruction = instruction,
+                instruction = TranslationPromptStage.defaultInstruction(stage),
                 enabled = true,
                 builtIn = false,
                 sortNumber = index,
             )
         }
     }
+}
+
+internal fun translationPromptEditorForStage(
+    stage: TranslationPromptStage,
+    currentId: String?,
+    items: Iterable<TranslationPromptItemUi>,
+): TranslationPromptEditorUi {
+    if (currentId == null) {
+        return TranslationPromptEditorUi(
+            stage = stage,
+            name = stage.storageKey.replaceFirstChar(Char::uppercase),
+            instruction = TranslationPromptStage.defaultInstruction(stage),
+        )
+    }
+
+    val item = items
+        .asSequence()
+        .filter { it.stage == stage && it.id != currentId }
+        .minWithOrNull(compareBy({ it.sortNumber }, { it.name }))
+    return item?.let {
+        TranslationPromptEditorUi(
+            id = it.id,
+            stage = it.stage,
+            name = it.name,
+            instruction = it.instruction,
+        )
+    } ?: TranslationPromptEditorUi(
+        stage = stage,
+        name = stage.storageKey.replaceFirstChar(Char::uppercase),
+        instruction = TranslationPromptStage.defaultInstruction(stage),
+    )
 }

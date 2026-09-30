@@ -18,6 +18,7 @@ import io.legado.app.domain.model.quickDictionaryUniverseKey
 import io.legado.app.domain.model.toQuickPhoneticPair
 import io.legado.app.domain.model.toQuickTranslationPair
 import io.legado.app.domain.usecase.TranslateChapterUseCase
+import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -36,6 +37,7 @@ class QuickDictionaryEditorViewModel(
     private val quickDictionaryGateway: QuickDictionaryGateway,
     private val quickTranslationGateway: QuickTranslationGateway,
     private val translateChapterUseCase: TranslateChapterUseCase,
+    private val translationStoryMemoryUseCase: TranslationStoryMemoryUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(QuickDictionaryUiState())
@@ -74,6 +76,9 @@ class QuickDictionaryEditorViewModel(
             }
             is QuickDictionaryEditorIntent.SetContextMarkers -> updateForm {
                 copy(contextMarkers = intent.value)
+            }
+            is QuickDictionaryEditorIntent.SetSaveToTranslationMemory -> updateForm {
+                copy(saveToTranslationMemory = intent.value)
             }
             is QuickDictionaryEditorIntent.SelectMappingAlternative -> {
                 selectMappingAlternative(intent.index)
@@ -362,6 +367,14 @@ class QuickDictionaryEditorViewModel(
                         scopeKey = scopeKey,
                     )
                 )
+                if (form.saveToTranslationMemory && book != null) {
+                    translationStoryMemoryUseCase.addQuickDictionaryEntry(
+                        book = book,
+                        raw = form.raw,
+                        target = form.target,
+                        type = form.type,
+                    )
+                }
             }.onSuccess {
                 _uiState.value = QuickDictionaryUiState()
                 _effects.tryEmit(QuickDictionaryEditorEffect.Saved)
