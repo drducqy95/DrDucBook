@@ -441,20 +441,51 @@ private fun findHanVietRange(
 ): IntRange? {
     val targetReading = normalizeReading(selectedText)
     if (targetReading.isBlank()) return null
-    val targetWordCount = targetReading.split(' ').count(String::isNotBlank).coerceAtLeast(1)
-    val minChars = (targetWordCount - 1).coerceAtLeast(1)
-    val maxChars = (targetWordCount + 2).coerceAtMost(12)
+    val targetWords = targetReading.split(' ').filter(String::isNotBlank)
+    if (targetWords.isEmpty()) return null
+    val minChars = (targetWords.size - 1).coerceAtLeast(1)
+    val maxChars = (targetWords.size + 2).coerceAtMost(12)
     val windowStart = searchWindow.start.coerceAtLeast(0)
     val windowEnd = searchWindow.endInclusive.coerceAtMost(sourceText.lastIndex)
+    if (windowEnd < windowStart) return null
+
+    // Pre-extract phrase characters and their Han-Viet readings for the window in one pass
+    val phraseIndices = ArrayList<Int>()
+    val charReadings = ArrayList<String>()
+    for (i in windowStart..windowEnd) {
+        if (sourceText[i].isPhraseChar()) {
+            phraseIndices.add(i)
+            charReadings.add(normalizeReading(quickTranslationGateway.hanViet(sourceText[i].toString())))
+        }
+    }
+    if (phraseIndices.isEmpty()) return null
+
+    // Fast path: exact sequence match across phrase characters (0.01 ms)
+    if (phraseIndices.size >= targetWords.size) {
+        for (i in 0..(phraseIndices.size - targetWords.size)) {
+            var match = true
+            for (w in targetWords.indices) {
+                if (charReadings[i + w] != targetWords[w]) {
+                    match = false
+                    break
+                }
+            }
+            if (match) {
+                return phraseIndices[i] until (phraseIndices[i + targetWords.size - 1] + 1)
+            }
+        }
+    }
+
+    // Evaluating candidates: joined readings from pre-extracted charReadings (no extra dictionary calls)
     var bestRange: IntRange? = null
     var bestScore = Int.MAX_VALUE
-    for (start in windowStart..windowEnd) {
-        if (!sourceText[start].isPhraseChar()) continue
+    for (startIdx in phraseIndices.indices) {
+        val start = phraseIndices[startIdx]
         for (charCount in minChars..maxChars) {
-            val end = endAfterPhraseChars(sourceText, start, charCount) ?: continue
-            if (end - 1 > windowEnd) continue
-            val candidate = sourceText.substring(start, end)
-            val reading = normalizeReading(quickTranslationGateway.hanViet(candidate))
+            val endIdx = startIdx + charCount - 1
+            if (endIdx >= phraseIndices.size) break
+            val end = phraseIndices[endIdx] + 1
+            val reading = charReadings.subList(startIdx, endIdx + 1).joinToString(" ")
             if (reading == targetReading) return start until end
             if (reading.isNotBlank() &&
                 (reading.contains(targetReading) || targetReading.contains(reading))
@@ -486,14 +517,25 @@ private fun findTranslatedRange(
     val targetReading = normalizeReading(selectedText)
     if (targetReading.isBlank()) return null
     val targetWordCount = targetReading.split(' ').count(String::isNotBlank).coerceAtLeast(1)
-    val minChars = 1
-    val maxChars = (targetWordCount + 6).coerceIn(2, MAX_TRANSLATED_CANDIDATE_CHARS)
+    val minChars = (targetWordCount / 2).coerceAtLeast(1)
+    val maxChars = (targetWordCount * 2 + 2).coerceIn(2, MAX_TRANSLATED_CANDIDATE_CHARS)
     val windowStart = searchWindow.start.coerceAtLeast(0)
     val windowEnd = searchWindow.endInclusive.coerceAtMost(sourceText.lastIndex)
+    if (windowEnd < windowStart) return null
+
+    // Radiate outward from approximatePosition for fastest early convergence
+    val starts = (windowStart..windowEnd)
+        .filter { sourceText[it].isPhraseChar() }
+        .sortedBy { abs(it - searchWindow.approximatePosition) }
+
     var best: ScoredRange? = null
     val readingCache = HashMap<String, List<String>>()
-    for (start in windowStart..windowEnd) {
-        if (!sourceText[start].isPhraseChar()) continue
+
+    for (start in starts) {
+        // If an exact match was already found and current start is farther away, break early
+        if (best != null && best.confidence >= 0.95f && abs(start - searchWindow.approximatePosition) >= best.score) {
+            break
+        }
         for (charCount in minChars..maxChars) {
             val end = endAfterPhraseChars(sourceText, start, charCount) ?: continue
             if (end - 1 > windowEnd) continue
@@ -519,16 +561,21 @@ private fun findTranslatedRange(
                         candidateReading = normalizedCandidateReading,
                         targetReading = targetReading,
                     )
+                    val conf = when {
+                        normalizedCandidateReading == targetReading -> 0.95f
+                        normalizedCandidateReading.wordContains(targetReading) &&
+                            resolvedRange != (start until end) -> 0.9f
+                        else -> 0.65f
+                    }
                     best = ScoredRange(
                         range = resolvedRange,
                         score = score,
-                        confidence = when {
-                            normalizedCandidateReading == targetReading -> 0.95f
-                            normalizedCandidateReading.wordContains(targetReading) &&
-                                resolvedRange != (start until end) -> 0.9f
-                            else -> 0.65f
-                        },
+                        confidence = conf,
                     )
+                    // If exact match found at approximatePosition, return immediately
+                    if (conf >= 0.95f && abs(start - searchWindow.approximatePosition) <= 2) {
+                        return best
+                    }
                 }
             }
         }

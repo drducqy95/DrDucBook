@@ -143,7 +143,9 @@ import io.legado.app.ui.quickdict.QuickDictionarySelectionAlternativeUi
 import io.legado.app.ui.quickdict.QuickDictionarySelectionResolution
 import io.legado.app.ui.quickdict.QuickDictionarySuggestionUi
 import io.legado.app.ui.quickdict.QuickDictionaryUiState
+import io.legado.app.ui.quickdict.StoryMemoryCategory
 import io.legado.app.ui.quickdict.resolveQuickDictionarySelectionResult
+import io.legado.app.ui.quickdict.withHanVietSuggestion
 import io.legado.app.ui.widget.components.importComponents.BaseImportUiState
 import io.legado.app.ui.widget.components.importComponents.ImportItemWrapper
 import io.legado.app.ui.widget.components.importComponents.ImportStatus
@@ -619,7 +621,12 @@ class ReadBookViewModel(
                 chapterPosition = intent.chapterPosition,
             )
             is ReadBookIntent.SetQuickDictionaryRaw -> setQuickDictionaryRaw(intent.value)
-            is ReadBookIntent.SetQuickDictionaryHanViet -> updateQuickDictionary { copy(hanViet = intent.value) }
+            is ReadBookIntent.SetQuickDictionaryHanViet -> updateQuickDictionary {
+                copy(
+                    hanViet = intent.value,
+                    suggestions = withHanVietSuggestion(suggestions, intent.value),
+                )
+            }
             is ReadBookIntent.SetQuickDictionaryTarget -> updateQuickDictionary { copy(target = intent.value) }
             is ReadBookIntent.RequestQuickDictionarySuggestion -> {
                 requestQuickDictionarySuggestion(intent.provider)
@@ -627,7 +634,14 @@ class ReadBookViewModel(
             is ReadBookIntent.ApplyQuickDictionarySuggestion -> updateQuickDictionary {
                 copy(target = intent.value)
             }
-            is ReadBookIntent.SetQuickDictionaryType -> updateQuickDictionary { copy(type = intent.value) }
+            is ReadBookIntent.SetQuickDictionaryType -> updateQuickDictionary {
+                val newCat = if (intent.value == QuickDictionaryType.NAME && memoryCategory == StoryMemoryCategory.TERM) {
+                    StoryMemoryCategory.CHARACTER
+                } else {
+                    memoryCategory
+                }
+                copy(type = intent.value, memoryCategory = newCat)
+            }
             is ReadBookIntent.SetQuickDictionaryScope -> updateQuickDictionary {
                 val universe = availableUniverses.firstOrNull()
                 if (intent.value == QuickDictionaryScope.UNIVERSE &&
@@ -657,6 +671,12 @@ class ReadBookViewModel(
             }
             is ReadBookIntent.SetQuickDictionarySaveToTranslationMemory -> updateQuickDictionary {
                 copy(saveToTranslationMemory = intent.value)
+            }
+            is ReadBookIntent.SetQuickDictionaryMemoryCategory -> updateQuickDictionary {
+                copy(memoryCategory = intent.value)
+            }
+            is ReadBookIntent.SetQuickDictionaryMemoryDescription -> updateQuickDictionary {
+                copy(memoryDescription = intent.value)
             }
             is ReadBookIntent.SaveQuickDictionary -> saveQuickDictionary()
             is ReadBookIntent.OpenEntityAnalyzer -> {
@@ -6537,19 +6557,22 @@ class ReadBookViewModel(
                         contextAfter = anchor?.contextAfter.orEmpty(),
                         sourceLocation = sourceLocation,
                         sourceUrl = chapter?.url.orEmpty(),
-                        suggestions = initialSuggestion.takeIf(String::isNotBlank)
-                            ?.let { suggestion ->
-                                persistentListOf(
-                                    QuickDictionarySuggestionUi(
-                                        provider = TranslationConstants.PROVIDER_QUICK_TRANSLATOR,
-                                        providerLabel = quickDictionaryProviderLabel(
-                                            TranslationConstants.PROVIDER_QUICK_TRANSLATOR
-                                        ),
-                                        text = suggestion,
+                        suggestions = withHanVietSuggestion(
+                            initialSuggestion.takeIf(String::isNotBlank)
+                                ?.let { suggestion ->
+                                    persistentListOf(
+                                        QuickDictionarySuggestionUi(
+                                            provider = TranslationConstants.PROVIDER_QUICK_TRANSLATOR,
+                                            providerLabel = quickDictionaryProviderLabel(
+                                                TranslationConstants.PROVIDER_QUICK_TRANSLATOR
+                                            ),
+                                            text = suggestion,
+                                        )
                                     )
-                                )
-                            }
-                            ?: persistentListOf(),
+                                }
+                                ?: persistentListOf(),
+                            hanViet,
+                        ),
                         availableUniverses = universes.toImmutableList(),
                         canExpandSelectionLeft = anchor?.canExpandLeft == true,
                         canExpandSelectionRight = anchor?.canExpandRight == true,
@@ -6612,20 +6635,14 @@ class ReadBookViewModel(
             .distinctBy { it.original.trim() }
         val selectionStart = resolvedChapterPosition.coerceAtLeast(0)
         val resolvedDisplayText = displayText.ifBlank { rawContent }
-        val exactMapping = quickTranslationGateway.translateMapped(
-            text = rawContent,
-            projectTerms = translationTerms,
-            customPhonetics = scopedPhonetics,
-        ).asDisplayText(rawContent).rebaseDisplayText(resolvedDisplayText)
         val snapshot = ReaderContentSnapshot(
             rawText = rawContent,
             displayText = resolvedDisplayText,
-            mappedDisplayText = exactMapping.takeIf { it.segments.isNotEmpty() }
-                ?: alignedParagraphMapping(
-                    sourceText = rawContent,
-                    displayText = resolvedDisplayText,
-                    engine = "reader",
-                ),
+            mappedDisplayText = alignedParagraphMapping(
+                sourceText = rawContent,
+                displayText = resolvedDisplayText,
+                engine = "reader",
+            ),
         )
         val request = QuickDictionaryRequest(
             bookUrl = book.bookUrl,
@@ -6750,7 +6767,10 @@ class ReadBookViewModel(
             val hanViet = quickTranslationGateway.hanViet(raw)
             _uiState.update {
                 if (it.quickDictionary.raw != raw) it else it.copy(
-                    quickDictionary = it.quickDictionary.copy(hanViet = hanViet)
+                    quickDictionary = it.quickDictionary.copy(
+                        hanViet = hanViet,
+                        suggestions = withHanVietSuggestion(it.quickDictionary.suggestions, hanViet),
+                    )
                 )
             }
         }
@@ -6789,12 +6809,13 @@ class ReadBookViewModel(
                             providerLabel = quickDictionaryProviderLabel(provider),
                             text = translated,
                         )
+                        val updatedSuggestions = (form.suggestions.filterNot {
+                            it.provider == provider
+                        } + suggestion)
                         current.copy(
                             quickDictionary = form.copy(
                                 target = translated,
-                                suggestions = (form.suggestions.filterNot {
-                                    it.provider == provider
-                                } + suggestion).toImmutableList(),
+                                suggestions = withHanVietSuggestion(updatedSuggestions, form.hanViet),
                                 isSuggesting = false,
                             )
                         )
@@ -6925,6 +6946,8 @@ class ReadBookViewModel(
                         raw = form.raw,
                         target = form.target,
                         type = form.type,
+                        memoryCategory = form.memoryCategory.name,
+                        description = form.memoryDescription,
                     )
                 }
             }.onSuccess {

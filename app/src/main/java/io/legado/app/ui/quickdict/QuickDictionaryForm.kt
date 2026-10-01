@@ -22,12 +22,12 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
+import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
@@ -484,27 +484,32 @@ private fun <T> CompactDropdownField(
             readOnly = true,
             label = { AppText(label) },
             trailingIcon = {
-                IconButton(onClick = { expanded = !expanded }) {
-                    Icon(
-                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        contentDescription = null,
-                    )
-                }
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = LegadoTheme.colorScheme.onSurfaceVariant,
+                )
             },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = true },
+            modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        DropdownMenu(
+        // Click capture overlay over the entire text field so tapping anywhere opens the dropdown
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clickable { expanded = !expanded },
+        )
+        RoundDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-        ) {
+        ) { dismiss ->
             items.forEach { item ->
-                DropdownMenuItem(
-                    text = { AppText(itemLabel(item)) },
+                val text = itemLabel(item)
+                RoundDropdownMenuItem(
+                    text = text,
+                    isSelected = text == value,
                     onClick = {
-                        expanded = false
+                        dismiss()
                         onItemSelected(item)
                     },
                 )

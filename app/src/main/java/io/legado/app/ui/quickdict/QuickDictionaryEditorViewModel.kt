@@ -56,7 +56,12 @@ class QuickDictionaryEditorViewModel(
         when (intent) {
             is QuickDictionaryEditorIntent.Load -> load(intent.request)
             is QuickDictionaryEditorIntent.SetRaw -> setRaw(intent.value)
-            is QuickDictionaryEditorIntent.SetHanViet -> updateForm { copy(hanViet = intent.value) }
+            is QuickDictionaryEditorIntent.SetHanViet -> updateForm {
+                copy(
+                    hanViet = intent.value,
+                    suggestions = withHanVietSuggestion(suggestions, intent.value),
+                )
+            }
             is QuickDictionaryEditorIntent.SetTarget -> updateForm { copy(target = intent.value) }
             is QuickDictionaryEditorIntent.RequestSuggestion -> requestSuggestion(intent.provider)
             is QuickDictionaryEditorIntent.ApplySuggestion -> updateForm { copy(target = intent.value) }
@@ -203,14 +208,16 @@ class QuickDictionaryEditorViewModel(
         universes: List<QuickDictionaryUniverse>,
     ) {
         currentAnchor = anchor
+        val hanViet = quickTranslationGateway.hanViet(anchor.rawText)
         _uiState.update {
             it.copy(
                 raw = anchor.rawText,
-                hanViet = quickTranslationGateway.hanViet(anchor.rawText),
+                hanViet = hanViet,
                 contextBefore = anchor.contextBefore,
                 contextAfter = anchor.contextAfter,
                 scope = if (book == null) QuickDictionaryScope.GLOBAL else QuickDictionaryScope.PROJECT,
                 availableUniverses = universes.toImmutableList(),
+                suggestions = withHanVietSuggestion(it.suggestions, hanViet),
                 canExpandSelectionLeft = anchor.canExpandLeft,
                 canExpandSelectionRight = anchor.canExpandRight,
                 canShrinkSelectionLeft = anchor.canShrinkLeft,
@@ -250,14 +257,15 @@ class QuickDictionaryEditorViewModel(
         } ?: return
         currentAnchor = adjusted
         val raw = adjusted.rawText
+        val hanViet = quickTranslationGateway.hanViet(raw)
         _uiState.update {
             it.copy(
                 raw = raw,
-                hanViet = quickTranslationGateway.hanViet(raw),
+                hanViet = hanViet,
                 target = "",
                 contextBefore = adjusted.contextBefore,
                 contextAfter = adjusted.contextAfter,
-                suggestions = persistentListOf(),
+                suggestions = withHanVietSuggestion(persistentListOf(), hanViet),
                 canExpandSelectionLeft = adjusted.canExpandLeft,
                 canExpandSelectionRight = adjusted.canExpandRight,
                 canShrinkSelectionLeft = adjusted.canShrinkLeft,
@@ -287,16 +295,19 @@ class QuickDictionaryEditorViewModel(
             ).onSuccess { translated ->
                 _uiState.update { current ->
                     if (current.raw.trim() != raw || current.selectedProvider != provider) current
-                    else current.copy(
-                        target = translated,
-                        suggestions = (current.suggestions.filterNot { it.provider == provider } +
-                            QuickDictionarySuggestionUi(
-                                provider = provider,
-                                providerLabel = providerLabel(provider),
-                                text = translated,
-                            )).toImmutableList(),
-                        isSuggesting = false,
-                    )
+                    else {
+                        val suggestion = QuickDictionarySuggestionUi(
+                            provider = provider,
+                            providerLabel = providerLabel(provider),
+                            text = translated,
+                        )
+                        val updated = (current.suggestions.filterNot { it.provider == provider } + suggestion)
+                        current.copy(
+                            target = translated,
+                            suggestions = withHanVietSuggestion(updated, current.hanViet),
+                            isSuggesting = false,
+                        )
+                    }
                 }
             }.onFailure { error ->
                 _uiState.update { current ->

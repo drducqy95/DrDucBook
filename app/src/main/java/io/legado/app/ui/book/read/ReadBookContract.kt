@@ -22,6 +22,7 @@ import io.legado.app.ui.book.read.page.entities.TextPos
 import io.legado.app.ui.book.searchContent.SearchResult
 import io.legado.app.ui.quickdict.QuickDictionarySelectionAction
 import io.legado.app.ui.quickdict.QuickDictionaryUiState
+import io.legado.app.ui.quickdict.StoryMemoryCategory
 import io.legado.app.ui.widget.components.importComponents.BaseImportUiState
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableMap
@@ -547,6 +548,8 @@ sealed interface ReadBookIntent {
     data class SetQuickDictionaryUniverseName(val value: String) : ReadBookIntent
     data class SetQuickDictionaryContextMarkers(val value: String) : ReadBookIntent
     data class SetQuickDictionarySaveToTranslationMemory(val value: Boolean) : ReadBookIntent
+    data class SetQuickDictionaryMemoryCategory(val value: StoryMemoryCategory) : ReadBookIntent
+    data class SetQuickDictionaryMemoryDescription(val value: String) : ReadBookIntent
     data object SaveQuickDictionary : ReadBookIntent
     data object OpenEntityAnalyzer : ReadBookIntent
     data object OpenChapterSummary : ReadBookIntent

@@ -11,6 +11,7 @@ import io.legado.app.ui.translation.TranslationCaseTransform
 import io.legado.app.ui.translation.applyTranslationCaseTransform
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 
 enum class StoryMemoryCategory(
     val entityType: String?,
@@ -54,6 +55,25 @@ data class QuickDictionarySelectionAlternativeUi(
     val contextBefore: String,
     val contextAfter: String,
 )
+
+fun withHanVietSuggestion(
+    suggestions: List<QuickDictionarySuggestionUi>,
+    hanViet: String,
+): ImmutableList<QuickDictionarySuggestionUi> {
+    val cleanHanViet = hanViet.trim()
+    val otherSuggestions = suggestions.filterNot { it.provider == "han_viet" }
+    return if (cleanHanViet.isNotBlank()) {
+        (listOf(
+            QuickDictionarySuggestionUi(
+                provider = "han_viet",
+                providerLabel = "Hán Việt",
+                text = cleanHanViet,
+            )
+        ) + otherSuggestions).distinctBy { it.provider to it.text.trim().lowercase() }.toImmutableList()
+    } else {
+        otherSuggestions.toImmutableList()
+    }
+}
 
 @Stable
 data class QuickDictionaryUiState(
