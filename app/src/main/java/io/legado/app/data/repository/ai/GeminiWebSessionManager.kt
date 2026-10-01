@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 data class GeminiWebSession(
     val cookies: Map<String, String>,
@@ -40,14 +41,20 @@ object GeminiWebSessionManager {
         Regex("""boq_assistant-bard-web-server_[0-9.]+_p\d+"""),
     )
 
+    private const val MAX_CACHE_ENTRIES = 20
+    private const val DEFAULT_KEY = "__default_webkit_cookie__"
+
+    private fun normalizeKey(credential: String?): String =
+        credential?.trim().orEmpty().ifBlank { DEFAULT_KEY }
+
     private val mutex = Mutex()
-    @Volatile
-    private var cachedSession: GeminiWebSession? = null
+    private val sessionCache = ConcurrentHashMap<String, GeminiWebSession>()
 
     suspend fun getSession(explicitCredential: String? = null): GeminiWebSession =
         withContext(Dispatchers.IO) {
+            val key = normalizeKey(explicitCredential)
             mutex.withLock {
-                val current = cachedSession
+                val current = sessionCache[key]
                 val now = System.currentTimeMillis()
                 // Cache valid for 30 minutes
                 if (current != null && (now - current.fetchedAt) < 30 * 60 * 1000L) {
@@ -64,13 +71,15 @@ object GeminiWebSessionManager {
                         val jsonBl = extractJsonField(parsed, "bl", "cfb2h", "buildLabel", "build_label")
                         if (jsonCookie.isNotBlank() && jsonSnlm0e.isNotBlank()) {
                             val cookies = parseCookies(jsonCookie)
-                            return@withLock GeminiWebSession(
+                            val session = GeminiWebSession(
                                 cookies = cookies,
                                 snlm0e = jsonSnlm0e,
                                 cookieHeader = jsonCookie,
                                 buildLabel = jsonBl.ifBlank { DEFAULT_BUILD_LABEL },
                                 fetchedAt = now,
-                            ).also { cachedSession = it }
+                            )
+                            putSession(key, session)
+                            return@withLock session
                         }
                     }
                 }
@@ -91,18 +100,32 @@ object GeminiWebSessionManager {
                     ?: current?.buildLabel
                     ?: DEFAULT_BUILD_LABEL
 
-                GeminiWebSession(
+                val session = GeminiWebSession(
                     cookies = cookies,
                     snlm0e = resolvedSnlm0e,
                     cookieHeader = cookieHeader,
                     buildLabel = resolvedBl,
                     fetchedAt = now,
-                ).also { cachedSession = it }
+                )
+                putSession(key, session)
+                session
             }
         }
 
-    fun invalidateSession() {
-        cachedSession = null
+    private fun putSession(key: String, session: GeminiWebSession) {
+        if (sessionCache.size >= MAX_CACHE_ENTRIES && !sessionCache.containsKey(key)) {
+            val oldestKey = sessionCache.entries.minByOrNull { it.value.fetchedAt }?.key
+            if (oldestKey != null) sessionCache.remove(oldestKey)
+        }
+        sessionCache[key] = session
+    }
+
+    fun invalidateSession(explicitCredential: String? = null) {
+        if (explicitCredential == null) {
+            sessionCache.clear()
+        } else {
+            sessionCache.remove(normalizeKey(explicitCredential))
+        }
     }
 
     private fun extractJsonField(json: JsonObject, vararg keys: String): String {
@@ -162,17 +185,17 @@ object GeminiWebSessionManager {
             return raw
         }
 
-        // 4. WebKit CookieManager
+        // 4. Raw PSID value (when credential is provided as direct PSID string)
+        if (raw.isNotBlank()) {
+            return "__Secure-1PSID=$raw"
+        }
+
+        // 5. WebKit CookieManager (fallback only when explicit credential is blank, e.g. single account guest mode)
         val webkitCookie = runCatching {
             CookieManager.getInstance().getCookie(GEMINI_BASE_URL)
         }.getOrNull()
         if (!webkitCookie.isNullOrBlank()) {
             return webkitCookie
-        }
-
-        // 5. Raw PSID value
-        if (raw.isNotBlank()) {
-            return "__Secure-1PSID=$raw"
         }
         return ""
     }

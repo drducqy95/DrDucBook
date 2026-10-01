@@ -6,11 +6,11 @@
     "resumed_at": "2026-08-26T10:02:26.310280"
   },
   "working_on": {
-    "feature": "Drive Remote Rich Book Catalog & Zero-Download Metadata/Cover Extraction",
-    "current_milestone": "P38",
-    "current_plan_path": "plans/260913-0752-drive-remote-metadata-covers/",
-    "current_phase": "Phase 38",
-    "status": "planning_complete"
+    "feature": "OpenCode Zen Fix, Gemini Web Auto, Multi-Account Web Isolation & Route Protection",
+    "current_milestone": "P44",
+    "current_plan_path": "plans/261001-1150-ai-router-web-pool-fix/",
+    "current_phase": "phase-05-testing-verification",
+    "status": "COMPLETED"
   },
   "pending_tasks": [],
   "recent_changes": [

@@ -50,16 +50,19 @@ object AiProviderCatalog {
             modelsUrl = "https://opencode.ai/zen/v1/models",
             authType = AiProviderAuthType.NONE,
             models = listOf(
-                AiCatalogModel("big-pickle", "Big Pickle", 200_000, 32_000),
+                AiCatalogModel("deepseek-v4-flash-free", "DeepSeek V4 Flash Free", 128_000, 8_192),
                 AiCatalogModel("nemotron-3.5-lightning-free", "Nemotron 3.5 Lightning Free", 128_000, 8_192),
+                AiCatalogModel("mimo-v2.6-flash-free", "MiMo V2.6 Flash Free", 128_000, 8_192),
+                AiCatalogModel("space-bunny-free", "Space Bunny Free", 128_000, 8_192),
+                AiCatalogModel("longcat-2.5-preview-free", "LongCat 2.5 Preview Free", 128_000, 8_192),
+                AiCatalogModel("big-pickle", "Big Pickle", 200_000, 32_000),
                 AiCatalogModel("hy3-free", "Hunyuan 3 Free", 64_000, 4_096),
                 AiCatalogModel("x-preview-f-free", "X Preview F Free", 128_000, 8_192),
                 AiCatalogModel("laguna-s-2.1-free", "Laguna S 2.1 Free", 128_000, 4_096),
                 AiCatalogModel("nemotron-3-ultra-free", "Nemotron 3 Ultra Free", 128_000, 8_192),
-                AiCatalogModel("deepseek-v4-flash-free", "DeepSeek V4 Flash Free", 128_000, 8_192),
                 AiCatalogModel("muse-spark-1.2-contributor-free", "Muse Spark 1.2 Free", 64_000, 4_096),
             ),
-            notice = "Không cần API key; tự động đồng bộ đầy đủ các model miễn phí từ OpenCode Zen.",
+            notice = "OpenCode Free Zen đã được tích hợp giả lập CLI headers (User-Agent, x-opencode-*). Miễn phí không cần API key.",
         ),
         AiProviderCatalogEntry(
             id = "nvidia",
@@ -260,7 +263,7 @@ object AiProviderCatalog {
 
     fun byId(id: String): AiProviderCatalogEntry? = entries.firstOrNull { it.id == id }
 
-    val autoInstallIds: Set<String> = setOf("opencode_free")
+    val autoInstallIds: Set<String> = setOf("gemini_web", "opencode_free")
 }
 
 private fun toTextCatalogEntry(registry: AiProviderRegistryEntry): AiProviderCatalogEntry? {

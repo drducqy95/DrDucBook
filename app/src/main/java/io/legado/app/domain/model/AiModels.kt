@@ -122,8 +122,8 @@ object AiProviderPresets {
             protocol = AiProtocol.OPENAI_CHAT_COMPLETIONS,
             baseUrl = "https://opencode.ai/zen/v1",
             modelsUrl = "https://opencode.ai/zen/v1/models",
-            modelName = "Big Pickle",
-            modelId = "big-pickle"
+            modelName = "DeepSeek V4 Flash Free",
+            modelId = "deepseek-v4-flash-free"
         ),
         AiProviderPreset(
             id = "openai_chat",

@@ -102,7 +102,7 @@ data class AiRouteProfileDraft(
     val maxAttempts: Int = 3,
     val stickySession: Boolean = true,
     val enabled: Boolean = true,
-    val makeDefault: Boolean = true,
+    val makeDefault: Boolean? = null,
     val sortNumber: Int = 0,
 )
 

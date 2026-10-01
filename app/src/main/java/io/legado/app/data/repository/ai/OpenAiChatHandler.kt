@@ -27,6 +27,7 @@ import io.legado.app.utils.GSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Response
+import java.util.UUID
 
 class OpenAiChatHandler : AiProtocolHandler {
 
@@ -137,9 +138,7 @@ class OpenAiChatHandler : AiProtocolHandler {
                 val streamText = extractOpenAiChatStreamText(data)
                 val chunk = runCatching {
                     GSON.fromJson(data, OpenAiChatStreamChunk::class.java)
-                }.getOrElse {
-                    throw Exception("Invalid OpenAI chat stream chunk", it)
-                }
+                }.getOrNull()
                 chunk?.choices?.firstOrNull()?.finish_reason
                     ?.takeIf(String::isNotBlank)
                     ?.let { finishReason = it }
@@ -165,17 +164,17 @@ class OpenAiChatHandler : AiProtocolHandler {
                 }
 
                 // Citations / Annotations
-                val choice = root?.getAsJsonArray("choices")?.firstOrNull()?.asJsonObjectOrNull()
-                val deltaObj = choice?.getAsJsonObject("delta")
-                deltaObj?.getAsJsonArray("annotations")?.forEach { elem ->
+                val choice = root?.optJsonArray("choices")?.firstOrNull()?.asJsonObjectOrNull()
+                val deltaObj = choice?.optJsonObject("delta")
+                deltaObj?.optJsonArray("annotations")?.forEach { elem ->
                     elem.asJsonObjectOrNull()?.let { ann ->
                         val url = ann.getString("url")
-                            ?: ann.getAsJsonObject("url_citation")?.getString("url")
+                            ?: ann.optJsonObject("url_citation")?.getString("url")
                         if (!url.isNullOrBlank()) {
                             emitEvent(
                                 AiStreamEvent.Citation(
-                                    startIndex = ann.get("start_index")?.asInt,
-                                    endIndex = ann.get("end_index")?.asInt,
+                                    startIndex = ann.get("start_index")?.takeIf { !it.isJsonNull }?.asInt,
+                                    endIndex = ann.get("end_index")?.takeIf { !it.isJsonNull }?.asInt,
                                     uri = url,
                                     title = ann.getString("title").orEmpty(),
                                 )
@@ -185,12 +184,12 @@ class OpenAiChatHandler : AiProtocolHandler {
                 }
 
                 // Token usage
-                root?.getAsJsonObject("usage")?.let { usage ->
-                    val promptTokens = usage.get("prompt_tokens")?.asInt ?: 0
-                    val completionTokens = usage.get("completion_tokens")?.asInt ?: 0
-                    val totalTokens = usage.get("total_tokens")?.asInt ?: (promptTokens + completionTokens)
-                    val reasoningTokens = usage.getAsJsonObject("completion_tokens_details")
-                        ?.get("reasoning_tokens")?.asInt ?: 0
+                root?.optJsonObject("usage")?.let { usage ->
+                    val promptTokens = usage.get("prompt_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                    val completionTokens = usage.get("completion_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                    val totalTokens = usage.get("total_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: (promptTokens + completionTokens)
+                    val reasoningTokens = usage.optJsonObject("completion_tokens_details")
+                        ?.get("reasoning_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
                     emitEvent(
                         AiStreamEvent.Usage(
                             promptTokens = promptTokens,
@@ -247,6 +246,13 @@ internal fun openAiChatHeaders(
     apiKey: String,
 ): Map<String, String> = buildMap {
     putAll(provider.headers)
+    if (provider.baseUrl.contains("opencode.ai")) {
+        put("User-Agent", "opencode/1.1.2/cli")
+        put("x-opencode-client", "cli")
+        put("x-opencode-session", UUID.randomUUID().toString())
+        put("x-opencode-project", UUID.randomUUID().toString())
+        put("x-opencode-request", UUID.randomUUID().toString())
+    }
     provider.customHeaders.forEach { (name, value) ->
         put(name, value.replace("{apiKey}", apiKey).replace("${'$'}API_KEY", apiKey))
     }

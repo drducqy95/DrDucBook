@@ -24,6 +24,7 @@ import io.legado.app.help.http.postJson
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 class OpenAiResponsesHandler : AiProtocolHandler {
 
@@ -203,14 +204,14 @@ class OpenAiResponsesHandler : AiProtocolHandler {
                         )
                     }
                     "response.output_text.annotation.added" -> {
-                        root.getAsJsonObject("annotation")?.let { ann ->
+                        root.optJsonObject("annotation")?.let { ann ->
                             val url = ann.getString("url")
-                                ?: ann.getAsJsonObject("url_citation")?.getString("url")
+                                ?: ann.optJsonObject("url_citation")?.getString("url")
                             if (!url.isNullOrBlank()) {
                                 emitEvent(
                                     AiStreamEvent.Citation(
-                                        startIndex = ann.get("start_index")?.asInt,
-                                        endIndex = ann.get("end_index")?.asInt,
+                                        startIndex = ann.get("start_index")?.takeIf { !it.isJsonNull }?.asInt,
+                                        endIndex = ann.get("end_index")?.takeIf { !it.isJsonNull }?.asInt,
                                         uri = url,
                                         title = ann.getString("title").orEmpty(),
                                     )
@@ -220,17 +221,17 @@ class OpenAiResponsesHandler : AiProtocolHandler {
                     }
                     "response.done",
                     "response.completed" -> {
-                        val responseObj = root.getAsJsonObject("response") ?: root
-                        responseObj.getAsJsonObject("usage")?.let { usage ->
-                            val promptTokens = usage.get("input_tokens")?.asInt
-                                ?: usage.get("prompt_tokens")?.asInt ?: 0
-                            val completionTokens = usage.get("output_tokens")?.asInt
-                                ?: usage.get("completion_tokens")?.asInt ?: 0
-                            val totalTokens = usage.get("total_tokens")?.asInt ?: (promptTokens + completionTokens)
-                            val reasoningTokens = usage.getAsJsonObject("output_token_details")
-                                ?.get("reasoning_tokens")?.asInt
-                                ?: usage.getAsJsonObject("completion_tokens_details")
-                                    ?.get("reasoning_tokens")?.asInt ?: 0
+                        val responseObj = root.optJsonObject("response") ?: root
+                        responseObj.optJsonObject("usage")?.let { usage ->
+                            val promptTokens = usage.get("input_tokens")?.takeIf { !it.isJsonNull }?.asInt
+                                ?: usage.get("prompt_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                            val completionTokens = usage.get("output_tokens")?.takeIf { !it.isJsonNull }?.asInt
+                                ?: usage.get("completion_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                            val totalTokens = usage.get("total_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: (promptTokens + completionTokens)
+                            val reasoningTokens = usage.optJsonObject("output_token_details")
+                                ?.get("reasoning_tokens")?.takeIf { !it.isJsonNull }?.asInt
+                                ?: usage.optJsonObject("completion_tokens_details")
+                                    ?.get("reasoning_tokens")?.takeIf { !it.isJsonNull }?.asInt ?: 0
                             emitEvent(
                                 AiStreamEvent.Usage(
                                     promptTokens = promptTokens,
@@ -265,12 +266,7 @@ class OpenAiResponsesHandler : AiProtocolHandler {
         return retryWithBackoff(maxAttempts = keyRotator.attemptsAtLeast(2), keyRotator = keyRotator) {
             val response = okHttpClient.newCallStrResponse {
                 url(modelsUrl)
-                addHeaders(
-                    provider.headers + provider.customHeaders + mapOf(
-                        "Authorization" to "Bearer ${keyRotator.currentKey}",
-                        "Content-Type" to "application/json"
-                    )
-                )
+                addHeaders(openAiResponsesHeaders(provider, keyRotator.currentKey))
             }
             if (!response.isSuccessful()) {
                 throw Exception("HTTP ${response.code()}: ${response.message()}")
@@ -430,6 +426,13 @@ internal fun openAiResponsesHeaders(
     routeSessionKey: String? = null,
 ): Map<String, String> = buildMap {
     putAll(provider.headers)
+    if (provider.baseUrl.contains("opencode.ai")) {
+        put("User-Agent", "opencode/1.1.2/cli")
+        put("x-opencode-client", "cli")
+        put("x-opencode-session", UUID.randomUUID().toString())
+        put("x-opencode-project", UUID.randomUUID().toString())
+        put("x-opencode-request", UUID.randomUUID().toString())
+    }
     provider.customHeaders.forEach { (name, value) ->
         put(name, value.replace("{apiKey}", accessToken).replace("${'$'}API_KEY", accessToken))
     }

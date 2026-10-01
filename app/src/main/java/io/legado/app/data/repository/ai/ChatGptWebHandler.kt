@@ -148,10 +148,14 @@ class ChatGptWebHandler : AiProtocolHandler {
             ""
         }
 
-        val cookies = cookieFromCred.ifBlank {
+        val cookies = if (cookieFromCred.isNotBlank()) {
+            cookieFromCred
+        } else if (explicitCred.isBlank()) {
             runCatching {
                 CookieManager.getInstance().getCookie("https://chatgpt.com")
             }.getOrNull().orEmpty()
+        } else {
+            ""
         }
 
         val oaiDeviceId = UUID.randomUUID().toString()
@@ -193,7 +197,7 @@ class ChatGptWebHandler : AiProtocolHandler {
         if (!response.isSuccessful) {
             val errorBody = runCatching { response.body.string() }.getOrNull().orEmpty()
             if (response.code == 401 || response.code == 403) {
-                ChatGptWebSessionManager.invalidateSession()
+                ChatGptWebSessionManager.invalidateSession(request.model.provider.apiKey)
                 val hint = if (errorBody.contains("token_expired", ignoreCase = true) || errorBody.contains("expired", ignoreCase = true)) {
                     "Access Token đã hết hạn."
                 } else {
@@ -234,8 +238,8 @@ class ChatGptWebHandler : AiProtocolHandler {
                 }
 
                 // Only extract content from assistant messages (skip system/user echos)
-                val messageObj = root.getAsJsonObject("message") ?: return@readSseData
-                val authorRole = messageObj.getAsJsonObject("author")
+                val messageObj = root.optJsonObject("message") ?: return@readSseData
+                val authorRole = messageObj.optJsonObject("author")
                     ?.get("role")?.takeIf { !it.isJsonNull }?.asString
                 if (authorRole != "assistant") return@readSseData
 
@@ -247,10 +251,10 @@ class ChatGptWebHandler : AiProtocolHandler {
                     emittedTextLength = 0
                 }
 
-                val contentObj = messageObj.getAsJsonObject("content")
+                val contentObj = messageObj.optJsonObject("content")
                 val contentType = contentObj?.get("content_type")?.takeIf { !it.isJsonNull }?.asString
                 if (contentType == "text") {
-                    val partsArray = contentObj.getAsJsonArray("parts")
+                    val partsArray = contentObj.optJsonArray("parts")
                     if (partsArray != null && partsArray.size() > 0) {
                         val fullText = partsArray.joinToString("") { part ->
                             if (part.isJsonPrimitive) part.asString else ""

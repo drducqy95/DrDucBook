@@ -146,17 +146,17 @@ class AntigravityHandler : AiProtocolHandler {
                 }
 
                 // Citations and grounding
-                payload.getAsJsonArray("candidates")?.firstOrNull()?.asJsonObjectOrNull()?.let { candidate ->
-                    candidate.getAsJsonObject("citationMetadata")
-                        ?.getAsJsonArray("citationSources")
+                payload.optJsonArray("candidates")?.firstOrNull()?.asJsonObjectOrNull()?.let { candidate ->
+                    candidate.optJsonObject("citationMetadata")
+                        ?.optJsonArray("citationSources")
                         ?.forEach { elem ->
                             elem.asJsonObjectOrNull()?.let { source ->
                                 val uri = source.getString("uri")
                                 if (!uri.isNullOrBlank()) {
                                     emitEvent(
                                         AiStreamEvent.Citation(
-                                            startIndex = source.get("startIndex")?.asInt,
-                                            endIndex = source.get("endIndex")?.asInt,
+                                            startIndex = source.get("startIndex")?.takeIf { !it.isJsonNull }?.asInt,
+                                            endIndex = source.get("endIndex")?.takeIf { !it.isJsonNull }?.asInt,
                                             uri = uri,
                                             title = source.getString("title").orEmpty(),
                                             snippet = source.getString("snippet").orEmpty(),
@@ -165,10 +165,10 @@ class AntigravityHandler : AiProtocolHandler {
                                 }
                             }
                         }
-                    candidate.getAsJsonObject("groundingMetadata")
-                        ?.getAsJsonArray("groundingChunks")
+                    candidate.optJsonObject("groundingMetadata")
+                        ?.optJsonArray("groundingChunks")
                         ?.forEach { elem ->
-                            elem.asJsonObjectOrNull()?.getAsJsonObject("web")?.let { web ->
+                            elem.asJsonObjectOrNull()?.optJsonObject("web")?.let { web ->
                                 val uri = web.getString("uri")
                                 if (!uri.isNullOrBlank()) {
                                     emitEvent(
@@ -183,11 +183,11 @@ class AntigravityHandler : AiProtocolHandler {
                 }
 
                 // Token usage
-                payload.getAsJsonObject("usageMetadata")?.let { usage ->
-                    val promptTokens = usage.get("promptTokenCount")?.asInt ?: 0
-                    val completionTokens = usage.get("candidatesTokenCount")?.asInt ?: 0
-                    val totalTokens = usage.get("totalTokenCount")?.asInt ?: (promptTokens + completionTokens)
-                    val reasoningTokens = usage.get("thoughtsTokenCount")?.asInt ?: 0
+                payload.optJsonObject("usageMetadata")?.let { usage ->
+                    val promptTokens = usage.get("promptTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                    val completionTokens = usage.get("candidatesTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                    val totalTokens = usage.get("totalTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: (promptTokens + completionTokens)
+                    val reasoningTokens = usage.get("thoughtsTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
                     emitEvent(
                         AiStreamEvent.Usage(
                             promptTokens = promptTokens,
@@ -308,11 +308,10 @@ private fun antigravityUuidFromSeed(seed: String): String {
 }
 
 private fun JsonObject.antigravityParts(): List<JsonObject> {
-    val candidateParts = getAsJsonArray("candidates")?.toList().orEmpty().flatMap { candidate ->
+    val candidateParts = optJsonArray("candidates")?.toList().orEmpty().flatMap { candidate ->
         candidate.asJsonObjectOrNull()
-            ?.get("content")
-            ?.asJsonObjectOrNull()
-            ?.getAsJsonArray("parts")
+            ?.optJsonObject("content")
+            ?.optJsonArray("parts")
             ?.toList()
             .orEmpty()
             .mapNotNull(JsonElement::asJsonObjectOrNull)
@@ -320,11 +319,9 @@ private fun JsonObject.antigravityParts(): List<JsonObject> {
     // Cloud Code Assist has emitted both Gemini candidates and the newer serverContent/modelTurn
     // envelope during rollout. Accept both so a backend shape change does not look like an empty
     // translation to the user.
-    val serverParts = get("serverContent")
-        ?.asJsonObjectOrNull()
-        ?.get("modelTurn")
-        ?.asJsonObjectOrNull()
-        ?.getAsJsonArray("parts")
+    val serverParts = optJsonObject("serverContent")
+        ?.optJsonObject("modelTurn")
+        ?.optJsonArray("parts")
         ?.toList()
         .orEmpty()
         .mapNotNull(JsonElement::asJsonObjectOrNull)

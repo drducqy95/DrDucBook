@@ -132,7 +132,7 @@ class GeminiWebHandler : AiProtocolHandler {
 
         if (!response.isSuccessful) {
             if (response.code == 401 || response.code == 403) {
-                GeminiWebSessionManager.invalidateSession()
+                GeminiWebSessionManager.invalidateSession(request.model.provider.apiKey)
             }
             throw Exception("Gemini Web HTTP ${response.code}: ${response.message}")
         }
@@ -146,7 +146,7 @@ class GeminiWebHandler : AiProtocolHandler {
                 if (line.isBlank() || line.startsWith(")]}'")) continue
 
                 // Check for explicit RPC error envelopes
-                checkRpcError(line)
+                checkRpcError(line, request.model.provider.apiKey)
 
                 // Lines in batchexecute response format:
                 // Length prefix line, followed by JSON payload containing [["wrb.fr", null, "JSON_STRING", ...]]
@@ -168,17 +168,17 @@ class GeminiWebHandler : AiProtocolHandler {
         }
     }
 
-    internal fun checkRpcError(line: String) {
+    internal fun checkRpcError(line: String, credentialKey: String? = null) {
         val trimmed = line.trim()
         if (trimmed.startsWith("[[\"er\"") || trimmed.contains("[\"er\",") || trimmed.contains("\"er\",null,")) {
-            GeminiWebSessionManager.invalidateSession()
+            GeminiWebSessionManager.invalidateSession(credentialKey)
             throw Exception("Google Gemini Web RPC Error: Phiên đăng nhập không hợp lệ hoặc đã hết hạn (RPC er). Vui lòng cập nhật Cookie.")
         }
         if (trimmed.contains("BardErrorInfo")) {
             val errorMatch = Regex("""BardErrorInfo\s*\[(\d+)\]""").find(trimmed)
             val code = errorMatch?.groupValues?.getOrNull(1) ?: "unknown"
             if (code == "1" || code == "2" || code == "3") {
-                GeminiWebSessionManager.invalidateSession()
+                GeminiWebSessionManager.invalidateSession(credentialKey)
             }
             throw Exception("Google Gemini Web từ chối yêu cầu (BardErrorInfo [$code]). Có thể phiên đăng nhập đã hết hạn hoặc cookie cần làm mới.")
         }

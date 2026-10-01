@@ -766,6 +766,7 @@ class AiRouterViewModel(
                     maxAttempts = selectedModels.size.coerceAtLeast(1),
                     stickySession = true,
                     enabled = true,
+                    makeDefault = true,
                 )
             )
             selectedModels.forEachIndexed { index, model ->
@@ -787,6 +788,26 @@ class AiRouterViewModel(
                     )
                 )
             }
+            val preset = profileGateway.getTaskPreset(taskType)
+            val modelId = selectedModels.first().id
+            profileGateway.saveTaskPreset(
+                AiTaskPresetDraft(
+                    presetId = preset?.id,
+                    taskType = taskType,
+                    name = preset?.name ?: "Combo · ${comboTaskLabel(taskType)}",
+                    description = preset?.description.orEmpty(),
+                    modelProfileId = preset?.model?.id ?: modelId,
+                    promptTemplate = preset?.promptTemplate
+                        ?.takeIf(String::isNotBlank)
+                        ?: AiPromptCatalog.defaultPrompt(taskType),
+                    params = preset?.params ?: io.legado.app.domain.model.AiGenerationParams(),
+                    runtimeOptions = preset?.runtimeOptions
+                        ?.copy(routeProfileId = route.id)
+                        ?: io.legado.app.domain.model.AiTaskRuntimeOptions(routeProfileId = route.id),
+                    enabled = true,
+                    makeDefault = true,
+                )
+            )
         }
     }
 
@@ -881,6 +902,7 @@ class AiRouterViewModel(
             providerOrder = AUTO_INSTALL_PROVIDER_PROFILE_IDS,
             maxModelsPerProvider = MAX_AUTO_MODELS_PER_PROVIDER,
             eligibleModelIdsByProvider = mapOf(
+                "catalog_gemini_web" to GEMINI_WEB_KNOWN_FREE_MODELS,
                 "catalog_opencode_free" to OPENCODE_KNOWN_FREE_MODELS,
             ),
         )
@@ -947,19 +969,19 @@ class AiRouterViewModel(
                 )
             ) {
                 // Rebuild only generated routes. A user-created route for the task always wins.
-                existingTargets.forEach { routerGateway.deleteTarget(it.id) }
-                routerGateway.saveRoute(
-                    AiRouteProfileDraft(
-                        id = namedRoute?.id,
-                        name = spec.name,
-                        taskType = spec.taskType,
-                        strategy = spec.strategy,
-                        maxAttempts = modelIds.size.coerceAtLeast(1),
-                        stickySession = true,
-                        enabled = true,
-                        makeDefault = true,
-                    )
-                ).also { savedRoute ->
+                    val shouldBeDefault = namedRoute?.isDefault ?: taskRoutes.none { it.isDefault }
+                    routerGateway.saveRoute(
+                        AiRouteProfileDraft(
+                            id = namedRoute?.id,
+                            name = spec.name,
+                            taskType = spec.taskType,
+                            strategy = spec.strategy,
+                            maxAttempts = modelIds.size.coerceAtLeast(1),
+                            stickySession = true,
+                            enabled = true,
+                            makeDefault = shouldBeDefault,
+                        )
+                    ).also { savedRoute ->
                     modelIds.forEachIndexed { index, modelId ->
                         routerGateway.saveTarget(
                             AiRouteTargetDraft(
@@ -1015,7 +1037,7 @@ class AiRouterViewModel(
         modelIds: List<String>,
     ) {
         val existing = profileGateway.getTaskPreset(taskType)
-        if (existing?.runtimeOptions?.routeProfileId == routeId) return
+        if (existing?.runtimeOptions?.routeProfileId?.isNotBlank() == true) return
         val modelProfileId = existing?.model?.id
             ?.takeIf(modelIds::contains)
             ?: modelIds.first()
@@ -1347,10 +1369,17 @@ class AiRouterViewModel(
         const val MAX_GENERATED_ROUTE_ATTEMPTS = 20
         const val FREE_CHAT_ROUTE = "Chat AI · Free fallback"
         val AUTO_INSTALL_PROVIDER_PROFILE_IDS = listOf(
+            "catalog_gemini_web",
             "catalog_opencode_free",
         )
         val RETIRED_AUTO_PROVIDER_PROFILE_IDS = setOf(
             "catalog_mimo_free",
+        )
+        val GEMINI_WEB_KNOWN_FREE_MODELS = setOf(
+            "gemini-web-flash",
+            "gemini-web-default",
+            "gemini-web-pro",
+            "gemini-web-thinking",
         )
         val PREFERRED_GEMINI_MODELS = listOf(
             "gemini-3.6-flash",
@@ -1368,13 +1397,16 @@ class AiRouterViewModel(
             "nemotron-3-super-free",
         )
         val OPENCODE_KNOWN_FREE_MODELS = setOf(
-            "big-pickle",
+            "deepseek-v4-flash-free",
             "nemotron-3.5-lightning-free",
+            "mimo-v2.6-flash-free",
+            "space-bunny-free",
+            "longcat-2.5-preview-free",
+            "big-pickle",
             "hy3-free",
             "x-preview-f-free",
             "laguna-s-2.1-free",
             "nemotron-3-ultra-free",
-            "deepseek-v4-flash-free",
             "muse-spark-1.2-contributor-free",
         )
         val PREFERRED_CHAT_MODELS = listOf(
@@ -1391,25 +1423,33 @@ class AiRouterViewModel(
         )
         val comboTemplates = listOf(
             ComboTemplate(
+                id = "free_web_pool",
+                name = "Free Web & OpenCode",
+                description = "Gemini Web → OpenCode Zen; hoàn toàn miễn phí không cần API key.",
+                strategy = io.legado.app.domain.model.AiRouteStrategy.PRIORITY,
+                providerOrder = listOf(
+                    "catalog_gemini_web",
+                    "catalog_opencode_free",
+                ),
+            ),
+            ComboTemplate(
                 id = "subscription_free",
                 name = "Subscription → Free",
-                description = "Claude/Codex/Antigravity trước, rồi MiMo và OpenCode Free.",
+                description = "Claude/Codex/Antigravity trước, rồi MiMo.",
                 strategy = io.legado.app.domain.model.AiRouteStrategy.PRIORITY,
                 providerOrder = listOf(
                     "oauth_claude",
                     "oauth_codex",
                     "oauth_antigravity",
                     "catalog_xiaomi_mimo",
-                    "catalog_opencode_free",
                 ),
             ),
             ComboTemplate(
                 id = "free_first",
                 name = "Free First",
-                description = "OpenCode Free → Groq → OpenRouter; không dùng provider trả phí trước.",
+                description = "Groq → OpenRouter; không dùng provider trả phí trước.",
                 strategy = io.legado.app.domain.model.AiRouteStrategy.PRIORITY,
                 providerOrder = listOf(
-                    "catalog_opencode_free",
                     "catalog_groq",
                     "catalog_openrouter",
                 ),
@@ -1424,7 +1464,6 @@ class AiRouterViewModel(
                     "oauth_codex",
                     "catalog_gemini",
                     "catalog_xiaomi_mimo",
-                    "catalog_opencode_free",
                 ),
             ),
         )

@@ -159,4 +159,87 @@ class WebSessionManagerTest {
         assertEquals(2, parts.size)
         assertEquals(40, parts[1].length)
     }
+
+    @Test
+    fun geminiWebSessionManagerIsolatesMultipleAccountsInPool() = runBlocking {
+        val credA = JsonObject().apply {
+            addProperty("cookie", "__Secure-1PSID=account_A; __Secure-1PSIDTS=ts_A")
+            addProperty("snlm0e", "snlm0e_A")
+            addProperty("bl", "bl_A")
+        }.toString()
+
+        val credB = JsonObject().apply {
+            addProperty("cookie", "__Secure-1PSID=account_B; __Secure-1PSIDTS=ts_B")
+            addProperty("snlm0e", "snlm0e_B")
+            addProperty("bl", "bl_B")
+        }.toString()
+
+        val sessionA = GeminiWebSessionManager.getSession(credA)
+        val sessionB = GeminiWebSessionManager.getSession(credB)
+
+        assertEquals("snlm0e_A", sessionA.snlm0e)
+        assertEquals("snlm0e_B", sessionB.snlm0e)
+        assertEquals("account_A", sessionA.cookies["__Secure-1PSID"])
+        assertEquals("account_B", sessionB.cookies["__Secure-1PSID"])
+
+        // Invalidate only account A
+        GeminiWebSessionManager.invalidateSession(credA)
+
+        // Account B should still be intact in cache
+        val sessionBStillValid = GeminiWebSessionManager.getSession(credB)
+        assertEquals("snlm0e_B", sessionBStillValid.snlm0e)
+        assertEquals(sessionB.fetchedAt, sessionBStillValid.fetchedAt)
+
+        // Full invalidate clears all
+        GeminiWebSessionManager.invalidateSession(null)
+    }
+
+    @Test
+    fun chatGptWebSessionManagerIsolatesMultipleAccountsInPool() = runBlocking {
+        val jwtA = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhY2NvdW50X0EiLCJleHAiOjE5OTk5OTk5OTl9.signatureA"
+        val jwtB = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhY2NvdW50X0IiLCJleHAiOjE5OTk5OTk5OTl9.signatureB"
+
+        val credA = JsonObject().apply { addProperty("accessToken", jwtA) }.toString()
+        val credB = JsonObject().apply { addProperty("accessToken", jwtB) }.toString()
+
+        val tokenA = ChatGptWebSessionManager.resolveAccessToken(credA)
+        val tokenB = ChatGptWebSessionManager.resolveAccessToken(credB)
+
+        assertEquals(jwtA, tokenA)
+        assertEquals(jwtB, tokenB)
+
+        // Invalidate only account A
+        ChatGptWebSessionManager.invalidateSession(credA)
+
+        // Account B should still resolve B
+        val tokenBAfter = ChatGptWebSessionManager.resolveAccessToken(credB)
+        assertEquals(jwtB, tokenBAfter)
+    }
+
+    @Test
+    fun geminiWebHandlerCheckRpcErrorInvalidatesTargetCredential() = runBlocking {
+        val handler = GeminiWebHandler()
+        val credA = JsonObject().apply {
+            addProperty("cookie", "__Secure-1PSID=acc_A; __Secure-1PSIDTS=ts_A")
+            addProperty("snlm0e", "snlm0e_A")
+        }.toString()
+        val credB = JsonObject().apply {
+            addProperty("cookie", "__Secure-1PSID=acc_B; __Secure-1PSIDTS=ts_B")
+            addProperty("snlm0e", "snlm0e_B")
+        }.toString()
+
+        GeminiWebSessionManager.getSession(credA)
+        val sessionB = GeminiWebSessionManager.getSession(credB)
+
+        // Trigger RPC error with credA
+        try {
+            handler.checkRpcError("""[["er", null, "auth error"]]""", credentialKey = credA)
+        } catch (_: Exception) {}
+
+        // Verify account B session remains cached and unchanged
+        val sessionBRetrieved = GeminiWebSessionManager.getSession(credB)
+        assertEquals("snlm0e_B", sessionBRetrieved.snlm0e)
+        assertEquals(sessionB.fetchedAt, sessionBRetrieved.fetchedAt)
+    }
 }
+

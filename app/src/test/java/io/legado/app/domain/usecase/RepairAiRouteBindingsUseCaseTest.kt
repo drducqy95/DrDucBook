@@ -458,7 +458,7 @@ private class FakeRepairRouterGateway(
             maxAttempts = draft.maxAttempts,
             stickySession = draft.stickySession,
             enabled = draft.enabled,
-            isDefault = draft.makeDefault,
+            isDefault = draft.makeDefault ?: false,
             sortNumber = draft.sortNumber,
         )
     }

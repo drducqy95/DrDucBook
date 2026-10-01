@@ -209,7 +209,7 @@ class GenerateChapterSummaryUseCase(
                 params = preset.params,
                 toolContext = toolContext,
                 taskType = AiTaskType.SUMMARIZE_CHAPTER,
-                routeProfileId = preset.runtimeOptions.routeProfileId,
+                routeProfileId = preset.runtimeOptions.routeProfileId.takeIf(String::isNotBlank),
                 routeSessionKey = toolContext.bookUrl,
             )
         )
@@ -233,7 +233,7 @@ class GenerateChapterSummaryUseCase(
                 params = preset.params,
                 toolContext = toolContext,
                 taskType = AiTaskType.SUMMARIZE_CHAPTER,
-                routeProfileId = preset.runtimeOptions.routeProfileId,
+                routeProfileId = preset.runtimeOptions.routeProfileId.takeIf(String::isNotBlank),
                 routeSessionKey = toolContext.bookUrl,
             )
         ).collect { event ->

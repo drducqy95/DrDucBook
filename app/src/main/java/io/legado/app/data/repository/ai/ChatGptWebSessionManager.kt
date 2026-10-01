@@ -21,6 +21,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import splitties.init.appCtx
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
 data class ChatGptWebSession(
@@ -39,9 +40,14 @@ object ChatGptWebSessionManager {
     private val KEY_TOKEN_REGEX = Regex(""""(?:accessToken|token)"\s*:\s*"([^"]+)"""")
     private val LOOSE_JWT_REGEX = Regex("""(eyJ[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]{15,}\.[a-zA-Z0-9_-]+)""")
 
+    private const val MAX_CACHE_ENTRIES = 20
+    private const val DEFAULT_KEY = "__default_webkit_cookie__"
+
+    private fun normalizeKey(credential: String?): String =
+        credential?.trim().orEmpty().ifBlank { DEFAULT_KEY }
+
     private val mutex = Mutex()
-    @Volatile
-    private var cachedSession: ChatGptWebSession? = null
+    private val tokenCache = ConcurrentHashMap<String, ChatGptWebSession>()
 
     suspend fun resolveAccessToken(explicitCredential: String? = null): String =
         withContext(Dispatchers.IO) {
@@ -53,8 +59,9 @@ object ChatGptWebSessionManager {
                 return@withContext matchedJwt
             }
 
+            val key = normalizeKey(explicitCredential)
             mutex.withLock {
-                val current = cachedSession
+                val current = tokenCache[key]
                 val now = System.currentTimeMillis()
                 // Cache token for 10 minutes
                 if (current != null && (now - current.fetchedAt) < 10 * 60 * 1000L) {
@@ -79,18 +86,27 @@ object ChatGptWebSessionManager {
                         "👉 Vui lòng mở https://chatgpt.com/api/auth/session trên trình duyệt máy bạn (Chrome/Edge), copy chuỗi accessToken (bắt đầu bằng 'eyJ...') hoặc toàn bộ JSON rồi dán vào ô cấu hình."
                     )
 
-                ChatGptWebSession(
+                val session = ChatGptWebSession(
                     accessToken = finalToken,
                     cookieHeader = cookieHeader,
                     fetchedAt = now,
-                ).also { cachedSession = it }
+                )
+                if (tokenCache.size >= MAX_CACHE_ENTRIES && !tokenCache.containsKey(key)) {
+                    val oldestKey = tokenCache.entries.minByOrNull { it.value.fetchedAt }?.key
+                    if (oldestKey != null) tokenCache.remove(oldestKey)
+                }
+                tokenCache[key] = session
 
                 finalToken
             }
         }
 
-    fun invalidateSession() {
-        cachedSession = null
+    fun invalidateSession(explicitCredential: String? = null) {
+        if (explicitCredential == null) {
+            tokenCache.clear()
+        } else {
+            tokenCache.remove(normalizeKey(explicitCredential))
+        }
     }
 
     fun extractJwt(text: String): String? {

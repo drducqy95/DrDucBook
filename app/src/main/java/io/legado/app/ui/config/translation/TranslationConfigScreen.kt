@@ -35,6 +35,7 @@ import io.legado.app.domain.gateway.AiRouterGateway
 import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
 import io.legado.app.domain.model.AiRouterSnapshot
+import io.legado.app.domain.model.AiRouteProfileDraft
 import io.legado.app.domain.model.AiTaskPresetDraft
 import io.legado.app.domain.model.AiTaskRuntimeOptions
 import io.legado.app.domain.model.AiTaskType
@@ -682,6 +683,23 @@ fun TranslationConfigScreen(
                                                 ?: 0,
                                         )
                                     )
+                                    if (routeId.isNotBlank()) {
+                                        translationAiRoutes.firstOrNull { it.id == routeId }?.let { targetRoute ->
+                                            aiRouterGateway.saveRoute(
+                                                AiRouteProfileDraft(
+                                                    id = targetRoute.id,
+                                                    name = targetRoute.name,
+                                                    taskType = targetRoute.taskType,
+                                                    strategy = targetRoute.strategy,
+                                                    maxAttempts = targetRoute.maxAttempts,
+                                                    stickySession = targetRoute.stickySession,
+                                                    enabled = true,
+                                                    makeDefault = true,
+                                                    sortNumber = targetRoute.sortNumber,
+                                                )
+                                            )
+                                        }
+                                    }
                                 }.onFailure { error ->
                                     context.toastOnUi(
                                         error.localizedMessage

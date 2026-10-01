@@ -197,7 +197,7 @@ class AiRouterRepository(
             maxAttempts = draft.maxAttempts.coerceIn(1, MAX_ROUTE_ATTEMPTS),
             stickySession = draft.stickySession,
             enabled = draft.enabled,
-            isDefault = draft.makeDefault || existing?.isDefault == true,
+            isDefault = draft.makeDefault ?: existing?.isDefault ?: false,
             sortNumber = draft.sortNumber,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,

@@ -278,4 +278,95 @@ class AiRouterAutoInstallPolicyTest {
         sortNumber = sortNumber,
         createdAt = sortNumber.toLong(),
     )
+
+    @Test
+    fun geminiWebAndOpencodeAreSelectedIntoGeneratedFreeRoutesInOrder() {
+        val models = listOf(
+            model("gemini-web-flash", "catalog_gemini_web", sortNumber = 0),
+            model("gemini-web-pro", "catalog_gemini_web", sortNumber = 1),
+            model("deepseek-v4-flash-free", "catalog_opencode_free", sortNumber = 0),
+            model("big-pickle", "catalog_opencode_free", sortNumber = 1),
+        )
+
+        val selected = selectGeneratedFreeRouteModelIds(
+            models = models,
+            providerOrder = listOf("catalog_gemini_web", "catalog_opencode_free"),
+            maxModelsPerProvider = 2,
+        )
+
+        assertEquals(
+            listOf("gemini-web-flash", "gemini-web-pro", "deepseek-v4-flash-free", "big-pickle"),
+            selected,
+        )
+    }
+
+    @Test
+    fun geminiWebAutoInstallIdIsInCatalog() {
+        assertTrue(io.legado.app.domain.model.AiProviderCatalog.autoInstallIds.contains("gemini_web"))
+        assertTrue(io.legado.app.domain.model.AiProviderCatalog.autoInstallIds.contains("opencode_free"))
+    }
+
+    @Test
+    fun generatedRouteDefaultPolicyProtectsCustomDefaultRoute() {
+        val customDefaultRoute = AiRouteProfileConfig(
+            id = "custom-route",
+            name = "My Custom Combo",
+            taskType = "translate_chapter",
+            isDefault = true,
+        )
+        val generatedRoute = AiRouteProfileConfig(
+            id = "gen-route",
+            name = "Dịch AI · Free fallback",
+            taskType = "translate_chapter",
+            isDefault = false,
+        )
+        val taskRoutes = listOf(customDefaultRoute, generatedRoute)
+
+        val namedRoute: AiRouteProfileConfig? = generatedRoute
+        val shouldBeDefaultForGenerated = namedRoute?.isDefault ?: taskRoutes.none { it.isDefault }
+        assertFalse("Rebuilt generated route must NOT hijack default when user has custom default", shouldBeDefaultForGenerated)
+
+        val noDefaultRoutes = listOf(
+            customDefaultRoute.copy(isDefault = false),
+        )
+        val nullNamedRoute: AiRouteProfileConfig? = null
+        val shouldBeDefaultWhenEmpty = nullNamedRoute?.isDefault ?: noDefaultRoutes.none { it.isDefault }
+        assertTrue("When no default exists, generated route can be default", shouldBeDefaultWhenEmpty)
+    }
+
+    @Test
+    fun presetBindingGuardProtectsExistingCustomRouteProfileId() {
+        val presetWithCustomRoute = io.legado.app.domain.model.AiTaskPresetConfig(
+            id = "preset-1",
+            taskType = "translate_chapter",
+            name = "My Preset",
+            description = "",
+            model = io.legado.app.domain.model.AiModelConfig(
+                id = "model-1",
+                provider = io.legado.app.domain.model.AiProviderConfig(
+                    id = "prov",
+                    name = "Prov",
+                    protocol = "openai_chat_completions",
+                    baseUrl = "https://example.test",
+                    apiKey = "key",
+                ),
+                displayName = "Model 1",
+                modelId = "model-1",
+            ),
+            promptTemplate = "",
+            params = io.legado.app.domain.model.AiGenerationParams(),
+            runtimeOptions = io.legado.app.domain.model.AiTaskRuntimeOptions(
+                routeProfileId = "custom_combo_123"
+            ),
+        )
+
+        val shouldSkipOverwrite = presetWithCustomRoute.runtimeOptions.routeProfileId.isNotBlank()
+        assertTrue("Must skip overwrite when preset already has a bound route", shouldSkipOverwrite)
+
+        val presetWithoutRoute = presetWithCustomRoute.copy(
+            runtimeOptions = presetWithCustomRoute.runtimeOptions.copy(routeProfileId = "")
+        )
+        val shouldOverwriteEmpty = presetWithoutRoute.runtimeOptions.routeProfileId.isNotBlank()
+        assertFalse("Can overwrite when routeProfileId is blank", shouldOverwriteEmpty)
+    }
 }

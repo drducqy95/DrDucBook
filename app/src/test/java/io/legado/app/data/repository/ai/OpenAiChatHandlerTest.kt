@@ -121,4 +121,49 @@ class OpenAiChatHandlerTest {
         assertEquals("secret", headers["x-token"])
         assertFalse(headers.containsKey("Authorization"))
     }
+
+    @Test
+    fun openAiChatHeadersInjectsOpenCodeCliHeadersWhenBaseUrlIsOpencode() {
+        val provider = AiProviderConfig(
+            id = "opencode_free",
+            name = "OpenCode Free",
+            protocol = "openai_chat_completions",
+            baseUrl = "https://opencode.ai/zen/v1",
+            apiKey = "",
+            authType = AiProviderAuthType.NONE,
+        )
+
+        val headers = openAiChatHeaders(provider, "")
+
+        assertEquals("opencode/1.1.2/cli", headers["User-Agent"])
+        assertEquals("cli", headers["x-opencode-client"])
+        assertTrue(headers.containsKey("x-opencode-session"))
+        assertTrue(headers["x-opencode-session"]?.isNotBlank() == true)
+        assertTrue(headers.containsKey("x-opencode-project"))
+        assertTrue(headers["x-opencode-project"]?.isNotBlank() == true)
+        assertTrue(headers.containsKey("x-opencode-request"))
+        assertTrue(headers["x-opencode-request"]?.isNotBlank() == true)
+    }
+
+    @Test
+    fun openAiChatHeadersDoesNotInjectOpenCodeHeadersForOtherProviders() {
+        val provider = AiProviderConfig(
+            id = "deepseek",
+            name = "DeepSeek",
+            protocol = "openai_chat_completions",
+            baseUrl = "https://api.deepseek.com/v1",
+            apiKey = "sk-test",
+            authType = AiProviderAuthType.BEARER,
+        )
+
+        val headers = openAiChatHeaders(provider, "sk-test")
+
+        assertFalse(headers.containsKey("x-opencode-client"))
+        assertFalse(headers.containsKey("x-opencode-session"))
+        assertFalse(headers.containsKey("x-opencode-project"))
+        assertFalse(headers.containsKey("x-opencode-request"))
+        assertFalse(headers.containsKey("User-Agent"))
+        assertEquals("Bearer sk-test", headers["Authorization"])
+    }
 }
+

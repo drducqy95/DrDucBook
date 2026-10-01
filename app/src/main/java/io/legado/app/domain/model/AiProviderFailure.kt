@@ -248,7 +248,9 @@ object AiProviderFailureClassifier {
                     "json syntax",
                 )
             ) -> AiFailureKind.PARSE_ERROR
-            statusCode in setOf(400, 404, 405, 406, 409, 415, 422) || normalized.containsAny(
+            chain.any { it is ClassCastException } ||
+                normalized.containsAny(listOf("cannot be cast to", "classcastexception")) ||
+                statusCode in setOf(400, 404, 405, 406, 409, 415, 422) || normalized.containsAny(
                 listOf(
                     "invalid response",
                     "protocol error",
@@ -298,7 +300,11 @@ object AiProviderFailureClassifier {
             chain.any { it is IOException } -> AiFailureKind.NETWORK
             else -> AiFailureKind.UNKNOWN
         }
-        val sanitizedDetail = detail.redactSecrets()
+        val sanitizedDetail = if (normalized.contains("can only be used from within opencode") || normalized.contains("freetiererror")) {
+            "👉 OpenCode đã chặn quyền truy cập bên ngoài cho bản Free Zen từ 09/2026. Vui lòng chuyển sang gói OpenCode Go (dùng API key) hoặc dùng provider khác (Google Gemini, Groq, DeepSeek, Xiaomi MiMo)."
+        } else {
+            detail.redactSecrets()
+        }
         val failure = AiProviderFailure(
             kind = kind,
             provider = provider,

@@ -10,6 +10,7 @@ import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.domain.model.AiReasoningLevel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Base64
 
@@ -253,4 +254,46 @@ class OpenAiResponsesHandlerTest {
     @Suppress("UNCHECKED_CAST")
     private fun responseReasoning(body: Map<String, Any?>): Map<String, Any?> =
         body["reasoning"] as Map<String, Any?>
+
+    @Test
+    fun openAiResponsesHeadersInjectsOpenCodeCliHeadersWhenBaseUrlIsOpencode() {
+        val prov = AiProviderConfig(
+            id = "opencode_free",
+            name = "OpenCode Free",
+            protocol = AiProtocol.OPENAI_RESPONSES,
+            baseUrl = "https://opencode.ai/zen/v1",
+            apiKey = "token",
+        )
+
+        val headers = openAiResponsesHeaders(prov, "token")
+
+        assertEquals("opencode/1.1.2/cli", headers["User-Agent"])
+        assertEquals("cli", headers["x-opencode-client"])
+        assertTrue(headers.containsKey("x-opencode-session"))
+        assertTrue(headers["x-opencode-session"]?.isNotBlank() == true)
+        assertTrue(headers.containsKey("x-opencode-project"))
+        assertTrue(headers["x-opencode-project"]?.isNotBlank() == true)
+        assertTrue(headers.containsKey("x-opencode-request"))
+        assertTrue(headers["x-opencode-request"]?.isNotBlank() == true)
+    }
+
+    @Test
+    fun openAiResponsesHeadersDoesNotInjectOpenCodeHeadersForOtherProviders() {
+        val prov = AiProviderConfig(
+            id = "provider",
+            name = "Provider",
+            protocol = AiProtocol.OPENAI_RESPONSES,
+            baseUrl = "https://example.test/v1",
+            apiKey = "token",
+        )
+
+        val headers = openAiResponsesHeaders(prov, "token")
+
+        assertFalse(headers.containsKey("x-opencode-client"))
+        assertFalse(headers.containsKey("x-opencode-session"))
+        assertFalse(headers.containsKey("x-opencode-project"))
+        assertFalse(headers.containsKey("x-opencode-request"))
+        assertFalse(headers.containsKey("User-Agent"))
+    }
 }
+

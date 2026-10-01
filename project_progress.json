@@ -1,10 +1,10 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-09-15T11:10:00.000000",
-    "overall_progress_percent": 100,
-    "current_phase": "Phase 42 - ZeroTTS Inference Optimization & Quantization",
-    "status": "DONE",
+    "last_updated": "2026-10-01T11:55:00.000000",
+    "overall_progress_percent": 96,
+    "current_phase": "Phase 44 - OpenCode Zen Fix, Gemini Web Auto, Web Pool Isolation & Route Protection",
+    "status": "IN_PROGRESS",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
@@ -1618,6 +1618,62 @@
         {
           "id": "T42.17",
           "desc": "Phase 04 - Physical Device Performance Optimization: Re-enable CPU arena allocator & memory pattern, tune threading for big.LITTLE (clamp to 4, AR 2 threads), deduplicate prefetch in-flight race condition, and reduce lookahead depth",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P43",
+      "name": "AI Route Provider Hardening & Streaming JsonNull Cast Fix",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T43.1",
+          "desc": "Fix ClassCastException JsonNull to JsonObject across all AI SSE streaming protocol handlers (ERR_0035)",
+          "status": "DONE"
+        },
+        {
+          "id": "T43.2",
+          "desc": "Add ProGuard keep rules for AiStreamEvent subclasses and Gson JSON types",
+          "status": "DONE"
+        },
+        {
+          "id": "T43.3",
+          "desc": "Verify build compilation and unit tests",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P44",
+      "name": "OpenCode Zen Fix, Gemini Web Auto, Web Pool Isolation & Route Protection",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T44.1",
+          "desc": "Phase 01 - OpenCode Zen & Go CLI Header Bypass & Active Catalog Models",
+          "status": "DONE"
+        },
+        {
+          "id": "T44.2",
+          "desc": "Phase 02 - Auto-enable Gemini Web Free in Catalog & ViewModel Bootstrap",
+          "status": "DONE"
+        },
+        {
+          "id": "T44.3",
+          "desc": "Phase 03 - Multi-Account Web Session Isolation for Gemini Web & ChatGPT Web Pool",
+          "status": "DONE"
+        },
+        {
+          "id": "T44.4",
+          "desc": "Phase 04 - Route Combo Fallback Protection & Prevent Free Route Overwriting",
+          "status": "DONE"
+        },
+        {
+          "id": "T44.5",
+          "desc": "Phase 05 - Unit Testing, Regression Verification & Kotlin Build Check",
           "status": "DONE"
         }
       ]

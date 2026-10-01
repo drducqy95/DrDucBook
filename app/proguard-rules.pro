@@ -195,8 +195,14 @@ cn.hutool.core.util.**{*;}
 # AI Models, Entities, and Handlers
 -keep class io.legado.app.domain.model.** { *; }
 -keep class io.legado.app.domain.gateway.** { *; }
+-keep class io.legado.app.domain.gateway.AiStreamEvent$* { *; }
 -keep class io.legado.app.data.entities.Ai* { *; }
 -keep class io.legado.app.data.repository.ai.** { *; }
+-keep class com.google.gson.JsonElement { *; }
+-keep class com.google.gson.JsonObject { *; }
+-keep class com.google.gson.JsonArray { *; }
+-keep class com.google.gson.JsonNull { *; }
+-keep class com.google.gson.JsonPrimitive { *; }
 
 # Go / Gomobile WebDAV runtime (protects JNI bindings from R8 stripping - ref: ERR_0006)
 -keep class go.** { *; }

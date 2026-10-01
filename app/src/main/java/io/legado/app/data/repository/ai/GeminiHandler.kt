@@ -121,17 +121,17 @@ class GeminiHandler : AiProtocolHandler {
                 }
 
                 // Citations and grounding
-                root.getAsJsonArray("candidates")?.firstOrNull()?.asJsonObjectOrNull()?.let { candidate ->
-                    candidate.getAsJsonObject("citationMetadata")
-                        ?.getAsJsonArray("citationSources")
+                root.optJsonArray("candidates")?.firstOrNull()?.asJsonObjectOrNull()?.let { candidate ->
+                    candidate.optJsonObject("citationMetadata")
+                        ?.optJsonArray("citationSources")
                         ?.forEach { elem ->
                             elem.asJsonObjectOrNull()?.let { source ->
                                 val uri = source.getString("uri")
                                 if (!uri.isNullOrBlank()) {
                                     emitEvent(
                                         AiStreamEvent.Citation(
-                                            startIndex = source.get("startIndex")?.asInt,
-                                            endIndex = source.get("endIndex")?.asInt,
+                                            startIndex = source.get("startIndex")?.takeIf { !it.isJsonNull }?.asInt,
+                                            endIndex = source.get("endIndex")?.takeIf { !it.isJsonNull }?.asInt,
                                             uri = uri,
                                             title = source.getString("title").orEmpty(),
                                             snippet = source.getString("snippet").orEmpty(),
@@ -140,10 +140,10 @@ class GeminiHandler : AiProtocolHandler {
                                 }
                             }
                         }
-                    candidate.getAsJsonObject("groundingMetadata")
-                        ?.getAsJsonArray("groundingChunks")
+                    candidate.optJsonObject("groundingMetadata")
+                        ?.optJsonArray("groundingChunks")
                         ?.forEach { elem ->
-                            elem.asJsonObjectOrNull()?.getAsJsonObject("web")?.let { web ->
+                            elem.asJsonObjectOrNull()?.optJsonObject("web")?.let { web ->
                                 val uri = web.getString("uri")
                                 if (!uri.isNullOrBlank()) {
                                     emitEvent(
@@ -158,11 +158,11 @@ class GeminiHandler : AiProtocolHandler {
                 }
 
                 // Token usage
-                root.getAsJsonObject("usageMetadata")?.let { usage ->
-                    val promptTokens = usage.get("promptTokenCount")?.asInt ?: 0
-                    val completionTokens = usage.get("candidatesTokenCount")?.asInt ?: 0
-                    val totalTokens = usage.get("totalTokenCount")?.asInt ?: (promptTokens + completionTokens)
-                    val reasoningTokens = usage.get("thoughtsTokenCount")?.asInt ?: 0
+                root.optJsonObject("usageMetadata")?.let { usage ->
+                    val promptTokens = usage.get("promptTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                    val completionTokens = usage.get("candidatesTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+                    val totalTokens = usage.get("totalTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: (promptTokens + completionTokens)
+                    val reasoningTokens = usage.get("thoughtsTokenCount")?.takeIf { !it.isJsonNull }?.asInt ?: 0
                     emitEvent(
                         AiStreamEvent.Usage(
                             promptTokens = promptTokens,
@@ -200,10 +200,10 @@ class GeminiHandler : AiProtocolHandler {
                 throw Exception("HTTP ${response.code()}: ${detail ?: response.message()}")
             }
             val root = body.toJsonObject() ?: throw Exception("Invalid Gemini models response")
-            root.getAsJsonArray("models")?.toList().orEmpty().mapNotNull { element ->
+            root.optJsonArray("models")?.toList().orEmpty().mapNotNull { element ->
                 val model = element.asJsonObjectOrNull() ?: return@mapNotNull null
-                val methods = model.getAsJsonArray("supportedGenerationMethods")
-                    ?: model.getAsJsonArray("supportedActions")
+                val methods = model.optJsonArray("supportedGenerationMethods")
+                    ?: model.optJsonArray("supportedActions")
                 if (methods != null && methods.none { it.asString == "generateContent" }) {
                     return@mapNotNull null
                 }
@@ -448,20 +448,19 @@ internal fun extractGeminiText(root: JsonObject): String = root.geminiResponsePa
     .joinToString("")
 
 private fun JsonObject.geminiResponseParts(): List<JsonObject> =
-    getAsJsonArray("candidates")?.toList().orEmpty()
+    optJsonArray("candidates")?.toList().orEmpty()
         .flatMap { candidate ->
             candidate.asJsonObjectOrNull()
-                ?.get("content")
-                ?.asJsonObjectOrNull()
-                ?.getAsJsonArray("parts")
+                ?.optJsonObject("content")
+                ?.optJsonArray("parts")
                 ?.toList()
                 .orEmpty()
                 .mapNotNull(JsonElement::asJsonObjectOrNull)
         }
 
 private fun extractGeminiBlockedReason(root: JsonObject): String? =
-    root.get("promptFeedback")?.asJsonObjectOrNull()?.getString("blockReason")
-        ?: root.getAsJsonArray("candidates")?.firstOrNull()?.asJsonObjectOrNull()
+    root.optJsonObject("promptFeedback")?.getString("blockReason")
+        ?: root.optJsonArray("candidates")?.firstOrNull()?.asJsonObjectOrNull()
             ?.getString("finishReason")
 
 private fun geminiGenerateUrl(

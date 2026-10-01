@@ -1,5 +1,6 @@
 package io.legado.app.data.repository.ai
 
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import io.legado.app.domain.model.AiCapability
@@ -71,11 +72,15 @@ internal fun JsonObject.extractApiErrorMessage(): String? {
     return null
 }
 
-internal fun JsonElement.asJsonObjectOrNull(): JsonObject? {
-    return if (isJsonObject) asJsonObject else null
-}
+internal fun JsonElement?.asJsonObjectOrNull(): JsonObject? =
+    if (this != null && !isJsonNull && isJsonObject) asJsonObject else null
 
-internal fun JsonElement.asJsonArrayOrNull() = if (isJsonArray) asJsonArray else null
+internal fun JsonElement?.asJsonArrayOrNull(): JsonArray? =
+    if (this != null && !isJsonNull && isJsonArray) asJsonArray else null
+
+internal fun JsonObject.optJsonObject(name: String): JsonObject? = get(name)?.asJsonObjectOrNull()
+
+internal fun JsonObject.optJsonArray(name: String): JsonArray? = get(name)?.asJsonArrayOrNull()
 
 /**
  * Check if the model supports reasoning capability.
