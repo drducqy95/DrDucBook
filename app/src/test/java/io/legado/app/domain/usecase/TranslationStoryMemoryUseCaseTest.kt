@@ -373,6 +373,48 @@ class TranslationStoryMemoryUseCaseTest {
     }
 
     @Test
+    fun timelineCharacterRelationshipsAreExtractedAndPersisted() = runBlocking {
+        val book = Book(bookUrl = "test://timeline-rel", name = "Test Rel", author = "test")
+        val gateway = InMemoryAiMemoryGateway()
+        val useCase = TranslationStoryMemoryUseCase(
+            aiTextGateway = UnusedAiTextGateway(),
+            aiMemoryGateway = gateway,
+            cachedChapterGateway = SingleBookCachedChapterGateway(book),
+            quickTranslationGateway = IdentityQuickTranslationGateway(),
+        )
+
+        val result = AiTranslationRefinePipeline.parseRefinerOutput(
+            rawOutput = """
+                {
+                  "refined_segments":[{"id":1,"refined_translation":"Lyon la anh trai cua Angel."}],
+                  "story_timeline":{
+                    "summary":"Gioi thieu",
+                    "events":[],
+                    "characters":[
+                      {"raw":"里昂","target":"Lyon","status":"new","role":"Anh trai","relationships":["anh trai của Angel"]},
+                      {"raw":"安格尔","target":"Angel","status":"new","role":"Em trai","relationships":[]}
+                    ],
+                    "discoveries":[]
+                  }
+                }
+            """.trimIndent(),
+            expectedIds = listOf(1),
+            targetLanguage = TranslationConstants.TARGET_VIETNAMESE,
+        )
+
+        useCase.persistRefinerResult(
+            book = book,
+            chapter = BookChapter(url = "ch-1", title = "Ch 1", bookUrl = book.bookUrl, index = 0),
+            source = "里昂是安格尔的哥哥",
+            result = result,
+        ).getOrThrow()
+
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        assertEquals(2, snapshot.entities.size)
+        assertTrue(snapshot.relationships.any { it.source == "里昂" && it.target == "Angel" && it.relationship.contains("anh trai") })
+    }
+
+    @Test
     fun wikiSeparatesBooksAndProjectsTimelineRelationshipsWithoutGlossaryDuplicates() = runBlocking {
         val firstBook = Book(bookUrl = "test://wiki-first", name = "First", author = "test")
         val secondBook = Book(bookUrl = "test://wiki-second", name = "Second", author = "test")

@@ -5,6 +5,7 @@ package io.legado.app.help.book
 import com.drducbook.app.R
 import android.net.Uri
 import androidx.core.net.toUri
+import splitties.init.appCtx
 import com.script.buildScriptBindings
 import com.script.rhino.RhinoScriptEngine
 import io.legado.app.constant.AppLog
@@ -112,11 +113,11 @@ fun Book.getBookTypeName(): String {
         isMobi       -> "MOBI"
         isExternalDocument -> originName.substringAfterLast('.', "").uppercase()
         isVideo      -> "Video"
-        isAudio      -> "有声书"
-        isImage      -> "漫画"
-        isOnLineTxt  -> "小说"
-        isWebFile    -> "网页文件"
-        else         -> "未知类型"
+        isAudio      -> runCatching { appCtx.getString(R.string.audio) }.getOrDefault("Audio")
+        isImage      -> runCatching { appCtx.getString(R.string.manga) }.getOrDefault("Manga")
+        isOnLineTxt  -> runCatching { appCtx.getString(R.string.noval) }.getOrDefault("Novel")
+        isWebFile    -> "Web"
+        else         -> runCatching { appCtx.getString(R.string.unknown_state) }.getOrDefault("Unknown")
     }
 }
 

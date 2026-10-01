@@ -1,6 +1,7 @@
 package io.legado.app.model.localBook
 
 import androidx.core.net.toUri
+import com.drducbook.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.utils.EncodingDetect
@@ -14,6 +15,7 @@ import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 import org.jsoup.parser.Parser
+import splitties.init.appCtx
 import java.io.InputStream
 import java.nio.charset.Charset
 import java.util.Locale
@@ -27,15 +29,16 @@ import java.util.zip.ZipInputStream
  */
 object ExternalDocumentFile : BaseLocalBookParse {
 
-    private data class ParsedChapter(
+    internal data class ParsedChapter(
         val title: String,
         val content: String,
     )
 
-    private data class ParsedDocument(
+    internal data class ParsedDocument(
         val fingerprint: String,
         val title: String?,
         val author: String?,
+        val intro: String? = null,
         val chapters: List<ParsedChapter>,
     )
 
@@ -58,7 +61,7 @@ object ExternalDocumentFile : BaseLocalBookParse {
             if (book.author.isBlank()) book.author = author
         }
         if (book.intro.isNullOrBlank()) {
-            book.intro = parsed.chapters.firstOrNull()?.content?.take(500)
+            book.intro = parsed.intro ?: parsed.chapters.firstOrNull()?.content?.take(500)
         }
     }
 
@@ -97,7 +100,9 @@ object ExternalDocumentFile : BaseLocalBookParse {
 
     private fun parse(book: Book, fingerprint: String): ParsedDocument {
         val format = extension(book.originName)
-        val fallbackTitle = baseName(book.originName).ifBlank { "未命名书籍" }
+        val fallbackTitle = baseName(book.originName).ifBlank {
+            runCatching { appCtx.getString(R.string.untitled_book) }.getOrDefault("Untitled Book")
+        }
         return LocalBook.getBookInputStream(book).use { input ->
             when (format) {
                 "html", "htm" -> parseHtml(input, fallbackTitle, fingerprint)
@@ -109,18 +114,23 @@ object ExternalDocumentFile : BaseLocalBookParse {
         }
     }
 
-    private fun parseHtml(
+    internal fun parseHtml(
         input: InputStream,
         fallbackTitle: String,
         fingerprint: String,
     ): ParsedDocument {
         val document = Jsoup.parse(input, null, "")
+        val intro = document.select("meta[name=description], meta[property=og:description], meta[property=book:description], meta[name=intro]")
+            .firstOrNull()?.attr("content")?.trim()
+            ?: document.select(".intro, #intro, .description, #description, .book-intro, .book-summary")
+                .firstOrNull()?.text()?.trim()
         return ParsedDocument(
             fingerprint = fingerprint,
             title = document.title().trim().takeIf(String::isNotBlank),
             author = document.select("meta[name=author], meta[property=book:author]")
                 .firstOrNull()?.attr("content")?.trim(),
-            chapters = splitChapters(stripHtmlForTranslation(document), fallbackTitle),
+            intro = intro?.takeIf(String::isNotBlank),
+            chapters = splitChapters(stripHtmlForTranslation(document), fallbackTitle, detectExplicitChapters = true),
         )
     }
 
@@ -301,8 +311,10 @@ object ExternalDocumentFile : BaseLocalBookParse {
         fun flush() {
             val content = normalizeText(currentBody.toString())
             if (content.isNotBlank()) {
+                val introTitle = runCatching { appCtx.getString(R.string.ebook_editor_description) }
+                    .getOrDefault("Introduction")
                 chapters += ParsedChapter(
-                    title = if (hasHeading) currentTitle else "简介",
+                    title = if (hasHeading) currentTitle else introTitle,
                     content = content,
                 )
             }

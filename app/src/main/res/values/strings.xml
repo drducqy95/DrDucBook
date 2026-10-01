@@ -4105,4 +4105,7 @@
     <string name="entity_analyzer_ai_enrich_done">AI analysis complete</string>
     <string name="entity_analyzer_ai_enrich_failed">AI analysis failed</string>
     <string name="entity_analyzer_false_positive">False positive</string>
+    <string name="untitled_book">Untitled Book</string>
+    <string name="untitled_chapter">Untitled Chapter</string>
+    <string name="import_book_file_name_hint">Use js to parse file name from src, then assign name/author.</string>
 </resources>

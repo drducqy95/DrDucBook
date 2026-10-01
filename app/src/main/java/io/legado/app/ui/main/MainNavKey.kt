@@ -258,6 +258,7 @@ object MainRouteConst {
     const val ROUTE_WRITING = "writing"
     const val ROUTE_EBOOK_EDITOR = "ebook_editor"
     const val ROUTE_RSS = "rss"
+    const val ROUTE_STORY_WIKI = "story_wiki"
     const val ROUTE_SETTINGS_CUSTOM_THEME = "settings/custom_theme"
     const val ROUTE_SETTINGS_LAB_CONFIG = "settings/lab_config"
     const val ROUTE_SETTINGS_DOWNLOAD_CACHE = "settings/download_cache"

@@ -41,4 +41,27 @@ class ExternalDocumentFileTest {
         assertFalse(text.contains("**"))
         assertFalse(text.contains("https://example.com"))
     }
+
+    @Test
+    fun htmlMetaDescriptionIsExtractedAsIntro() {
+        val html = """
+            <html>
+            <head>
+                <title>Test Novel</title>
+                <meta name="description" content="This is an awesome webnovel about cultivation." />
+            </head>
+            <body>
+                <h1>Chapter 1</h1>
+                <p>Prose begins here.</p>
+            </body>
+            </html>
+        """.trimIndent()
+        val parsed = ExternalDocumentFile.parseHtml(
+            input = html.byteInputStream(),
+            fallbackTitle = "Fallback",
+            fingerprint = "fp",
+        )
+        org.junit.Assert.assertEquals("This is an awesome webnovel about cultivation.", parsed.intro)
+        org.junit.Assert.assertEquals("Test Novel", parsed.title)
+    }
 }

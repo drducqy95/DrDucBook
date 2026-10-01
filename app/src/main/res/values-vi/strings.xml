@@ -4104,4 +4104,7 @@
     <string name="entity_analyzer_ai_enrich_done">Phân tích AI hoàn tất</string>
     <string name="entity_analyzer_ai_enrich_failed">Phân tích AI thất bại</string>
     <string name="entity_analyzer_false_positive">Không phải thực thể</string>
+    <string name="untitled_book">Sách chưa đặt tên</string>
+    <string name="untitled_chapter">Chương không tên</string>
+    <string name="import_book_file_name_hint">Dùng JS để phân tích tên tệp từ src, sau đó gán tên/tác giả.</string>
 </resources>

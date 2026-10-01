@@ -643,7 +643,7 @@ class BookshelfViewModel(
         if (!TranslationConfig.dynamicUiTranslationEnabled) return
         val currentUrls = books.mapTo(hashSetOf()) { it.bookUrl }
         translatedBooksFlow.value = translatedBooksFlow.value.filterKeys(currentUrls::contains)
-        books.asSequence().filterNot(BookShelfItem::isLocal).forEach { book ->
+        books.asSequence().forEach { book ->
             val fingerprint = book.dynamicUiFingerprint()
             if (translationFingerprints[book.bookUrl] == fingerprint &&
                 translatedBooksFlow.value.containsKey(book.bookUrl)

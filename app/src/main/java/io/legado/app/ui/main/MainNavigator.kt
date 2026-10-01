@@ -253,7 +253,8 @@ object MainNavigator {
             MainRouteReadRecord,
             MainRouteWriting,
             MainRouteEbookEditor,
-            MainRouteRss -> {
+            MainRouteRss,
+            MainRouteStoryWiki -> {
                 if (currentRoute == MainRouteHome) {
                     backStack.add(route)
                 } else {
@@ -374,6 +375,7 @@ object MainNavigator {
             MainRouteConst.ROUTE_WRITING -> MainRouteWriting
             MainRouteConst.ROUTE_EBOOK_EDITOR -> MainRouteEbookEditor
             MainRouteConst.ROUTE_RSS -> MainRouteRss
+            MainRouteConst.ROUTE_STORY_WIKI -> MainRouteStoryWiki
             MainRouteConst.ROUTE_SETTINGS_CUSTOM_THEME -> MainRouteSettingsCustomTheme
             MainRouteConst.ROUTE_SETTINGS_DOWNLOAD_CACHE -> MainRouteSettingsDownloadCache
             MainRouteConst.ROUTE_SETTINGS_TRANSLATION -> MainRouteSettingsTranslation

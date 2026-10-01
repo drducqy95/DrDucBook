@@ -30,6 +30,7 @@ import io.legado.app.domain.model.AiTranslationMemoryCandidate
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
 import io.legado.app.domain.model.AiTranslationStoryRelationship
 import io.legado.app.domain.model.AiTranslationStoryTimeline
+import io.legado.app.domain.model.AiTranslationTimelineCharacter
 import io.legado.app.domain.model.AiTranslationStoryWikiRecord
 import io.legado.app.domain.model.StoryWikiCharacterGraph
 import io.legado.app.domain.model.StoryWikiGraphEdge
@@ -170,11 +171,37 @@ class TranslationStoryMemoryUseCase(
             val pendingKey = pendingKey(chapter.index, source, delta)
             try {
                 val snapshot = loadSnapshot(book.bookUrl)
-                val normalizedEntities = normalizeEntities(delta.entities, source, chapter.index)
-                val knownNames = (snapshot.entities + normalizedEntities).flatMap { entity ->
+                val incomingTimeline = delta.timeline ?: AiTranslationStoryTimeline()
+                val timelineCharactersAsEntities = incomingTimeline.characters
+                    .filter { character ->
+                        character.raw.isNotBlank() &&
+                            source.contains(character.raw) &&
+                            (character.status.equals("new", ignoreCase = true) || snapshot.entities.none { it.raw == character.raw })
+                    }
+                    .map { character ->
+                        AiTranslationStoryEntity(
+                            raw = character.raw,
+                            target = character.target.ifBlank { character.raw },
+                            type = "character",
+                            description = character.role.ifBlank { "Character from chapter timeline" },
+                            firstChapterIndex = chapter.index,
+                            lastChapterIndex = chapter.index,
+                        )
+                    }
+                val normalizedEntities = normalizeEntities(delta.entities + timelineCharactersAsEntities, source, chapter.index)
+                val knownNames = ((snapshot.entities + normalizedEntities).flatMap { entity ->
                     listOf(entity.raw, entity.target) + entity.aliases
-                }.filter(String::isNotBlank).toSet()
-                val normalizedRelationships = delta.relationships
+                } + (snapshot.worldBuilding + delta.worldBuilding).flatMap { entry ->
+                    listOf(entry.raw, entry.target) + entry.entityRefs
+                }).filter(String::isNotBlank).toSet()
+                val timelineRelationships = extractRelationshipsFromTimeline(
+                    characters = incomingTimeline.characters,
+                    knownNames = knownNames,
+                    source = source,
+                    chapterIndex = chapter.index,
+                )
+                val allCandidateRelationships = delta.relationships + timelineRelationships
+                val normalizedRelationships = allCandidateRelationships
                     .mapNotNull { relationship ->
                         relationship.takeIf { value ->
                             (value.source in knownNames || source.contains(value.source)) &&
@@ -182,6 +209,7 @@ class TranslationStoryMemoryUseCase(
                                 value.relationship.isNotBlank()
                         }?.copy(chapterIndex = chapter.index)
                     }
+                    .distinctBy { "${it.source}\u0000${it.target}\u0000${it.relationship}".lowercase() }
                 val placeholders = normalizedRelationships
                     .flatMap { relationship -> listOf(relationship.source, relationship.target) }
                     .filter { name -> name !in knownNames && source.contains(name) }
@@ -196,7 +224,6 @@ class TranslationStoryMemoryUseCase(
                             lastChapterIndex = chapter.index,
                         )
                     }
-                val incomingTimeline = delta.timeline ?: AiTranslationStoryTimeline()
                 val timeline = incomingTimeline.copy(
                     chapterIndex = chapter.index,
                     chapterTitle = chapter.title,
@@ -215,27 +242,10 @@ class TranslationStoryMemoryUseCase(
                         )
                     },
                 )
-                val timelineCharactersAsEntities = timeline.characters
-                    .filter { character ->
-                        character.status.equals("new", ignoreCase = true) &&
-                            character.raw.isNotBlank() &&
-                            source.contains(character.raw) &&
-                            character.raw !in knownNames
-                    }
-                    .map { character ->
-                        AiTranslationStoryEntity(
-                            raw = character.raw,
-                            target = character.target.ifBlank { character.raw },
-                            type = "character",
-                            description = character.role.ifBlank { "Character from chapter timeline" },
-                            firstChapterIndex = chapter.index,
-                            lastChapterIndex = chapter.index,
-                        )
-                    }
                 val analysis = AiTranslationStoryAnalysis(
                     chapterIndex = chapter.index,
                     chapterTitle = chapter.title,
-                    entities = (normalizedEntities + placeholders + timelineCharactersAsEntities)
+                    entities = (normalizedEntities + placeholders)
                         .distinctBy { TranslationMemoryCanonicalizer.identity(it.raw, it.senseKey) },
                     relationships = normalizedRelationships
                         .distinctBy { "${it.source}\u0000${it.target}\u0000${it.relationship}".lowercase() },
@@ -299,6 +309,44 @@ class TranslationStoryMemoryUseCase(
                 }
             }
         }
+    }
+
+    private fun extractRelationshipsFromTimeline(
+        characters: List<AiTranslationTimelineCharacter>,
+        knownNames: Set<String>,
+        source: String,
+        chapterIndex: Int,
+    ): List<AiTranslationStoryRelationship> {
+        if (characters.isEmpty()) return emptyList()
+        val extracted = mutableListOf<AiTranslationStoryRelationship>()
+        characters.forEach { char ->
+            val charName = char.raw.ifBlank { char.target }.trim()
+            if (charName.isBlank()) return@forEach
+            char.relationships.forEach { relDesc ->
+                val trimmed = relDesc.trim()
+                if (trimmed.isBlank()) return@forEach
+                val matchedTarget = knownNames
+                    .filter { it.length >= 2 && !it.equals(charName, ignoreCase = true) && !it.equals(char.target, ignoreCase = true) }
+                    .sortedByDescending { it.length }
+                    .firstOrNull { name -> trimmed.contains(name, ignoreCase = true) }
+                if (matchedTarget != null) {
+                    val cleanRelation = trimmed
+                        .replace(matchedTarget, "", ignoreCase = true)
+                        .replace(Regex("^(?:của|với|là|và|về|thuộc|ở|trong|tại|of|to|with|and|is)\\s+", RegexOption.IGNORE_CASE), "")
+                        .replace(Regex("\\s+(?:của|với|là|và|về|thuộc|ở|trong|tại|of|to|with|and|is)$", RegexOption.IGNORE_CASE), "")
+                        .trim(' ', ':', '-', ',', '·', '—')
+                        .ifBlank { trimmed }
+                    extracted += AiTranslationStoryRelationship(
+                        source = charName,
+                        target = matchedTarget,
+                        relationship = cleanRelation,
+                        description = trimmed,
+                        chapterIndex = chapterIndex,
+                    )
+                }
+            }
+        }
+        return extracted
     }
 
     suspend fun loadSnapshotWithSeriesInheritance(

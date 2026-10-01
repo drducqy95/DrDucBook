@@ -1521,7 +1521,7 @@ class BookInfoViewModel(
     }
 
     private fun scheduleDynamicUiTranslation(book: Book) {
-        if (!TranslationConfig.dynamicUiTranslationEnabled || book.isLocal) {
+        if (!TranslationConfig.dynamicUiTranslationEnabled) {
             translatedBookUi = null
             translatedKindLabels = null
             translatedHighlightedTags = null

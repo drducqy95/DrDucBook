@@ -327,7 +327,7 @@ fun ImportBookScreen(
         onDismissRequest = { showImportFileNameDialog = false },
         title = stringResource(R.string.import_file_name),
         content = {
-            AppText("Use js to parse file name from src, then assign name/author.")
+            AppText(stringResource(R.string.import_book_file_name_hint))
             OutlinedTextField(
                 value = fileNameJs,
                 onValueChange = { fileNameJs = it },

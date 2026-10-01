@@ -155,7 +155,7 @@ object LocalBook {
         list.forEachIndexed { index, bookChapter ->
             bookChapter.index = index
             if (bookChapter.title.isEmpty()) {
-                bookChapter.title = "无标题章节"
+                bookChapter.title = appCtx.getString(R.string.untitled_chapter)
             }
         }
         val replaceRules = ContentProcessor.get(book).getTitleReplaceRules()
