@@ -27,4 +27,10 @@ REPLACE	-115	\b(thiết kế|mẫu|hình|kiểu|loại)\s+của\s+([\p{L}\p{M}]+
 REPLACE	-114	\b(\d+)\s+tuổi\s+của\s+([\p{L}\p{M}]+(?:\s+[\p{L}\p{M}]+){0,3})\b	$2 lúc $1 tuổi	clean_age_cua
 REPLACE	-115	\bcủa\s+(đã\s+từng|từng)\s+([\p{L}\p{M}]+)\b	$1 $2	clean_past_tense_cua
 REPLACE	-115	\b(kết quả|hậu quả|nguyên nhân|quá trình|nội dung|mục đích|ý nghĩa)\s+của\s+(giải thích|phân tích|nghiên cứu|điều tra|giáo dục|đào tạo|huấn luyện)\b	$1 $2	clean_abstract_noun_cua_v2
+QT_TEMPLATE	870	不在{0}之下	không hề thua kém {0}	comparison
+QT_TEMPLATE	870	仅次于{0}	chỉ đứng sau {0}	comparison
+REPLACE	-115	\bkhông có mặt\s+(ở|trong|dưới|trên)\b	không $1	clean_khong_co_mat
+REPLACE	-115	\b(thế giới|tự|chùa|đền|phòng|núi|sơn|động)\s+trong\b	trong $1	clean_postposition_trong
+REPLACE	-115	\bthịt linh song\b	linh nhục song tu	clean_linh_nhuc_censorship
+REPLACE	-115	\bvõ đạo của tu bí này\b	bí bản võ đạo	clean_tu_bi_nay
 

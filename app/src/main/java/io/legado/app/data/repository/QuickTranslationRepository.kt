@@ -4340,10 +4340,10 @@ class QuickTranslationRepository(
 
     companion object {
         private const val MAPPED_ENGINE = "quick_translator_exact"
-        private const val PACK_VERSION = "qt-clean-4.2.23"
+        private const val PACK_VERSION = "qt-clean-4.2.24"
         private const val QT2025_PACK_VERSION =
-            "qt2025-302f9f8d+qt-clean-4.2.23+runtime-3-entity-lock"
-        private const val QT2020_PACK_VERSION = "qt2020-2025.09.01+qt-clean-4.2.23"
+            "qt2025-302f9f8d+qt-clean-4.2.24+runtime-3-entity-lock"
+        private const val QT2020_PACK_VERSION = "qt2020-2025.09.01+qt-clean-4.2.24"
         private const val QT2025_TERM_INDEX_ASSET = "offline/qt2025/qt2025-terms.qtdict"
         private const val QT2025_PHONETIC_ASSET = "offline/qt2025/ChinesePhienAmWords.txt"
         private const val QT2025_RULE_ASSET = "offline/qt2025/LuatNhan.txt"
@@ -5336,7 +5336,7 @@ internal fun shouldEnableJiebaTokenizer(
 private const val MIN_JIEBA_HEAP_MB = 256
 
 internal fun cleanQuickDictionaryTarget(value: String): String {
-    val trimmed = value.trim()
+    val trimmed = value.substringBefore('\t').substringBefore("//").trim()
     if (trimmed.isEmpty() || "://" in trimmed) return trimmed
     val candidates = quickDictionaryTargetCandidates(trimmed)
         .asSequence()

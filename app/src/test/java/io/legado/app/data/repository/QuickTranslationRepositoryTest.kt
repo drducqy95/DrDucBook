@@ -1321,6 +1321,20 @@ class QuickTranslationRepositoryTest {
         }
         assertFalse(actual, actual.contains("lý huy hán"))
     }
+
+    @Test
+    fun regressionTrueBugAndCultivationTermsDoNotLeakMetadata() {
+        assertEquals("điển", cleanQuickDictionaryTarget("điển\ttrue"))
+        assertEquals("tiên", cleanQuickDictionaryTarget("tiên\ttrue"))
+
+        val repo = QuickTranslationRepository()
+        val text = "可以说其意境高深无匹，不在人仙秘典《现世如来经》那称霸现在，统领三千，唯我独尊的意境之下！"
+        val actual = repo.translate(text, emptyList())
+        assertFalse("Output must not contain 'true': $actual", actual.contains("true"))
+        assertFalse("Output must not contain 'người tiên': $actual", actual.contains("người tiên"))
+        assertTrue("Output should contain 'Nhân Tiên': $actual", actual.contains("Nhân Tiên"))
+        assertFalse("Output must not contain 'không có mặt': $actual", actual.contains("không có mặt"))
+    }
 }
 
 private fun isQuickDictionaryCjkForTest(codePoint: Int): Boolean =

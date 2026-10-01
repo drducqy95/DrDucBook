@@ -436,6 +436,23 @@ class QuickDictionaryPackStore(
                 index.delete()
                 source.delete()
                 metadata.delete()
+            } else {
+                runCatching {
+                    val text = source.readText(Charsets.UTF_8)
+                    if (text.contains("\ttrue") || text.contains("\tfalse")) {
+                        val sanitized = text.lines().joinToString("\n") { line ->
+                            val delimiter = line.indexOf('=')
+                            if (delimiter > 0) {
+                                val k = line.substring(0, delimiter)
+                                val v = cleanQuickDictionaryTarget(line.substring(delimiter + 1))
+                                "$k=$v"
+                            } else {
+                                line
+                            }
+                        }
+                        source.writeText(sanitized, Charsets.UTF_8)
+                    }
+                }
             }
         }
     }
