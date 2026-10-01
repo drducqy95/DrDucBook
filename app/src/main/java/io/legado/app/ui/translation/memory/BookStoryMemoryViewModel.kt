@@ -93,6 +93,20 @@ class BookStoryMemoryViewModel(
             BookStoryMemoryIntent.RetryPending -> retryPending()
             BookStoryMemoryIntent.BackfillCachedChapters -> backfillCachedChapters()
             is BookStoryMemoryIntent.ImportJson -> importDocument(intent.content)
+
+            BookStoryMemoryIntent.OpenAiBuilderDialog -> openAiBuilderDialog()
+            is BookStoryMemoryIntent.UpdateAiBuilderDialog -> _uiState.update { it.copy(builderDialog = intent.value) }
+            BookStoryMemoryIntent.DismissAiBuilderDialog -> _uiState.update {
+                if (!it.builderDialog.isRunning) it.copy(builderDialog = it.builderDialog.copy(isOpen = false)) else it
+            }
+            BookStoryMemoryIntent.ExecuteAiBuilder -> executeAiBuilder()
+
+            BookStoryMemoryIntent.OpenRetrofitDialog -> openRetrofitDialog()
+            is BookStoryMemoryIntent.UpdateRetrofitDialog -> _uiState.update { it.copy(retrofitDialog = intent.value) }
+            BookStoryMemoryIntent.DismissRetrofitDialog -> _uiState.update {
+                if (!it.retrofitDialog.isRunning) it.copy(retrofitDialog = it.retrofitDialog.copy(isOpen = false)) else it
+            }
+            BookStoryMemoryIntent.ExecuteRetrofit -> executeRetrofit()
         }
     }
 
@@ -172,13 +186,18 @@ class BookStoryMemoryViewModel(
                 )
             }
             snapshot.relationships.forEach { relationship ->
+                val typeTag = relationship.relationship.takeIf(String::isNotBlank)
+                val relTitle = if (typeTag != null) {
+                    "[$typeTag] ${relationship.source} ⇄ ${relationship.target}"
+                } else {
+                    "${relationship.source} ⇄ ${relationship.target}"
+                }
                 add(
                     StoryMemoryItemUi(
                         id = TranslationStoryMemoryUseCase.relationshipKey(relationship),
                         kind = AiTranslationStoryMemoryKind.RELATIONSHIP,
-                        title = "${relationship.source} → ${relationship.target}",
-                        subtitle = listOf(relationship.relationship, relationship.description)
-                            .filter(String::isNotBlank).joinToString(" · "),
+                        title = relTitle,
+                        subtitle = relationship.description.takeIf(String::isNotBlank).orEmpty(),
                         chapterIndex = relationship.chapterIndex.takeIf { it >= 0 },
                     )
                 )
@@ -353,14 +372,174 @@ class BookStoryMemoryViewModel(
             _effects.tryEmit(BookStoryMemoryEffect.ShowMessageText("Chưa có chương đã lưu để phân tích"))
             return@runMutation
         }
-        val preset = aiProfileGateway.getTaskPreset(AiTaskType.SUMMARIZE_CHAPTER)
-            ?: error("Chưa cấu hình AI tóm tắt chương")
+        val preset = aiProfileGateway.getTaskPreset(AiTaskType.EXTRACT_STORY_MEMORY)
+            ?: aiProfileGateway.getTaskPreset(AiTaskType.SUMMARIZE_CHAPTER)
+            ?: error("Chưa cấu hình AI tóm tắt/trích xuất chương")
         val completed = storyMemoryUseCase.backfill(book, preset, 0 until chapterCount)
         _effects.tryEmit(
             BookStoryMemoryEffect.ShowMessageText(
                 "Đã phân tích lại $completed/$chapterCount chương đã lưu",
             )
         )
+    }
+
+    private fun openAiBuilderDialog() {
+        viewModelScope.launch {
+            val count = cachedChapterGateway.getChapterCount(bookUrl)
+            _uiState.update {
+                it.copy(
+                    builderDialog = AiStoryMemoryBuilderDialogState(
+                        isOpen = true,
+                        mode = AiStoryMemoryBuilderDialogState.MODE_CHAPTERS,
+                        startChapter = 0,
+                        endChapter = minOf(10, count.coerceAtLeast(1)),
+                        maxChapters = count,
+                    )
+                )
+            }
+        }
+    }
+
+    private fun executeAiBuilder() {
+        val dialog = _uiState.value.builderDialog
+        if (dialog.isRunning) return
+        viewModelScope.launch {
+            val book = cachedChapterGateway.getBook(bookUrl) ?: run {
+                _effects.tryEmit(BookStoryMemoryEffect.ShowError("Không tìm thấy sách"))
+                return@launch
+            }
+            _uiState.update {
+                it.copy(
+                    builderDialog = it.builderDialog.copy(
+                        isRunning = true,
+                        progressCurrent = 0,
+                        progressTotal = if (dialog.mode == AiStoryMemoryBuilderDialogState.MODE_CHAPTERS) {
+                            (dialog.endChapter - dialog.startChapter).coerceAtLeast(1)
+                        } else 1,
+                        progressMessage = "Đang khởi tạo tiến trình AI...",
+                    )
+                )
+            }
+            try {
+                val preset = aiProfileGateway.getTaskPreset(AiTaskType.EXTRACT_STORY_MEMORY)
+                    ?: aiProfileGateway.getTaskPreset(AiTaskType.SUMMARIZE_CHAPTER)
+                    ?: error("Chưa cấu hình AI trích xuất bộ nhớ truyện")
+                if (dialog.mode == AiStoryMemoryBuilderDialogState.MODE_CHAPTERS) {
+                    val range = dialog.startChapter until dialog.endChapter
+                    val result = storyMemoryUseCase.batchAnalyzeChapters(
+                        book = book,
+                        chapterRange = range,
+                        preset = preset,
+                        force = true,
+                        onProgress = { current, total ->
+                            _uiState.update {
+                                it.copy(
+                                    builderDialog = it.builderDialog.copy(
+                                        progressCurrent = current,
+                                        progressTotal = total,
+                                        progressMessage = "Đang phân tích chương $current / $total...",
+                                    )
+                                )
+                            }
+                        }
+                    )
+                    val count = result.getOrThrow()
+                    _uiState.update { it.copy(builderDialog = it.builderDialog.copy(isOpen = false, isRunning = false)) }
+                    _effects.tryEmit(BookStoryMemoryEffect.ShowMessageText("Đã phân tích thành công $count chương và cập nhật bộ nhớ dịch!"))
+                } else {
+                    val result = storyMemoryUseCase.analyzeTextContent(
+                        book = book,
+                        rawText = dialog.directText,
+                        preset = preset,
+                    )
+                    val analysis = result.getOrThrow()
+                    _uiState.update { it.copy(builderDialog = it.builderDialog.copy(isOpen = false, isRunning = false)) }
+                    _effects.tryEmit(
+                        BookStoryMemoryEffect.ShowMessageText(
+                            "Đã trích xuất ${analysis.entities.size} thực thể, ${analysis.relationships.size} quan hệ và ${analysis.worldBuilding.size} thiết lập thế giới!"
+                        )
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _uiState.update {
+                    it.copy(builderDialog = it.builderDialog.copy(isRunning = false))
+                }
+                _effects.tryEmit(BookStoryMemoryEffect.ShowError(error.localizedMessage ?: "Lỗi kiến tạo AI"))
+            }
+        }
+    }
+
+    private fun openRetrofitDialog() {
+        viewModelScope.launch {
+            val count = cachedChapterGateway.getChapterCount(bookUrl)
+            _uiState.update {
+                it.copy(
+                    retrofitDialog = RetrofitCacheDialogState(
+                        isOpen = true,
+                        startChapter = 0,
+                        endChapter = minOf(10, count.coerceAtLeast(1)),
+                        maxChapters = count,
+                    )
+                )
+            }
+        }
+    }
+
+    private fun executeRetrofit() {
+        val dialog = _uiState.value.retrofitDialog
+        if (dialog.isRunning) return
+        viewModelScope.launch {
+            val book = cachedChapterGateway.getBook(bookUrl) ?: run {
+                _effects.tryEmit(BookStoryMemoryEffect.ShowError("Không tìm thấy sách"))
+                return@launch
+            }
+            val range = (dialog.startChapter until dialog.endChapter).toList()
+            val total = range.size
+            _uiState.update {
+                it.copy(
+                    retrofitDialog = it.retrofitDialog.copy(
+                        isRunning = true,
+                        progressCurrent = 0,
+                        progressTotal = total,
+                        progressMessage = "Đang chuẩn bị làm mới bản dịch...",
+                    )
+                )
+            }
+            try {
+                val result = storyMemoryUseCase.retrofitChapterTranslations(
+                    book = book,
+                    chapterIndices = range,
+                    translateChapterUseCase = translateChapterUseCase,
+                    onProgress = { current, max ->
+                        _uiState.update {
+                            it.copy(
+                                retrofitDialog = it.retrofitDialog.copy(
+                                    progressCurrent = current,
+                                    progressTotal = max,
+                                    progressMessage = "Đang làm mới chương $current / $max...",
+                                )
+                            )
+                        }
+                    }
+                )
+                val retrofitted = result.getOrThrow()
+                _uiState.update { it.copy(retrofitDialog = it.retrofitDialog.copy(isOpen = false, isRunning = false)) }
+                _effects.tryEmit(
+                    BookStoryMemoryEffect.ShowMessageText(
+                        "Đã hoàn thành làm mới $retrofitted/$total chương theo bộ nhớ dịch mới nhất!"
+                    )
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _uiState.update {
+                    it.copy(retrofitDialog = it.retrofitDialog.copy(isRunning = false))
+                }
+                _effects.tryEmit(BookStoryMemoryEffect.ShowError(error.localizedMessage ?: "Lỗi làm mới bản dịch"))
+            }
+        }
     }
 
     private fun runMutation(block: suspend () -> Unit) {
@@ -413,6 +592,7 @@ class BookStoryMemoryViewModel(
         imagePath = imagePath,
         imagePrompt = imagePrompt,
         imageUpdatedAt = imageUpdatedAt,
+        metadata = metadata,
     )
 
     private fun AiTranslationStoryRelationship.toDraft(id: String) = StoryMemoryEditorDraft(
@@ -475,6 +655,7 @@ class BookStoryMemoryViewModel(
         category = type.trim().ifBlank { "character" },
         userEdited = true,
         source = "USER",
+        metadata = metadata,
     )
 
     private fun StoryMemoryEditorDraft.toRelationship() = AiTranslationStoryRelationship(

@@ -1,16 +1,18 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-09-14T22:49:49.755462",
-    "saved_at": "2026-09-12T22:40:26.729596",
-    "resumed_at": "2026-08-26T10:02:26.310280"
+    "last_active": "2026-10-01T15:56:00.000000",
+    "saved_at": "2026-10-01T15:56:00.000000",
+    "resumed_at": "2026-10-01T15:03:00.000000"
   },
   "working_on": {
-    "feature": "OpenCode Zen Fix, Gemini Web Auto, Multi-Account Web Isolation & Route Protection",
-    "current_milestone": "P44",
-    "current_plan_path": "plans/261001-1150-ai-router-web-pool-fix/",
-    "current_phase": "phase-05-testing-verification",
-    "status": "COMPLETED"
+    "feature": "Story Memory, Wiki & Translation Cache System Overhaul",
+    "current_milestone": "P45",
+    "current_plan_path": "plans/261001-1525-story-memory-wiki-cache-refactor/",
+    "current_phase": "phase-01-relationship-logic-and-labels",
+    "total_phases": 8,
+    "phases": ["01", "02", "02b", "03", "04", "05", "06", "07"],
+    "status": "PLANNING_REFINED"
   },
   "pending_tasks": [],
   "recent_changes": [

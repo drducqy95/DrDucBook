@@ -82,6 +82,12 @@ fun QuickDictionaryEditorSheet(
             onSaveToTranslationMemoryChange = {
                 viewModel.onIntent(QuickDictionaryEditorIntent.SetSaveToTranslationMemory(it))
             },
+            onMemoryCategoryChange = {
+                viewModel.onIntent(QuickDictionaryEditorIntent.SetMemoryCategory(it))
+            },
+            onMemoryDescriptionChange = {
+                viewModel.onIntent(QuickDictionaryEditorIntent.SetMemoryDescription(it))
+            },
             onSave = { viewModel.onIntent(QuickDictionaryEditorIntent.Save) },
             modifier = Modifier
                 .fillMaxWidth()

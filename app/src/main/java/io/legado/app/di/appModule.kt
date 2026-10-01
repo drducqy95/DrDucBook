@@ -243,6 +243,7 @@ import io.legado.app.domain.usecase.TranslateChapterUseCase
 import io.legado.app.domain.usecase.TranslateDynamicBookUiUseCase
 import io.legado.app.domain.usecase.TranslateDynamicUiTextUseCase
 import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
+import io.legado.app.domain.usecase.SyncStoryMemoryWithQuickDictionaryUseCase
 import io.legado.app.domain.usecase.StoryIllustrationUseCase
 import io.legado.app.domain.usecase.UpdateBooksGroupUseCase
 import io.legado.app.domain.usecase.UploadReadingProgressUseCase
@@ -620,6 +621,7 @@ val appModule = module {
     singleOf(::ReplaceRuleRepository)
     single<DictionaryGateway> { DictionaryRepositoryImpl() }
     singleOf(::TranslationStoryMemoryUseCase)
+    singleOf(::SyncStoryMemoryWithQuickDictionaryUseCase)
     singleOf(::StoryIllustrationUseCase)
     singleOf(::TranslateChapterUseCase)
     single<MangaTextTranslationGateway> { MangaTextTranslationRepository(get()) }

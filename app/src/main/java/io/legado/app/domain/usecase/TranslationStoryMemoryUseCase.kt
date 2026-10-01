@@ -10,7 +10,10 @@ import io.legado.app.domain.gateway.AiMemoryGateway
 import io.legado.app.domain.gateway.AiStreamEvent
 import io.legado.app.domain.gateway.AiTextGateway
 import io.legado.app.domain.gateway.CachedChapterGateway
+import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
+import io.legado.app.domain.model.QuickDictionaryEntry
+import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.model.AiCapability
 import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiMessage
@@ -74,9 +77,31 @@ class TranslationStoryMemoryUseCase(
     private val aiMemoryGateway: AiMemoryGateway,
     private val cachedChapterGateway: CachedChapterGateway,
     private val quickTranslationGateway: QuickTranslationGateway,
+    private val quickDictionaryGateway: QuickDictionaryGateway? = null,
 ) {
 
     private val bookLocks = ConcurrentHashMap<String, Mutex>()
+
+    private suspend fun syncToQuickDict(
+        bookUrl: String,
+        raw: String,
+        target: String,
+        type: QuickDictionaryType,
+    ) {
+        if (raw.isBlank() || target.isBlank()) return
+        runCatching {
+            quickDictionaryGateway?.save(
+                QuickDictionaryEntry(
+                    raw = raw,
+                    hanViet = "",
+                    target = target,
+                    type = type,
+                    scope = QuickDictionaryScope.PROJECT,
+                    scopeKey = bookUrl,
+                )
+            )
+        }
+    }
 
     suspend fun prepareForTranslation(
         book: Book,
@@ -481,6 +506,123 @@ class TranslationStoryMemoryUseCase(
         }
     }
 
+    suspend fun analyzeTextContent(
+        book: Book,
+        rawText: String,
+        preset: AiTaskPresetConfig,
+    ): Result<AiTranslationStoryAnalysis> {
+        val cleanText = rawText.trim()
+        if (cleanText.isBlank()) {
+            return Result.failure(IllegalArgumentException("Text to analyze is blank"))
+        }
+        val lock = bookLocks.getOrPut(book.bookUrl) { Mutex() }
+        return lock.withLock {
+            val snapshot = loadSnapshot(book.bookUrl)
+            val fakeChapter = BookChapter(
+                url = "custom_text:${System.currentTimeMillis()}",
+                title = "Văn bản bách khoa",
+                bookUrl = book.bookUrl,
+                index = -1,
+            )
+            val dictionary = snapshot.toDictionaryPairs()
+            val relevantDictionary = dictionary.asSequence()
+                .filter { it.original.isNotBlank() && cleanText.contains(it.original) }
+                .distinctBy { it.original.lowercase() }
+                .take(MAX_ANALYSIS_DICTIONARY_PAIRS)
+                .toList()
+            val qtDraft = runCatching {
+                quickTranslationGateway.translate(cleanText, relevantDictionary)
+            }.getOrDefault("")
+            val analysis = generateAnalysis(
+                preset = preset,
+                book = book,
+                chapter = fakeChapter,
+                source = cleanText,
+                qtDraft = qtDraft,
+                dictionary = relevantDictionary,
+                partIndex = 0,
+            ) ?: return@withLock Result.failure(Exception("AI did not return a valid story analysis"))
+            persistAnalysis(book.bookUrl, analysis, snapshot)
+            Result.success(analysis)
+        }
+    }
+
+    suspend fun batchAnalyzeChapters(
+        book: Book,
+        chapterRange: IntRange,
+        preset: AiTaskPresetConfig,
+        force: Boolean = false,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
+    ): Result<Int> {
+        val lock = bookLocks.getOrPut(book.bookUrl) { Mutex() }
+        return lock.withLock {
+            var snapshot = loadSnapshot(book.bookUrl)
+            val indices = chapterRange.filter { it >= 0 }
+            val total = indices.size
+            if (total == 0) return@withLock Result.success(0)
+            var completed = 0
+            indices.forEachIndexed { i, chapterIndex ->
+                onProgress?.invoke(i, total)
+                if (!force && chapterIndex in snapshot.analyzedChapterIndices) {
+                    completed++
+                    return@forEachIndexed
+                }
+                val chapter = cachedChapterGateway.getChapter(book.bookUrl, chapterIndex)
+                    ?: return@forEachIndexed
+                val content = cachedChapterGateway.getChapterContent(book, chapter)
+                    ?.takeIf(String::isNotBlank) ?: return@forEachIndexed
+                val analysis = analyzeChapter(
+                    book = book,
+                    chapter = chapter,
+                    content = content,
+                    preset = preset,
+                    dictionary = snapshot.toDictionaryPairs(),
+                ) ?: return@forEachIndexed
+                persistAnalysis(book.bookUrl, analysis, snapshot)
+                markChapterAnalyzed(book.bookUrl, chapter)
+                snapshot = loadSnapshot(book.bookUrl)
+                completed++
+                onProgress?.invoke(completed, total)
+            }
+            onProgress?.invoke(total, total)
+            Result.success(completed)
+        }
+    }
+
+    suspend fun retrofitChapterTranslations(
+        book: Book,
+        chapterIndices: List<Int>,
+        translateChapterUseCase: TranslateChapterUseCase,
+        provider: String = TranslationConfig.llmProvider,
+        targetLanguage: String = TranslationConfig.llmTargetLanguage,
+        onProgress: ((current: Int, total: Int) -> Unit)? = null,
+    ): Result<Int> {
+        val validIndices = chapterIndices.filter { it >= 0 }.distinct()
+        val total = validIndices.size
+        if (total == 0) return Result.success(0)
+        var retrofitted = 0
+        validIndices.forEachIndexed { idx, chapterIndex ->
+            onProgress?.invoke(idx, total)
+            val chapter = cachedChapterGateway.getChapter(book.bookUrl, chapterIndex)
+                ?: return@forEachIndexed
+            val translationResult = translateChapterUseCase.execute(
+                book = book,
+                bookChapter = chapter,
+                forceRetranslate = true,
+                provider = provider,
+                targetLanguage = targetLanguage,
+                onProgress = {},
+                onTranslateStarted = {},
+            )
+            if (translationResult.isSuccess) {
+                retrofitted++
+            }
+            onProgress?.invoke(idx + 1, total)
+        }
+        onProgress?.invoke(total, total)
+        return Result.success(retrofitted)
+    }
+
     fun observeBookSnapshot(bookUrl: String): Flow<AiTranslationStoryMemorySnapshot> =
         aiMemoryGateway.observeByScope(AiMemory.SCOPE_BOOK, bookUrl)
             .map { memories -> memories.toStorySnapshot() }
@@ -511,9 +653,11 @@ class TranslationStoryMemoryUseCase(
                 .filterKeys(String::isNotBlank)
                 .map { (bookUrl, bookMemories) ->
                     val snapshot = bookMemories.toStorySnapshot()
-                    val bookName = cachedChapterGateway.getBook(bookUrl)?.name
-                        ?.takeIf(String::isNotBlank) ?: bookUrl
-                    buildWikiSnapshot(bookUrl, bookName, snapshot)
+                    val book = cachedChapterGateway.getBook(bookUrl)
+                    val bookName = book?.name?.takeIf(String::isNotBlank) ?: bookUrl
+                    val bookAuthor = book?.author.orEmpty()
+                    val bookCoverUrl = book?.coverUrl.orEmpty()
+                    buildWikiSnapshot(bookUrl, bookName, snapshot, bookAuthor, bookCoverUrl)
                 }
                 .sortedBy { it.bookName.lowercase() }
         }
@@ -522,6 +666,8 @@ class TranslationStoryMemoryUseCase(
         bookUrl: String,
         bookName: String,
         snapshot: AiTranslationStoryMemorySnapshot,
+        bookAuthor: String = "",
+        bookCoverUrl: String = "",
     ): StoryWikiSnapshot {
         val glossary = snapshot.canonicalMemory.map { entry ->
             AiTranslationStoryWikiRecord(
@@ -547,6 +693,7 @@ class TranslationStoryMemoryUseCase(
                 senseKey = entry.senseKey,
                 category = entry.category,
                 description = entry.description,
+                metadata = entry.metadata,
             )
         }
         val timelines = snapshot.timelines
@@ -641,6 +788,8 @@ class TranslationStoryMemoryUseCase(
         return StoryWikiSnapshot(
             bookUrl = bookUrl,
             bookName = bookName,
+            bookAuthor = bookAuthor,
+            bookCoverUrl = bookCoverUrl,
             glossaryRecords = glossary,
             timelineRecords = timelines,
             relationshipTags = relationshipTags,
@@ -719,6 +868,7 @@ class TranslationStoryMemoryUseCase(
                     userEdited = entity.userEdited,
                     source = entity.source.toMemorySourceValue(),
                     updatedAt = memory.updatedAt,
+                    metadata = entity.metadata,
                 )
             }
         } + worldMemories.mapNotNull { memory ->
@@ -791,6 +941,8 @@ class TranslationStoryMemoryUseCase(
         raw: String,
         target: String,
         type: QuickDictionaryType,
+        memoryCategory: String = if (type == QuickDictionaryType.NAME) "CHARACTER" else "TERM",
+        description: String = "",
     ) {
         if (type == QuickDictionaryType.PHONETIC || type == QuickDictionaryType.IGNORE) return
         val cleanRaw = raw.trim()
@@ -806,7 +958,18 @@ class TranslationStoryMemoryUseCase(
             }
             return
         }
-        if (type == QuickDictionaryType.NAME) {
+        val isCharacter = memoryCategory.equals("CHARACTER", ignoreCase = true) ||
+            (memoryCategory.isBlank() && type == QuickDictionaryType.NAME)
+        val worldCat = when (memoryCategory.uppercase()) {
+            "FACTION" -> "faction"
+            "LOCATION" -> "location"
+            "ARTIFACT" -> "weapon"
+            "TECHNIQUE" -> "technique"
+            "REALM" -> "rank"
+            else -> "term"
+        }
+        val cleanDesc = description.trim()
+        if (isCharacter) {
             upsertEntity(
                 book.bookUrl,
                 AiTranslationStoryEntity(
@@ -814,6 +977,7 @@ class TranslationStoryMemoryUseCase(
                     target = cleanTarget,
                     type = "character",
                     category = "character",
+                    description = cleanDesc,
                     userEdited = true,
                     source = "QT",
                 ),
@@ -824,7 +988,8 @@ class TranslationStoryMemoryUseCase(
                 AiTranslationWorldEntry(
                     raw = cleanRaw,
                     target = cleanTarget,
-                    category = "term",
+                    category = worldCat,
+                    description = cleanDesc,
                     userEdited = true,
                     source = "QT",
                 ),
@@ -889,6 +1054,7 @@ class TranslationStoryMemoryUseCase(
                 )
             }
         }
+        syncToQuickDict(bookUrl, entityToWrite.raw, entityToWrite.target, QuickDictionaryType.NAME)
     }
 
     private suspend fun upsertWorldEntryUnlocked(
@@ -948,6 +1114,7 @@ class TranslationStoryMemoryUseCase(
                 )
             }
         }
+        syncToQuickDict(bookUrl, worldToWrite.raw, worldToWrite.target, QuickDictionaryType.VIETPHRASE)
     }
 
     private suspend fun deleteGlossaryIdentity(bookUrl: String, raw: String, senseKey: String) {
@@ -1140,7 +1307,7 @@ class TranslationStoryMemoryUseCase(
                     )
                 },
                 params = params,
-                taskType = AiTaskType.SUMMARIZE_CHAPTER,
+                taskType = preset.taskType.ifBlank { AiTaskType.EXTRACT_STORY_MEMORY },
                 routeProfileId = preset.runtimeOptions.routeProfileId,
                 routeSessionKey = "story-memory:${book.bookUrl}:${chapter.index}:$partIndex",
                 routeRetryOffset = attempt,

@@ -116,28 +116,71 @@ internal fun resolveQuickDictionarySelectionResult(
             confidence = 1f,
         )
     }
-    var translatedMatch = findTranslatedRange(
+    // Fast path: try exact Han-Viet reading match first within local searchWindow.
+    // Han-Viet phonetic lookup is O(N) direct map, order-of-magnitude faster than candidateTranslator Trie.
+    val fastHanVietRange = findHanVietRange(
         sourceText = source,
         selectedText = selection.text,
         searchWindow = searchWindow,
-        candidateTranslator = candidateTranslator,
-        candidatePhoneticReader = candidatePhoneticReader,
+        quickTranslationGateway = quickTranslationGateway,
     )
-    if (translatedMatch == null && source.length <= MAX_GLOBAL_ALIGNMENT_SOURCE_CHARS) {
-        translatedMatch = findTranslatedRange(
-                sourceText = source,
-                selectedText = selection.text,
-                searchWindow = searchWindow.expandedForFallback(source.length),
-                candidateTranslator = candidateTranslator,
-                candidatePhoneticReader = candidatePhoneticReader,
-            )
+    var translatedMatch = if (fastHanVietRange != null) {
+        val candidate = source.substring(fastHanVietRange)
+        val conf = mappingConfidence(
+            sourceCandidate = candidate,
+            selectedText = selection.text,
+            candidateTranslator = candidateTranslator,
+            candidatePhoneticReader = candidatePhoneticReader,
+        )
+        if (conf >= MappedSelection.HIGH_CONFIDENCE_MAPPING) {
+            ScoredRange(fastHanVietRange, 0, conf)
+        } else {
+            null
+        }
+    } else {
+        null
     }
-    val range = translatedMatch?.range ?: findHanVietRange(
+
+    if (translatedMatch == null) {
+        translatedMatch = findTranslatedRange(
             sourceText = source,
             selectedText = selection.text,
             searchWindow = searchWindow,
+            candidateTranslator = candidateTranslator,
+            candidatePhoneticReader = candidatePhoneticReader,
+        )
+    }
+    if (translatedMatch == null && source.length <= MAX_GLOBAL_ALIGNMENT_SOURCE_CHARS) {
+        val expandedWindow = searchWindow.expandedForFallback(source.length)
+        val expandedHanVietRange = findHanVietRange(
+            sourceText = source,
+            selectedText = selection.text,
+            searchWindow = expandedWindow,
             quickTranslationGateway = quickTranslationGateway,
         )
+        if (expandedHanVietRange != null) {
+            val candidate = source.substring(expandedHanVietRange)
+            val conf = mappingConfidence(
+                sourceCandidate = candidate,
+                selectedText = selection.text,
+                candidateTranslator = candidateTranslator,
+                candidatePhoneticReader = candidatePhoneticReader,
+            )
+            if (conf >= MappedSelection.HIGH_CONFIDENCE_MAPPING) {
+                translatedMatch = ScoredRange(expandedHanVietRange, 0, conf)
+            }
+        }
+        if (translatedMatch == null) {
+            translatedMatch = findTranslatedRange(
+                sourceText = source,
+                selectedText = selection.text,
+                searchWindow = expandedWindow,
+                candidateTranslator = candidateTranslator,
+                candidatePhoneticReader = candidatePhoneticReader,
+            )
+        }
+    }
+    val range = translatedMatch?.range ?: fastHanVietRange
         ?: if (source == display) {
             fallbackRange(source, selection.text, searchWindow.approximatePosition)
         } else {
@@ -326,9 +369,11 @@ private fun sourceSearchWindow(
 
 private fun SourceSearchWindow.expandedForFallback(sourceLength: Int): SourceSearchWindow {
     if (sourceLength <= 0) return this
+    val fallbackStart = (approximatePosition - SEARCH_RADIUS_FALLBACK).coerceAtLeast(0)
+    val fallbackEnd = (approximatePosition + SEARCH_RADIUS_FALLBACK).coerceAtMost(sourceLength - 1)
     return copy(
-        start = 0,
-        endInclusive = sourceLength - 1,
+        start = fallbackStart,
+        endInclusive = fallbackEnd,
     )
 }
 
@@ -621,6 +666,7 @@ private fun Char.isPhraseChar(): Boolean = isLetterOrDigit() ||
 
 private const val CONTEXT_CHARS = 400
 private const val SEARCH_RADIUS = 192
+private const val SEARCH_RADIUS_FALLBACK = 320
 private const val MAX_TRANSLATED_CANDIDATE_CHARS = 16
 private const val MAX_GLOBAL_ALIGNMENT_SOURCE_CHARS = 2_400
 private const val PARTIAL_MATCH_MIN_CHARS = 4

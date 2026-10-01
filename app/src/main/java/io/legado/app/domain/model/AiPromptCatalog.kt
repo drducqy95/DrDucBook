@@ -31,6 +31,7 @@ object AiPromptCatalog {
         AiTaskType.AUTHORING_DIRECTOR,
         AiTaskType.AUTHORING_WRITER,
         AiTaskType.GENERATE_STORY_IMAGE,
+        AiTaskType.EXTRACT_STORY_MEMORY,
     )
 
     val templates: List<AiPromptCatalogTemplate> = listOf(
@@ -379,6 +380,13 @@ object AiPromptCatalog {
             name = "Minh họa Wiki truyện",
             description = "Tạo ảnh nhân vật, trang bị, công pháp và bản đồ từ dữ kiện đã xác thực.",
             prompt = AiPromptTemplate.DEFAULT_STORY_IMAGE,
+        ),
+        AiPromptCatalogTemplate(
+            id = "extract_story_memory_v1",
+            taskType = AiTaskType.EXTRACT_STORY_MEMORY,
+            name = "Trích xuất Bách khoa & Bộ nhớ dịch",
+            description = "Tự động phân tích nhân vật, quan hệ, thế giới quan, dòng thời gian chuẩn JSON bách khoa.",
+            prompt = AiPromptTemplate.DEFAULT_EXTRACT_STORY_MEMORY,
         ),
     )
 

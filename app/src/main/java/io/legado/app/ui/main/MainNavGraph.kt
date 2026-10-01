@@ -199,7 +199,7 @@ fun MainActivity.mainEntryProvider(
                 onNavigateToRoute(MainRouteRss)
             },
             onNavigateToStoryWiki = {
-                onNavigateToRoute(MainRouteStoryWiki)
+                onNavigateToRoute(MainRouteStoryWiki())
             },
             onNavigateToSearch = { key ->
                 onNavigateToRoute(
@@ -1092,8 +1092,9 @@ fun MainActivity.mainEntryProvider(
         )
     }
 
-    entry<MainRouteStoryWiki> {
+    entry<MainRouteStoryWiki> { route ->
         StoryWikiRouteScreen(
+            initialBookUrl = route.bookUrl,
             onBack = { onNavigateBack() },
             onOpenBook = { bookUrl, bookName ->
                 onNavigateToRoute(

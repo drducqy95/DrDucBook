@@ -141,4 +141,84 @@ class AiTranslationStoryMemoryTest {
         assertEquals(QuickDictionaryType.NAME, pairs.first { it.original == "大梦学宫" }.type)
         assertEquals(QuickDictionaryType.TERM, pairs.first { it.original == "青锋剑" }.type)
     }
+
+    @Test
+    fun memoryDictionaryIncludesBothEntitiesAndWorldBuilding() {
+        val context = AiTranslationStoryContext(
+            entityDictionary = listOf(
+                DictPair(original = "韩立", translation = "Hàn Lập", type = QuickDictionaryType.NAME),
+            ),
+            currentWorldBuilding = listOf(
+                AiTranslationWorldEntry("掌天瓶", "Chưởng Thiên Bình", category = "artifact"),
+                AiTranslationWorldEntry("青元剑诀", "Thanh Nguyên Kiếm Quyết", category = "technique"),
+            ),
+        )
+
+        val dict = context.memoryDictionary
+        assertEquals(3, dict.size)
+        assertTrue(dict.any { it.original == "韩立" && it.translation == "Hàn Lập" })
+        assertTrue(dict.any { it.original == "掌天瓶" && it.translation == "Chưởng Thiên Bình" })
+        assertTrue(dict.any { it.original == "青元剑诀" && it.translation == "Thanh Nguyên Kiếm Quyết" })
+    }
+
+    @Test
+    fun characterDossierProfileSerializesAndDeserializesRoundTrip() {
+        val profile = CharacterProfileDetails(
+            identity = "Đệ tử Thất Huyền Môn, đệ nhất tu sĩ Nhân giới",
+            appearance = "Dáng người bình thường, da dẻ hơi ngăm đen",
+            personality = "Cẩn thận, tỉ mỉ, tâm cơ thâm trầm, quyết đoán",
+            aptitude = "Tứ linh căn (ngụy linh căn)",
+            realm = "Đại Thừa kỳ",
+            sect = "Thanh Nguyên Tông, Lạc Vân Tông",
+            titles = listOf("Hàn Chạy Nhanh", "Hàn Lão Ma"),
+            artifacts = listOf("Chưởng Thiên Bình", "Thanh Trúc Phong Vân Kiếm"),
+            techniques = listOf("Thanh Nguyên Kiếm Quyết", "Đại Diễn Quyết"),
+            divineAbilities = listOf("Tích Tà Thần Lôi", "Minh Vương Thân"),
+            spiritBeasts = listOf("Phệ Kim Trùng", "Đề Hồn Thú"),
+        )
+
+        val entity = AiTranslationStoryEntity(
+            raw = "韩立",
+            target = "Hàn Lập",
+            type = "character",
+        ).withCharacterProfile(profile)
+
+        assertTrue(entity.metadata.isNotBlank())
+        val decoded = entity.characterProfile()
+        assertEquals(profile.identity, decoded?.identity)
+        assertEquals(profile.personality, decoded?.personality)
+        assertEquals(profile.realm, decoded?.realm)
+        assertEquals(profile.sect, decoded?.sect)
+        assertEquals(listOf("Hàn Chạy Nhanh", "Hàn Lão Ma"), decoded?.titles)
+        assertEquals(listOf("Chưởng Thiên Bình", "Thanh Trúc Phong Vân Kiếm"), decoded?.artifacts)
+        assertEquals(listOf("Phệ Kim Trùng", "Đề Hồn Thú"), decoded?.spiritBeasts)
+    }
+
+    @Test
+    fun legacyEntityWithoutMetadataReturnsNullProfileSafely() {
+        val entity = AiTranslationStoryEntity(
+            raw = "韩立",
+            target = "Hàn Lập",
+            type = "character",
+            metadata = "",
+        )
+        val profile = entity.characterProfile()
+        org.junit.Assert.assertNull(profile)
+    }
+
+    @Test
+    fun relationshipModelPreservesSubjectObjectDistinction() {
+        val rel = AiTranslationStoryRelationship(
+            source = "韩立",
+            target = "厉飞雨",
+            relationship = "Bằng hữu sinh tử",
+            description = "Hai người quen nhau từ lúc ở Thất Huyền Môn",
+            chapterIndex = 12,
+        )
+
+        assertEquals("韩立", rel.source)
+        assertEquals("厉飞雨", rel.target)
+        assertEquals("Bằng hữu sinh tử", rel.relationship)
+        assertEquals("Hai người quen nhau từ lúc ở Thất Huyền Môn", rel.description)
+    }
 }

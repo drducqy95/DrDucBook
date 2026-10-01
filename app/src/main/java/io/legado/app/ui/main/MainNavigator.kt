@@ -253,8 +253,17 @@ object MainNavigator {
             MainRouteReadRecord,
             MainRouteWriting,
             MainRouteEbookEditor,
-            MainRouteRss,
-            MainRouteStoryWiki -> {
+            MainRouteRss -> {
+                if (currentRoute == MainRouteHome) {
+                    backStack.add(route)
+                } else {
+                    backStack.clear()
+                    backStack.add(MainRouteHome)
+                    backStack.add(route)
+                }
+            }
+
+            is MainRouteStoryWiki -> {
                 if (currentRoute == MainRouteHome) {
                     backStack.add(route)
                 } else {
@@ -375,7 +384,9 @@ object MainNavigator {
             MainRouteConst.ROUTE_WRITING -> MainRouteWriting
             MainRouteConst.ROUTE_EBOOK_EDITOR -> MainRouteEbookEditor
             MainRouteConst.ROUTE_RSS -> MainRouteRss
-            MainRouteConst.ROUTE_STORY_WIKI -> MainRouteStoryWiki
+            MainRouteConst.ROUTE_STORY_WIKI -> MainRouteStoryWiki(
+                bookUrl = intent?.getStringExtra(MainIntent.EXTRA_BOOK_URL)
+            )
             MainRouteConst.ROUTE_SETTINGS_CUSTOM_THEME -> MainRouteSettingsCustomTheme
             MainRouteConst.ROUTE_SETTINGS_DOWNLOAD_CACHE -> MainRouteSettingsDownloadCache
             MainRouteConst.ROUTE_SETTINGS_TRANSLATION -> MainRouteSettingsTranslation

@@ -40,6 +40,7 @@ data class StoryMemoryEditorDraft(
     val imagePath: String = "",
     val imagePrompt: String = "",
     val imageUpdatedAt: Long = 0L,
+    val metadata: String = "",
     val selectedProvider: String = TranslationConstants.PROVIDER_QUICK_TRANSLATOR,
     val suggestions: ImmutableList<TranslationSuggestionUi> = persistentListOf(),
     val isSuggesting: Boolean = false,
@@ -53,11 +54,44 @@ data class TranslationSuggestionUi(
 )
 
 @Stable
+data class AiStoryMemoryBuilderDialogState(
+    val isOpen: Boolean = false,
+    val mode: Int = MODE_CHAPTERS,
+    val startChapter: Int = 0,
+    val endChapter: Int = 10,
+    val maxChapters: Int = 0,
+    val directText: String = "",
+    val isRunning: Boolean = false,
+    val progressCurrent: Int = 0,
+    val progressTotal: Int = 0,
+    val progressMessage: String = "",
+) {
+    companion object {
+        const val MODE_CHAPTERS = 0
+        const val MODE_CUSTOM_TEXT = 1
+    }
+}
+
+@Stable
+data class RetrofitCacheDialogState(
+    val isOpen: Boolean = false,
+    val startChapter: Int = 0,
+    val endChapter: Int = 10,
+    val maxChapters: Int = 0,
+    val isRunning: Boolean = false,
+    val progressCurrent: Int = 0,
+    val progressTotal: Int = 0,
+    val progressMessage: String = "",
+)
+
+@Stable
 data class BookStoryMemoryUiState(
     val loading: Boolean = true,
     val selectedKind: AiTranslationStoryMemoryKind? = null,
     val items: ImmutableList<StoryMemoryItemUi> = persistentListOf(),
     val editor: StoryMemoryEditorDraft? = null,
+    val builderDialog: AiStoryMemoryBuilderDialogState = AiStoryMemoryBuilderDialogState(),
+    val retrofitDialog: RetrofitCacheDialogState = RetrofitCacheDialogState(),
     val saving: Boolean = false,
     val errorMessage: String? = null,
     val counts: ImmutableMap<AiTranslationStoryMemoryKind, Int> = persistentMapOf(),
@@ -83,6 +117,16 @@ sealed interface BookStoryMemoryIntent {
     data object RetryPending : BookStoryMemoryIntent
     data object BackfillCachedChapters : BookStoryMemoryIntent
     data class ImportJson(val content: String) : BookStoryMemoryIntent
+
+    data object OpenAiBuilderDialog : BookStoryMemoryIntent
+    data class UpdateAiBuilderDialog(val value: AiStoryMemoryBuilderDialogState) : BookStoryMemoryIntent
+    data object DismissAiBuilderDialog : BookStoryMemoryIntent
+    data object ExecuteAiBuilder : BookStoryMemoryIntent
+
+    data object OpenRetrofitDialog : BookStoryMemoryIntent
+    data class UpdateRetrofitDialog(val value: RetrofitCacheDialogState) : BookStoryMemoryIntent
+    data object DismissRetrofitDialog : BookStoryMemoryIntent
+    data object ExecuteRetrofit : BookStoryMemoryIntent
 }
 
 sealed interface BookStoryMemoryEffect {

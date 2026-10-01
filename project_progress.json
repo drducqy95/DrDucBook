@@ -1,10 +1,10 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-01T11:55:00.000000",
-    "overall_progress_percent": 96,
-    "current_phase": "Phase 44 - OpenCode Zen Fix, Gemini Web Auto, Web Pool Isolation & Route Protection",
-    "status": "IN_PROGRESS",
+    "last_updated": "2026-10-01T17:42:00.000000",
+    "overall_progress_percent": 100,
+    "current_phase": "Phase 45 - Story Memory, Wiki & Translation Cache System Overhaul",
+    "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
@@ -1674,6 +1674,54 @@
         {
           "id": "T44.5",
           "desc": "Phase 05 - Unit Testing, Regression Verification & Kotlin Build Check",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P45",
+      "name": "Story Memory, Wiki & Translation Cache System Overhaul",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T45.1",
+          "desc": "Phase 01 - Fix Relationship logic and labels (Entity 1 - Entity 2 - Type - Description)",
+          "status": "DONE"
+        },
+        {
+          "id": "T45.2",
+          "desc": "Phase 02 - Optimize QuickDictionary selection resolver speed and clarify Memory destination category",
+          "status": "DONE"
+        },
+        {
+          "id": "T45.2b",
+          "desc": "Phase 02b - QuickDictionary UI Compaction (FilterChip → ExposedDropdownMenuBox, reduce ~250dp scroll)",
+          "status": "DONE"
+        },
+        {
+          "id": "T45.3",
+          "desc": "Phase 03 - Cross-provider memory synchronization + fix memoryDictionary getter + SyncUseCase",
+          "status": "DONE"
+        },
+        {
+          "id": "T45.4",
+          "desc": "Phase 04 - Hierarchical Story Wiki (Book-First Master-Detail view)",
+          "status": "DONE"
+        },
+        {
+          "id": "T45.5",
+          "desc": "Phase 05 - Rich Character Dossier system (Anime Library Han Li encyclopedia schema)",
+          "status": "DONE"
+        },
+        {
+          "id": "T45.6",
+          "desc": "Phase 06 - Dedicated AI/manual story memory builder and cache retrofit for earlier chapters",
+          "status": "DONE"
+        },
+        {
+          "id": "T45.7",
+          "desc": "Phase 07 - Comprehensive unit testing, debug compilation, and Huawei device verification",
           "status": "DONE"
         }
       ]

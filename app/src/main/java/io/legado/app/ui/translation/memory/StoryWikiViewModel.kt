@@ -40,7 +40,6 @@ class StoryWikiViewModel(
                     allSnapshots = snapshots
                     val selected = _uiState.value.selectedBookUrl
                         ?.takeIf { url -> snapshots.any { it.bookUrl == url } }
-                        ?: snapshots.firstOrNull()?.bookUrl
                     _uiState.update { it.copy(books = snapshots.toImmutableList(), selectedBookUrl = selected) }
                     publishFilteredRecords()
                 }
@@ -59,6 +58,18 @@ class StoryWikiViewModel(
                         selectedBookUrl = intent.value,
                         selectedRecord = null,
                         selectedGraphNode = null,
+                        query = "",
+                    )
+                }
+                publishFilteredRecords()
+            }
+            StoryWikiIntent.BackToBookList -> {
+                _uiState.update {
+                    it.copy(
+                        selectedBookUrl = null,
+                        selectedRecord = null,
+                        selectedGraphNode = null,
+                        query = "",
                     )
                 }
                 publishFilteredRecords()

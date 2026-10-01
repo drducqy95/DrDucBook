@@ -36,6 +36,7 @@ data class StoryWikiUiState(
 sealed interface StoryWikiIntent {
     data class ChangeQuery(val value: String) : StoryWikiIntent
     data class SelectBook(val value: String?) : StoryWikiIntent
+    data object BackToBookList : StoryWikiIntent
     data class SelectTab(val value: StoryWikiTab) : StoryWikiIntent
     data class SelectRecord(val value: AiTranslationStoryWikiRecord) : StoryWikiIntent
     data class SelectGraphNode(val value: String) : StoryWikiIntent

@@ -18,19 +18,28 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,7 +62,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drducbook.app.R
 import coil.compose.AsyncImage
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
+import io.legado.app.domain.model.CharacterProfileDetails
 import io.legado.app.domain.model.TranslationConstants
+import io.legado.app.utils.GSON
 import io.legado.app.ui.translation.TranslationCaseControls
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBar
@@ -199,13 +210,53 @@ fun BookStoryMemoryScreen(
                         BookMemoryKindChip(kind, state.selectedKind, onIntent)
                     }
                 }
-                if (state.pendingChapterCount > 0) {
-                    TextButton(onClick = { onIntent(BookStoryMemoryIntent.RetryPending) }) {
-                        Text("Ghi lại memory đang chờ")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilledTonalButton(
+                        onClick = { onIntent(BookStoryMemoryIntent.OpenAiBuilderDialog) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.story_memory_btn_builder),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FilledTonalButton(
+                        onClick = { onIntent(BookStoryMemoryIntent.OpenRetrofitDialog) },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.story_memory_btn_retrofit),
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
-                TextButton(onClick = { onIntent(BookStoryMemoryIntent.BackfillCachedChapters) }) {
-                    Text("Phân tích các chương đã lưu")
+                if (state.pendingChapterCount > 0) {
+                    TextButton(onClick = { onIntent(BookStoryMemoryIntent.RetryPending) }) {
+                        Text("Ghi lại ${state.pendingChapterCount} memory đang chờ")
+                    }
                 }
             }
             when {
@@ -269,6 +320,22 @@ fun BookStoryMemoryScreen(
             onDismiss = { onIntent(BookStoryMemoryIntent.DismissEditor) },
         )
     }
+    if (state.builderDialog.isOpen) {
+        AiStoryMemoryBuilderDialog(
+            state = state.builderDialog,
+            onUpdate = { onIntent(BookStoryMemoryIntent.UpdateAiBuilderDialog(it)) },
+            onExecute = { onIntent(BookStoryMemoryIntent.ExecuteAiBuilder) },
+            onDismiss = { onIntent(BookStoryMemoryIntent.DismissAiBuilderDialog) },
+        )
+    }
+    if (state.retrofitDialog.isOpen) {
+        RetrofitCacheDialog(
+            state = state.retrofitDialog,
+            onUpdate = { onIntent(BookStoryMemoryIntent.UpdateRetrofitDialog(it)) },
+            onExecute = { onIntent(BookStoryMemoryIntent.ExecuteRetrofit) },
+            onDismiss = { onIntent(BookStoryMemoryIntent.DismissRetrofitDialog) },
+        )
+    }
 }
 
 @Composable
@@ -302,27 +369,109 @@ private fun StoryMemoryEditorDialog(
                             .clip(RoundedCornerShape(12.dp)),
                     )
                 }
-                EditorField(draft.primary, { onChange(draft.copy(primary = it)) },
-                    if (draft.kind == AiTranslationStoryMemoryKind.TIMELINE) {
-                        stringResource(R.string.story_memory_chapter_title)
-                    } else stringResource(R.string.story_memory_raw))
-                if (draft.kind != AiTranslationStoryMemoryKind.TIMELINE) {
-                    EditorField(draft.secondary, { onChange(draft.copy(secondary = it)) },
-                        stringResource(R.string.story_memory_target))
-                    EditorField(
-                        draft.senseKey,
-                        { onChange(draft.copy(senseKey = it)) },
-                        stringResource(R.string.story_memory_sense_key),
-                    )
-                    TranslationCaseControls(
-                        value = draft.secondary,
-                        onValueChange = { onChange(draft.copy(secondary = it)) },
-                    )
-                    if (draft.kind in setOf(
-                            AiTranslationStoryMemoryKind.ENTITY,
-                            AiTranslationStoryMemoryKind.WORLD_BUILDING,
+                when (draft.kind) {
+                    AiTranslationStoryMemoryKind.RELATIONSHIP -> {
+                        EditorField(
+                            value = draft.primary,
+                            onValueChange = { onChange(draft.copy(primary = it)) },
+                            label = stringResource(R.string.story_memory_rel_entity_source),
                         )
-                    ) {
+                        EditorField(
+                            value = draft.secondary,
+                            onValueChange = { onChange(draft.copy(secondary = it)) },
+                            label = stringResource(R.string.story_memory_rel_entity_target),
+                        )
+                        EditorField(
+                            value = draft.type,
+                            onValueChange = { onChange(draft.copy(type = it)) },
+                            label = stringResource(R.string.story_memory_rel_type),
+                        )
+                        val relationshipPresets = listOf(
+                            "Sư đồ", "Huynh đệ", "Tỷ muội", "Đạo lữ", "Đồng minh", "Kẻ thù", "Chủ tớ", "Môn đồ", "Bằng hữu"
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            relationshipPresets.forEach { preset ->
+                                FilterChip(
+                                    selected = draft.type == preset,
+                                    onClick = { onChange(draft.copy(type = preset)) },
+                                    label = { Text(preset) },
+                                )
+                            }
+                        }
+                        EditorField(
+                            value = draft.description,
+                            onValueChange = { onChange(draft.copy(description = it)) },
+                            label = stringResource(R.string.story_memory_rel_description),
+                            singleLine = false,
+                        )
+                        EditorField(
+                            value = draft.chapterIndexText,
+                            onValueChange = { onChange(draft.copy(chapterIndexText = it)) },
+                            label = stringResource(R.string.story_memory_chapter_index),
+                            keyboardType = KeyboardType.Number,
+                        )
+                    }
+                    AiTranslationStoryMemoryKind.TIMELINE -> {
+                        EditorField(
+                            value = draft.primary,
+                            onValueChange = { onChange(draft.copy(primary = it)) },
+                            label = stringResource(R.string.story_memory_chapter_title),
+                        )
+                        EditorField(
+                            value = draft.description,
+                            onValueChange = { onChange(draft.copy(description = it)) },
+                            label = stringResource(R.string.story_memory_description),
+                            singleLine = false,
+                        )
+                        EditorField(
+                            value = draft.chapterIndexText,
+                            onValueChange = { onChange(draft.copy(chapterIndexText = it)) },
+                            label = stringResource(R.string.story_memory_chapter_index),
+                            keyboardType = KeyboardType.Number,
+                        )
+                        EditorField(
+                            value = draft.eventsText,
+                            onValueChange = { onChange(draft.copy(eventsText = it)) },
+                            label = stringResource(R.string.story_memory_events),
+                            singleLine = false,
+                        )
+                        EditorField(
+                            value = draft.charactersText,
+                            onValueChange = { onChange(draft.copy(charactersText = it)) },
+                            label = stringResource(R.string.story_memory_characters_hint),
+                            singleLine = false,
+                        )
+                        EditorField(
+                            value = draft.discoveriesText,
+                            onValueChange = { onChange(draft.copy(discoveriesText = it)) },
+                            label = stringResource(R.string.story_memory_discoveries_hint),
+                            singleLine = false,
+                        )
+                    }
+                    AiTranslationStoryMemoryKind.ENTITY,
+                    AiTranslationStoryMemoryKind.WORLD_BUILDING -> {
+                        EditorField(
+                            value = draft.primary,
+                            onValueChange = { onChange(draft.copy(primary = it)) },
+                            label = stringResource(R.string.story_memory_raw),
+                        )
+                        EditorField(
+                            value = draft.secondary,
+                            onValueChange = { onChange(draft.copy(secondary = it)) },
+                            label = stringResource(R.string.story_memory_target),
+                        )
+                        EditorField(
+                            value = draft.senseKey,
+                            onValueChange = { onChange(draft.copy(senseKey = it)) },
+                            label = stringResource(R.string.story_memory_sense_key),
+                        )
+                        TranslationCaseControls(
+                            value = draft.secondary,
+                            onValueChange = { onChange(draft.copy(secondary = it)) },
+                        )
                         Text(
                             text = stringResource(R.string.quick_dictionary_translation_provider),
                         )
@@ -354,49 +503,136 @@ private fun StoryMemoryEditorDialog(
                                 }
                             }
                         }
+                        EditorField(
+                            value = draft.type,
+                            onValueChange = { onChange(draft.copy(type = it)) },
+                            label = stringResource(R.string.story_memory_type),
+                        )
+                        EditorField(
+                            value = draft.description,
+                            onValueChange = { onChange(draft.copy(description = it)) },
+                            label = stringResource(R.string.story_memory_description),
+                            singleLine = false,
+                        )
+                        EditorField(
+                            value = draft.chapterIndexText,
+                            onValueChange = { onChange(draft.copy(chapterIndexText = it)) },
+                            label = stringResource(R.string.story_memory_chapter_index),
+                            keyboardType = KeyboardType.Number,
+                        )
+                        if (draft.kind == AiTranslationStoryMemoryKind.ENTITY) {
+                            EditorField(
+                                value = draft.aliasesOrRefsText,
+                                onValueChange = { onChange(draft.copy(aliasesOrRefsText = it)) },
+                                label = stringResource(R.string.story_memory_aliases_refs),
+                                singleLine = false,
+                            )
+                            EditorField(
+                                value = draft.gender,
+                                onValueChange = { onChange(draft.copy(gender = it)) },
+                                label = stringResource(R.string.story_memory_gender),
+                            )
+                            EditorField(
+                                value = draft.rank,
+                                onValueChange = { onChange(draft.copy(rank = it)) },
+                                label = stringResource(R.string.story_memory_rank),
+                            )
+
+                            var showProfileFields by remember { mutableStateOf(false) }
+                            val profile = remember(draft.metadata) {
+                                draft.metadata.takeIf { it.startsWith("{") }?.let {
+                                    try { GSON.fromJson(it, CharacterProfileDetails::class.java) } catch (_: Throwable) { null }
+                                } ?: CharacterProfileDetails()
+                            }
+
+                            TextButton(
+                                onClick = { showProfileFields = !showProfileFields },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    if (showProfileFields) {
+                                        "▲ " + stringResource(R.string.character_dossier_profile_section)
+                                    } else {
+                                        "▼ " + stringResource(R.string.character_dossier_profile_section)
+                                    }
+                                )
+                            }
+
+                            if (showProfileFields) {
+                                EditorField(
+                                    value = profile.realm,
+                                    onValueChange = {
+                                        val updated = profile.copy(realm = it)
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_realm),
+                                )
+                                EditorField(
+                                    value = profile.sect,
+                                    onValueChange = {
+                                        val updated = profile.copy(sect = it)
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_sect),
+                                )
+                                EditorField(
+                                    value = profile.titles.joinToString(", "),
+                                    onValueChange = {
+                                        val updated = profile.copy(titles = it.split(",").map(String::trim).filter(String::isNotBlank))
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_titles),
+                                )
+                                EditorField(
+                                    value = profile.artifacts.joinToString(", "),
+                                    onValueChange = {
+                                        val updated = profile.copy(artifacts = it.split(",").map(String::trim).filter(String::isNotBlank))
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_artifacts),
+                                )
+                                EditorField(
+                                    value = profile.techniques.joinToString(", "),
+                                    onValueChange = {
+                                        val updated = profile.copy(techniques = it.split(",").map(String::trim).filter(String::isNotBlank))
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_techniques),
+                                )
+                                EditorField(
+                                    value = profile.aptitude,
+                                    onValueChange = {
+                                        val updated = profile.copy(aptitude = it)
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_aptitude),
+                                )
+                                EditorField(
+                                    value = profile.personality,
+                                    onValueChange = {
+                                        val updated = profile.copy(personality = it)
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_personality),
+                                )
+                                EditorField(
+                                    value = profile.appearance,
+                                    onValueChange = {
+                                        val updated = profile.copy(appearance = it)
+                                        onChange(draft.copy(metadata = GSON.toJson(updated)))
+                                    },
+                                    label = stringResource(R.string.character_dossier_appearance),
+                                )
+                            }
+                        } else {
+                            EditorField(
+                                value = draft.aliasesOrRefsText,
+                                onValueChange = { onChange(draft.copy(aliasesOrRefsText = it)) },
+                                label = stringResource(R.string.story_memory_aliases_refs),
+                                singleLine = false,
+                            )
+                        }
                     }
-                    EditorField(draft.type, { onChange(draft.copy(type = it)) },
-                        stringResource(R.string.story_memory_type))
-                }
-                EditorField(
-                    draft.description,
-                    { onChange(draft.copy(description = it)) },
-                    stringResource(R.string.story_memory_description),
-                    singleLine = false,
-                )
-                EditorField(
-                    draft.chapterIndexText,
-                    { onChange(draft.copy(chapterIndexText = it)) },
-                    stringResource(R.string.story_memory_chapter_index),
-                    keyboardType = KeyboardType.Number,
-                )
-                when (draft.kind) {
-                    AiTranslationStoryMemoryKind.ENTITY -> {
-                        EditorField(draft.aliasesOrRefsText,
-                            { onChange(draft.copy(aliasesOrRefsText = it)) },
-                            stringResource(R.string.story_memory_aliases_refs), false)
-                        EditorField(draft.gender, { onChange(draft.copy(gender = it)) },
-                            stringResource(R.string.story_memory_gender))
-                        EditorField(draft.rank, { onChange(draft.copy(rank = it)) },
-                            stringResource(R.string.story_memory_rank))
-                    }
-                    AiTranslationStoryMemoryKind.WORLD_BUILDING -> EditorField(
-                        draft.aliasesOrRefsText,
-                        { onChange(draft.copy(aliasesOrRefsText = it)) },
-                        stringResource(R.string.story_memory_aliases_refs),
-                        false,
-                    )
-                    AiTranslationStoryMemoryKind.TIMELINE -> {
-                        EditorField(draft.eventsText, { onChange(draft.copy(eventsText = it)) },
-                            stringResource(R.string.story_memory_events), false)
-                        EditorField(draft.charactersText,
-                            { onChange(draft.copy(charactersText = it)) },
-                            stringResource(R.string.story_memory_characters_hint), false)
-                        EditorField(draft.discoveriesText,
-                            { onChange(draft.copy(discoveriesText = it)) },
-                            stringResource(R.string.story_memory_discoveries_hint), false)
-                    }
-                    AiTranslationStoryMemoryKind.RELATIONSHIP -> Unit
                 }
                 if (
                     draft.originalId != null &&
@@ -472,3 +708,264 @@ private fun AiTranslationStoryMemoryKind?.label(): String = stringResource(
         AiTranslationStoryMemoryKind.TIMELINE -> R.string.story_memory_timeline
     }
 )
+
+@Composable
+private fun AiStoryMemoryBuilderDialog(
+    state: AiStoryMemoryBuilderDialogState,
+    onUpdate: (AiStoryMemoryBuilderDialogState) -> Unit,
+    onExecute: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.story_memory_ai_builder_title))
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.story_memory_ai_builder_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilterChip(
+                        selected = state.mode == AiStoryMemoryBuilderDialogState.MODE_CHAPTERS,
+                        onClick = { onUpdate(state.copy(mode = AiStoryMemoryBuilderDialogState.MODE_CHAPTERS)) },
+                        label = { Text(stringResource(R.string.story_memory_builder_mode_chapters)) },
+                        enabled = !state.isRunning,
+                    )
+                    FilterChip(
+                        selected = state.mode == AiStoryMemoryBuilderDialogState.MODE_CUSTOM_TEXT,
+                        onClick = { onUpdate(state.copy(mode = AiStoryMemoryBuilderDialogState.MODE_CUSTOM_TEXT)) },
+                        label = { Text(stringResource(R.string.story_memory_builder_mode_text)) },
+                        enabled = !state.isRunning,
+                    )
+                }
+
+                if (state.mode == AiStoryMemoryBuilderDialogState.MODE_CHAPTERS) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = state.startChapter.toString(),
+                            onValueChange = { str ->
+                                str.toIntOrNull()?.let { onUpdate(state.copy(startChapter = it)) }
+                            },
+                            label = { Text(stringResource(R.string.story_memory_start_chapter)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            enabled = !state.isRunning,
+                            singleLine = true,
+                        )
+                        OutlinedTextField(
+                            value = state.endChapter.toString(),
+                            onValueChange = { str ->
+                                str.toIntOrNull()?.let { onUpdate(state.copy(endChapter = it)) }
+                            },
+                            label = { Text(stringResource(R.string.story_memory_end_chapter)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            enabled = !state.isRunning,
+                            singleLine = true,
+                        )
+                    }
+                    if (state.maxChapters > 0) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            SuggestionChip(
+                                onClick = { onUpdate(state.copy(startChapter = 0, endChapter = minOf(10, state.maxChapters))) },
+                                label = { Text("10 chương đầu") },
+                                enabled = !state.isRunning,
+                            )
+                            SuggestionChip(
+                                onClick = { onUpdate(state.copy(startChapter = 0, endChapter = state.maxChapters)) },
+                                label = { Text("Tất cả (${state.maxChapters} ch)") },
+                                enabled = !state.isRunning,
+                            )
+                        }
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = state.directText,
+                        onValueChange = { onUpdate(state.copy(directText = it)) },
+                        placeholder = { Text(stringResource(R.string.story_memory_custom_text_hint)) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp, max = 200.dp),
+                        enabled = !state.isRunning,
+                        minLines = 4,
+                        maxLines = 8,
+                    )
+                }
+
+                if (state.isRunning) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        LinearProgressIndicator(
+                            progress = {
+                                if (state.progressTotal > 0) {
+                                    state.progressCurrent.toFloat() / state.progressTotal.toFloat()
+                                } else 0f
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            text = state.progressMessage.ifBlank { stringResource(R.string.story_memory_builder_running) },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onExecute,
+                enabled = !state.isRunning && (state.mode == AiStoryMemoryBuilderDialogState.MODE_CHAPTERS || state.directText.isNotBlank()),
+            ) {
+                Text(stringResource(R.string.story_memory_execute_builder))
+            }
+        },
+        dismissButton = {
+            if (!state.isRunning) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        },
+    )
+}
+
+@Composable
+private fun RetrofitCacheDialog(
+    state: RetrofitCacheDialogState,
+    onUpdate: (RetrofitCacheDialogState) -> Unit,
+    onExecute: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Sync,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.story_memory_retrofit_title))
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.story_memory_retrofit_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = state.startChapter.toString(),
+                        onValueChange = { str ->
+                            str.toIntOrNull()?.let { onUpdate(state.copy(startChapter = it)) }
+                        },
+                        label = { Text(stringResource(R.string.story_memory_start_chapter)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.isRunning,
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = state.endChapter.toString(),
+                        onValueChange = { str ->
+                            str.toIntOrNull()?.let { onUpdate(state.copy(endChapter = it)) }
+                        },
+                        label = { Text(stringResource(R.string.story_memory_end_chapter)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        enabled = !state.isRunning,
+                        singleLine = true,
+                    )
+                }
+                if (state.maxChapters > 0) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        SuggestionChip(
+                            onClick = { onUpdate(state.copy(startChapter = 0, endChapter = minOf(10, state.maxChapters))) },
+                            label = { Text("10 chương đầu") },
+                            enabled = !state.isRunning,
+                        )
+                        SuggestionChip(
+                            onClick = { onUpdate(state.copy(startChapter = 0, endChapter = state.maxChapters)) },
+                            label = { Text("Tất cả (${state.maxChapters} ch)") },
+                            enabled = !state.isRunning,
+                        )
+                    }
+                }
+                if (state.isRunning) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        LinearProgressIndicator(
+                            progress = {
+                                if (state.progressTotal > 0) {
+                                    state.progressCurrent.toFloat() / state.progressTotal.toFloat()
+                                } else 0f
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            text = state.progressMessage.ifBlank { stringResource(R.string.story_memory_retrofit_running) },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onExecute,
+                enabled = !state.isRunning && (state.endChapter > state.startChapter),
+            ) {
+                Text(stringResource(R.string.story_memory_execute_retrofit))
+            }
+        },
+        dismissButton = {
+            if (!state.isRunning) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        },
+    )
+}

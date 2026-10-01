@@ -308,6 +308,7 @@ class AiProfileRepository(
                 AiTaskType.TRANSLATE_CHAPTER -> DEFAULT_TRANSLATE_PRESET_ID
                 AiTaskType.SUMMARIZE_CHAPTER -> DEFAULT_SUMMARY_PRESET_ID
                 AiTaskType.CHAT -> DEFAULT_CHAT_PRESET_ID
+                AiTaskType.EXTRACT_STORY_MEMORY -> DEFAULT_EXTRACT_STORY_MEMORY_PRESET_ID
                 else -> newId("preset")
             }
             val modelsList = aiProfileDao.observeModels().firstOrNull()
@@ -327,6 +328,7 @@ class AiProfileRepository(
                     AiTaskType.TRANSLATE_CHAPTER -> "Default Translation"
                     AiTaskType.SUMMARIZE_CHAPTER -> "Default Chapter Summary"
                     AiTaskType.CHAT -> "Default Chat"
+                    AiTaskType.EXTRACT_STORY_MEMORY -> "Default Extract Story Memory"
                     else -> "Default Preset"
                 },
                 modelProfileId = modelProfileId,
@@ -334,6 +336,7 @@ class AiProfileRepository(
                     when (taskType) {
                         AiTaskType.TRANSLATE_CHAPTER -> TranslationConstants.DEFAULT_PROMPT
                         AiTaskType.SUMMARIZE_CHAPTER -> AiPromptTemplate.DEFAULT_CHAPTER_SUMMARY
+                        AiTaskType.EXTRACT_STORY_MEMORY -> AiPromptTemplate.DEFAULT_EXTRACT_STORY_MEMORY
                         else -> "You are a helpful AI assistant."
                     }
                 },
@@ -464,6 +467,14 @@ class AiProfileRepository(
             fallbackId = DEFAULT_AUTHORING_WRITER_PRESET_ID,
             fallbackName = "Story Writer",
             fallbackPrompt = AiPromptTemplate.DEFAULT_AUTHORING_WRITER,
+            modelProfileId = modelProfileId,
+            params = params,
+        )
+        upsertActivePresetForModel(
+            taskType = AiTaskType.EXTRACT_STORY_MEMORY,
+            fallbackId = DEFAULT_EXTRACT_STORY_MEMORY_PRESET_ID,
+            fallbackName = "Extract Story Memory",
+            fallbackPrompt = AiPromptTemplate.DEFAULT_EXTRACT_STORY_MEMORY,
             modelProfileId = modelProfileId,
             params = params,
         )
@@ -640,6 +651,7 @@ class AiProfileRepository(
         const val DEFAULT_CHAT_PRESET_ID = "default_chat"
         const val DEFAULT_AUTHORING_DIRECTOR_PRESET_ID = "default_authoring_director"
         const val DEFAULT_AUTHORING_WRITER_PRESET_ID = "default_authoring_writer"
+        const val DEFAULT_EXTRACT_STORY_MEMORY_PRESET_ID = "default_extract_story_memory"
         const val LEGACY_DEFAULT_TRANSLATION_CHUNK_CHARS = 10_000
         const val SAFE_DEFAULT_TRANSLATION_CHUNK_CHARS = 1_000
 

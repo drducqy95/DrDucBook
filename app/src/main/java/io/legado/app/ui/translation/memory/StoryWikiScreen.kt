@@ -1,41 +1,48 @@
 package io.legado.app.ui.translation.memory
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.drducbook.app.R
@@ -44,7 +51,10 @@ import io.legado.app.domain.model.AiTranslationStoryWikiRecord
 import io.legado.app.domain.model.StoryWikiCharacterGraph
 import io.legado.app.domain.model.StoryWikiGraphNode
 import io.legado.app.domain.model.StoryWikiRelationshipTag
+import io.legado.app.domain.model.StoryWikiSnapshot
 import io.legado.app.ui.widget.components.AppScaffold
+import io.legado.app.ui.widget.components.card.NormalCard
+import io.legado.app.ui.widget.components.image.cover.CoilBookCover
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBar
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
 import kotlinx.coroutines.flow.collectLatest
@@ -53,11 +63,17 @@ import java.io.File
 
 @Composable
 fun StoryWikiRouteScreen(
+    initialBookUrl: String? = null,
     onBack: () -> Unit,
     onOpenBook: (bookUrl: String, bookName: String) -> Unit,
     viewModel: StoryWikiViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(initialBookUrl) {
+        if (!initialBookUrl.isNullOrBlank()) {
+            viewModel.onIntent(StoryWikiIntent.SelectBook(initialBookUrl))
+        }
+    }
     LaunchedEffect(viewModel) {
         viewModel.effects.collectLatest { effect ->
             when (effect) {
@@ -74,121 +90,341 @@ fun StoryWikiScreen(
     onIntent: (StoryWikiIntent) -> Unit,
     onBack: () -> Unit,
 ) {
+    BackHandler(enabled = state.selectedBookUrl != null) {
+        onIntent(StoryWikiIntent.BackToBookList)
+    }
+
+    val selectedBook = state.books.firstOrNull { it.bookUrl == state.selectedBookUrl }
+
     AppScaffold(
         topBar = {
             GlassTopAppBar(
-                title = stringResource(R.string.story_wiki_title),
-                navigationIcon = { TopBarNavigationButton(onClick = onBack) },
+                title = if (selectedBook != null) {
+                    selectedBook.bookName
+                } else {
+                    stringResource(R.string.story_wiki_title)
+                },
+                navigationIcon = {
+                    TopBarNavigationButton(
+                        onClick = {
+                            if (state.selectedBookUrl != null) {
+                                onIntent(StoryWikiIntent.BackToBookList)
+                            } else {
+                                onBack()
+                            }
+                        }
+                    )
+                },
             )
         },
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                top = padding.calculateTopPadding() + 12.dp,
-                end = 16.dp,
-                bottom = padding.calculateBottomPadding() + 24.dp,
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                OutlinedTextField(
-                    value = state.query,
-                    onValueChange = { onIntent(StoryWikiIntent.ChangeQuery(it)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.story_memory_search_hint)) },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                )
-            }
-            if (state.books.size > 1) {
-                item {
-                    androidx.compose.foundation.layout.FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        state.books.forEach { book ->
-                            FilterChip(
-                                selected = state.selectedBookUrl == book.bookUrl,
-                                onClick = { onIntent(StoryWikiIntent.SelectBook(book.bookUrl)) },
-                                label = { Text(book.bookName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            )
-                        }
-                    }
-                }
-            }
-            item {
-                ScrollableTabRow(selectedTabIndex = state.selectedTab.ordinal) {
-                    StoryWikiTab.entries.forEach { tab ->
-                        Tab(
-                            selected = state.selectedTab == tab,
-                            onClick = { onIntent(StoryWikiIntent.SelectTab(tab)) },
-                            text = { Text(tab.label()) },
-                        )
-                    }
-                }
-            }
-            when {
-                state.loading -> item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) { CircularProgressIndicator() }
-                }
-                state.errorMessage != null -> item { Text(state.errorMessage, modifier = Modifier.padding(16.dp)) }
-                state.selectedTab == StoryWikiTab.CHARACTER_GRAPH -> {
-                    if (state.characterGraph.nodes.isEmpty()) {
-                        item { Text(stringResource(R.string.story_memory_empty), modifier = Modifier.padding(16.dp)) }
-                    } else {
-                        items(
-                            graphRows(state.characterGraph),
-                            key = { it.first.id },
-                        ) { (node, depth) ->
-                            ListItem(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = (depth * 20).dp)
-                                    .clickable { onIntent(StoryWikiIntent.SelectGraphNode(node.id)) },
-                                headlineContent = {
-                                    Text(node.target.ifBlank { node.raw }, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                },
-                                supportingContent = { Text("${node.raw} · ${node.category}") },
-                            )
-                        }
-                    }
-                }
-                state.selectedTab == StoryWikiTab.TIMELINE -> {
-                    if (state.timelineRecords.isEmpty()) {
-                        item { Text(stringResource(R.string.story_memory_empty), modifier = Modifier.padding(16.dp)) }
-                    } else {
-                        items(state.timelineRecords, key = AiTranslationStoryWikiRecord::id) { record ->
-                            WikiRecordItem(record, onIntent)
-                        }
-                    }
-                }
-                else -> {
-                    if (state.glossaryRecords.isEmpty()) {
-                        item { Text(stringResource(R.string.story_memory_empty), modifier = Modifier.padding(16.dp)) }
-                    } else {
-                        items(
-                            state.glossaryRecords.filter {
-                                (state.selectedTab == StoryWikiTab.ENTITY && it.kind == AiTranslationStoryMemoryKind.ENTITY) ||
-                                    (state.selectedTab == StoryWikiTab.WORLD_BUILDING && it.kind == AiTranslationStoryMemoryKind.WORLD_BUILDING)
-                            },
-                            key = AiTranslationStoryWikiRecord::id,
-                        ) { record -> WikiRecordItem(record, onIntent) }
-                    }
-                }
-            }
+        if (state.selectedBookUrl == null) {
+            StoryWikiBookListContent(
+                state = state,
+                onIntent = onIntent,
+                contentPadding = padding,
+            )
+        } else {
+            StoryWikiBookDetailContent(
+                state = state,
+                onIntent = onIntent,
+                contentPadding = padding,
+            )
         }
     }
 
     state.selectedRecord?.let { record ->
-        WikiRecordDialog(record, state.relationshipTags, onIntent)
+        if (record.kind == AiTranslationStoryMemoryKind.ENTITY) {
+            CharacterDossierSheet(
+                record = record,
+                allRecords = state.glossaryRecords,
+                tags = state.relationshipTags,
+                timeline = state.timelineRecords,
+                onDismissRequest = { onIntent(StoryWikiIntent.DismissRecord) },
+                onOpenBook = { onIntent(StoryWikiIntent.OpenSelectedBook) },
+                onSelectRelatedRecord = { relatedRecord -> onIntent(StoryWikiIntent.SelectRecord(relatedRecord)) },
+            )
+        } else {
+            WikiRecordDialog(record, state.relationshipTags, onIntent)
+        }
     }
     state.selectedGraphNode?.let { node ->
         GraphNodeDialog(node, state.relationshipTags, onIntent)
+    }
+}
+
+@Composable
+private fun StoryWikiBookListContent(
+    state: StoryWikiUiState,
+    onIntent: (StoryWikiIntent) -> Unit,
+    contentPadding: PaddingValues,
+) {
+    val query = state.query.trim()
+    val filteredBooks = remember(state.books, query) {
+        if (query.isBlank()) {
+            state.books
+        } else {
+            state.books.filter { book ->
+                book.bookName.contains(query, ignoreCase = true) ||
+                    book.bookAuthor.contains(query, ignoreCase = true) ||
+                    book.glossaryRecords.any { it.title.contains(query, ignoreCase = true) || it.raw.contains(query, ignoreCase = true) }
+            }
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = contentPadding.calculateTopPadding() + 12.dp,
+            end = 16.dp,
+            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = { onIntent(StoryWikiIntent.ChangeQuery(it)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.story_memory_search_hint)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            )
+        }
+
+        when {
+            state.loading -> item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) { CircularProgressIndicator() }
+            }
+            state.errorMessage != null -> item {
+                Text(state.errorMessage, modifier = Modifier.padding(16.dp))
+            }
+            filteredBooks.isEmpty() -> item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = stringResource(R.string.story_wiki_no_books),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            else -> {
+                item {
+                    Text(
+                        text = stringResource(R.string.story_wiki_book_count, filteredBooks.size),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+                items(filteredBooks, key = StoryWikiSnapshot::bookUrl) { book ->
+                    StoryWikiBookCard(book = book, onIntent = onIntent)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StoryWikiBookCard(
+    book: StoryWikiSnapshot,
+    onIntent: (StoryWikiIntent) -> Unit,
+) {
+    val entityCount = remember(book.glossaryRecords) {
+        book.glossaryRecords.count { it.kind == AiTranslationStoryMemoryKind.ENTITY }
+    }
+    val worldCount = remember(book.glossaryRecords) {
+        book.glossaryRecords.count { it.kind == AiTranslationStoryMemoryKind.WORLD_BUILDING }
+    }
+    val relationCount = book.relationshipTags.size
+    val timelineCount = book.timelineRecords.size
+
+    NormalCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = { onIntent(StoryWikiIntent.SelectBook(book.bookUrl)) },
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            CoilBookCover(
+                name = book.bookName,
+                author = book.bookAuthor,
+                path = book.bookCoverUrl,
+                modifier = Modifier.width(54.dp),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = book.bookName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (book.bookAuthor.isNotBlank()) {
+                    Text(
+                        text = book.bookAuthor,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    StatBadge(icon = "👥", count = entityCount)
+                    StatBadge(icon = "🏰", count = worldCount)
+                    if (relationCount > 0) {
+                        StatBadge(icon = "🔗", count = relationCount)
+                    }
+                    if (timelineCount > 0) {
+                        StatBadge(icon = "📖", count = timelineCount)
+                    }
+                }
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = stringResource(R.string.story_wiki_enter_book),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatBadge(
+    icon: String,
+    count: Int,
+) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Text(icon, fontSize = 11.sp)
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StoryWikiBookDetailContent(
+    state: StoryWikiUiState,
+    onIntent: (StoryWikiIntent) -> Unit,
+    contentPadding: PaddingValues,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            top = contentPadding.calculateTopPadding() + 12.dp,
+            end = 16.dp,
+            bottom = contentPadding.calculateBottomPadding() + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            OutlinedTextField(
+                value = state.query,
+                onValueChange = { onIntent(StoryWikiIntent.ChangeQuery(it)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.story_memory_search_hint)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            )
+        }
+        item {
+            ScrollableTabRow(selectedTabIndex = state.selectedTab.ordinal) {
+                StoryWikiTab.entries.forEach { tab ->
+                    Tab(
+                        selected = state.selectedTab == tab,
+                        onClick = { onIntent(StoryWikiIntent.SelectTab(tab)) },
+                        text = { Text(tab.label()) },
+                    )
+                }
+            }
+        }
+        when {
+            state.loading -> item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) { CircularProgressIndicator() }
+            }
+            state.errorMessage != null -> item { Text(state.errorMessage, modifier = Modifier.padding(16.dp)) }
+            state.selectedTab == StoryWikiTab.CHARACTER_GRAPH -> {
+                if (state.characterGraph.nodes.isEmpty()) {
+                    item { Text(stringResource(R.string.story_memory_empty), modifier = Modifier.padding(16.dp)) }
+                } else {
+                    items(
+                        graphRows(state.characterGraph),
+                        key = { it.first.id },
+                    ) { (node, depth) ->
+                        ListItem(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = (depth * 20).dp)
+                                .clickable { onIntent(StoryWikiIntent.SelectGraphNode(node.id)) },
+                            headlineContent = {
+                                Text(node.target.ifBlank { node.raw }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
+                            supportingContent = { Text("${node.raw} · ${node.category}") },
+                        )
+                    }
+                }
+            }
+            state.selectedTab == StoryWikiTab.TIMELINE -> {
+                if (state.timelineRecords.isEmpty()) {
+                    item { Text(stringResource(R.string.story_memory_empty), modifier = Modifier.padding(16.dp)) }
+                } else {
+                    items(state.timelineRecords, key = AiTranslationStoryWikiRecord::id) { record ->
+                        WikiRecordItem(record, onIntent)
+                    }
+                }
+            }
+            else -> {
+                val filteredRecords = state.glossaryRecords.filter {
+                    (state.selectedTab == StoryWikiTab.ENTITY && it.kind == AiTranslationStoryMemoryKind.ENTITY) ||
+                        (state.selectedTab == StoryWikiTab.WORLD_BUILDING && it.kind == AiTranslationStoryMemoryKind.WORLD_BUILDING)
+                }
+                if (filteredRecords.isEmpty()) {
+                    item { Text(stringResource(R.string.story_memory_empty), modifier = Modifier.padding(16.dp)) }
+                } else {
+                    items(
+                        filteredRecords,
+                        key = AiTranslationStoryWikiRecord::id,
+                    ) { record -> WikiRecordItem(record, onIntent) }
+                }
+            }
+        }
     }
 }
 
@@ -305,9 +541,10 @@ private fun graphRows(graph: StoryWikiCharacterGraph): List<Pair<StoryWikiGraphN
     return result
 }
 
+@Composable
 private fun StoryWikiTab.label(): String = when (this) {
-    StoryWikiTab.ENTITY -> "Entity"
-    StoryWikiTab.WORLD_BUILDING -> "World-building"
-    StoryWikiTab.TIMELINE -> "Timeline"
-    StoryWikiTab.CHARACTER_GRAPH -> "Character graph"
+    StoryWikiTab.ENTITY -> stringResource(R.string.story_wiki_tab_entity)
+    StoryWikiTab.WORLD_BUILDING -> stringResource(R.string.story_wiki_tab_world)
+    StoryWikiTab.TIMELINE -> stringResource(R.string.story_wiki_tab_timeline)
+    StoryWikiTab.CHARACTER_GRAPH -> stringResource(R.string.story_wiki_tab_graph)
 }

@@ -78,7 +78,9 @@ data object MainRouteEbookEditor : MainRoute
 data object MainRouteRss : MainRoute
 
 @Serializable
-data object MainRouteStoryWiki : MainRoute
+data class MainRouteStoryWiki(
+    val bookUrl: String? = null,
+) : MainRoute
 
 @Serializable
 data class MainRouteEbookPreview(val projectId: String) : MainRoute

@@ -6,10 +6,34 @@ import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.domain.model.QuickDictionaryUniverse
 import io.legado.app.domain.model.MappedDisplayText
 import io.legado.app.domain.model.TranslationConstants
+import com.drducbook.app.R
 import io.legado.app.ui.translation.TranslationCaseTransform
 import io.legado.app.ui.translation.applyTranslationCaseTransform
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
+
+enum class StoryMemoryCategory(
+    val entityType: String?,
+    val worldCategory: String?,
+) {
+    CHARACTER("character", null),
+    FACTION(null, "faction"),
+    LOCATION(null, "location"),
+    ARTIFACT(null, "weapon"),
+    TECHNIQUE(null, "technique"),
+    REALM(null, "rank"),
+    TERM(null, "term"),
+}
+
+fun StoryMemoryCategory.labelResource(): Int = when (this) {
+    StoryMemoryCategory.CHARACTER -> R.string.story_memory_cat_character
+    StoryMemoryCategory.FACTION -> R.string.story_memory_cat_faction
+    StoryMemoryCategory.LOCATION -> R.string.story_memory_cat_location
+    StoryMemoryCategory.ARTIFACT -> R.string.story_memory_cat_artifact
+    StoryMemoryCategory.TECHNIQUE -> R.string.story_memory_cat_technique
+    StoryMemoryCategory.REALM -> R.string.story_memory_cat_realm
+    StoryMemoryCategory.TERM -> R.string.story_memory_cat_term
+}
 
 @Stable
 data class QuickDictionaryProviderUi(
@@ -59,6 +83,8 @@ data class QuickDictionaryUiState(
     val selectionAlternatives: ImmutableList<QuickDictionarySelectionAlternativeUi> = persistentListOf(),
     val showSelectionChooser: Boolean = false,
     val saveToTranslationMemory: Boolean = false,
+    val memoryCategory: StoryMemoryCategory = StoryMemoryCategory.TERM,
+    val memoryDescription: String = "",
 )
 
 enum class QuickDictionarySelectionAction {
@@ -106,6 +132,8 @@ sealed interface QuickDictionaryEditorIntent {
     data class SetUniverseName(val value: String) : QuickDictionaryEditorIntent
     data class SetContextMarkers(val value: String) : QuickDictionaryEditorIntent
     data class SetSaveToTranslationMemory(val value: Boolean) : QuickDictionaryEditorIntent
+    data class SetMemoryCategory(val value: StoryMemoryCategory) : QuickDictionaryEditorIntent
+    data class SetMemoryDescription(val value: String) : QuickDictionaryEditorIntent
     data class SelectMappingAlternative(val index: Int) : QuickDictionaryEditorIntent
     data object DismissMappingAlternatives : QuickDictionaryEditorIntent
     data object Save : QuickDictionaryEditorIntent

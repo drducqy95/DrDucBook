@@ -60,7 +60,14 @@ class QuickDictionaryEditorViewModel(
             is QuickDictionaryEditorIntent.SetTarget -> updateForm { copy(target = intent.value) }
             is QuickDictionaryEditorIntent.RequestSuggestion -> requestSuggestion(intent.provider)
             is QuickDictionaryEditorIntent.ApplySuggestion -> updateForm { copy(target = intent.value) }
-            is QuickDictionaryEditorIntent.SetType -> updateForm { copy(type = intent.value) }
+            is QuickDictionaryEditorIntent.SetType -> updateForm {
+                val newCat = if (intent.value == QuickDictionaryType.NAME && memoryCategory == StoryMemoryCategory.TERM) {
+                    StoryMemoryCategory.CHARACTER
+                } else {
+                    memoryCategory
+                }
+                copy(type = intent.value, memoryCategory = newCat)
+            }
             is QuickDictionaryEditorIntent.SetScope -> updateForm {
                 copy(
                     scope = intent.value,
@@ -79,6 +86,12 @@ class QuickDictionaryEditorViewModel(
             }
             is QuickDictionaryEditorIntent.SetSaveToTranslationMemory -> updateForm {
                 copy(saveToTranslationMemory = intent.value)
+            }
+            is QuickDictionaryEditorIntent.SetMemoryCategory -> updateForm {
+                copy(memoryCategory = intent.value)
+            }
+            is QuickDictionaryEditorIntent.SetMemoryDescription -> updateForm {
+                copy(memoryDescription = intent.value)
             }
             is QuickDictionaryEditorIntent.SelectMappingAlternative -> {
                 selectMappingAlternative(intent.index)
@@ -373,6 +386,8 @@ class QuickDictionaryEditorViewModel(
                         raw = form.raw,
                         target = form.target,
                         type = form.type,
+                        memoryCategory = form.memoryCategory.name,
+                        description = form.memoryDescription,
                     )
                 }
             }.onSuccess {

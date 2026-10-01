@@ -27,7 +27,35 @@ data class AiTranslationStoryEntity(
     val category: String = "character",
     val userEdited: Boolean = false,
     val source: String = "AI",
+    val metadata: String = "",
 )
+
+@Keep
+data class CharacterProfileDetails(
+    val identity: String = "",
+    val appearance: String = "",
+    val personality: String = "",
+    val aptitude: String = "",
+    val realm: String = "",
+    val titles: List<String> = emptyList(),
+    val sect: String = "",
+    val artifacts: List<String> = emptyList(),
+    val techniques: List<String> = emptyList(),
+    val divineAbilities: List<String> = emptyList(),
+    val spiritBeasts: List<String> = emptyList(),
+)
+
+fun AiTranslationStoryEntity.characterProfile(): CharacterProfileDetails? =
+    metadata.takeIf { it.startsWith("{") }?.let { json ->
+        try {
+            GSON.fromJson(json, CharacterProfileDetails::class.java)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+fun AiTranslationStoryEntity.withCharacterProfile(profile: CharacterProfileDetails): AiTranslationStoryEntity =
+    copy(metadata = GSON.toJson(profile))
 
 @Keep
 data class AiTranslationStoryRelationship(
@@ -203,6 +231,7 @@ data class CanonicalTranslationMemory(
     val userEdited: Boolean = false,
     val source: TranslationMemorySource = TranslationMemorySource.AI,
     val updatedAt: Long = 0L,
+    val metadata: String = "",
 )
 
 object TranslationMemoryCanonicalizer {
@@ -288,7 +317,26 @@ data class AiTranslationStoryContext(
 ) {
     /** All locked memory pairs, including world-building terms, in precedence order. */
     val memoryDictionary: List<DictPair>
-        get() = entityDictionary
+        get() {
+            val pairs = ArrayList<DictPair>()
+            val seen = HashSet<String>()
+            for (pair in entityDictionary) {
+                if (pair.original.isNotBlank() && pair.translation.isNotBlank() && seen.add(pair.original.lowercase())) {
+                    pairs.add(pair)
+                }
+            }
+            for (mem in canonicalMemory) {
+                if (mem.raw.isNotBlank() && mem.target.isNotBlank() && seen.add(mem.raw.lowercase())) {
+                    pairs.add(DictPair(original = mem.raw, translation = mem.target, type = QuickDictionaryType.NAME))
+                }
+            }
+            for (world in currentWorldBuilding) {
+                if (world.raw.isNotBlank() && world.target.isNotBlank() && seen.add(world.raw.lowercase())) {
+                    pairs.add(DictPair(original = world.raw, translation = world.target, type = QuickDictionaryType.VIETPHRASE))
+                }
+            }
+            return pairs
+        }
 
     fun memoryPromptRecords(): List<Map<String, Any?>> = buildList {
         canonicalMemory.ifEmpty {
@@ -309,6 +357,7 @@ data class AiTranslationStoryContext(
                     imagePath = entity.imagePath,
                     userEdited = entity.userEdited,
                     source = entity.source.toMemorySource(),
+                    metadata = entity.metadata,
                 )
             } + currentWorldBuilding.map { entry ->
                 CanonicalTranslationMemory(
@@ -419,7 +468,17 @@ data class AiTranslationStoryWikiRecord(
     val senseKey: String = "",
     val category: String = "",
     val description: String = "",
+    val metadata: String = "",
 )
+
+fun AiTranslationStoryWikiRecord.characterProfile(): CharacterProfileDetails? =
+    metadata.takeIf { it.startsWith("{") }?.let { json ->
+        try {
+            GSON.fromJson(json, CharacterProfileDetails::class.java)
+        } catch (_: Throwable) {
+            null
+        }
+    }
 
 @Keep
 data class StoryWikiRelationshipTag(
@@ -461,6 +520,8 @@ data class StoryWikiCharacterGraph(
 data class StoryWikiSnapshot(
     val bookUrl: String = "",
     val bookName: String = "",
+    val bookAuthor: String = "",
+    val bookCoverUrl: String = "",
     val glossaryRecords: List<AiTranslationStoryWikiRecord> = emptyList(),
     val timelineRecords: List<AiTranslationStoryWikiRecord> = emptyList(),
     val relationshipTags: List<StoryWikiRelationshipTag> = emptyList(),
@@ -676,6 +737,7 @@ object AiTranslationStoryMemoryPipeline {
                     "QT" -> TranslationMemorySource.QT
                     else -> TranslationMemorySource.AI
                 },
+                metadata = entity.metadata,
             )
         }
         val world = snapshot.worldBuilding.map { entry ->

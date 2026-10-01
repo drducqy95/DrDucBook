@@ -1,7 +1,9 @@
 package io.legado.app.ui.quickdict
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +22,8 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +34,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -66,6 +71,8 @@ fun QuickDictionaryForm(
     onUniverseNameChange: (String) -> Unit,
     onContextMarkersChange: (String) -> Unit,
     onSaveToTranslationMemoryChange: (Boolean) -> Unit,
+    onMemoryCategoryChange: (StoryMemoryCategory) -> Unit = {},
+    onMemoryDescriptionChange: (String) -> Unit = {},
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -154,10 +161,6 @@ fun QuickDictionaryForm(
         }
 
         if (state.hasSelectionControls) {
-            AppText(
-                text = stringResource(R.string.quick_dictionary_selection_tools),
-                style = LegadoTheme.typography.titleSmall,
-            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -212,29 +215,79 @@ fun QuickDictionaryForm(
             onValueChange = onTargetChange,
         )
 
-        AppText(
-            text = stringResource(R.string.quick_dictionary_translation_provider),
-            style = LegadoTheme.typography.titleSmall,
-        )
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            state.providerOptions.forEach { provider ->
-                FilterChip(
-                    selected = provider.value == state.selectedProvider,
-                    enabled = !state.isSuggesting,
-                    onClick = { onRequestSuggestion(provider.value) },
-                    label = { AppText(provider.label) },
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            CompactDropdownField(
+                value = stringResource(state.type.labelResource()),
+                label = stringResource(R.string.quick_dictionary_type),
+                items = quickDictionaryVisibleTypes,
+                itemLabel = { stringResource(it.labelResource()) },
+                onItemSelected = onTypeChange,
+                modifier = Modifier.weight(1f),
+            )
+            CompactDropdownField(
+                value = stringResource(state.scope.labelResource()),
+                label = stringResource(R.string.quick_dictionary_scope),
+                items = QuickDictionaryScope.entries,
+                itemLabel = { stringResource(it.labelResource()) },
+                onItemSelected = onScopeChange,
+                modifier = Modifier.weight(1f),
+            )
+        }
+
+        AnimatedVisibility(visible = state.scope == QuickDictionaryScope.UNIVERSE) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val universeOptions = listOf("" to stringResource(R.string.quick_dictionary_universe_new)) +
+                    state.availableUniverses.map { it.key to it.name }
+                val currentUniverseLabel = universeOptions.firstOrNull { it.first == state.universeKey }?.second
+                    ?: stringResource(R.string.quick_dictionary_universe_new)
+                CompactDropdownField(
+                    value = currentUniverseLabel,
+                    label = stringResource(R.string.quick_dictionary_universe_name),
+                    items = universeOptions,
+                    itemLabel = { it.second },
+                    onItemSelected = { onSelectUniverse(it.first) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = state.universeName,
+                    onValueChange = onUniverseNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { AppText(stringResource(R.string.quick_dictionary_universe_name)) },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = state.contextMarkers,
+                    onValueChange = onContextMarkersChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { AppText(stringResource(R.string.quick_dictionary_context_markers)) },
+                    supportingText = {
+                        AppText(stringResource(R.string.quick_dictionary_context_markers_summary))
+                    },
+                    minLines = 2,
                 )
             }
+        }
+
+        if (state.providerOptions.isNotEmpty()) {
+            val currentProviderLabel = state.providerOptions.firstOrNull { it.value == state.selectedProvider }?.label
+                ?: state.selectedProvider
+            CompactDropdownField(
+                value = currentProviderLabel,
+                label = stringResource(R.string.quick_dictionary_translation_provider),
+                items = state.providerOptions,
+                itemLabel = { it.label },
+                onItemSelected = { onRequestSuggestion(it.value) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         if (state.isSuggesting) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }
         if (state.suggestions.isNotEmpty()) {
-            AppText(
-                text = stringResource(R.string.quick_dictionary_suggestions),
-                style = LegadoTheme.typography.titleSmall,
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 state.suggestions.forEach { suggestion ->
                     OutlinedButton(
                         onClick = { onApplySuggestion(suggestion.text) },
@@ -243,6 +296,42 @@ fun QuickDictionaryForm(
                         AppText("${suggestion.providerLabel}: ${suggestion.text}")
                     }
                 }
+            }
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onSaveToTranslationMemoryChange(!state.saveToTranslationMemory) },
+        ) {
+            Checkbox(
+                checked = state.saveToTranslationMemory,
+                onCheckedChange = onSaveToTranslationMemoryChange,
+            )
+            AppText(stringResource(R.string.quick_dictionary_save_to_translation_memory))
+        }
+        AnimatedVisibility(visible = state.saveToTranslationMemory) {
+            Column(
+                modifier = Modifier.padding(start = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CompactDropdownField(
+                    value = stringResource(state.memoryCategory.labelResource()),
+                    label = stringResource(R.string.quick_dictionary_memory_category),
+                    items = StoryMemoryCategory.entries,
+                    itemLabel = { stringResource(it.labelResource()) },
+                    onItemSelected = onMemoryCategoryChange,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = state.memoryDescription,
+                    onValueChange = onMemoryDescriptionChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { AppText(stringResource(R.string.quick_dictionary_memory_description)) },
+                    singleLine = false,
+                    minLines = 2,
+                )
             }
         }
 
@@ -261,84 +350,12 @@ fun QuickDictionaryForm(
         }
 
         AnimatedVisibility(visible = showAdvanced) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                AppText(
-                    text = stringResource(R.string.quick_dictionary_type),
-                    style = LegadoTheme.typography.titleSmall,
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    quickDictionaryVisibleTypes.forEach { type ->
-                        FilterChip(
-                            selected = type == state.type,
-                            onClick = { onTypeChange(type) },
-                            label = { AppText(stringResource(type.labelResource())) },
-                        )
-                    }
-                }
-
-                AppText(
-                    text = stringResource(R.string.quick_dictionary_scope),
-                    style = LegadoTheme.typography.titleSmall,
-                )
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    QuickDictionaryScope.entries.forEach { scope ->
-                        FilterChip(
-                            selected = scope == state.scope,
-                            onClick = { onScopeChange(scope) },
-                            label = { AppText(stringResource(scope.labelResource())) },
-                        )
-                    }
-                }
-                if (state.scope == QuickDictionaryScope.UNIVERSE) {
-                    AppText(
-                        text = stringResource(R.string.quick_dictionary_universe_explanation),
-                        style = LegadoTheme.typography.bodySmall,
-                        color = LegadoTheme.colorScheme.onSurfaceVariant,
-                    )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = state.universeKey.isBlank(),
-                            onClick = { onSelectUniverse("") },
-                            label = { AppText(stringResource(R.string.quick_dictionary_universe_new)) },
-                        )
-                        state.availableUniverses.forEach { universe ->
-                            FilterChip(
-                                selected = state.universeKey == universe.key,
-                                onClick = { onSelectUniverse(universe.key) },
-                                label = { AppText(universe.name) },
-                            )
-                        }
-                    }
-                    OutlinedTextField(
-                        value = state.universeName,
-                        onValueChange = onUniverseNameChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { AppText(stringResource(R.string.quick_dictionary_universe_name)) },
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        value = state.contextMarkers,
-                        onValueChange = onContextMarkersChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { AppText(stringResource(R.string.quick_dictionary_context_markers)) },
-                        supportingText = {
-                            AppText(stringResource(R.string.quick_dictionary_context_markers_summary))
-                        },
-                        minLines = 3,
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 AppText(
                     text = stringResource(R.string.quick_dictionary_priority_summary),
                     style = LegadoTheme.typography.bodySmall,
                     color = LegadoTheme.colorScheme.onSurfaceVariant,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = state.saveToTranslationMemory,
-                        onCheckedChange = onSaveToTranslationMemoryChange,
-                    )
-                    AppText(stringResource(R.string.quick_dictionary_save_to_translation_memory))
-                }
             }
         }
 
@@ -448,6 +465,52 @@ internal fun quickDictionaryContextPreview(
         omittedBefore = contextBefore.length > safeLimit,
         omittedAfter = contextAfter.length > safeLimit,
     )
+}
+
+@Composable
+private fun <T> CompactDropdownField(
+    value: String,
+    label: String,
+    items: List<T>,
+    itemLabel: @Composable (T) -> String,
+    onItemSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            label = { AppText(label) },
+            trailingIcon = {
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                    )
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true },
+            singleLine = true,
+        )
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { AppText(itemLabel(item)) },
+                    onClick = {
+                        expanded = false
+                        onItemSelected(item)
+                    },
+                )
+            }
+        }
+    }
 }
 
 private const val SOURCE_CONTEXT_CHARS = 14
