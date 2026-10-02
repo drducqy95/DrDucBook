@@ -116,14 +116,21 @@ class StoryIllustrationUseCase(
         size: String,
     ): String {
         val configuredPreset = aiProfileGateway.getTaskPreset(AiTaskType.GENERATE_STORY_IMAGE)
-        val preset = if (configuredPreset != null && isSupportedImageModel(configuredPreset.model)) {
-            configuredPreset
+        val preset = configuredPreset ?: resolveDefaultImagePreset()
+            ?: error(
+                "Chưa cấu hình model tạo ảnh cho Story Wiki.\n" +
+                    "Hỗ trợ: OpenAI (DALL-E, Flux), Google Gemini, ChatGPT Web, Gemini Web và các provider AI khác.\n" +
+                    "Vui lòng thêm model trong Cài đặt AI → Quản lý Prompt → Tạo ảnh minh họa."
+            )
+        // Merge the preset's system prompt template with the entity/world-specific prompt
+        val templatePart = preset.promptTemplate.trim()
+        val requestPrompt = if (templatePart.isNotBlank() && prompt.isNotBlank()) {
+            "$templatePart\n\n$prompt"
         } else {
-            resolveDefaultImagePreset()
-        } ?: error("Chưa cấu hình model tạo ảnh cho Story Wiki. Vui lòng thêm model DALL-E/Flux trong Cài đặt AI (Cần provider tương thích OpenAI có hỗ trợ /images/generations).")
-        val requestPrompt = listOf(preset.promptTemplate.trim(), prompt)
-            .filter(String::isNotBlank)
-            .joinToString("\n\n")
+            prompt.ifBlank { templatePart }.ifBlank {
+                error("Prompt tạo ảnh trống. Vui lòng kiểm tra cấu hình prompt trong Cài đặt AI → Quản lý Prompt.")
+            }
+        }
         val result = aiImageGateway.generate(
             AiImageGenerateRequest(
                 model = preset.model,
@@ -140,27 +147,46 @@ class StoryIllustrationUseCase(
     }
 
     private fun isSupportedImageModel(model: io.legado.app.domain.model.AiModelConfig): Boolean {
-        val protocolOk = model.provider.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_CHAT_COMPLETIONS ||
-            model.provider.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_RESPONSES
+        val protocol = model.provider.protocol
+        val protocolOk = protocol == io.legado.app.domain.model.AiProtocol.OPENAI_CHAT_COMPLETIONS ||
+            protocol == io.legado.app.domain.model.AiProtocol.OPENAI_RESPONSES ||
+            protocol == io.legado.app.domain.model.AiProtocol.GEMINI_GENERATE_CONTENT ||
+            protocol == io.legado.app.domain.model.AiProtocol.CHATGPT_WEB ||
+            protocol == io.legado.app.domain.model.AiProtocol.GEMINI_WEB
         if (!protocolOk) return false
         val nameMatch = model.modelId.contains("dall-e", ignoreCase = true) ||
             model.modelId.contains("flux", ignoreCase = true) ||
             model.modelId.contains("image", ignoreCase = true) ||
+            model.modelId.contains("imagen", ignoreCase = true) ||
             model.displayName.contains("dall-e", ignoreCase = true) ||
             model.displayName.contains("flux", ignoreCase = true) ||
-            model.displayName.contains("image", ignoreCase = true)
-        val capabilityMatch = model.capabilities.contains("image") || model.capabilities.contains("image_generation")
-        return nameMatch || capabilityMatch
+            model.displayName.contains("image", ignoreCase = true) ||
+            model.displayName.contains("imagen", ignoreCase = true)
+        val capabilityMatch = model.capabilities.contains("image") ||
+            model.capabilities.contains("image_generation")
+        // Gemini and Web models support image generation
+        val webOrGemini = protocol == io.legado.app.domain.model.AiProtocol.GEMINI_GENERATE_CONTENT ||
+            protocol == io.legado.app.domain.model.AiProtocol.CHATGPT_WEB ||
+            protocol == io.legado.app.domain.model.AiProtocol.GEMINI_WEB
+        return nameMatch || capabilityMatch || webOrGemini
     }
 
     private suspend fun resolveDefaultImagePreset(): io.legado.app.domain.model.AiTaskPresetConfig? {
         val allModels = aiProfileGateway.observeModels().firstOrNull()?.filter { it.enabled }.orEmpty()
-        val imageModel = allModels.firstOrNull { model ->
+        // Priority 1: explicit image models (dall-e, flux, imagen)
+        val explicitImageModel = allModels.firstOrNull { model ->
+            val config = aiProfileGateway.getModelConfig(model.id)
+            config != null && isExplicitImageModel(config)
+        }
+        // Priority 2: Gemini or web models or image-capable models
+        val supportedModel = explicitImageModel ?: allModels.firstOrNull { model ->
             val config = aiProfileGateway.getModelConfig(model.id)
             config != null && isSupportedImageModel(config)
-        } ?: return null
+        }
+        // Priority 3: any enabled model in the app
+        val targetModel = supportedModel ?: allModels.firstOrNull() ?: return null
 
-        val modelConfig = aiProfileGateway.getModelConfig(imageModel.id) ?: return null
+        val modelConfig = aiProfileGateway.getModelConfig(targetModel.id) ?: return null
         return io.legado.app.domain.model.AiTaskPresetConfig(
             id = "default_generate_story_image",
             name = "Default Story Image",
@@ -168,6 +194,19 @@ class StoryIllustrationUseCase(
             promptTemplate = io.legado.app.domain.model.AiPromptTemplate.DEFAULT_STORY_IMAGE,
             model = modelConfig,
         )
+    }
+
+    /** Checks if a model is explicitly an image-generation model (DALL-E, Flux, Imagen). */
+    private fun isExplicitImageModel(model: io.legado.app.domain.model.AiModelConfig): Boolean {
+        val nameMatch = model.modelId.contains("dall-e", ignoreCase = true) ||
+            model.modelId.contains("flux", ignoreCase = true) ||
+            model.modelId.contains("imagen", ignoreCase = true) ||
+            model.displayName.contains("dall-e", ignoreCase = true) ||
+            model.displayName.contains("flux", ignoreCase = true) ||
+            model.displayName.contains("imagen", ignoreCase = true)
+        val capabilityMatch = model.capabilities.contains("image") ||
+            model.capabilities.contains("image_generation")
+        return nameMatch || capabilityMatch
     }
 
     companion object {

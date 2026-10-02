@@ -332,21 +332,30 @@ class BookStoryMemoryViewModel(
 
     private fun generateEditorImage() = runMutation {
         val draft = _uiState.value.editor ?: return@runMutation
-        val originalId = draft.originalId ?: error("Save the memory before generating an image")
         when (draft.kind) {
             AiTranslationStoryMemoryKind.ENTITY -> {
-                val entity = snapshot.entities.firstOrNull {
-                    TranslationStoryMemoryUseCase.entityKey(it.raw, it.senseKey) == originalId
-                } ?: error("Entity not found")
+                val entity = draft.toEntity()
+                require(entity.raw.isNotBlank()) { "Vui lòng nhập tên gốc nhân vật" }
+                storyMemoryUseCase.upsertEntity(bookUrl, entity)
+                val originalId = draft.originalId
+                val newId = TranslationStoryMemoryUseCase.entityKey(entity.raw, entity.senseKey)
+                if (originalId != null && originalId != newId) {
+                    deleteById(draft.kind, originalId)
+                }
                 storyIllustrationUseCase.generateEntity(bookUrl, entity.raw, force = true)
             }
             AiTranslationStoryMemoryKind.WORLD_BUILDING -> {
-                val world = snapshot.worldBuilding.firstOrNull {
-                    TranslationStoryMemoryUseCase.worldKey(it) == originalId
-                } ?: error("World entry not found")
+                val world = draft.toWorldEntry()
+                require(world.raw.isNotBlank()) { "Vui lòng nhập tên mục thế giới" }
+                storyMemoryUseCase.upsertWorldEntry(bookUrl, world)
+                val originalId = draft.originalId
+                val newId = TranslationStoryMemoryUseCase.worldKey(world)
+                if (originalId != null && originalId != newId) {
+                    deleteById(draft.kind, originalId)
+                }
                 storyIllustrationUseCase.generateWorldEntry(bookUrl, world, force = true)
             }
-            else -> error("Images are available for characters and world entries")
+            else -> error("Chỉ hỗ trợ tạo ảnh cho nhân vật và mục thế giới")
         }
         _uiState.update { it.copy(editor = null) }
         _effects.tryEmit(BookStoryMemoryEffect.ShowMessage(R.string.story_memory_image_created))

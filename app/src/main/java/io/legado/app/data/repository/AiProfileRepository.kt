@@ -482,16 +482,24 @@ class AiProfileRepository(
             params = params,
         )
         val model = getModel(modelProfileId)
+        val provider = model?.let { aiProfileDao.getProvider(it.providerId) }
         val isImageModel = model?.let {
             it.capabilities.contains("image") ||
                 it.capabilities.contains("image_generation") ||
                 it.modelId.contains("dall-e", ignoreCase = true) ||
                 it.modelId.contains("flux", ignoreCase = true) ||
+                it.modelId.contains("imagen", ignoreCase = true) ||
                 it.modelId.contains("image", ignoreCase = true) ||
                 it.displayName.contains("dall-e", ignoreCase = true) ||
-                it.displayName.contains("flux", ignoreCase = true)
+                it.displayName.contains("flux", ignoreCase = true) ||
+                it.displayName.contains("imagen", ignoreCase = true) ||
+                // Gemini flash/pro models support native image generation via responseModalities
+                (provider?.protocol == AiProtocol.GEMINI_GENERATE_CONTENT &&
+                    (it.modelId.contains("flash", ignoreCase = true) ||
+                        it.modelId.contains("pro", ignoreCase = true)))
         } ?: false
-        if (isImageModel) {
+        val hasExistingImagePreset = aiProfileDao.getDefaultPreset(AiTaskType.GENERATE_STORY_IMAGE) != null
+        if (isImageModel || !hasExistingImagePreset) {
             upsertActivePresetForModel(
                 taskType = AiTaskType.GENERATE_STORY_IMAGE,
                 fallbackId = DEFAULT_GENERATE_STORY_IMAGE_PRESET_ID,

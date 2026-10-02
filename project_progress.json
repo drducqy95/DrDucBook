@@ -1,9 +1,9 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-02T18:25:00.000000",
+    "last_updated": "2026-10-02T19:12:00.000000",
     "overall_progress_percent": 100,
-    "current_phase": "Phase 47 - App Icon System, Source Health Bulk Delete & Workspace Book Source Hub",
+    "current_phase": "Phase 48 - Multi-Provider Image Generation, Universal Fallback & Prompt Preset Auto-Init",
     "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
@@ -1790,6 +1790,39 @@
         {
           "id": "T47.5",
           "desc": "Phase 05 - BrandIdentityTest & unit verification, compileAppDebugKotlin check, APK assembly (assembleAppRelease SUCCESS in 26m 6s), and APK artifact generation for Huawei device",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P48",
+      "name": "Multi-Provider Image Generation, Universal Fallback & Prompt Preset Auto-Init",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T48.1",
+          "desc": "T48.1 - Native Gemini image generator via generateContent with responseModalities IMAGE + inline base64 parser",
+          "status": "DONE"
+        },
+        {
+          "id": "T48.2",
+          "desc": "T48.2 - Universal OpenAiImageRepository gateway: OpenAI DALL-E/Flux + response_format fix, Gemini native, ChatGPT Web / Gemini Web extraction, and Pollinations FLUX fallback",
+          "status": "DONE"
+        },
+        {
+          "id": "T48.3",
+          "desc": "T48.3 - StoryIllustrationUseCase: Honor configured preset unconditionally without model filter rejection; 3-tier fallback resolving any enabled model",
+          "status": "DONE"
+        },
+        {
+          "id": "T48.4",
+          "desc": "T48.4 - AiProfileRepository: Auto-create GENERATE_STORY_IMAGE preset if none exists, resolving 'chưa có cấu hình prompt' error",
+          "status": "DONE"
+        },
+        {
+          "id": "T48.5",
+          "desc": "T48.5 - BookStoryMemory: Auto-save entity before image generation, allow 1-click image creation on newly added entities, and compile + unit test verification passed",
           "status": "DONE"
         }
       ]

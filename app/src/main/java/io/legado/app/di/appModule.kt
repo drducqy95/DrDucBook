@@ -483,7 +483,7 @@ val appModule = module {
     single<AiAgentGateway> { AiAgentRepository(get()) }
     single<AiChatGateway> { AiChatRepository(get()) }
     single<AiMemoryGateway> { AiMemoryRepository(get()) }
-    single<AiImageGateway> { OpenAiImageRepository(getOrNull(), getOrNull()) }
+    single<AiImageGateway> { OpenAiImageRepository(getOrNull(), getOrNull(), lazy { getOrNull<AiTextGateway>() }) }
     single<StoryImageStorageGateway> { StoryImageStorageRepository(androidContext()) }
     single<AiSkillGateway> { AiSkillRepository(get(), get()) }
     single<CustomAgentToolGateway> { CustomAgentToolRepository(get()) }

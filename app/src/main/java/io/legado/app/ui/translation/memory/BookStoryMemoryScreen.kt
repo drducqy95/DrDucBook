@@ -642,7 +642,7 @@ private fun StoryMemoryEditorDialog(
                     )
                 }
                 if (
-                    draft.originalId != null &&
+                    draft.primary.isNotBlank() &&
                     draft.kind in setOf(
                         AiTranslationStoryMemoryKind.ENTITY,
                         AiTranslationStoryMemoryKind.WORLD_BUILDING,
