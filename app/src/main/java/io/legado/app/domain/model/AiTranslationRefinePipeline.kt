@@ -609,7 +609,7 @@ object AiTranslationRefinePipeline {
         appendLine("8. Read LOCKED_TRANSLATION_MEMORY before extracting memory. A user-edited entry is immutable; reuse its target, category, and naming style exactly and never create a duplicate.")
         appendLine("9. Add only reusable names, items, techniques, places, factions, ranks, systems, and terms to translation_memory. The raw value must occur exactly in RAW and the target must be Vietnamese without CJK or U+XXXX.")
         appendLine("10. Naming rules: ancient Chinese/xianxia uses consistent Sino-Vietnamese; Western settings keep Latin spelling; Japanese uses Hepburn; Korean uses Revised Romanization. Keep item, technique, rank, and place categories stable; never mix ancient and Western naming styles. Use sense_key only when the same raw truly has different meanings; category alone is not a sense discriminator.")
-        appendLine("11. Fill story_timeline with: summary (chapter continuity summary), events (key plot events), characters (characters in this chapter with raw, target, status new or existing, role, and relationships), and discoveries (new items, equipment, techniques, locations, factions). Also fill relationships and world_building when new continuity facts appear.")
+        appendLine("11. Fill story_timeline with: chapter_title (translated title of this chapter in natural Vietnamese title case, e.g. \"Chương 1: Trên Trời Rơi Xuống Kỳ Duyên\"), summary (chapter continuity summary), events (key plot events), characters (characters in this chapter with raw, target, status new or existing, role, and relationships), and discoveries (new items, equipment, techniques, locations, factions). Also fill relationships and world_building when new continuity facts appear.")
         appendLine("12. Every relationship endpoint must be a raw entity name occurring in RAW or in existing memory.")
         appendLine("13. Populate relationships whenever characters, factions, or entities interact or their connections appear in this chapter. Each item must have source, target, relationship, and description. Keep translation_memory and grammar_notes concise.")
         appendLine("14. name_candidates (if present) lists algorithmically-detected foreign names with origin (western/japanese/korean) and suggested romanization. Use 'suggested' as a starting hint, then choose the most natural spelling for the genre. If a locked_dictionary target exists for that name, the locked target takes absolute precedence.")
@@ -625,7 +625,7 @@ object AiTranslationRefinePipeline {
         }
         appendLine()
         appendLine("Output JSON schema (one object, no markdown):")
-        appendLine("""{"refined_segments":[{"id":1,"refined_translation":"..."}],"story_timeline":{"summary":"...","events":[],"characters":[{"raw":"...","target":"...","status":"new|existing","role":"...","relationships":[]}],"discoveries":[{"raw":"...","target":"...","sense_key":"","category":"equipment|weapon|technique|faction|location|item|rank|system|concept|other","description":"...","entity_refs":[]}]},"translation_memory":[{"raw":"...","target":"...","sense_key":"","kind":"entity|world|term","origin":"chinese|western|japanese|korean|unknown","name_type":"person|place|faction|title|item|technique|background|term","naming_style":"ancient_sino_vietnamese|western_latin|japanese_hepburn|korean_revised|modern_vietnamese|literal_term","category":"character|weapon|technique|location|faction|rank|system|concept|other","aliases":[]}],"new_entities":[],"relationships":[{"source":"...","target":"...","relationship":"...","description":"..."}],"world_building":[],"grammar_notes":[]}""")
+        appendLine("""{"refined_segments":[{"id":1,"refined_translation":"..."}],"story_timeline":{"chapter_title":"Chương 1: Tiêu đề chương tiếng Việt","summary":"...","events":[],"characters":[{"raw":"...","target":"...","status":"new|existing","role":"...","relationships":[]}],"discoveries":[{"raw":"...","target":"...","sense_key":"","category":"equipment|weapon|technique|faction|location|item|rank|system|concept|other","description":"...","entity_refs":[]}]},"translation_memory":[{"raw":"...","target":"...","sense_key":"","kind":"entity|world|term","origin":"chinese|western|japanese|korean|unknown","name_type":"person|place|faction|title|item|technique|background|term","naming_style":"ancient_sino_vietnamese|western_latin|japanese_hepburn|korean_revised|modern_vietnamese|literal_term","category":"character|weapon|technique|location|faction|rank|system|concept|other","aliases":[]}],"new_entities":[],"relationships":[{"source":"...","target":"...","relationship":"...","description":"..."}],"world_building":[],"grammar_notes":[]}""")
     }
 
     fun toCompactJson(contextPack: AiTranslationContextPack): String {
@@ -700,6 +700,23 @@ object AiTranslationRefinePipeline {
                 expectedIds = expectedIds,
                 targetLanguage = "",
             )
+        }
+        if (expectedIds.size == 1) {
+            val clean = rawOutput
+                .replace(markdownFencePattern, "$1")
+                .trim()
+                .removeSurrounding("\"")
+                .trim()
+            if (clean.isNotBlank()) {
+                return AiTranslationRefinerResult(
+                    refined_segments = listOf(
+                        AiTranslationRefinedSegment(
+                            id = expectedIds.first(),
+                            refined_translation = clean,
+                        )
+                    )
+                )
+            }
         }
         throw IllegalArgumentException("AI did not return a valid refiner JSON object")
     }
@@ -1111,7 +1128,11 @@ object AiTranslationRefinePipeline {
                         )
                     }
                 }.orEmpty().filter { it.raw.isNotBlank() }.take(80)
+            val chapterTitle = obj.string("chapter_title")
+                ?: obj.string("chapterTitle")
+                ?: ""
             AiTranslationStoryTimeline(
+                chapterTitle = chapterTitle.trim(),
                 summary = summary,
                 events = events,
                 characters = characters,

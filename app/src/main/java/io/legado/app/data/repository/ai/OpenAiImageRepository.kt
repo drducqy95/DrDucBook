@@ -2,7 +2,10 @@ package io.legado.app.data.repository.ai
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import io.legado.app.data.AppDatabase
 import io.legado.app.domain.gateway.AiImageGateway
+import io.legado.app.domain.gateway.AiSecretStore
+import io.legado.app.domain.model.AiCredentialStatus
 import io.legado.app.domain.model.AiImageGenerateRequest
 import io.legado.app.domain.model.AiImageGenerateResult
 import io.legado.app.domain.model.AiProtocol
@@ -16,20 +19,33 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Base64
 
-class OpenAiImageRepository : AiImageGateway {
+class OpenAiImageRepository(
+    private val secretStore: AiSecretStore? = null,
+    private val appDb: AppDatabase? = null,
+) : AiImageGateway {
 
     override suspend fun generate(request: AiImageGenerateRequest): AiImageGenerateResult =
         withContext(Dispatchers.IO) {
-            val provider = request.model.provider
+            val rawProvider = request.model.provider
             require(
-                provider.protocol == AiProtocol.OPENAI_CHAT_COMPLETIONS ||
-                    provider.protocol == AiProtocol.OPENAI_RESPONSES
+                rawProvider.protocol == AiProtocol.OPENAI_CHAT_COMPLETIONS ||
+                    rawProvider.protocol == AiProtocol.OPENAI_RESPONSES
             ) { "Story image generation currently requires an OpenAI-compatible provider" }
+            val resolvedApiKey = if (rawProvider.apiKey.isNotBlank()) {
+                rawProvider.apiKey
+            } else {
+                val credential = appDb?.aiRouterDao?.getCredentialsForProvider(rawProvider.id)
+                    ?.firstOrNull { it.enabled && AiCredentialStatus.isRouterEligible(it.status) }
+                if (credential != null && secretStore != null) {
+                    secretStore.get(credential.id).orEmpty()
+                } else ""
+            }
+            val provider = rawProvider.copy(apiKey = resolvedApiKey)
             require(
                 provider.baseUrl.isNotBlank() &&
                     provider.hasRequiredCredential() &&
                     request.model.modelId.isNotBlank()
-            ) { "Image provider configuration is incomplete" }
+            ) { "Cấu hình provider tạo ảnh chưa đầy đủ (thiếu Base URL hoặc API Key). Vui lòng kiểm tra Cài đặt AI." }
             val keyRotator = KeyRotator(provider.apiKey)
             retryWithBackoff(
                 maxAttempts = keyRotator.attemptsAtLeast(2),

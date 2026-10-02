@@ -78,6 +78,7 @@ class TranslationStoryMemoryUseCase(
     private val cachedChapterGateway: CachedChapterGateway,
     private val quickTranslationGateway: QuickTranslationGateway,
     private val quickDictionaryGateway: QuickDictionaryGateway? = null,
+    private val translateDynamicUiTextUseCase: TranslateDynamicUiTextUseCase? = null,
 ) {
 
     private val bookLocks = ConcurrentHashMap<String, Mutex>()
@@ -249,9 +250,14 @@ class TranslationStoryMemoryUseCase(
                             lastChapterIndex = chapter.index,
                         )
                     }
+                val resolvedChapterTitle = if (incomingTimeline.chapterTitle.isNotBlank() && !incomingTimeline.chapterTitle.containsCjk()) {
+                    incomingTimeline.chapterTitle.restructureChapterNumbers().toTitleCase()
+                } else {
+                    formatVietnameseChapterTitle(book.bookUrl, chapter.index, chapter.title)
+                }
                 val timeline = incomingTimeline.copy(
                     chapterIndex = chapter.index,
-                    chapterTitle = chapter.title,
+                    chapterTitle = resolvedChapterTitle,
                     characters = incomingTimeline.characters.filter { character ->
                         character.raw.isNotBlank() && (
                             source.contains(character.raw) ||
@@ -700,16 +706,18 @@ class TranslationStoryMemoryUseCase(
             .groupBy { it.chapterIndex }
             .map { (_, values) ->
                 val timeline = values.reduce { existing, incoming -> mergeTimeline(existing, incoming) }
+                val resolvedTitle = formatVietnameseChapterTitle(bookUrl, timeline.chapterIndex, timeline.chapterTitle)
                 AiTranslationStoryWikiRecord(
                     id = "$bookUrl|timeline|${timeline.chapterIndex}",
                     bookUrl = bookUrl,
                     bookName = bookName,
                     kind = AiTranslationStoryMemoryKind.TIMELINE,
-                    title = timeline.chapterTitle.ifBlank { "Chương ${timeline.chapterIndex + 1}" },
+                    title = resolvedTitle,
                     subtitle = timeline.summary,
                     chapterIndex = timeline.chapterIndex.takeIf { it >= 0 },
                     raw = timeline.characters.joinToString(", ") { it.raw },
                     description = timeline.events.joinToString(" · "),
+                    metadata = GSON.toJson(timeline.characters),
                 )
             }
             .sortedBy { it.chapterIndex }
@@ -795,6 +803,19 @@ class TranslationStoryMemoryUseCase(
             relationshipTags = relationshipTags,
             characterGraph = StoryWikiCharacterGraph(graphNodeMap.values.toList(), graphEdges),
         )
+    }
+
+    fun formatVietnameseChapterTitle(
+        bookUrl: String,
+        chapterIndex: Int,
+        title: String,
+    ): String {
+        if (title.isBlank()) return "Chương ${chapterIndex + 1}"
+        if (!title.containsCjk()) {
+            return title.restructureChapterNumbers().toTitleCase()
+        }
+        val translated = quickTranslationGateway.translate(title)
+        return translated.restructureChapterNumbers().toTitleCase()
     }
 
     private fun chapterRange(first: Int, last: Int): String? = when {

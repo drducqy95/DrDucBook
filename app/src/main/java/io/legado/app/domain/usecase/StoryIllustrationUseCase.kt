@@ -8,6 +8,7 @@ import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.AiTranslationStoryEntity
 import io.legado.app.domain.model.AiTranslationStoryMemorySnapshot
 import io.legado.app.domain.model.AiTranslationWorldEntry
+import kotlinx.coroutines.flow.firstOrNull
 
 class StoryIllustrationUseCase(
     private val aiProfileGateway: AiProfileGateway,
@@ -115,7 +116,8 @@ class StoryIllustrationUseCase(
         size: String,
     ): String {
         val preset = aiProfileGateway.getTaskPreset(AiTaskType.GENERATE_STORY_IMAGE)
-            ?: error("Configure a default Story image generation preset in AI prompts first")
+            ?: resolveDefaultImagePreset()
+            ?: error("Chưa cấu hình preset tạo ảnh cho Story Wiki. Vui lòng thêm preset hoặc chọn model OpenAI/DALL-E trong Cài đặt AI.")
         val requestPrompt = listOf(preset.promptTemplate.trim(), prompt)
             .filter(String::isNotBlank)
             .joinToString("\n\n")
@@ -131,6 +133,29 @@ class StoryIllustrationUseCase(
             subjectKey = subjectKey,
             bytes = result.bytes,
             mimeType = result.mimeType,
+        )
+    }
+
+    private suspend fun resolveDefaultImagePreset(): io.legado.app.domain.model.AiTaskPresetConfig? {
+        val allModels = aiProfileGateway.observeModels().firstOrNull()?.filter { it.enabled }.orEmpty()
+        val imageModel = allModels.firstOrNull { model ->
+            model.modelId.contains("dall-e", ignoreCase = true) ||
+                model.modelId.contains("flux", ignoreCase = true) ||
+                model.modelId.contains("image", ignoreCase = true) ||
+                model.displayName.contains("dall-e", ignoreCase = true)
+        } ?: allModels.firstOrNull { model ->
+            val config = aiProfileGateway.getModelConfig(model.id)
+            config?.provider?.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_CHAT_COMPLETIONS ||
+                config?.provider?.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_RESPONSES
+        } ?: return null
+
+        val modelConfig = aiProfileGateway.getModelConfig(imageModel.id) ?: return null
+        return io.legado.app.domain.model.AiTaskPresetConfig(
+            id = "default_generate_story_image",
+            name = "Default Story Image",
+            taskType = AiTaskType.GENERATE_STORY_IMAGE,
+            promptTemplate = io.legado.app.domain.model.AiPromptTemplate.DEFAULT_STORY_IMAGE,
+            model = modelConfig,
         )
     }
 

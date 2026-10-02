@@ -241,13 +241,46 @@ class TranslateDynamicUiTextUseCase(
         book: Book? = null,
         contextText: String = originalText,
         forceRetranslate: Boolean = false,
-    ): Result<String> = execute(
-        scopeKey = "$scopeKey:title",
-        originalText = originalText,
-        book = book,
-        contextText = contextText,
-        forceRetranslate = forceRetranslate,
-    ).map { it.restructureChapterNumbers().toTitleCase() }
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (originalText.isBlank() || !originalText.containsCjk()) {
+            return@withContext Result.success(originalText)
+        }
+        val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val titleScopeKey = "$scopeKey:title"
+        if (!forceRetranslate) {
+            translationCacheGateway.readDynamicUiTranslation(
+                scopeKey = titleScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = TranslationConstants.PROVIDER_APP_AI,
+            )?.let { return@withContext Result.success(it.restructureChapterNumbers().toTitleCase()) }
+        }
+        execute(
+            scopeKey = titleScopeKey,
+            originalText = originalText,
+            book = book,
+            contextText = contextText,
+            forceRetranslate = forceRetranslate,
+        ).map { it.restructureChapterNumbers().toTitleCase() }
+    }
+
+    suspend fun saveAiChapterTitle(
+        scopeKey: String,
+        originalText: String,
+        aiTitle: String,
+    ) = withContext(Dispatchers.IO) {
+        if (originalText.isBlank() || aiTitle.isBlank() || aiTitle.containsCjk()) return@withContext
+        val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val titleScopeKey = "$scopeKey:title"
+        val formatted = aiTitle.restructureChapterNumbers().toTitleCase()
+        translationCacheGateway.writeDynamicUiTranslation(
+            scopeKey = titleScopeKey,
+            originalText = originalText,
+            targetLanguage = targetLanguage,
+            provider = TranslationConstants.PROVIDER_APP_AI,
+            translatedText = formatted,
+        )
+    }
 
     suspend fun executeChapterTitles(
         scopeKey: String,

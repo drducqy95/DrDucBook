@@ -330,8 +330,8 @@ class AiRouterRepository(
                 resolveRoute(request)
             } catch (error: CancellationException) {
                 throw error
-            } catch (error: Throwable) {
-                return Result.failure(classify(error, request))
+            } catch (_: Throwable) {
+                null
             } ?: return delegate.generate(resolveDirectRequest(request))
         }
         return Result.failure(
@@ -344,8 +344,8 @@ class AiRouterRepository(
             resolveRoute(request)
         } catch (error: CancellationException) {
             throw error
-        } catch (error: Throwable) {
-            throw classify(error, request)
+        } catch (_: Throwable) {
+            null
         } ?: run {
             val direct = resolveDirectRequest(request)
             delegate.generateStream(direct).collect { emit(it) }
@@ -435,13 +435,14 @@ class AiRouterRepository(
         val explicitRouteId = request.routeProfileId?.takeIf(String::isNotBlank)
         val profile = if (explicitRouteId != null) {
             val route = dao.getRoute(explicitRouteId)
-                ?: error("AI route not found")
-            require(route.enabled) { "AI route is disabled" }
-            require(route.taskType == taskType) { "AI route does not match task $taskType" }
-            route.toConfig()
+            if (route != null && route.enabled && route.taskType == taskType) {
+                route.toConfig()
+            } else {
+                dao.getActiveRoute(taskType)?.toConfig()
+            }
         } else {
-            dao.getActiveRoute(taskType)?.toConfig() ?: return null
-        }
+            dao.getActiveRoute(taskType)?.toConfig()
+        } ?: return null
         val now = clock.millis()
         val outputContract = request.outputContract.ifBlank {
             AiOutputContract.forTask(profile.taskType, request.tools.isNotEmpty())
@@ -460,7 +461,7 @@ class AiRouterRepository(
             targets = dao.getEnabledTargets(profile.id),
             now = now,
         )
-        if (entities.isEmpty()) error("AI route has no enabled targets")
+        if (entities.isEmpty()) return null
         val credentials = entities.mapNotNull(AiRouteTargetEntity::credentialId)
             .distinct()
             .associateWith { dao.getCredential(it) }

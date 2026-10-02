@@ -1,6 +1,7 @@
 package io.legado.app.ui.translation.memory
 
 import androidx.compose.foundation.clickable
+import com.google.gson.JsonParser
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -137,7 +138,7 @@ fun CharacterDossierSheet(
                     allRecords = allRecords,
                     onSelectRelatedRecord = onSelectRelatedRecord,
                 )
-                3 -> TimelineTabContent(timelineEvents = characterTimeline)
+                3 -> TimelineTabContent(record = record, profile = profile, timelineEvents = characterTimeline)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -539,11 +540,25 @@ private fun RelationshipsTabContent(
     }
 }
 
+private data class DistilledCharacterChronology(
+    val chapterTitle: String,
+    val chapterIndex: Int?,
+    val roleBadge: String?,
+    val characterSummary: String,
+    val directEvents: List<String>,
+)
+
 @Composable
 private fun TimelineTabContent(
+    record: AiTranslationStoryWikiRecord,
+    profile: CharacterProfileDetails?,
     timelineEvents: List<AiTranslationStoryWikiRecord>,
 ) {
-    if (timelineEvents.isEmpty()) {
+    val distilledEvents = remember(record, profile, timelineEvents) {
+        distillCharacterChronology(record, profile, timelineEvents)
+    }
+
+    if (distilledEvents.isEmpty()) {
         NormalCard(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = stringResource(R.string.character_dossier_no_data),
@@ -553,37 +568,142 @@ private fun TimelineTabContent(
             )
         }
     } else {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            timelineEvents.forEach { event ->
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            distilledEvents.forEach { event ->
                 NormalCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(
-                            text = event.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        if (event.subtitle.isNotBlank()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
                             Text(
-                                text = event.subtitle,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                text = event.chapterTitle,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            if (event.roleBadge != null) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = RoundedCornerShape(4.dp),
+                                    modifier = Modifier.padding(start = 6.dp),
+                                ) {
+                                    Text(
+                                        text = event.roleBadge,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    )
+                                }
+                            }
+                        }
+
+                        if (event.characterSummary.isNotBlank()) {
+                            Text(
+                                text = event.characterSummary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
                             )
                         }
-                        if (event.description.isNotBlank()) {
-                            Text(
-                                text = event.description,
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
+
+                        if (event.directEvents.isNotEmpty()) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                                modifier = Modifier.padding(start = 4.dp),
+                            ) {
+                                event.directEvents.forEach { ev ->
+                                    Row(
+                                        verticalAlignment = Alignment.Top,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    ) {
+                                        Text(
+                                            text = "•",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Text(
+                                            text = ev,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+private fun distillCharacterChronology(
+    record: AiTranslationStoryWikiRecord,
+    profile: CharacterProfileDetails?,
+    timelineEvents: List<AiTranslationStoryWikiRecord>,
+): List<DistilledCharacterChronology> {
+    val nameCandidates = buildSet {
+        if (record.title.isNotBlank()) add(record.title.trim().lowercase())
+        if (record.raw.isNotBlank()) add(record.raw.trim().lowercase())
+        profile?.titles?.forEach { title ->
+            if (title.isNotBlank()) add(title.trim().lowercase())
+        }
+    }
+
+    return timelineEvents.mapNotNull { event ->
+        val characterInfo = runCatching {
+            if (event.metadata.isNotBlank()) {
+                val array = JsonParser.parseString(event.metadata).asJsonArray
+                array.mapNotNull { elem ->
+                    val obj = elem.asJsonObject
+                    val raw = obj.get("raw")?.asString.orEmpty()
+                    val target = obj.get("target")?.asString.orEmpty()
+                    val role = obj.get("role")?.asString.orEmpty()
+                    if (nameCandidates.any { it == raw.lowercase() || it == target.lowercase() }) role else null
+                }.firstOrNull()
+            } else null
+        }.getOrNull()
+
+        val summarySentences = event.subtitle
+            .split(Regex("[.!?;\n]+"))
+            .map(String::trim)
+            .filter { sentence ->
+                sentence.isNotBlank() && nameCandidates.any { name -> sentence.lowercase().contains(name) }
+            }
+
+        val distilledSummary = when {
+            summarySentences.isNotEmpty() -> summarySentences.joinToString(". ") + "."
+            !characterInfo.isNullOrBlank() -> "Hành trạng trong chương: $characterInfo"
+            event.subtitle.isNotBlank() -> event.subtitle.take(160) + if (event.subtitle.length > 160) "…" else ""
+            else -> ""
+        }
+
+        val directEvents = event.description
+            .split(Regex("·|\\n"))
+            .map(String::trim)
+            .filter { ev ->
+                ev.isNotBlank() && nameCandidates.any { name -> ev.lowercase().contains(name) }
+            }
+
+        val isMentioned = summarySentences.isNotEmpty() || directEvents.isNotEmpty() ||
+            !characterInfo.isNullOrBlank() ||
+            nameCandidates.any { name -> event.raw.lowercase().contains(name) }
+
+        if (!isMentioned) return@mapNotNull null
+
+        DistilledCharacterChronology(
+            chapterTitle = event.title,
+            chapterIndex = event.chapterIndex,
+            roleBadge = characterInfo?.takeIf(String::isNotBlank),
+            characterSummary = distilledSummary,
+            directEvents = directEvents,
+        )
     }
 }
 

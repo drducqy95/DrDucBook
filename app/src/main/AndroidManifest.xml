@@ -285,6 +285,16 @@
             android:name="io.legado.app.ui.book.source.manage.BookSourceActivity"
             android:enableOnBackInvokedCallback="false"
             android:launchMode="singleTop" />
+        <activity
+            android:name="io.legado.app.ui.vbook.importer.VbookImportActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name="io.legado.app.ui.book.source.health.SourceHealthActivity"
+            android:enableOnBackInvokedCallback="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize" />
         <!-- 订阅源管理 -->
         <activity
             android:name="io.legado.app.ui.rss.source.manage.RssSourceActivity"

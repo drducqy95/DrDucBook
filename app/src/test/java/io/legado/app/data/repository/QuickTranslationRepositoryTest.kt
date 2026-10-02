@@ -1335,6 +1335,87 @@ class QuickTranslationRepositoryTest {
         assertTrue("Output should contain 'Nhân Tiên': $actual", actual.contains("Nhân Tiên"))
         assertFalse("Output must not contain 'không có mặt': $actual", actual.contains("không có mặt"))
     }
+
+    @Test
+    fun regressionAttributiveCuaAndGrammarFixed() {
+        val repo = QuickTranslationRepository()
+        val text1 = "整条右臂无力的垂下。"
+        val actual1 = repo.translate(text1, emptyList()).lowercase()
+        assertFalse("Should not have 'của bất lực' in: $actual1", actual1.contains("của bất lực"))
+        assertTrue("Should have 'bất lực' in: $actual1", actual1.contains("bất lực"))
+
+        val text2 = "一模一样的境界。唯我独尊的意境。不可思议的境界。肉身成圣的境界。"
+        val actual2 = repo.translate(text2, emptyList()).lowercase()
+        assertFalse("Should not have 'của giống hệt' in: $actual2", actual2.contains("của giống hệt"))
+        assertTrue("Should have 'giống hệt' in: $actual2", actual2.contains("giống hệt"))
+        assertFalse("Should not have 'của duy ngã' in: $actual2", actual2.contains("của duy ngã"))
+        assertTrue("Should have 'duy ngã độc tôn' in: $actual2", actual2.contains("duy ngã độc tôn"))
+        assertFalse("Should not have 'của tư nghị' in: $actual2", actual2.contains("của tư nghị"))
+        assertTrue("Should have 'không thể tưởng tượng' in: $actual2", actual2.contains("không thể tưởng tượng"))
+        assertFalse("Should not have 'của thành thánh' in: $actual2", actual2.contains("của thành thánh"))
+        assertTrue("Should have 'nhục thân thành thánh' in: $actual2", actual2.contains("nhục thân thành thánh"))
+
+        val text3 = "真是生不如死他妈的。主人，这是不可能的。赵奇的话音刚落。一系列境界。"
+        val actual3 = repo.translate(text3, emptyList()).lowercase()
+        assertFalse("Should not have 'của mụ hắn' in: $actual3", actual3.contains("của mụ hắn"))
+        assertTrue("Should have 'mẹ nó' in: $actual3", actual3.contains("mẹ nó"))
+        assertFalse("Should not have 'của không thể' in: $actual3", actual3.contains("của không thể"))
+        assertTrue("Should have 'không thể nào' in: $actual3", actual3.contains("không thể nào"))
+        assertFalse("Should not have 'vừa dứt lời của' in: $actual3", actual3.contains("vừa dứt lời của"))
+        assertFalse("Should not have 'của loạt' in: $actual3", actual3.contains("của loạt"))
+        assertTrue("Should have 'một loạt cảnh giới' in: $actual3", actual3.contains("một loạt cảnh giới"))
+
+        // Legitimate person possession should still work
+        val textPossession = "张元清的房间。"
+        val actualPossession = repo.translate(
+            textPossession,
+            listOf(DictPair("张元清", "Trương Nguyên Thanh"), DictPair("房间", "phòng"))
+        ).lowercase()
+        assertTrue("Should preserve legitimate possession: $actualPossession", actualPossession.contains("phòng của trương nguyên thanh"))
+    }
+
+    @Test
+    fun regressionYangShenWorldAndAcupointsAttributiveFixed() {
+        val repo = QuickTranslationRepository()
+
+        // Test 1: Yang Shen world, temple location and three buddhas treasure
+        val text1 = "阳神世界中大禅寺里仅次于过去，现在，未来三大佛陀武学的镇寺之宝！"
+        val actual1 = repo.translate(text1, emptyList()).lowercase()
+        assertFalse("Should not have 'dương thần trong thế giới' in: $actual1", actual1.contains("dương thần trong thế giới"))
+        assertFalse("Should not have 'đại thiền trong tự' in: $actual1", actual1.contains("đại thiền trong tự"))
+        assertFalse("Should not have 'võ học của bảo vật' in: $actual1", actual1.contains("võ học của bảo vật"))
+        assertTrue("Should have 'trong đại thiền tự' in: $actual1", actual1.contains("trong đại thiền tự"))
+        assertTrue("Should have 'thế giới dương thần' in: $actual1", actual1.contains("thế giới dương thần"))
+        assertTrue("Should have 'bảo vật trấn tự' in: $actual1", actual1.contains("bảo vật trấn tự"))
+        assertTrue("Should have 'quá khứ, hiện tại, vị lai' in: $actual1", actual1.contains("quá khứ, hiện tại, vị lai"))
+
+        // Test 2: Acupoints measurement and cultivation essence
+        val text2 = "关于周身一千二百九十六道穴窍的测量与开辟的方法。人仙一系功法的精华部分就是达到人仙后。"
+        val actual2 = repo.translate(text2, emptyList()).lowercase()
+        assertFalse("Should not have 'khảo sát của khiếu' in: $actual2", actual2.contains("khảo sát của khiếu"))
+        assertFalse("Should not have 'đặc điểm tốt nhất của công pháp phần' in: $actual2", actual2.contains("đặc điểm tốt nhất của công pháp phần"))
+        assertFalse("Should not have 'phần chính xác' in: $actual2", actual2.contains("phần chính xác"))
+        assertTrue("Should have 'huyệt khiếu' in: $actual2", actual2.contains("huyệt khiếu"))
+        assertTrue("Should have 'phần tinh hoa' in: $actual2", actual2.contains("phần tinh hoa"))
+        assertTrue("Should have 'đạt tới nhân tiên' in: $actual2", actual2.contains("đạt tới nhân tiên"))
+
+        // Test 3: Wu Sheng realm and points estimation
+        val text3 = "所以武圣级的功法需要的神力并不多，应该在20点左右。"
+        val actual3 = repo.translate(text3, emptyList()).lowercase()
+        assertFalse("Should not have 'vũ công pháp thánh cấp' in: $actual3", actual3.contains("vũ công pháp thánh cấp"))
+        assertFalse("Should not have '20 giờ trái phải' in: $actual3", actual3.contains("20 giờ trái phải"))
+        assertTrue("Should have 'cấp võ thánh' in: $actual3", actual3.contains("cấp võ thánh"))
+        assertTrue("Should have '20 điểm' in: $actual3", actual3.contains("20 điểm"))
+
+        // Test 4: Relief speech, divine power reserve and technique invocation
+        val text4 = "“那就好。”赵奇大松了口气，还好没有超过自己的神灵力储备。“那就出来吧，《大威天龙菩萨观》！”"
+        val actual4 = repo.translate(text4, emptyList()).lowercase()
+        assertFalse("Should not have 'nhẹ nhàng thở ra lớn' in: $actual4", actual4.contains("nhẹ nhàng thở ra lớn"))
+        assertFalse("Should not have 'thần linh lực của mình dự trữ' in: $actual4", actual4.contains("thần linh lực của mình dự trữ"))
+        assertFalse("Should not have 'xuất có lẽ đến' in: $actual4", actual4.contains("xuất có lẽ đến"))
+        assertTrue("Should have 'thở phào' in: $actual4", actual4.contains("thở phào"))
+        assertTrue("Should have 'xuất hiện đi' in: $actual4", actual4.contains("xuất hiện đi"))
+    }
 }
 
 private fun isQuickDictionaryCjkForTest(codePoint: Int): Boolean =

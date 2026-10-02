@@ -65,4 +65,35 @@ class TranslateDynamicUiTextUseCaseTest {
             "hoắc cách học của watts bảng".toTitleCase()
         )
     }
+
+    @Test
+    fun refinerHandlesSingleSegmentPlainTextFallback() {
+        val result = io.legado.app.domain.model.AiTranslationRefinePipeline.parseRefinerStructureOutput(
+            rawOutput = "\"Tiêu Viêm\"",
+            expectedIds = listOf(0),
+        )
+        org.junit.Assert.assertEquals(1, result.refined_segments.size)
+        org.junit.Assert.assertEquals(0, result.refined_segments.first().id)
+        org.junit.Assert.assertEquals("Tiêu Viêm", result.refined_segments.first().refined_translation)
+    }
+
+    @Test
+    fun refinerParsesChapterTitleInStoryTimeline() {
+        val json = """
+            {
+                "refined_segments": [{"id": 0, "refined_translation": "Nội dung chương"}],
+                "story_timeline": {
+                    "chapter_title": "Chương 1: Mở Đầu Kỳ Duyên",
+                    "summary": "Tóm tắt chương 1",
+                    "events": ["Sự kiện 1"]
+                }
+            }
+        """.trimIndent()
+        val result = io.legado.app.domain.model.AiTranslationRefinePipeline.parseRefinerStructureOutput(
+            rawOutput = json,
+            expectedIds = listOf(0),
+        )
+        org.junit.Assert.assertEquals("Chương 1: Mở Đầu Kỳ Duyên", result.story_memory?.timeline?.chapterTitle)
+        org.junit.Assert.assertEquals("Tóm tắt chương 1", result.story_memory?.timeline?.summary)
+    }
 }

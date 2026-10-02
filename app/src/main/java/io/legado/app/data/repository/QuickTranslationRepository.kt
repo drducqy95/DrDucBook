@@ -1953,12 +1953,28 @@ class QuickTranslationRepository(
         rightTarget: String,
         matches: RuntimeMatchIndex? = null,
     ): String? {
+        if (isVerbOrAction(right, rightTarget, matches)) {
+            if (posOf(left, matches) in setOf(TermPos.ADVERB, TermPos.ADJECTIVE) ||
+                isDescriptiveModifier(left) ||
+                isActionAttributiveModifier(left, leftTarget, matches)
+            ) {
+                return listOf(leftTarget, rightTarget).joinToStringByWord { it }
+            }
+        }
         if (isPersonHead(right) && isActionAttributiveModifier(left, leftTarget, matches)) {
             return listOf(rightTarget, leftTarget).joinToStringByWord { it }
         }
         if (isPossessiveOwner(left)) return null
         if (posOf(right, matches) in ATTRIBUTIVE_ACTION_HEAD_POS &&
             isActionAttributiveModifier(left, leftTarget, matches)
+        ) {
+            return listOf(rightTarget, leftTarget).joinToStringByWord { it }
+        }
+        val lowerRight = rightTarget.lowercase()
+        if (ABSTRACT_CONCEPT_TARGETS.any { lowerRight.contains(it) } &&
+            (posOf(left, matches) == TermPos.ADJECTIVE ||
+                isDescriptiveModifier(left) ||
+                isActionAttributiveModifier(left, leftTarget, matches))
         ) {
             return listOf(rightTarget, leftTarget).joinToStringByWord { it }
         }
@@ -1975,6 +1991,19 @@ class QuickTranslationRepository(
                 else -> null
             }
         }
+    }
+
+    private fun isVerbOrAction(
+        match: TermMatch,
+        target: String,
+        matches: RuntimeMatchIndex?,
+    ): Boolean {
+        val pos = posOf(match, matches)
+        if (pos == TermPos.VERB) return true
+        val source = match.term.source
+        if (VERB_SOURCE_SUFFIXES.any(source::endsWith)) return true
+        val lowerTarget = target.lowercase()
+        return VERB_TARGET_PREFIXES.any(lowerTarget::startsWith)
     }
 
     private fun isActionAttributiveModifier(
@@ -2035,10 +2064,27 @@ class QuickTranslationRepository(
     private fun isPossessiveOwner(match: TermMatch): Boolean {
         val source = match.term.source
         if (source in POSSESSIVE_OWNER_SOURCES) return true
+        if (match.term.type == QuickDictionaryType.NAME || isPersonHead(match)) return true
         val target = match.term.target
-        if (target.any(Char::isUpperCase)) return true
+        if (target.any(Char::isUpperCase) && isLikelyPersonName(target, source)) return true
         val normalized = target.lowercase()
-        return POSSESSIVE_OWNER_TARGETS.any(normalized::contains)
+        if (POSSESSIVE_OWNER_TARGETS.any { normalized == it || normalized.contains(it) }) return true
+        if (isDescriptiveModifier(match) || isLocationModifier(match)) return false
+        val pos = match.term.runtimePos
+        if (pos == TermPos.ADJECTIVE || pos == TermPos.VERB || pos == TermPos.LOCATION) return false
+        if (source.length >= 2 && NON_PERSON_NAME_SUFFIXES.any(source::endsWith)) return false
+        return false
+    }
+
+    private fun isLikelyPersonName(target: String, source: String): Boolean {
+        if (source.any { it in NON_PERSON_SOURCE_CHARS }) return false
+        if (NON_PERSON_NAME_SUFFIXES.any(source::endsWith)) return false
+        val words = target.trim().split(Regex("\\s+"))
+        if (words.size !in 2..4) return false
+        if (!words.all { it.isNotEmpty() && it.first().isUpperCase() }) return false
+        val lower = target.lowercase()
+        if (NON_PERSON_TARGET_WORDS.any { lower.contains(it) }) return false
+        return true
     }
 
     private fun isAgeModifier(match: TermMatch): Boolean {
@@ -2059,10 +2105,14 @@ class QuickTranslationRepository(
     }
 
     private fun isDescriptiveModifier(match: TermMatch): Boolean {
+        if (match.term.type == QuickDictionaryType.NAME) return false
+        val target = match.term.target
         val source = match.term.source
+        if (target.any(Char::isUpperCase) && isLikelyPersonName(target, source)) return false
+        if (isPersonHead(match)) return false
         if (isDescriptiveSource(source)) return true
-        val target = match.term.target.lowercase()
-        return DESCRIPTIVE_MODIFIER_TARGET_PREFIXES.any(target::startsWith)
+        val lowerTarget = target.lowercase()
+        return DESCRIPTIVE_MODIFIER_TARGET_PREFIXES.any(lowerTarget::startsWith)
     }
 
     private fun isDescriptiveSource(source: String): Boolean {
@@ -4340,10 +4390,10 @@ class QuickTranslationRepository(
 
     companion object {
         private const val MAPPED_ENGINE = "quick_translator_exact"
-        private const val PACK_VERSION = "qt-clean-4.2.24"
+        private const val PACK_VERSION = "qt-clean-4.2.26"
         private const val QT2025_PACK_VERSION =
-            "qt2025-302f9f8d+qt-clean-4.2.24+runtime-3-entity-lock"
-        private const val QT2020_PACK_VERSION = "qt2020-2025.09.01+qt-clean-4.2.24"
+            "qt2025-302f9f8d+qt-clean-4.2.26+runtime-3-entity-lock"
+        private const val QT2020_PACK_VERSION = "qt2020-2025.09.01+qt-clean-4.2.26"
         private const val QT2025_TERM_INDEX_ASSET = "offline/qt2025/qt2025-terms.qtdict"
         private const val QT2025_PHONETIC_ASSET = "offline/qt2025/ChinesePhienAmWords.txt"
         private const val QT2025_RULE_ASSET = "offline/qt2025/LuatNhan.txt"
@@ -4588,7 +4638,7 @@ class QuickTranslationRepository(
             "\u4E86",
             "\u8FC7",
         )
-        private val ATTRIBUTIVE_ACTION_HEAD_POS = setOf(TermPos.PERSON, TermPos.NAME)
+        private val ATTRIBUTIVE_ACTION_HEAD_POS = setOf(TermPos.PERSON, TermPos.NAME, TermPos.NOUN)
         private val ACTION_ATTRIBUTIVE_MARKERS = listOf(
             "\u7740",
             "\u5730",
@@ -4758,6 +4808,10 @@ class QuickTranslationRepository(
             "漆黑", "巨大", "古怪", "奇怪", "特殊", "普通", "平静", "冰冷",
             "温柔", "灿烂", "明亮", "清澈", "深邃", "灵动", "寻常",
             "更多", "更少", "很大", "微小", "极多", "极少",
+            "一模一样", "唯我独尊", "不可思议", "肉身成圣", "生不如死", "生生", "生生的",
+            "庞大庄严", "庄严", "未知", "神秘", "具体", "无力", "单纯", "完整", "基本",
+            "实打实", "珍稀", "稀有", "珍贵", "纯净", "雄厚", "狂暴", "浩瀚", "宏大",
+            "相同", "不同", "奇特", "微弱", "强烈", "绝对", "相对", "无穷", "无限",
             "对面", "旁边", "附近", "周围", "上方", "下方", "前边", "后边", "左边", "右边", "外边", "里边",
         )
         private val DESCRIPTIVE_MODIFIER_CHARS = setOf(
@@ -4765,6 +4819,13 @@ class QuickTranslationRepository(
             '蓝', '绿', '紫', '黄', '灰', '瘦', '胖', '细', '粗', '新',
             '旧', '冷', '热', '美', '丑', '浓', '淡', '深', '浅', '柔',
             '硬', '精', '灵', '多', '少', '窄', '宽', '慢', '快',
+            '样', '同', '异', '殊', '常', '特', '奇', '妙', '绝', '纯',
+            '杂', '真', '假', '虚', '实', '强', '弱', '烈', '暴', '狂',
+            '静', '平', '稳', '乱', '危', '险', '安', '全', '整', '完',
+            '缺', '准', '确', '明', '暗', '清', '浊', '显', '隐', '微',
+            '圣', '神', '秘', '凡', '尊', '极', '严', '庞', '重', '轻',
+            '急', '缓', '软', '空', '无', '未', '知', '基', '本', '单',
+            '巨', '广', '宏',
         )
         private val DESCRIPTIVE_MODIFIER_TARGET_PREFIXES = listOf(
             "m\u1EC7t", "nhanh", "r\u1EA5t", "cao",
@@ -4774,6 +4835,34 @@ class QuickTranslationRepository(
             "ấm", "dịu", "sáng", "trong", "sâu", "linh",
             "hẹp", "rộng", "chậm", "nhiều", "ít", "tối thiểu", "tối đa", "đầy", "vô số",
             "đối diện", "bên cạnh", "gần đây", "xung quanh", "phía trên", "phía dưới", "phía trước", "phía sau", "bên trái", "bên phải", "bên ngoài", "bên trong",
+            "giống", "như", "khác", "thần bí", "huyền bí", "bất lực", "đơn thuần", "đơn giản",
+            "quý hiếm", "hiếm", "to lớn", "uy nghiêm", "thánh", "chưa biết", "cụ thể", "hoàn chỉnh",
+            "toàn bộ", "mạnh", "yếu", "sạch", "thuần khiết", "hùng hậu", "tự do", "vô thượng",
+            "tuyệt đối", "tương tự", "thực sự", "đặc biệt", "nguy hiểm", "chân chính", "thực thụ",
+            "không thể tưởng tượng", "duy ngã độc tôn", "nhục thân thành thánh", "sống sờ sờ",
+            "hoàn chỉnh", "tinh hoa", "cần thiết", "dự trữ", "đo lường", "khai mở",
+        )
+        private val ABSTRACT_CONCEPT_TARGETS = listOf(
+            "cảnh giới", "ý cảnh", "thần lực", "khí thế", "bối cảnh", "pháp bào",
+            "quy luật", "tham số", "nội dung", "sự tình", "biến cố", "thuộc tính",
+            "cơ thể", "bản chất", "thể hiện", "võ học", "công pháp", "pháp môn",
+            "thức mở đầu", "tướng", "ấn", "chi bảo", "lực lượng", "sức mạnh",
+            "âm thanh", "tiếng", "ký ức", "linh dược", "nghề nghiệp", "chức nghiệp",
+            "huyệt khiếu", "phương pháp", "tinh hoa", "dự trữ", "biểu hiện", "bảo vật",
+        )
+        private val NON_PERSON_SOURCE_CHARS = setOf(
+            '经', '典', '法', '印', '拳', '寺', '界', '域', '门', '派', '宗', '神', '仙',
+            '圣', '道', '体', '术', '功', '境', '式', '相', '国', '城', '阵', '殿', '阁', '峰', '谷'
+        )
+        private val NON_PERSON_NAME_SUFFIXES = listOf(
+            "经", "典", "法", "印", "拳", "寺", "界", "域", "门", "派", "宗", "神", "仙",
+            "圣", "道", "体", "术", "功", "境", "式", "相", "国", "城", "阵", "殿", "阁", "峰", "谷"
+        )
+        private val NON_PERSON_TARGET_WORDS = listOf(
+            "kinh", "điển", "pháp", "ấn", "quyền", "tự", "giới", "vực", "thần", "tiên",
+            "thánh", "đạo", "thể", "thuật", "công", "cảnh", "tướng", "chức nghiệp",
+            "nghề nghiệp", "quốc", "thành trì", "thành thánh", "trận", "điện", "các", "phong", "cốc",
+            "bảo", "bí bản", "quy luật", "tham số", "bối cảnh"
         )
         private val ADVERBIAL_SOURCES = listOf(
             "突然", "忽然", "立刻", "马上", "缓缓", "慢慢", "轻轻", "狠狠",

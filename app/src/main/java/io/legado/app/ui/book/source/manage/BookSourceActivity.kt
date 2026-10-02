@@ -40,9 +40,11 @@ import io.legado.app.ui.book.search.SearchActivity
 import io.legado.app.ui.book.search.SearchScope
 import io.legado.app.ui.book.source.debug.BookSourceDebugActivity
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.book.source.health.SourceHealthActivity
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.main.MainIntent
 import io.legado.app.ui.main.MainRouteConst
+import io.legado.app.ui.vbook.importer.VbookImportActivity
 import io.legado.app.ui.config.CheckSourceConfig
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.ui.qrcode.QrCodeResult
@@ -208,13 +210,9 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                 allowExtensions = arrayOf("zip")
             }
 
-            R.id.menu_import_vbook_registry -> startActivity<MainActivity> {
-                putExtra(MainIntent.EXTRA_START_ROUTE, MainRouteConst.ROUTE_VBOOK_IMPORT)
-            }
+            R.id.menu_import_vbook_registry -> startActivity<VbookImportActivity>()
 
-            R.id.menu_source_health -> startActivity<MainActivity> {
-                putExtra(MainIntent.EXTRA_START_ROUTE, MainRouteConst.ROUTE_SOURCE_HEALTH)
-            }
+            R.id.menu_source_health -> startActivity<SourceHealthActivity>()
 
             R.id.menu_import_onLine -> showImportDialog()
 
@@ -430,6 +428,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
     override fun onResume() {
         super.onResume()
         adapter.upResumed(true)
+        upBookSource(searchView.query?.toString())
     }
 
     override fun onPause() {

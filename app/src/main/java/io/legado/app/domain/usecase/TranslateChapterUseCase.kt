@@ -75,6 +75,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.IdentityHashMap
@@ -289,10 +290,10 @@ class TranslateChapterUseCase(
                 TranslationConstants.PROVIDER_REWRITE -> {
                     val preset = if (provider == TranslationConstants.PROVIDER_REWRITE) {
                         resolveRewritePreset(book)
-                            ?: error("No AI rewrite preset configured")
+                            ?: error("Chưa cấu hình preset hoặc model cho AI viết lại. Vui lòng vào Cài đặt AI để chọn model.")
                     } else {
                         resolveTranslationPreset(book)
-                            ?: error("No AI translation preset configured")
+                            ?: error("Chưa cấu hình preset hoặc model cho AI dịch. Vui lòng vào Cài đặt AI để chọn model.")
                     }
                     val promptStages = TranslationPromptStage.entries.associateWith { stage ->
                         aiPromptPresetGateway.getEnabledByTaskType(stage.taskType)
@@ -489,6 +490,42 @@ class TranslateChapterUseCase(
                 return@withContext Result.success(displayTranslation)
             }
 
+            val isAiTranslation = provider == TranslationConstants.PROVIDER_APP_AI ||
+                provider == TranslationConstants.PROVIDER_REWRITE
+            if (forceRetranslate && isAiTranslation) {
+                val existingAiTranslation = translationCacheGateway.getCurrentRevision(
+                    book = book,
+                    bookChapter = bookChapter,
+                    targetLanguage = targetLanguage,
+                    provider = provider,
+                    currentRawContentHash = rawContentHash,
+                )?.takeIf { it.content.isNotBlank() }?.content
+                    ?: translationCacheGateway.readCurrentTranslation(
+                        book = book,
+                        bookChapter = bookChapter,
+                        targetLanguage = targetLanguage,
+                        originalContentHash = rawContentHash,
+                        provider = provider,
+                    )
+                if (existingAiTranslation != null) {
+                    val displayTranslation = postProcessTranslation(
+                        existingAiTranslation,
+                        targetLanguage,
+                        isRewrite = isRewrite,
+                    )
+                    onProgress(
+                        TranslationProgress(
+                            currentChunk = 1,
+                            totalChunks = 1,
+                            mixedContent = displayTranslation,
+                            translatedChunkIndices = emptySet(),
+                            stage = "AI_CACHE_PRESERVED provider=$provider",
+                        )
+                    )
+                    return@withContext Result.success(displayTranslation)
+                }
+            }
+
             if (!forceRetranslate) {
                 val cachedTranslation = findPreferredMachineCache(
                     book = book,
@@ -604,6 +641,13 @@ class TranslateChapterUseCase(
                         "MEMORY_PENDING warning=${error.message ?: error::class.java.simpleName}"
                     },
                 ) ?: "MEMORY_DISABLED"
+                result.story_memory?.timeline?.chapterTitle?.takeIf { it.isNotBlank() && !it.containsCjk() }?.let { aiTitle ->
+                    translateDynamicUiTextUseCase.saveAiChapterTitle(
+                        scopeKey = "chapter-title:${book.bookUrl}:${bookChapter.index}",
+                        originalText = bookChapter.title,
+                        aiTitle = aiTitle,
+                    )
+                }
                 onProgress(
                     TranslationProgress(
                         currentChunk = completedChunkCount,
@@ -1571,6 +1615,20 @@ class TranslateChapterUseCase(
                 name = "Translation fallback",
                 promptTemplate = TranslationConstants.DEFAULT_PROMPT,
             )
+            ?: run {
+                val model = aiProfileGateway.observeModels().firstOrNull()?.firstOrNull { it.enabled }
+                if (model != null) {
+                    aiProfileGateway.getModelConfig(model.id)?.let { modelConfig ->
+                        AiTaskPresetConfig(
+                            id = "default_translation",
+                            name = "Default Translation",
+                            taskType = AiTaskType.TRANSLATE_CHAPTER,
+                            promptTemplate = TranslationConstants.DEFAULT_PROMPT,
+                            model = modelConfig,
+                        )
+                    }
+                } else null
+            }
         if (base == null) return null
         val effectivePrompt = resolveEffectiveTranslationPrompt(book, base.promptTemplate)
         return base.copy(promptTemplate = effectivePrompt)
@@ -1583,6 +1641,20 @@ class TranslateChapterUseCase(
                 name = "Rewrite fallback",
                 promptTemplate = AiPromptTemplate.DEFAULT_REWRITE,
             )
+            ?: run {
+                val model = aiProfileGateway.observeModels().firstOrNull()?.firstOrNull { it.enabled }
+                if (model != null) {
+                    aiProfileGateway.getModelConfig(model.id)?.let { modelConfig ->
+                        AiTaskPresetConfig(
+                            id = "default_rewrite",
+                            name = "Default Rewrite",
+                            taskType = AiTaskType.REWRITE_TEXT,
+                            promptTemplate = AiPromptTemplate.DEFAULT_REWRITE,
+                            model = modelConfig,
+                        )
+                    }
+                } else null
+            }
 
         if (basePreset == null) return null
 

@@ -209,3 +209,11 @@ cn.hutool.core.util.**{*;}
 -keep interface go.** { *; }
 -keep class io.legado.app.gowebdav.** { *; }
 -keep interface io.legado.app.gowebdav.** { *; }
+
+# Suppress missing classes from Apache POI, Log4j, Desktop Java AWT, OSGi, FindBugs, aQute
+-dontwarn java.awt.**
+-dontwarn org.osgi.framework.**
+-dontwarn aQute.bnd.**
+-dontwarn edu.umd.cs.findbugs.annotations.**
+-dontwarn org.apache.logging.log4j.**
+-dontwarn org.apache.poi.**

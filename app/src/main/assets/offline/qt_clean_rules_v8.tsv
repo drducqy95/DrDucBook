@@ -29,8 +29,94 @@ REPLACE	-115	\bcủa\s+(đã\s+từng|từng)\s+([\p{L}\p{M}]+)\b	$1 $2	clean_pa
 REPLACE	-115	\b(kết quả|hậu quả|nguyên nhân|quá trình|nội dung|mục đích|ý nghĩa)\s+của\s+(giải thích|phân tích|nghiên cứu|điều tra|giáo dục|đào tạo|huấn luyện)\b	$1 $2	clean_abstract_noun_cua_v2
 QT_TEMPLATE	870	不在{0}之下	không hề thua kém {0}	comparison
 QT_TEMPLATE	870	仅次于{0}	chỉ đứng sau {0}	comparison
-REPLACE	-115	\bkhông có mặt\s+(ở|trong|dưới|trên)\b	không $1	clean_khong_co_mat
-REPLACE	-115	\b(thế giới|tự|chùa|đền|phòng|núi|sơn|động)\s+trong\b	trong $1	clean_postposition_trong
+REPLACE	-115	\b(chùa|đền|phòng|núi|sơn|động)\s+trong\b	trong $1	clean_postposition_trong
+REPLACE	-115	\b(Dương Thần|Chư Thần|Ma Thú|Đấu La|Đấu Phá|Thôn Phệ|Già Thiên|Hoàn Mỹ|Phàm Nhân|Tiên Nghịch|Trùng Sinh|Hồng Hoang|Phong Thần)\s+(?:trong thế giới|thế giới trong)\b	trong thế giới $1	clean_named_world_inversion
+REPLACE	-115	《([^》]+)》\s*(?:thế giới trong|trong thế giới)\b	trong thế giới《$1》	clean_quoted_world_inversion
+REPLACE	-115	\b(Đại Thiền|Thiếu Lâm|Bạch Mã|Lan Nhược|Huyền Thiên|Kim Các|Bảo Tích|Trấn Hải)\s+(?:trong [tT]ự|[tT]ự trong)\b	trong $1 Tự	clean_named_temple_inversion
 REPLACE	-115	\bthịt linh song\b	linh nhục song tu	clean_linh_nhuc_censorship
 REPLACE	-115	\bvõ đạo của tu bí này\b	bí bản võ đạo	clean_tu_bi_nay
+QT_TEMPLATE	872	{0:person}的话音刚落	lời của {0} vừa dứt	speech_person
+QT_TEMPLATE	870	一系列{0:noun}	một loạt {0}	quantifier_series
+QT_TEMPLATE	870	一系列{0}	một loạt {0}	quantifier_series
+QT_TEMPLATE	870	动须弥的气血运转	vận chuyển khí huyết Động Tu Di	technique_action
+QT_TEMPLATE	870	动须弥	Động Tu Di	technique
+QT_TEMPLATE	870	不可思议的境界	cảnh giới không thể tưởng tượng	realm_attributive
+QT_TEMPLATE	870	肉身成圣的境界	cảnh giới nhục thân thành thánh	realm_attributive
+QT_TEMPLATE	870	一模一样的境界	cảnh giới giống hệt nhau	realm_attributive
+QT_TEMPLATE	870	唯我独尊的意境	ý cảnh duy ngã độc tôn	realm_attributive
+QT_TEMPLATE	870	庞大庄严的金色菩萨相	tướng Bồ Tát màu vàng kim to lớn uy nghiêm	statue_attributive
+QT_TEMPLATE	870	这属性简而言之	thuộc tính này nói tóm lại	phrase
+QT_TEMPLATE	870	咧开嘴的主神	Chủ Thần toét miệng cười	person_action
+REPLACE	-115	\b(cảnh giới|ý cảnh|bối cảnh|quy luật|tham số|nội dung|sức mạnh|lực lượng|nguyên tắc|pháp bào|biến cố|thuộc tính)\s+của\s+(thành thánh|giống hệt|không thể tưởng tượng|tư nghị|duy ngã độc tôn|cơ bản|cụ thể|chưa biết|huyền bí|thần bí)\b	$1 $2	clean_abstract_noun_attributive_cua
+REPLACE	-115	\b(rủ xuống|buông thõng|xé rách|hút cạn)\s+của\s+([\p{L}\p{M}]+)\b	$2 $1	clean_verb_attributive_cua
+REPLACE	-115	\bcủa\s+(không thể|thần lực|thành thánh|duy ngã độc tôn|mụ hắn|loạt|đơn giản)\b	$1	clean_particle_residual_cua
+REPLACE	-115	\b(thần lực)\s+của\s+(cần)\b	$1 cần thiết	clean_than_luc_cua_can
+REPLACE	-115	\bthật là sống không bằng chết của mụ hắn\b	thật là sống không bằng chết, mẹ nó	clean_curse_cua
+REPLACE	-115	\b[Cc]hủy liệt khai của\s+([\p{L}\p{M}]+)\b	$1 toét miệng cười	clean_smile_cua
+REPLACE	-115	\bvăn học của thần\b	Thần Văn Học	clean_god_title_cua
+REPLACE	-115	\bcơ bản của vũ trụ tham số\b	tham số cơ bản của vũ trụ	clean_universe_param_cua
+REPLACE	-115	\bsáng thế nghề nghiệp của thần\b	nghề nghiệp Sáng Thế Thần	clean_god_job_cua
+REPLACE	-115	\bvừa dứt lời của\s+([\p{L}\p{M}]+)\b	lời của $1 vừa dứt	clean_speech_cua
+REPLACE	-115	\bngười bình thường của khoảng\s+(\d+)\s+lần\b	khoảng $1 lần người bình thường	clean_multiple_cua
+REPLACE	-115	\bthân thể của đơn giản\b	thể xác đơn thuần	clean_body_cua
+REPLACE	-115	\bcủa\s+(thực thụ|danh bất hư truyền)\b	$1	clean_adj_cua_residual
+REPLACE	-115	\b1\s+cảnh giới của loạt\b	một loạt cảnh giới	clean_series_realm_cua
+REPLACE	-115	\bcảnh giới của loạt\b	loạt cảnh giới	clean_series_realm_cua_v2
+REPLACE	-115	\bkết thúc của xây dựng\b	tận cùng của kiến trúc	clean_building_end
+REPLACE	-115	\bmọi thứ thể hiện của lực\b	thể hiện của mọi sức mạnh	clean_power_expression
+REPLACE	-115	\bchỉ đứng thứ hai sau qua\b	chỉ đứng sau Quá Khứ	clean_past_buddha
+REPLACE	-115	\bquá,\s+bây giờ,\s+tương lai\s+Phật Đà\b	Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddhas
+REPLACE	-115	\btương lai Phật Đà ba đại\b	ba đại Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddhas_v2
+REPLACE	-115	\btrấn tự của võ học chi bảo\b	bảo vật võ học trấn tự	clean_temple_treasure
+REPLACE	-115	\blung lay tu di của thế\b	thế làm lay động Tu Di	clean_xumi_shi
+REPLACE	-115	\bcó thể đánh ra của\b	có thể đánh ra được	clean_da_de_chu_de
+REPLACE	-115	\bChủ nhân,\s+này là\.\s+Của không thể\b	Chủ nhân, điều này là không thể nào	clean_impossible_sentence
+REPLACE	-115	\btò mò của không thể không\b	tò mò vô cùng	clean_curious_extreme
+REPLACE	-115	\bJane nói của đơn\b	nói tóm lại	clean_jian_er_yan_zhi
+REPLACE	-115	\blượng lớn linh dược của hiếm\b	lượng lớn linh dược quý hiếm	clean_rare_elixir
+REPLACE	-115	\btôi thuộc tính của bây giờ\b	bảng thuộc tính hiện tại của ta	clean_my_property
+REPLACE	-115	\bcụ thể của ngài thuộc tính\b	thuộc tính cụ thể của ngài	clean_specific_property
+REPLACE	-115	\bchính xác thực của BUG\b	đúng là BUG thực thụ	clean_real_bug
+REPLACE	-115	\btôi khiến ông sự tình của xử lý\b	chuyện ta bảo ngươi xử lý	clean_handle_matter
+REPLACE	-115	\btục lệ cũ của cụ thể bối cảnh\b	thiết lập bối cảnh cụ thể	clean_background_setting
+REPLACE	-115	\bchỉ đứng thứ hai sau\b	chỉ đứng sau	clean_chi_dung_thu_hai_sau
+QT_TEMPLATE	870	{0}世界中	trong thế giới {0}	location_world
+QT_TEMPLATE	870	{0}世界里	trong thế giới {0}	location_world
+QT_TEMPLATE	870	在{0}世界中	trong thế giới {0}	location_world
+QT_TEMPLATE	870	在{0}世界里	trong thế giới {0}	location_world
+QT_TEMPLATE	870	《{0}》的世界	thế giới《{0}》	media_world
+QT_TEMPLATE	870	《{0}》世界中	trong thế giới《{0}》	media_world
+QT_TEMPLATE	870	《{0}》世界里	trong thế giới《{0}》	media_world
+QT_TEMPLATE	870	在《{0}》世界中	trong thế giới《{0}》	media_world
+QT_TEMPLATE	870	在《{0}》世界里	trong thế giới《{0}》	media_world
+QT_TEMPLATE	870	{0}寺里	trong {0} Tự	location_temple
+QT_TEMPLATE	870	{0}寺中	trong {0} Tự	location_temple
+QT_TEMPLATE	870	在{0}寺里	trong {0} Tự	location_temple
+QT_TEMPLATE	870	在{0}寺中	trong {0} Tự	location_temple
+QT_TEMPLATE	870	武圣级的{0}	{0} cấp Võ Thánh	realm_attributive
+QT_TEMPLATE	870	武圣级{0}	{0} cấp Võ Thánh	realm_attributive
+QT_TEMPLATE	870	人仙一系的{0}	{0} Nhân Tiên nhất hệ	lineage_attributive
+QT_TEMPLATE	870	人仙一系{0}	{0} Nhân Tiên nhất hệ	lineage_attributive
+REPLACE	-115	\bkhảo sát của khiếu\b	đo lường huyệt khiếu	clean_khao_sat_cua_khieu
+REPLACE	-115	\bđặc điểm tốt nhất của công pháp phần\b	phần tinh hoa của công pháp	clean_tinh_hoa_cong_phap
+REPLACE	-115	\bvũ công pháp Thánh cấp\b	công pháp cấp Võ Thánh	clean_vu_cong_phap_thanh_cap
+REPLACE	-115	\bthần linh lực của mình dự trữ\b	lượng thần lực dự trữ của mình	clean_du_tru_than_luc
+REPLACE	-115	\bthần lực của mình dự trữ\b	lượng thần lực dự trữ của mình	clean_du_tru_than_luc_v2
+REPLACE	-115	\bở\s+(\d+)\s+giờ trái phải\b	khoảng $1 điểm	clean_gio_trai_phai
+REPLACE	-115	\bchỉ đứng sau trước đây,\s*bây giờ,\s*(?:tam đại [pP]hật [đĐ]à\s+)?(?:tương lai\s+)?võ học của tam đại [pP]hật [đĐ]à(?:\s+tương lai)?(?:\s+của bảo vật trấn tự)?\b	bảo vật trấn tự chỉ đứng sau võ học của tam đại Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddha_treasure_v1
+REPLACE	-115	\bchỉ đứng sau trước đây,\s*bây giờ,\s*tam đại [pP]hật [đĐ]à tương lai võ học của bảo vật trấn tự\b	bảo vật trấn tự chỉ đứng sau võ học của tam đại Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddha_treasure_v2
+REPLACE	-115	\btrước đây,\s*bây giờ,\s*võ học của tam đại [pP]hật [đĐ]à tương lai\b	võ học của tam đại Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddhas_v3
+REPLACE	-115	\btrước đây,\s*bây giờ,\s*tam đại [pP]hật [đĐ]à tương lai\b	tam đại Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddhas_v4
+REPLACE	-115	\btrước đây,\s*bây giờ,\s*tương lai\s+tam đại [pP]hật [đĐ]à\b	tam đại Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddhas_v5
+REPLACE	-115	\btrước đây,\s*bây giờ,\s*tương lai\b	Quá Khứ, Hiện Tại, Vị Lai	clean_three_times
+REPLACE	-115	\bvõ học của bảo vật trấn tự\b	bảo vật trấn tự của võ học	clean_vo_hoc_cua_bao_vat
+REPLACE	-115	\btương lai võ học của bảo vật trấn tự\b	bảo vật trấn tự của võ học	clean_tuong_lai_vo_hoc_bao_vat
+REPLACE	-115	\bvõ học của tam đại [pP]hật [đĐ]à tương lai của bảo vật trấn tự\b	bảo vật trấn tự của võ học tam đại Phật Đà Quá Khứ, Hiện Tại, Vị Lai	clean_three_buddhas_treasure_v3
+REPLACE	-115	\bVậy liền xuất có lẽ đến\b	Vậy thì xuất hiện đi	clean_xuat_hien_di
+REPLACE	-115	\bhoàn chỉnh công pháp nhất hệ\b	công pháp Nhân Tiên nhất hệ hoàn chỉnh	clean_hoan_chinh_cong_phap
+REPLACE	-115	\bthế gian thể hiện của mọi sức mạnh\b	biểu hiện của mọi sức mạnh thế gian	clean_bieu_hien_suc_manh
+REPLACE	-115	\bLinh tu nghĩ\b	Linh tu quán tưởng	clean_linh_tu_nghi
+REPLACE	-115	\bchính xác đạt tới Nhân Tiên sau\b	chính là sau khi đạt tới Nhân Tiên	clean_dat_toi_nhan_tien_sau
+REPLACE	-115	\bchu thân\s+(\d+)\s+đạo huyệt khảo sát của khiếu\b	đo lường $1 đạo huyệt khiếu chu thân	clean_khao_sat_huyet_khieu
+
 
