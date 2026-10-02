@@ -10,7 +10,9 @@ import io.legado.app.domain.model.BookSourceHealthRow
 import io.legado.app.domain.model.BookSourceHealthStatus
 import io.legado.app.domain.sourcehealth.SourceCheckRun
 import io.legado.app.domain.sourcehealth.SourceCheckStageResult
+import io.legado.app.help.source.SourceHelp
 import io.legado.app.worker.BookSourceHealthWorker
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -72,6 +74,52 @@ class SourceHealthViewModel(
             }
             is SourceHealthIntent.SelectSource -> selectSource(intent.sourceUrl, toggle = true)
             is SourceHealthIntent.SelectRun -> selectRun(intent.runId)
+            SourceHealthIntent.ToggleSelectionMode -> {
+                _uiState.update {
+                    it.copy(
+                        isSelectionMode = !it.isSelectionMode,
+                        selectedSourceUrls = kotlinx.collections.immutable.persistentListOf(),
+                    )
+                }
+            }
+            is SourceHealthIntent.ToggleSelectSource -> {
+                _uiState.update { current ->
+                    val selected = current.selectedSourceUrls.toMutableList()
+                    if (selected.contains(intent.sourceUrl)) {
+                        selected.remove(intent.sourceUrl)
+                    } else {
+                        selected.add(intent.sourceUrl)
+                    }
+                    current.copy(selectedSourceUrls = selected.toImmutableList())
+                }
+            }
+            is SourceHealthIntent.SelectAllSources -> {
+                _uiState.update { current ->
+                    val next = if (intent.selectAll) {
+                        current.items.map { it.sourceUrl }.toImmutableList()
+                    } else {
+                        kotlinx.collections.immutable.persistentListOf()
+                    }
+                    current.copy(selectedSourceUrls = next)
+                }
+            }
+            SourceHealthIntent.DeleteSelectedSources -> {
+                deleteSources(_uiState.value.selectedSourceUrls)
+            }
+            SourceHealthIntent.DeleteErrorSources -> {
+                val errorUrls = sourceRows
+                    .filter { row -> (row.health?.statusValue ?: BookSourceHealthStatus.UNKNOWN_OFFLINE).needsAttention() }
+                    .map { it.sourceUrl }
+                if (errorUrls.isEmpty()) {
+                    _effects.tryEmit(
+                        SourceHealthEffect.ShowMessage(
+                            application.getString(R.string.source_health_no_errors_to_delete)
+                        )
+                    )
+                } else {
+                    deleteSources(errorUrls)
+                }
+            }
             is SourceHealthIntent.OpenBrowser -> _effects.tryEmit(
                 SourceHealthEffect.OpenBrowser(
                     sourceUrl = intent.sourceUrl,
@@ -232,6 +280,31 @@ class SourceHealthViewModel(
             _effects.tryEmit(
                 SourceHealthEffect.ShowMessage(
                     application.getString(R.string.source_health_check_started)
+                )
+            )
+        }
+    }
+
+    private fun deleteSources(urls: List<String>) {
+        if (urls.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update { it.copy(isDeleting = true) }
+            val count = urls.size
+            urls.forEach { url ->
+                SourceHelp.deleteBookSource(url)
+            }
+            _uiState.update {
+                it.copy(
+                    isDeleting = false,
+                    isSelectionMode = false,
+                    selectedSourceUrls = kotlinx.collections.immutable.persistentListOf(),
+                    selectedSourceUrl = if (it.selectedSourceUrl in urls) null else it.selectedSourceUrl,
+                    selectedSource = if (it.selectedSourceUrl in urls) null else it.selectedSource,
+                )
+            }
+            _effects.tryEmit(
+                SourceHealthEffect.ShowMessage(
+                    application.getString(R.string.source_health_deleted_count, count)
                 )
             )
         }

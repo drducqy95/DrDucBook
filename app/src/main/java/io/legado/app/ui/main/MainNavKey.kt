@@ -83,6 +83,9 @@ data class MainRouteStoryWiki(
 ) : MainRoute
 
 @Serializable
+data object MainRouteBookSourceHub : MainRoute
+
+@Serializable
 data class MainRouteEbookPreview(val projectId: String) : MainRoute
 
 @Serializable

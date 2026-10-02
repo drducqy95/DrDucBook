@@ -56,6 +56,8 @@ import io.legado.app.data.repository.HomepageModulesRepository
 import io.legado.app.data.repository.LocalBookRepository
 import io.legado.app.data.repository.LocalAiEngineRepository
 import io.legado.app.data.repository.LocalTtsModelRepository
+import io.legado.app.data.repository.online_source.OnlineBookSourceRepository
+import io.legado.app.ui.book.source.hub.BookSourceHubViewModel
 import io.legado.app.data.repository.MangaOcrRepository
 import io.legado.app.data.repository.MangaTextTranslationRepository
 import io.legado.app.data.repository.MangaTranslationCacheRepository
@@ -565,6 +567,7 @@ val appModule = module {
     }
     singleOf(::BookSourceHealthCheckProcessor)
     singleOf(::BookSourceHealthRepository)
+    singleOf(::OnlineBookSourceRepository)
     singleOf(::BrowserBookmarkRepository)
     single<SourceDomainIndexGateway> { SourceDomainIndexRepository(get(), get()) }
     singleOf(::BrowserTabStore)
@@ -721,6 +724,7 @@ val appModule = module {
     viewModelOf(::TranslationRevisionViewModel)
     viewModelOf(::MangaTranslationEditorViewModel)
     viewModelOf(::SourceHealthViewModel)
+    viewModelOf(::BookSourceHubViewModel)
     viewModelOf(::VbookImportViewModel)
     viewModelOf(::BrowserViewModel)
     viewModelOf(::AiChatViewModel)

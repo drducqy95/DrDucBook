@@ -4,41 +4,41 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- DrDucBook Default Adaptive Foreground Vector -->
+    <!-- DrDucBook Foreground: sakura -->
     <!-- Book Back Cover -->
     <path
-        android:fillColor="#3E2723"
+        android:fillColor="#881337"
         android:pathData="M 54,52 C 45,46 36,44 24,46 C 23,46 22,47 22,48 L 22,72 C 22,73 23,74 24,74 C 36,72 45,74 54,80 C 63,74 72,72 84,74 C 85,74 86,73 86,72 L 86,48 C 86,47 85,46 84,46 C 72,44 63,46 54,52 Z" />
     <!-- Left Page -->
     <path
-        android:fillColor="#FFFDF9"
+        android:fillColor="#FFF1F2"
         android:pathData="M 53,51 C 45,46 37,44 27,45 C 26.5,45 26,45.5 26,46 L 26,67 C 36,65 44,67 53,72 Z" />
     <!-- Right Page -->
     <path
-        android:fillColor="#FFFDF9"
+        android:fillColor="#FFF1F2"
         android:pathData="M 55,51 C 63,46 71,44 81,45 C 81.5,45 82,45.5 82,46 L 82,67 C 72,65 64,67 55,72 Z" />
     <!-- Left Page Text Accents -->
     <path
-        android:strokeColor="#A1887F"
+        android:strokeColor="#FDA4AF"
         android:strokeWidth="1.2"
         android:strokeLineCap="round"
         android:pathData="M 31,52 C 37,51 43,52 48,55 M 31,57 C 37,56 43,57 48,60 M 31,62 C 37,61 43,62 48,65" />
     <!-- Right Page Text Accents -->
     <path
-        android:strokeColor="#A1887F"
+        android:strokeColor="#FDA4AF"
         android:strokeWidth="1.2"
         android:strokeLineCap="round"
         android:pathData="M 60,55 C 65,52 71,51 77,52 M 60,60 C 65,57 71,56 77,57 M 60,65 C 65,62 71,61 77,62" />
     <!-- Wisdom Flame Outer -->
     <path
-        android:fillColor="#F59E0B"
+        android:fillColor="#F43F5E"
         android:pathData="M 54,23 C 51,28 44,35 44,43 C 44,50 48.5,54 54,55 C 59.5,54 64,50 64,43 C 64,35 57,28 54,23 Z" />
     <!-- Wisdom Flame Core -->
     <path
-        android:fillColor="#FDE68A"
+        android:fillColor="#FECDD3"
         android:pathData="M 54,31 C 52,35 48,39 48,44 C 48,48 50.7,50.5 54,51 C 57.3,50.5 60,48 60,44 C 60,39 56,35 54,31 Z" />
     <!-- Wisdom Sparkle Star -->
     <path
-        android:fillColor="#D97706"
+        android:fillColor="#FB7185"
         android:pathData="M 54,16 L 55.5,19.5 L 59,20 L 55.5,20.5 L 54,24 L 52.5,20.5 L 49,20 L 52.5,19.5 Z" />
 </vector>

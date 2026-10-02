@@ -1,9 +1,9 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-01T21:30:00.000000",
+    "last_updated": "2026-10-02T18:25:00.000000",
     "overall_progress_percent": 100,
-    "current_phase": "Phase 45 - Story Memory, Wiki & Translation Cache System Overhaul",
+    "current_phase": "Phase 47 - App Icon System, Source Health Bulk Delete & Workspace Book Source Hub",
     "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
@@ -1757,6 +1757,39 @@
         {
           "id": "T45.14",
           "desc": "Story Illustration & Translation Refresh Bugfix - (1) Fixed image generation crash by using credential.secretRef, valid quality 'standard', guarding saveDefaultPresets against non-image models, and adding UI loading indicators; (2) Restored 'Dịch lại chương' by separating retrofitWithExistingDraft from forceRetranslate; (3) Fixed 'Làm mới bản dịch' by updating memory terms and persisting retrofitted drafts to disk cache; (4) Called TranslationManager.deleteTranslationCache on reader refresh and posted REFRESH_BOOK_CONTENT on retrofit completion; (5) Assembled release build with R8 minification and passed unit tests.",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P47",
+      "name": "App Icon System, Source Health Bulk Delete & Workspace Book Source Hub",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T47.1",
+          "desc": "Phase 01 - Launcher icons 9 variants + safe-zone vector fix + Android 13+ monochrome themed icons + BundledIconRegistry & IconPresetPickerSheet 1-click in-app icon replacement",
+          "status": "DONE"
+        },
+        {
+          "id": "T47.2",
+          "desc": "Phase 02 - Source health bulk error sources deletion + multi-select mode + safe DB cleanup in BookSourceDao, BookSourceHealthDao, CacheDao",
+          "status": "DONE"
+        },
+        {
+          "id": "T47.3",
+          "desc": "Phase 03 - Online book source repository data layer (HTML parser for yckceo.com, JSON fetcher jsons?id=..., and curated collection fetcher for yuedu.miaogongzi.net with offline cache)",
+          "status": "DONE"
+        },
+        {
+          "id": "T47.4",
+          "desc": "Phase 04 - Workspace BookSourceHub Compose MVI screen with 2 tabs (YCKCEO & Miao Gong Zi), search, feature filters, pagination, and 1-click direct Room DB import",
+          "status": "DONE"
+        },
+        {
+          "id": "T47.5",
+          "desc": "Phase 05 - BrandIdentityTest & unit verification, compileAppDebugKotlin check, APK assembly (assembleAppRelease SUCCESS in 26m 6s), and APK artifact generation for Huawei device",
           "status": "DONE"
         }
       ]

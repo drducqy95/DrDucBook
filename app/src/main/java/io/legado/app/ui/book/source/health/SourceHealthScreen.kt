@@ -25,15 +25,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RssFeed
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
@@ -41,11 +47,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -115,26 +125,87 @@ fun SourceHealthScreen(
     onBackClick: () -> Unit,
 ) {
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
+    var showDeleteErrorsDialog by remember { mutableStateOf(false) }
+    var showDeleteSelectedDialog by remember { mutableStateOf(false) }
+
     AppScaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            GlassMediumFlexibleTopAppBar(
-                title = stringResource(R.string.source_health),
-                navigationIcon = { TopBarNavigationButton(onClick = onBackClick) },
-                actions = {
-                    TopBarActionButton(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = stringResource(R.string.source_health_check_now),
-                        onClick = { onIntent(SourceHealthIntent.CheckNow) },
-                    )
-                    TopBarActionButton(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = stringResource(R.string.refresh),
-                        onClick = { onIntent(SourceHealthIntent.Refresh) },
-                    )
-                },
-                scrollBehavior = scrollBehavior,
-            )
+            if (state.isSelectionMode) {
+                GlassMediumFlexibleTopAppBar(
+                    title = stringResource(R.string.source_health_selected_count, state.selectedSourceUrls.size),
+                    navigationIcon = {
+                        TopBarActionButton(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.cancel),
+                            onClick = { onIntent(SourceHealthIntent.ToggleSelectionMode) },
+                        )
+                    },
+                    actions = {
+                        TopBarActionButton(
+                            imageVector = Icons.Default.SelectAll,
+                            contentDescription = stringResource(
+                                if (state.selectedSourceUrls.size == state.items.size) {
+                                    R.string.source_health_deselect_all
+                                } else {
+                                    R.string.source_health_select_all
+                                }
+                            ),
+                            onClick = {
+                                onIntent(
+                                    SourceHealthIntent.SelectAllSources(
+                                        state.selectedSourceUrls.size < state.items.size
+                                    )
+                                )
+                            },
+                        )
+                        TopBarActionButton(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete),
+                            onClick = {
+                                if (state.selectedSourceUrls.isNotEmpty()) {
+                                    showDeleteSelectedDialog = true
+                                }
+                            },
+                        )
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            } else {
+                GlassMediumFlexibleTopAppBar(
+                    title = stringResource(R.string.source_health),
+                    navigationIcon = { TopBarNavigationButton(onClick = onBackClick) },
+                    actions = {
+                        TopBarActionButton(
+                            imageVector = Icons.Default.DeleteSweep,
+                            contentDescription = stringResource(R.string.source_health_delete_errors),
+                            onClick = {
+                                if (state.summary.needsAttention == 0) {
+                                    onIntent(SourceHealthIntent.DeleteErrorSources)
+                                } else {
+                                    showDeleteErrorsDialog = true
+                                }
+                            },
+                        )
+                        TopBarActionButton(
+                            imageVector = Icons.Default.Checklist,
+                            contentDescription = stringResource(R.string.source_health_selection_mode),
+                            onClick = { onIntent(SourceHealthIntent.ToggleSelectionMode) },
+                        )
+                        TopBarActionButton(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = stringResource(R.string.source_health_check_now),
+                            onClick = { onIntent(SourceHealthIntent.CheckNow) },
+                        )
+                        TopBarActionButton(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.refresh),
+                            onClick = { onIntent(SourceHealthIntent.Refresh) },
+                        )
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
     ) { paddingValues ->
         LazyColumn(
@@ -206,11 +277,52 @@ fun SourceHealthScreen(
                 ) { item ->
                     SourceHealthSourceCard(
                         item = item,
-                        onClick = { onIntent(SourceHealthIntent.SelectSource(item.sourceUrl)) },
+                        isSelected = state.selectedSourceUrls.contains(item.sourceUrl),
+                        isSelectionMode = state.isSelectionMode,
+                        onToggleSelect = { onIntent(SourceHealthIntent.ToggleSelectSource(item.sourceUrl)) },
+                        onClick = {
+                            if (state.isSelectionMode) {
+                                onIntent(SourceHealthIntent.ToggleSelectSource(item.sourceUrl))
+                            } else {
+                                onIntent(SourceHealthIntent.SelectSource(item.sourceUrl))
+                            }
+                        },
                     )
                 }
             }
         }
+    }
+
+    if (showDeleteErrorsDialog) {
+        AppAlertDialog(
+            show = showDeleteErrorsDialog,
+            onDismissRequest = { showDeleteErrorsDialog = false },
+            title = stringResource(R.string.source_health_delete_errors),
+            text = stringResource(R.string.source_health_delete_errors_confirm, state.summary.needsAttention),
+            confirmText = stringResource(R.string.delete),
+            dismissText = stringResource(R.string.cancel),
+            onConfirm = {
+                showDeleteErrorsDialog = false
+                onIntent(SourceHealthIntent.DeleteErrorSources)
+            },
+            onDismiss = { showDeleteErrorsDialog = false },
+        )
+    }
+
+    if (showDeleteSelectedDialog) {
+        AppAlertDialog(
+            show = showDeleteSelectedDialog,
+            onDismissRequest = { showDeleteSelectedDialog = false },
+            title = stringResource(R.string.source_health_delete_selected, state.selectedSourceUrls.size),
+            text = stringResource(R.string.source_health_delete_selected_confirm, state.selectedSourceUrls.size),
+            confirmText = stringResource(R.string.delete),
+            dismissText = stringResource(R.string.cancel),
+            onConfirm = {
+                showDeleteSelectedDialog = false
+                onIntent(SourceHealthIntent.DeleteSelectedSources)
+            },
+            onDismiss = { showDeleteSelectedDialog = false },
+        )
     }
 
     SourceHealthDetailSheet(
@@ -329,6 +441,9 @@ private fun SourceHealthFilterRow(
 @Composable
 private fun SourceHealthSourceCard(
     item: SourceHealthItemUi,
+    isSelected: Boolean = false,
+    isSelectionMode: Boolean = false,
+    onToggleSelect: () -> Unit = {},
     onClick: () -> Unit,
 ) {
     NormalCard(
@@ -344,6 +459,12 @@ private fun SourceHealthSourceCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                if (isSelectionMode) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { onToggleSelect() },
+                    )
+                }
                 SourceIcon(
                     path = item.iconPath,
                     sourceOrigin = item.sourceUrl,

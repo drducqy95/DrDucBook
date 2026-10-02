@@ -67,11 +67,7 @@ fun PersonalizedIcon(
                 colorFilter = spec.tintColor?.let { ColorFilter.tint(Color(it)) },
             )
             spec?.bundledIcon != null -> Icon(
-                imageVector = when (spec.bundledIcon) {
-                    "sparkles" -> Icons.Default.AutoAwesome
-                    "rss" -> Icons.Default.RssFeed
-                    else -> Icons.Default.AutoStories
-                },
+                imageVector = BundledIconRegistry.getVector(spec.bundledIcon),
                 contentDescription = contentDescription,
                 modifier = Modifier
                     .size(iconSize)

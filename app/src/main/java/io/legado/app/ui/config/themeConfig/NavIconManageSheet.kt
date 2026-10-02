@@ -35,6 +35,8 @@ import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.text.AppText
+import io.legado.app.ui.widget.components.icon.BundledIconRegistry
+import io.legado.app.ui.widget.components.icon.IconPresetPickerSheet
 import java.io.File
 
 private data class NavIconDestination(
@@ -52,16 +54,13 @@ fun NavIconManageSheet(
 ) {
     val context = LocalContext.current
     var activeDest by remember { mutableStateOf<String?>(null) }
+    var pickerForDest by remember { mutableStateOf<NavIconDestination?>(null) }
 
     val destinations = listOf(
-        NavIconDestination(
-            "home",
-            R.string.home,
-            ThemeConfig.navIconHome
-        ) { ThemeConfig.navIconHome = it },
+        NavIconDestination("home", R.string.home, ThemeConfig.navIconHome) { ThemeConfig.navIconHome = it },
         NavIconDestination("bookshelf", R.string.bookshelf, ThemeConfig.navIconBookshelf) { ThemeConfig.navIconBookshelf = it },
         NavIconDestination("explore", R.string.discovery, ThemeConfig.navIconExplore) { ThemeConfig.navIconExplore = it },
-        NavIconDestination("rss", R.string.rss, ThemeConfig.navIconRss) { ThemeConfig.navIconRss = it },
+        NavIconDestination("workspace", R.string.workspace_title, ThemeConfig.navIconWorkspace) { ThemeConfig.navIconWorkspace = it },
         NavIconDestination("my", R.string.my, ThemeConfig.navIconMy) { ThemeConfig.navIconMy = it },
     )
 
@@ -106,8 +105,7 @@ fun NavIconManageSheet(
                     ) {
                         NormalCard(
                             onClick = {
-                                activeDest = dest.key
-                                selectImage.launch("image/png")
+                                pickerForDest = dest
                             },
                             cornerRadius = 12.dp,
                             containerColor = LegadoTheme.colorScheme.surfaceContainerHigh,
@@ -117,12 +115,24 @@ fun NavIconManageSheet(
                         ) {
                             if (dest.path.isNotEmpty()) {
                                 Box(modifier = Modifier.fillMaxSize()) {
-                                    AsyncImage(
-                                        model = dest.path,
-                                        contentDescription = label,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Fit
-                                    )
+                                    if (dest.path.startsWith("bundled://")) {
+                                        val iconKey = dest.path.removePrefix("bundled://")
+                                        AppIcon(
+                                            imageVector = BundledIconRegistry.getVector(iconKey),
+                                            contentDescription = label,
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .align(Alignment.Center),
+                                            tint = LegadoTheme.colorScheme.primary,
+                                        )
+                                    } else {
+                                        AsyncImage(
+                                            model = dest.path,
+                                            contentDescription = label,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    }
                                     SmallTonalButton(
                                         onClick = { dest.onSetPath("") },
                                         modifier = Modifier
@@ -158,5 +168,26 @@ fun NavIconManageSheet(
                 }
             }
         }
+    }
+
+    pickerForDest?.let { dest ->
+        IconPresetPickerSheet(
+            show = true,
+            currentIcon = if (dest.path.startsWith("bundled://")) dest.path.removePrefix("bundled://") else null,
+            onDismissRequest = { pickerForDest = null },
+            onSelectBundledIcon = { key ->
+                dest.onSetPath("bundled://$key")
+                pickerForDest = null
+            },
+            onPickCustomImage = {
+                activeDest = dest.key
+                selectImage.launch("image/*")
+                pickerForDest = null
+            },
+            onResetDefault = {
+                dest.onSetPath("")
+                pickerForDest = null
+            },
+        )
     }
 }

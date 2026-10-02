@@ -42,6 +42,13 @@ import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.utils.getCompatDrawable
+import androidx.annotation.StringRes
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import io.legado.app.ui.main.MainActivity
 import splitties.init.appCtx
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,7 +72,6 @@ fun LauncherIconPickerSheet(
                 .fillMaxWidth()
                 .padding(bottom = 24.dp)
         ) {
-
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -73,19 +79,18 @@ fun LauncherIconPickerSheet(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(icons, key = { it.value }) { item ->
-
-                    val isSelected = item.value == selectedValue
+                    val isSelected = item.value == selectedValue || (selectedValue.isEmpty() && item.value == "ic_launcher")
                     val drawable = remember(item.resId) {
                         context.getCompatDrawable(item.resId)
                     }
 
-                    Box(
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .aspectRatio(1f)
                             .clip(MaterialTheme.shapes.large)
                             .background(
                                 if (isSelected)
-                                    LegadoTheme.colorScheme.secondaryContainer
+                                    LegadoTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
                                 else
                                     LegadoTheme.colorScheme.surfaceContainer
                             )
@@ -104,19 +109,50 @@ fun LauncherIconPickerSheet(
                                 onValueChange(item.value)
                                 onDismissRequest()
                             }
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
+                            .padding(12.dp)
                     ) {
-                        AndroidView(
-                            factory = { ctx ->
-                                ImageView(ctx).apply {
-                                    scaleType = ImageView.ScaleType.FIT_CENTER
+                        Box(
+                            modifier = Modifier.size(56.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    ImageView(ctx).apply {
+                                        scaleType = ImageView.ScaleType.FIT_CENTER
+                                    }
+                                },
+                                update = { imageView ->
+                                    imageView.setImageDrawable(drawable)
+                                },
+                                modifier = Modifier.size(52.dp)
+                            )
+                            if (isSelected) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .size(18.dp)
+                                        .background(LegadoTheme.colorScheme.primary, MaterialTheme.shapes.small),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = LegadoTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
                                 }
-                            },
-                            update = { imageView ->
-                                imageView.setImageDrawable(drawable)
-                            },
-                            modifier = Modifier.size(48.dp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        AppText(
+                            text = stringResource(item.titleRes),
+                            style = LegadoTheme.typography.labelMedium,
+                            color = if (isSelected) LegadoTheme.colorScheme.primary else LegadoTheme.colorScheme.onSurface,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -129,7 +165,7 @@ fun LauncherIconPickerSheet(
 
 data class LauncherIconItem(
     val value: String,
-    val label: String,
+    @param:StringRes val titleRes: Int,
     val resId: Int,
     val component: ComponentName
 )
@@ -139,55 +175,55 @@ object LauncherIcons {
     val list = listOf(
         LauncherIconItem(
             value = "ic_launcher",
-            label = "iconMain",
+            titleRes = R.string.launcher_icon_default,
             resId = R.mipmap.ic_launcher,
-            component = ComponentName(appCtx, LauncherW::class.java)
+            component = ComponentName(appCtx, MainActivity::class.java)
         ),
         LauncherIconItem(
             value = "launcherw",
-            label = "iconWhite",
+            titleRes = R.string.launcher_icon_white,
             resId = R.mipmap.launcherw,
             component = ComponentName(appCtx, LauncherW::class.java)
         ),
         LauncherIconItem(
             value = "launcher0",
-            label = "icon0",
+            titleRes = R.string.launcher_icon_amoled,
             resId = R.mipmap.launcher0,
             component = ComponentName(appCtx, Launcher0::class.java)
         ),
         LauncherIconItem(
             value = "launcher1",
-            label = "icon1",
+            titleRes = R.string.launcher_icon_gold,
             resId = R.mipmap.launcher1,
             component = ComponentName(appCtx, Launcher1::class.java)
         ),
         LauncherIconItem(
             value = "launcher2",
-            label = "icon2",
+            titleRes = R.string.launcher_icon_jade,
             resId = R.mipmap.launcher2,
             component = ComponentName(appCtx, Launcher2::class.java)
         ),
         LauncherIconItem(
             value = "launcher3",
-            label = "icon3",
+            titleRes = R.string.launcher_icon_violet,
             resId = R.mipmap.launcher3,
             component = ComponentName(appCtx, Launcher3::class.java)
         ),
         LauncherIconItem(
             value = "launcher4",
-            label = "icon4",
+            titleRes = R.string.launcher_icon_sakura,
             resId = R.mipmap.launcher4,
             component = ComponentName(appCtx, Launcher4::class.java)
         ),
         LauncherIconItem(
             value = "launcher5",
-            label = "icon5",
+            titleRes = R.string.launcher_icon_crimson,
             resId = R.mipmap.launcher5,
             component = ComponentName(appCtx, Launcher5::class.java)
         ),
         LauncherIconItem(
             value = "launcher6",
-            label = "icon6",
+            titleRes = R.string.launcher_icon_amber,
             resId = R.mipmap.launcher6,
             component = ComponentName(appCtx, Launcher6::class.java)
         ),

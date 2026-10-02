@@ -10,6 +10,7 @@ enum class WorkspaceModule {
     AGENT,
     RSS,
     STORY_WIKI,
+    BOOK_SOURCE_HUB,
 }
 
 @Stable

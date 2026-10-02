@@ -19,7 +19,8 @@ class WorkspaceStateTest {
 
         assertFalse(state.isLoading)
         assertFalse(state.hasError)
-        assertEquals(5, state.modules.size)
+        assertEquals(6, state.modules.size)
+        assertEquals(1, state.modules.count { it.module == WorkspaceModule.BOOK_SOURCE_HUB })
         assertEquals(1, state.modules.count { it.module == WorkspaceModule.STORY_WIKI })
         assertEquals(1, state.modules.first { it.module == WorkspaceModule.WRITING }.badgeCount)
         assertEquals(1, state.modules.first { it.module == WorkspaceModule.AGENT }.badgeCount)
@@ -33,7 +34,7 @@ class WorkspaceStateTest {
     fun emptyWorkspaceStillExposesAllModules() {
         val state = buildWorkspaceUiState(emptyList(), emptyList(), emptyList())
 
-        assertEquals(5, state.modules.size)
+        assertEquals(6, state.modules.size)
         assertEquals(0, state.recentItems.size)
     }
 

@@ -6,6 +6,27 @@
     <string name="receiving_shared_label">DrDucBook·search</string>
     <string name="tip_perm_request_storage">DrDucBook needs storage access to find and read books. Please go to "App Settings" to allow "Storage Permission".</string>
 
+    <!-- Launcher Icon Styles -->
+    <string name="launcher_icon_default">Warm Parchment</string>
+    <string name="launcher_icon_white">Pure Minimalist</string>
+    <string name="launcher_icon_amoled">AMOLED Night</string>
+    <string name="launcher_icon_gold">Royal Gold</string>
+    <string name="launcher_icon_jade">Emerald Jade</string>
+    <string name="launcher_icon_violet">Cosmic Violet</string>
+    <string name="launcher_icon_sakura">Blush Sakura</string>
+    <string name="launcher_icon_crimson">Crimson Flame</string>
+    <string name="launcher_icon_amber">Sunset Amber</string>
+
+    <!-- In-App Bundled Icon Categories & Names -->
+    <string name="icon_category_nav">Navigation &amp; Bookshelf</string>
+    <string name="icon_category_reader">Reader &amp; Tools</string>
+    <string name="icon_category_ai">AI &amp; Translation</string>
+    <string name="icon_category_system">System &amp; More</string>
+    <string name="icon_picker_title">Select Preset Icon</string>
+    <string name="icon_picker_reset">Reset to Default</string>
+    <string name="icon_picker_custom_file">Import Image File</string>
+    <string name="icon_picker_search_placeholder">Search icons...</string>
+
     <!--Other-->
     <string name="menu_backup">Home</string>
     <string name="menu_restore">Restore</string>
@@ -4166,4 +4187,35 @@
     <string name="untitled_book">Untitled Book</string>
     <string name="untitled_chapter">Untitled Chapter</string>
     <string name="import_book_file_name_hint">Use js to parse file name from src, then assign name/author.</string>
+
+    <!-- Source Health Bulk Deletion -->
+    <string name="source_health_delete_errors">Delete error sources</string>
+    <string name="source_health_delete_errors_confirm">Delete all %1$d error sources? This action cannot be undone.</string>
+    <string name="source_health_delete_selected">Delete selected (%1$d)</string>
+    <string name="source_health_delete_selected_confirm">Delete %1$d selected sources? This action cannot be undone.</string>
+    <string name="source_health_deleted_count">Deleted %1$d sources</string>
+    <string name="source_health_no_errors_to_delete">No error sources found to delete</string>
+    <string name="source_health_selection_mode">Select sources</string>
+    <string name="source_health_selected_count">%1$d selected</string>
+    <string name="source_health_select_all">Select all</string>
+    <string name="source_health_deselect_all">Deselect all</string>
+
+    <!-- Online Book Source Hub -->
+    <string name="book_source_hub_title">Book Source Hub</string>
+    <string name="book_source_hub_desc">Search and import sources from online repositories</string>
+    <string name="source_hub_tab_yckceo">YCKCEO (源仓库)</string>
+    <string name="source_hub_tab_miaogongzi">Miao Gong Zi (喵公子)</string>
+    <string name="source_hub_search_hint">Search sources (name, author, domain)…</string>
+    <string name="source_hub_download">Import</string>
+    <string name="source_hub_importing">Importing…</string>
+    <string name="source_hub_imported_success">Imported %1$d sources</string>
+    <string name="source_hub_import_failed">Failed to import sources: %1$s</string>
+    <string name="source_hub_downloads_count">%1$s downloads</string>
+    <string name="source_hub_bundles_title">Curated Source Packs</string>
+    <string name="source_hub_bundle_sources_count">%1$d sources</string>
+    <string name="source_hub_all_sources">All sources</string>
+    <string name="source_hub_category_explore">Discovery</string>
+    <string name="source_hub_category_search">Search</string>
+    <string name="source_hub_category_comic">Comic/Manga</string>
+    <string name="source_hub_category_audio">Audio</string>
 </resources>

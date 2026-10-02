@@ -114,6 +114,7 @@ private fun workspaceModules(
     ebookCount: Int = 0,
     agentCount: Int = 0,
 ) = listOf(
+    WorkspaceModuleUi(WorkspaceModule.BOOK_SOURCE_HUB),
     WorkspaceModuleUi(WorkspaceModule.WRITING, badgeCount = writingCount.takeIf { it > 0 }),
     WorkspaceModuleUi(WorkspaceModule.EBOOK_EDITOR, badgeCount = ebookCount.takeIf { it > 0 }),
     WorkspaceModuleUi(WorkspaceModule.AGENT, badgeCount = agentCount.takeIf { it > 0 }),

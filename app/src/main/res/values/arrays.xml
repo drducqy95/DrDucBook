@@ -160,15 +160,15 @@
 	</string-array>
 
 	<string-array name="icon_names" tools:ignore="Typos">
-		<item>iconMain</item>
-		<item>iconWhite</item>
-        <item>icon0</item>
-		<item>icon1</item>
-		<item>icon2</item>
-		<item>icon3</item>
-		<item>icon4</item>
-		<item>icon5</item>
-		<item>icon6</item>
+		<item>@string/launcher_icon_default</item>
+		<item>@string/launcher_icon_white</item>
+		<item>@string/launcher_icon_amoled</item>
+		<item>@string/launcher_icon_gold</item>
+		<item>@string/launcher_icon_jade</item>
+		<item>@string/launcher_icon_violet</item>
+		<item>@string/launcher_icon_sakura</item>
+		<item>@string/launcher_icon_crimson</item>
+		<item>@string/launcher_icon_amber</item>
 	</string-array>
 
 	<string-array name="chinese_mode">

@@ -147,6 +147,7 @@ fun MainScreen(
     onNavigateToEbookEditor: () -> Unit,
     onNavigateToRss: () -> Unit,
     onNavigateToStoryWiki: () -> Unit,
+    onNavigateToBookSourceHub: () -> Unit = {},
     onNavigateToSearch: (String?) -> Unit,
     onNavigateToRemoteImport: () -> Unit,
     onNavigateToLocalImport: () -> Unit,
@@ -636,6 +637,7 @@ fun MainScreen(
                                 onOpenAgent = onNavigateToAgent,
                                 onOpenRss = onNavigateToRss,
                                 onOpenStoryWiki = onNavigateToStoryWiki,
+                                onOpenBookSourceHub = onNavigateToBookSourceHub,
                             )
                             MainDestination.My -> MyScreen(
                                 onOpenSettings = onOpenSettings,
@@ -900,11 +902,9 @@ private fun NavigationIcon(
         if (customIconPath.isNotEmpty()) {
             if (customIconPath.startsWith("bundled://")) {
                 Icon(
-                    imageVector = when (customIconPath.removePrefix("bundled://")) {
-                        "sparkles" -> Icons.Default.AutoAwesome
-                        "rss" -> Icons.Default.RssFeed
-                        else -> Icons.Default.AutoStories
-                    },
+                    imageVector = io.legado.app.ui.widget.components.icon.BundledIconRegistry.getVector(
+                        customIconPath.removePrefix("bundled://")
+                    ),
                     contentDescription = null,
                     modifier = iconModifier,
                     tint = spec?.tintColor?.let(::Color) ?: LegadoTheme.colorScheme.primary,

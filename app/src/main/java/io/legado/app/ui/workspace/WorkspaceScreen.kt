@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RssFeed
 import androidx.compose.material.icons.filled.MenuBook
@@ -65,6 +66,7 @@ fun WorkspaceRouteScreen(
     onOpenAgent: () -> Unit,
     onOpenRss: () -> Unit,
     onOpenStoryWiki: () -> Unit,
+    onOpenBookSourceHub: () -> Unit,
     viewModel: WorkspaceViewModel = koinViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -73,6 +75,7 @@ fun WorkspaceRouteScreen(
     val currentOpenAgent by rememberUpdatedState(onOpenAgent)
     val currentOpenRss by rememberUpdatedState(onOpenRss)
     val currentOpenStoryWiki by rememberUpdatedState(onOpenStoryWiki)
+    val currentOpenBookSourceHub by rememberUpdatedState(onOpenBookSourceHub)
 
     LaunchedEffect(viewModel) {
         viewModel.effects.collectLatest { effect ->
@@ -83,6 +86,7 @@ fun WorkspaceRouteScreen(
                     WorkspaceModule.AGENT -> currentOpenAgent()
                     WorkspaceModule.RSS -> currentOpenRss()
                     WorkspaceModule.STORY_WIKI -> currentOpenStoryWiki()
+                    WorkspaceModule.BOOK_SOURCE_HUB -> currentOpenBookSourceHub()
                 }
             }
         }
@@ -291,6 +295,7 @@ private fun WorkspaceModule.label(): String = stringResource(
         WorkspaceModule.AGENT -> R.string.ai_agent_nav
         WorkspaceModule.RSS -> R.string.workspace_rss_sources
         WorkspaceModule.STORY_WIKI -> R.string.story_wiki_title
+        WorkspaceModule.BOOK_SOURCE_HUB -> R.string.book_source_hub_title
     }
 )
 
@@ -300,6 +305,7 @@ private fun WorkspaceModule.icon(): ImageVector = when (this) {
     WorkspaceModule.AGENT -> Icons.Default.AutoAwesome
     WorkspaceModule.RSS -> Icons.Default.RssFeed
     WorkspaceModule.STORY_WIKI -> Icons.Default.MenuBook
+    WorkspaceModule.BOOK_SOURCE_HUB -> Icons.Default.Language
 }
 
 private fun WorkspaceModule.iconSlot(): IconSlot = when (this) {
@@ -308,4 +314,5 @@ private fun WorkspaceModule.iconSlot(): IconSlot = when (this) {
     WorkspaceModule.AGENT -> IconSlot.WORKSPACE_AGENT
     WorkspaceModule.RSS -> IconSlot.WORKSPACE_RSS
     WorkspaceModule.STORY_WIKI -> IconSlot.WORKSPACE_EBOOK
+    WorkspaceModule.BOOK_SOURCE_HUB -> IconSlot.NAV_EXPLORE
 }

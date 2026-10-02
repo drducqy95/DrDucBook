@@ -52,6 +52,12 @@ import io.legado.app.domain.model.AppearanceIconSpec
 import io.legado.app.domain.model.IconSlot
 import io.legado.app.domain.model.IconSlotGroup
 import io.legado.app.ui.theme.LegadoTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import io.legado.app.ui.widget.components.icon.BundledIconRegistry
+import io.legado.app.ui.widget.components.icon.IconPresetPickerSheet
 import kotlin.math.roundToInt
 
 @Composable
@@ -61,6 +67,7 @@ internal fun PersonalizationIconTab(
 ) {
     val draft = state.draft ?: return
     val spec = draft.iconSlots[state.selectedIconSlot.key] ?: AppearanceIconSpec()
+    var showPresetPicker by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = personalizationContentPadding(),
@@ -105,6 +112,14 @@ internal fun PersonalizationIconTab(
                         label = { Text(option.label()) },
                     )
                 }
+            }
+            OutlinedButton(
+                onClick = { showPresetPicker = true },
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.icon_picker_title))
             }
         }
         item {
@@ -179,6 +194,31 @@ internal fun PersonalizationIconTab(
                 },
             )
         }
+    }
+
+    if (showPresetPicker) {
+        IconPresetPickerSheet(
+            show = showPresetPicker,
+            currentIcon = spec.bundledIcon,
+            onDismissRequest = { showPresetPicker = false },
+            onSelectBundledIcon = { key ->
+                onIntent(
+                    PersonalizationIntent.UpdateIcon(
+                        spec.copy(
+                            assetId = "",
+                            legacyLocation = null,
+                            bundledIcon = key,
+                        )
+                    )
+                )
+            },
+            onPickCustomImage = {
+                onIntent(PersonalizationIntent.RequestIconImport)
+            },
+            onResetDefault = {
+                onIntent(PersonalizationIntent.RemoveIcon)
+            },
+        )
     }
 }
 
@@ -314,8 +354,5 @@ private fun BundledIconOption.label(): String = when (key) {
     else -> stringResource(R.string.personalization_icon_book)
 }
 
-private fun bundledIconVector(key: String): ImageVector = when (key) {
-    "sparkles" -> Icons.Default.AutoAwesome
-    "rss" -> Icons.Default.RssFeed
-    else -> Icons.Default.AutoStories
-}
+private fun bundledIconVector(key: String): ImageVector = BundledIconRegistry.getVector(key)
+

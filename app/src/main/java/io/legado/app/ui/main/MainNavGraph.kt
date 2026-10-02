@@ -67,6 +67,7 @@ import io.legado.app.ui.book.search.SearchViewModel
 import io.legado.app.ui.book.searchContent.SearchContentScreen
 import io.legado.app.ui.book.searchContent.SearchContentViewModel
 import io.legado.app.ui.book.source.edit.BookSourceEditActivity
+import io.legado.app.ui.book.source.hub.BookSourceHubRouteScreen
 import io.legado.app.ui.book.source.manage.BookSourceActivity
 import io.legado.app.ui.config.ConfigNavScreen
 import io.legado.app.constant.FeatureFlags
@@ -200,6 +201,9 @@ fun MainActivity.mainEntryProvider(
             },
             onNavigateToStoryWiki = {
                 onNavigateToRoute(MainRouteStoryWiki())
+            },
+            onNavigateToBookSourceHub = {
+                onNavigateToRoute(MainRouteBookSourceHub)
             },
             onNavigateToSearch = { key ->
                 onNavigateToRoute(
@@ -1105,6 +1109,12 @@ fun MainActivity.mainEntryProvider(
                     )
                 )
             },
+        )
+    }
+
+    entry<MainRouteBookSourceHub> {
+        BookSourceHubRouteScreen(
+            onBackClick = { onNavigateBack() },
         )
     }
 

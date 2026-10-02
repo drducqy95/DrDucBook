@@ -91,6 +91,9 @@ data class SourceHealthUiState(
     val selectedRunId: String? = null,
     val selectedRuns: ImmutableList<SourceHealthRunUi> = persistentListOf(),
     val selectedStages: ImmutableList<SourceHealthStageUi> = persistentListOf(),
+    val isSelectionMode: Boolean = false,
+    val selectedSourceUrls: ImmutableList<String> = persistentListOf(),
+    val isDeleting: Boolean = false,
 )
 
 sealed interface SourceHealthIntent {
@@ -102,6 +105,11 @@ sealed interface SourceHealthIntent {
     data class ChangeQuery(val query: String) : SourceHealthIntent
     data class SelectSource(val sourceUrl: String?) : SourceHealthIntent
     data class SelectRun(val runId: String?) : SourceHealthIntent
+    data object ToggleSelectionMode : SourceHealthIntent
+    data class ToggleSelectSource(val sourceUrl: String) : SourceHealthIntent
+    data class SelectAllSources(val selectAll: Boolean) : SourceHealthIntent
+    data object DeleteSelectedSources : SourceHealthIntent
+    data object DeleteErrorSources : SourceHealthIntent
     data class OpenBrowser(
         val sourceUrl: String,
         val initialUrl: String?,

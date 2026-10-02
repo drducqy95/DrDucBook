@@ -4,7 +4,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- DrDucBook Default Adaptive Foreground Vector -->
+    <!-- DrDucBook Foreground: default -->
     <!-- Book Back Cover -->
     <path
         android:fillColor="#3E2723"

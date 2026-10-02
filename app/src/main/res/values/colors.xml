@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#F5E9D8</color>
-    <color name="ic_launcher_background_w">#F5E9D8</color>
+    <color name="ic_launcher_background">#F6EFE5</color>
+    <color name="ic_launcher_background_w">#F8F9FA</color>
+    <color name="launcher0_background">#0A0D14</color>
+    <color name="launcher1_background">#0B132B</color>
+    <color name="launcher2_background">#064E3B</color>
+    <color name="launcher3_background">#2E1065</color>
+    <color name="launcher4_background">#FFF1F2</color>
+    <color name="launcher5_background">#450A0A</color>
+    <color name="launcher6_background">#271911</color>
     <color name="ic_st_aloud_background">#D7D7D7</color>
 
     <!--    GR Theme-->

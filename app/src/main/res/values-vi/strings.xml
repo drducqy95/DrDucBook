@@ -6,6 +6,27 @@
     <string name="receiving_shared_label">DrDucBook·tìm kiếm</string>
     <string name="tip_perm_request_storage">DrDucBook cần quyền truy cập bộ nhớ để tìm và đọc sách. Vui lòng vào "Cài đặt ứng dụng" để cấp "Quyền lưu trữ".</string>
 
+    <!-- Launcher Icon Styles -->
+    <string name="launcher_icon_default">Trang Giấy Ấm</string>
+    <string name="launcher_icon_white">Bạch Ngọc</string>
+    <string name="launcher_icon_amoled">Đêm AMOLED</string>
+    <string name="launcher_icon_gold">Hoàng Gia</string>
+    <string name="launcher_icon_jade">Ngọc Bích</string>
+    <string name="launcher_icon_violet">Tử Đằng</string>
+    <string name="launcher_icon_sakura">Anh Đào</string>
+    <string name="launcher_icon_crimson">Chu Sa</string>
+    <string name="launcher_icon_amber">Hổ Phách</string>
+
+    <!-- In-App Bundled Icon Categories & Names -->
+    <string name="icon_category_nav">Điều hướng &amp; Giá sách</string>
+    <string name="icon_category_reader">Trình đọc &amp; Công cụ</string>
+    <string name="icon_category_ai">AI &amp; Dịch thuật</string>
+    <string name="icon_category_system">Hệ thống &amp; Tiện ích</string>
+    <string name="icon_picker_title">Chọn Biểu Tượng Tích Hợp</string>
+    <string name="icon_picker_reset">Khôi phục mặc định</string>
+    <string name="icon_picker_custom_file">Chọn ảnh từ tệp tin</string>
+    <string name="icon_picker_search_placeholder">Tìm kiếm biểu tượng...</string>
+
     <!--Other-->
     <string name="menu_backup">Trang chủ</string>
     <string name="menu_restore">Khôi phục</string>
@@ -4165,4 +4186,35 @@
     <string name="untitled_book">Sách chưa đặt tên</string>
     <string name="untitled_chapter">Chương không tên</string>
     <string name="import_book_file_name_hint">Dùng JS để phân tích tên tệp từ src, sau đó gán tên/tác giả.</string>
+
+    <!-- Source Health Bulk Deletion -->
+    <string name="source_health_delete_errors">Xóa nguồn lỗi</string>
+    <string name="source_health_delete_errors_confirm">Xóa toàn bộ %1$d nguồn lỗi? Thao tác này không thể hoàn tác.</string>
+    <string name="source_health_delete_selected">Xóa đã chọn (%1$d)</string>
+    <string name="source_health_delete_selected_confirm">Xóa %1$d nguồn đã chọn? Thao tác này không thể hoàn tác.</string>
+    <string name="source_health_deleted_count">Đã xóa %1$d nguồn truyện</string>
+    <string name="source_health_no_errors_to_delete">Không tìm thấy nguồn lỗi nào để xóa</string>
+    <string name="source_health_selection_mode">Chọn nhiều nguồn</string>
+    <string name="source_health_selected_count">Đã chọn %1$d</string>
+    <string name="source_health_select_all">Chọn tất cả</string>
+    <string name="source_health_deselect_all">Bỏ chọn tất cả</string>
+
+    <!-- Online Book Source Hub -->
+    <string name="book_source_hub_title">Kho nguồn trực tuyến</string>
+    <string name="book_source_hub_desc">Tra cứu, tìm kiếm và nạp nguồn truyện từ kho trực tuyến</string>
+    <string name="source_hub_tab_yckceo">Kho YCKCEO (源仓库)</string>
+    <string name="source_hub_tab_miaogongzi">Kho 喵公子 (Miao Gong Zi)</string>
+    <string name="source_hub_search_hint">Tìm kiếm nguồn (tên, tác giả, tên miền)…</string>
+    <string name="source_hub_download">Tải về</string>
+    <string name="source_hub_importing">Đang nạp nguồn…</string>
+    <string name="source_hub_imported_success">Đã nhập thành công %1$d nguồn</string>
+    <string name="source_hub_import_failed">Tải nguồn thất bại: %1$s</string>
+    <string name="source_hub_downloads_count">%1$s lượt tải</string>
+    <string name="source_hub_bundles_title">Các gói nguồn tuyển chọn</string>
+    <string name="source_hub_bundle_sources_count">%1$d nguồn</string>
+    <string name="source_hub_all_sources">Tất cả nguồn</string>
+    <string name="source_hub_category_explore">Khám phá</string>
+    <string name="source_hub_category_search">Tìm kiếm</string>
+    <string name="source_hub_category_comic">Truyện tranh</string>
+    <string name="source_hub_category_audio">Âm thanh</string>
 </resources>

@@ -37,9 +37,21 @@ class BrandIdentityTest {
                 ComponentName(context, launcher),
                 PackageManager.MATCH_DISABLED_COMPONENTS,
             )
+            val expectedIcon = when (launcher) {
+                MainActivity::class.java -> R.mipmap.ic_launcher
+                LauncherW::class.java -> R.mipmap.launcherw
+                Launcher0::class.java -> R.mipmap.launcher0
+                Launcher1::class.java -> R.mipmap.launcher1
+                Launcher2::class.java -> R.mipmap.launcher2
+                Launcher3::class.java -> R.mipmap.launcher3
+                Launcher4::class.java -> R.mipmap.launcher4
+                Launcher5::class.java -> R.mipmap.launcher5
+                Launcher6::class.java -> R.mipmap.launcher6
+                else -> R.mipmap.ic_launcher
+            }
             assertEquals(
                 "Unexpected icon for ${launcher.name}",
-                R.mipmap.ic_launcher,
+                expectedIcon,
                 activityInfo.iconResource,
             )
         }
