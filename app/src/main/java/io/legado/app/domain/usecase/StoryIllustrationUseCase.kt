@@ -115,9 +115,12 @@ class StoryIllustrationUseCase(
         prompt: String,
         size: String,
     ): String {
-        val preset = aiProfileGateway.getTaskPreset(AiTaskType.GENERATE_STORY_IMAGE)
-            ?: resolveDefaultImagePreset()
-            ?: error("Chưa cấu hình preset tạo ảnh cho Story Wiki. Vui lòng thêm preset hoặc chọn model OpenAI/DALL-E trong Cài đặt AI.")
+        val configuredPreset = aiProfileGateway.getTaskPreset(AiTaskType.GENERATE_STORY_IMAGE)
+        val preset = if (configuredPreset != null && isSupportedImageModel(configuredPreset.model)) {
+            configuredPreset
+        } else {
+            resolveDefaultImagePreset()
+        } ?: error("Chưa cấu hình model tạo ảnh cho Story Wiki. Vui lòng thêm model DALL-E/Flux trong Cài đặt AI (Cần provider tương thích OpenAI có hỗ trợ /images/generations).")
         val requestPrompt = listOf(preset.promptTemplate.trim(), prompt)
             .filter(String::isNotBlank)
             .joinToString("\n\n")
@@ -136,17 +139,25 @@ class StoryIllustrationUseCase(
         )
     }
 
+    private fun isSupportedImageModel(model: io.legado.app.domain.model.AiModelConfig): Boolean {
+        val protocolOk = model.provider.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_CHAT_COMPLETIONS ||
+            model.provider.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_RESPONSES
+        if (!protocolOk) return false
+        val nameMatch = model.modelId.contains("dall-e", ignoreCase = true) ||
+            model.modelId.contains("flux", ignoreCase = true) ||
+            model.modelId.contains("image", ignoreCase = true) ||
+            model.displayName.contains("dall-e", ignoreCase = true) ||
+            model.displayName.contains("flux", ignoreCase = true) ||
+            model.displayName.contains("image", ignoreCase = true)
+        val capabilityMatch = model.capabilities.contains("image") || model.capabilities.contains("image_generation")
+        return nameMatch || capabilityMatch
+    }
+
     private suspend fun resolveDefaultImagePreset(): io.legado.app.domain.model.AiTaskPresetConfig? {
         val allModels = aiProfileGateway.observeModels().firstOrNull()?.filter { it.enabled }.orEmpty()
         val imageModel = allModels.firstOrNull { model ->
-            model.modelId.contains("dall-e", ignoreCase = true) ||
-                model.modelId.contains("flux", ignoreCase = true) ||
-                model.modelId.contains("image", ignoreCase = true) ||
-                model.displayName.contains("dall-e", ignoreCase = true)
-        } ?: allModels.firstOrNull { model ->
             val config = aiProfileGateway.getModelConfig(model.id)
-            config?.provider?.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_CHAT_COMPLETIONS ||
-                config?.provider?.protocol == io.legado.app.domain.model.AiProtocol.OPENAI_RESPONSES
+            config != null && isSupportedImageModel(config)
         } ?: return null
 
         val modelConfig = aiProfileGateway.getModelConfig(imageModel.id) ?: return null

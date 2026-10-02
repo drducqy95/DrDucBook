@@ -374,6 +374,7 @@ class TranslateChapterUseCase(
         book: Book,
         bookChapter: BookChapter,
         forceRetranslate: Boolean = false,
+        retrofitWithExistingDraft: Boolean = false,
         provider: String = TranslationConfig.llmProvider,
         targetLanguage: String = TranslationConfig.llmTargetLanguage,
         onProgress: (TranslationProgress) -> Unit,
@@ -492,14 +493,15 @@ class TranslateChapterUseCase(
 
             val isAiTranslation = provider == TranslationConstants.PROVIDER_APP_AI ||
                 provider == TranslationConstants.PROVIDER_REWRITE
-            if (forceRetranslate && isAiTranslation) {
-                val existingAiTranslation = translationCacheGateway.getCurrentRevision(
+            if (retrofitWithExistingDraft && isAiTranslation) {
+                val existingRevision = translationCacheGateway.getCurrentRevision(
                     book = book,
                     bookChapter = bookChapter,
                     targetLanguage = targetLanguage,
                     provider = provider,
                     currentRawContentHash = rawContentHash,
-                )?.takeIf { it.content.isNotBlank() }?.content
+                )
+                val existingAiTranslation = existingRevision?.takeIf { it.content.isNotBlank() }?.content
                     ?: translationCacheGateway.readCurrentTranslation(
                         book = book,
                         bookChapter = bookChapter,
@@ -508,10 +510,30 @@ class TranslateChapterUseCase(
                         provider = provider,
                     )
                 if (existingAiTranslation != null) {
+                    var updatedText: String = existingAiTranslation
+                    for (mem in storyContext.canonicalMemory) {
+                        if (mem.target.isNotBlank()) {
+                            for (alias in mem.aliases) {
+                                if (alias.isNotBlank() && alias != mem.target && updatedText.contains(alias)) {
+                                    updatedText = updatedText.replace(alias, mem.target)
+                                }
+                            }
+                        }
+                    }
                     val displayTranslation = postProcessTranslation(
-                        existingAiTranslation,
-                        targetLanguage,
+                        text = updatedText,
+                        targetLanguage = targetLanguage,
                         isRewrite = isRewrite,
+                    )
+                    translationCacheGateway.writeTranslation(
+                        book = book,
+                        bookChapter = bookChapter,
+                        targetLanguage = targetLanguage,
+                        content = displayTranslation,
+                        originalContentHash = contentHash,
+                        provider = provider,
+                        rawContentHash = rawContentHash,
+                        dictionaryRevision = dictionaryRevision.cacheToken,
                     )
                     onProgress(
                         TranslationProgress(

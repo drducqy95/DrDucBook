@@ -3,6 +3,9 @@ package io.legado.app.ui.translation.memory
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drducbook.app.R
+import io.legado.app.constant.EventBus
+import io.legado.app.model.ReadBook
+import io.legado.app.utils.postEvent
 import io.legado.app.domain.model.AiTranslationStoryEntity
 import io.legado.app.domain.model.AiTranslationStoryMemoryKind
 import io.legado.app.domain.model.AiTranslationStoryMemorySnapshot
@@ -525,6 +528,10 @@ class BookStoryMemoryViewModel(
                     }
                 )
                 val retrofitted = result.getOrThrow()
+                if (ReadBook.book?.bookUrl == bookUrl) {
+                    ReadBook.clearTextChapter()
+                    postEvent(EventBus.REFRESH_BOOK_CONTENT, true)
+                }
                 _uiState.update { it.copy(retrofitDialog = it.retrofitDialog.copy(isOpen = false, isRunning = false)) }
                 _effects.tryEmit(
                     BookStoryMemoryEffect.ShowMessageText(

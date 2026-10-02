@@ -76,7 +76,7 @@ data class AiImageGenerateRequest(
     val model: AiModelConfig,
     val prompt: String,
     val size: String = "1024x1024",
-    val quality: String = "medium",
+    val quality: String = "standard",
 )
 
 data class AiImageGenerateResult(

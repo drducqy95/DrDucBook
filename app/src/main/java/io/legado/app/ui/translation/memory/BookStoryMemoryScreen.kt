@@ -634,6 +634,13 @@ private fun StoryMemoryEditorDialog(
                         }
                     }
                 }
+                if (saving) {
+                    LinearProgressIndicator(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                    )
+                }
                 if (
                     draft.originalId != null &&
                     draft.kind in setOf(
@@ -641,12 +648,31 @@ private fun StoryMemoryEditorDialog(
                         AiTranslationStoryMemoryKind.WORLD_BUILDING,
                     )
                 ) {
-                    TextButton(
-                        onClick = onGenerateImage,
-                        enabled = !saving,
-                        modifier = Modifier.align(Alignment.End),
-                    ) {
-                        Text(stringResource(R.string.story_memory_generate_image))
+                    if (saving) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(vertical = 4.dp),
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                            )
+                            Text(
+                                text = "Đang xử lý tạo ảnh...",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    } else {
+                        TextButton(
+                            onClick = onGenerateImage,
+                            enabled = !saving,
+                            modifier = Modifier.align(Alignment.End),
+                        ) {
+                            Text(stringResource(R.string.story_memory_generate_image))
+                        }
                     }
                 }
             }

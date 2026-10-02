@@ -481,14 +481,26 @@ class AiProfileRepository(
             modelProfileId = modelProfileId,
             params = params,
         )
-        upsertActivePresetForModel(
-            taskType = AiTaskType.GENERATE_STORY_IMAGE,
-            fallbackId = DEFAULT_GENERATE_STORY_IMAGE_PRESET_ID,
-            fallbackName = "Story Illustration",
-            fallbackPrompt = AiPromptTemplate.DEFAULT_STORY_IMAGE,
-            modelProfileId = modelProfileId,
-            params = params,
-        )
+        val model = getModel(modelProfileId)
+        val isImageModel = model?.let {
+            it.capabilities.contains("image") ||
+                it.capabilities.contains("image_generation") ||
+                it.modelId.contains("dall-e", ignoreCase = true) ||
+                it.modelId.contains("flux", ignoreCase = true) ||
+                it.modelId.contains("image", ignoreCase = true) ||
+                it.displayName.contains("dall-e", ignoreCase = true) ||
+                it.displayName.contains("flux", ignoreCase = true)
+        } ?: false
+        if (isImageModel) {
+            upsertActivePresetForModel(
+                taskType = AiTaskType.GENERATE_STORY_IMAGE,
+                fallbackId = DEFAULT_GENERATE_STORY_IMAGE_PRESET_ID,
+                fallbackName = "Story Illustration",
+                fallbackPrompt = AiPromptTemplate.DEFAULT_STORY_IMAGE,
+                modelProfileId = modelProfileId,
+                params = params,
+            )
+        }
     }
 
     private suspend fun upsertActivePresetForModel(

@@ -615,6 +615,7 @@ class TranslationStoryMemoryUseCase(
                 book = book,
                 bookChapter = chapter,
                 forceRetranslate = true,
+                retrofitWithExistingDraft = true,
                 provider = provider,
                 targetLanguage = targetLanguage,
                 onProgress = {},

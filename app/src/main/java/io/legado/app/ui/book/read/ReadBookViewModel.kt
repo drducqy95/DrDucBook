@@ -3225,6 +3225,7 @@ class ReadBookViewModel(
                 appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
                     ?.let { chapter ->
                         BookHelp.delContent(book, chapter)
+                        io.legado.app.model.translation.TranslationManager.deleteTranslationCache(book, chapter)
                         ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
                     }
             }

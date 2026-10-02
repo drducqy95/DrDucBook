@@ -1753,6 +1753,11 @@
           "id": "T45.13",
           "desc": "Translation Cache & Story Memory Overhaul - (1) Distilled character chronology in CharacterDossierSheet from chapter summaries and direct events; (2) Guaranteed Vietnamese chapter titles in timeline wiki and enabled AI chapter title translation with dynamic UI cache overrides; (3) Protected AI translation from being retranslated on 'Làm mới bản dịch', preserving AI drafts while re-applying dictionary rules; (4) Restored AI suggestions in dictionary/word editors via plain text refiner fallback and route graceful degradation, and connected OpenAiImageRepository to AiSecretStore for story illustrations.",
           "status": "DONE"
+        },
+        {
+          "id": "T45.14",
+          "desc": "Story Illustration & Translation Refresh Bugfix - (1) Fixed image generation crash by using credential.secretRef, valid quality 'standard', guarding saveDefaultPresets against non-image models, and adding UI loading indicators; (2) Restored 'Dịch lại chương' by separating retrofitWithExistingDraft from forceRetranslate; (3) Fixed 'Làm mới bản dịch' by updating memory terms and persisting retrofitted drafts to disk cache; (4) Called TranslationManager.deleteTranslationCache on reader refresh and posted REFRESH_BOOK_CONTENT on retrofit completion; (5) Assembled release build with R8 minification and passed unit tests.",
+          "status": "DONE"
         }
       ]
     }

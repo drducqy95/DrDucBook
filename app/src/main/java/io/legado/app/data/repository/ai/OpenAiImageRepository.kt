@@ -37,7 +37,7 @@ class OpenAiImageRepository(
                 val credential = appDb?.aiRouterDao?.getCredentialsForProvider(rawProvider.id)
                     ?.firstOrNull { it.enabled && AiCredentialStatus.isRouterEligible(it.status) }
                 if (credential != null && secretStore != null) {
-                    secretStore.get(credential.id).orEmpty()
+                    secretStore.get(credential.secretRef).orEmpty()
                 } else ""
             }
             val provider = rawProvider.copy(apiKey = resolvedApiKey)
@@ -47,6 +47,7 @@ class OpenAiImageRepository(
                     request.model.modelId.isNotBlank()
             ) { "Cấu hình provider tạo ảnh chưa đầy đủ (thiếu Base URL hoặc API Key). Vui lòng kiểm tra Cài đặt AI." }
             val keyRotator = KeyRotator(provider.apiKey)
+            val effectiveQuality = if (request.quality.equals("hd", ignoreCase = true)) "hd" else "standard"
             retryWithBackoff(
                 maxAttempts = keyRotator.attemptsAtLeast(2),
                 keyRotator = keyRotator,
@@ -59,7 +60,7 @@ class OpenAiImageRepository(
                                 "model" to request.model.modelId,
                                 "prompt" to request.prompt,
                                 "size" to request.size,
-                                "quality" to request.quality,
+                                "quality" to effectiveQuality,
                                 "n" to 1,
                                 "output_format" to "png",
                             )

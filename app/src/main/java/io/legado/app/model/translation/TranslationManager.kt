@@ -566,9 +566,8 @@ object TranslationManager : KoinComponent {
     /**
      * Delete translation cache and state for a chapter.
      */
-    suspend fun deleteTranslationCache(book: Book, bookChapter: BookChapter) {
+    suspend fun deleteTranslationCache(book: Book, bookChapter: BookChapter, provider: String? = null) {
         val targetLanguage = currentTargetLanguage()
-        val provider = TranslationConfig.llmProvider
         translationCacheGateway.deleteTranslation(
             book,
             bookChapter,
@@ -581,7 +580,8 @@ object TranslationManager : KoinComponent {
             targetLanguage,
             provider,
         )
-        clearChapterState(book.bookUrl, bookChapter.index, provider, targetLanguage)
+        clearChapterState(book.bookUrl, bookChapter.index, provider ?: TranslationConfig.llmProvider, targetLanguage)
+        clearChapterState(book.bookUrl, bookChapter.index, TranslationConstants.PROVIDER_QUICK_TRANSLATOR, targetLanguage)
     }
 
     private fun currentTargetLanguage(): String {
