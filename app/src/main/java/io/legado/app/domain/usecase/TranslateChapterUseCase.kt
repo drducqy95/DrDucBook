@@ -251,6 +251,7 @@ class TranslateChapterUseCase(
                 TranslationConstants.PROVIDER_ML_KIT -> mlKitTranslationGateway.translate(
                     text = source,
                     targetLanguage = targetLanguage,
+                    sourceLanguage = inferMlKitSourceLanguageHint(source, targetLanguage),
                 )
                 TranslationConstants.PROVIDER_LOCAL_AI -> {
                     val gateway = localAiTranslationGateway
@@ -1855,6 +1856,13 @@ class TranslateChapterUseCase(
                 )
             )
         }
+        TranslationConstants.PROVIDER_ML_KIT -> {
+            GSON.toJson(
+                linkedMapOf(
+                    "sourceLanguage" to TranslationConfig.mlKitSourceLanguage,
+                )
+            )
+        }
         else -> ""
     }
 
@@ -3049,6 +3057,10 @@ internal fun inferMlKitSourceLanguageHint(
     text: String,
     targetLanguage: String,
 ): String? {
+    val configured = TranslationConfig.mlKitSourceLanguage.trim()
+    if (configured.isNotBlank() && !configured.equals("auto", ignoreCase = true)) {
+        return configured
+    }
     val inferred = inferCjkScriptLanguage(text) ?: return null
     return inferred.takeUnless { it == targetLanguage }
 }

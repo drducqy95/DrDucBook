@@ -15,6 +15,18 @@ class MlKitTranslationRepositoryTest {
     }
 
     @Test
+    fun resolveExplicitSourceLanguageBypassesAutoDetect() {
+        assertEquals("zh", resolveExplicitMlKitSourceLanguage("zh"))
+        assertEquals("zh", resolveExplicitMlKitSourceLanguage("zh-Hans"))
+        assertEquals("en", resolveExplicitMlKitSourceLanguage("en"))
+        assertEquals("ja", resolveExplicitMlKitSourceLanguage("ja"))
+        assertEquals(null, resolveExplicitMlKitSourceLanguage("auto"))
+        assertEquals(null, resolveExplicitMlKitSourceLanguage("AUTO"))
+        assertEquals(null, resolveExplicitMlKitSourceLanguage("   "))
+        assertEquals(null, resolveExplicitMlKitSourceLanguage(null))
+    }
+
+    @Test
     fun inferSourceLanguageUsesHanTextWhenLanguageIdIsUndetermined() {
         assertEquals("zh", inferMlKitSourceLanguage("\u53F6\u957F\u751F\u770B\u7740\u79E6\u8001\u8BF4\u9053"))
         assertEquals("zh", inferMlKitSourceLanguage("\u597D\u3002"))

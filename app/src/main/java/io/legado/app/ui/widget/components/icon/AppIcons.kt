@@ -4,12 +4,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AutoStories
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DashboardCustomize
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.AutoStories
+import androidx.compose.material.icons.outlined.DashboardCustomize
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Explore
@@ -129,7 +134,7 @@ object AppIcons {
             MainDestination.Bookshelf -> if (isMiuix) {
                 if (selected) MiuixIcons.Regular.Notes else MiuixIcons.Regular.Notes
             } else {
-                if (selected) Icons.AutoMirrored.Filled.LibraryBooks else Icons.AutoMirrored.Outlined.LibraryBooks
+                if (selected) Icons.Default.AutoStories else Icons.Outlined.AutoStories
             }
 
             MainDestination.Explore -> if (isMiuix) {
@@ -147,13 +152,13 @@ object AppIcons {
             MainDestination.Workspace -> if (isMiuix) {
                 MiuixIcons.Regular.Notes
             } else {
-                Icons.Default.DashboardCustomize
+                if (selected) Icons.Default.DashboardCustomize else Icons.Outlined.DashboardCustomize
             }
 
             MainDestination.My -> if (isMiuix) {
                 if (selected) MiuixIcons.Regular.Settings else MiuixIcons.Regular.Settings
             } else {
-                if (selected) Icons.Default.Person else Icons.Outlined.Person
+                if (selected) Icons.Default.AccountCircle else Icons.Outlined.AccountCircle
             }
         }
     }

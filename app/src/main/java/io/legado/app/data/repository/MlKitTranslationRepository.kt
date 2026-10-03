@@ -114,9 +114,7 @@ class MlKitTranslationRepository : MlKitTranslationGateway {
     }
 
     private suspend fun resolveSourceLanguage(text: String, sourceLanguage: String?): String? {
-        sourceLanguage?.takeIf { it.isNotBlank() }?.let { explicit ->
-            return normalizeLanguage(explicit)
-        }
+        resolveExplicitMlKitSourceLanguage(sourceLanguage)?.let { return it }
         return inferMlKitSourceLanguage(text)
             ?: normalizeLanguage(identifyLanguage(text))
     }
@@ -202,6 +200,14 @@ private fun isMlKitHangulCodePoint(value: Int): Boolean =
         value in 0xA960..0xA97F ||
         value in 0xAC00..0xD7AF ||
         value in 0xD7B0..0xD7FF
+
+internal fun resolveExplicitMlKitSourceLanguage(explicit: String?): String? {
+    val trimmed = explicit?.trim().orEmpty()
+    if (trimmed.isEmpty() || trimmed.equals("auto", ignoreCase = true)) {
+        return null
+    }
+    return normalizeMlKitLanguageTag(trimmed)
+}
 
 internal fun missingMlKitTranslationModels(
     sourceLanguage: String,

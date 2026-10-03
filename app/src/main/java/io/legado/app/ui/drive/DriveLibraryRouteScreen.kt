@@ -87,6 +87,9 @@ fun DriveLibraryRouteScreen(
             },
             onAddGoogleAccount = { email, folderId, name ->
                 viewModel.onIntent(DriveLibraryIntent.AddGoogleAccount(email, folderId, name))
+            },
+            onAddServiceAccount = { jsonContent, folderId, name ->
+                viewModel.onIntent(DriveLibraryIntent.AddServiceAccount(jsonContent, folderId, name))
             }
         )
     }

@@ -1,34 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- DrDucBook Adaptive Monochrome Vector for Android 13+ Themed Icons -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.75"
-        android:pathData="M 54,52 C 45,46 36,44 24,46 C 23,46 22,47 22,48 L 22,72 C 22,73 23,74 24,74 C 36,72 45,74 54,80 C 63,74 72,72 84,74 C 85,74 86,73 86,72 L 86,48 C 86,47 85,46 84,46 C 72,44 63,46 54,52 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="1.0"
-        android:pathData="M 53,51 C 45,46 37,44 27,45 C 26.5,45 26,45.5 26,46 L 26,67 C 36,65 44,67 53,72 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="1.0"
-        android:pathData="M 55,51 C 63,46 71,44 81,45 C 81.5,45 82,45.5 82,46 L 82,67 C 72,65 64,67 55,72 Z" />
-    <!-- Wisdom Flame -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.9"
-        android:pathData="M 54,23 C 51,28 44,35 44,43 C 44,50 48.5,54 54,55 C 59.5,54 64,50 64,43 C 64,35 57,28 54,23 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.5"
-        android:pathData="M 54,31 C 52,35 48,39 48,44 C 48,48 50.7,50.5 54,51 C 57.3,50.5 60,48 60,44 C 60,39 56,35 54,31 Z" />
-    <!-- Crest Star -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="1.0"
-        android:pathData="M 54,16 L 55.5,19.5 L 59,20 L 55.5,20.5 L 54,24 L 52.5,20.5 L 49,20 L 52.5,19.5 Z" />
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:antialias="true"
+    android:filter="true"
+    android:gravity="fill"
+    android:src="@drawable/drducbook_icon_monochrome" />

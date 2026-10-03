@@ -349,6 +349,20 @@ fun TranslationConfigScreen(
                         onValueChange = { TranslationConfig.llmTargetLanguage = it }
                     )
 
+                    if (TranslationConfig.llmProvider == TranslationConstants.PROVIDER_ML_KIT) {
+                        val sourceLanguages = TranslationConfig.mlKitSourceLanguages
+                        val sourceLanguageEntries = sourceLanguages.map { it.second }.toTypedArray()
+                        val sourceLanguageValues = sourceLanguages.map { it.first }.toTypedArray()
+                        DropdownListSettingItem(
+                            title = stringResource(R.string.mlkit_source_language),
+                            description = stringResource(R.string.mlkit_source_language_summary),
+                            selectedValue = TranslationConfig.mlKitSourceLanguage,
+                            displayEntries = sourceLanguageEntries,
+                            entryValues = sourceLanguageValues,
+                            onValueChange = { TranslationConfig.mlKitSourceLanguage = it }
+                        )
+                    }
+
                     DropdownListSettingItem(
                         title = stringResource(R.string.quick_translation_pronoun_mode),
                         description = stringResource(R.string.quick_translation_pronoun_mode_summary),

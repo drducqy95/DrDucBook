@@ -1,9 +1,9 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-02T19:12:00.000000",
+    "last_updated": "2026-10-03T13:00:00.000000",
     "overall_progress_percent": 100,
-    "current_phase": "Phase 48 - Multi-Provider Image Generation, Universal Fallback & Prompt Preset Auto-Init",
+    "current_phase": "Phase 53 - Local OPDS Drive Proxy Server & Service Account Support (Completed)",
     "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
@@ -1823,6 +1823,216 @@
         {
           "id": "T48.5",
           "desc": "T48.5 - BookStoryMemory: Auto-save entity before image generation, allow 1-click image creation on newly added entities, and compile + unit test verification passed",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P49",
+      "name": "Phase 49 - Fix App Icons, Hub Navigation, Credential Save Hang & Command Code Provider",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T49.1",
+          "desc": "Restore original app launcher avatar/mipmap icons and enhance bottom navigation with Material Expressive symbols",
+          "status": "DONE"
+        },
+        {
+          "id": "T49.2",
+          "desc": "Fix Hub navigation in MainNavigator by routing MainRouteBookSourceHub to BookSourceHubRouteScreen",
+          "status": "DONE"
+        },
+        {
+          "id": "T49.3",
+          "desc": "Prevent credential saving hang in AiRouterRepository with async probing and immediate persistence",
+          "status": "DONE"
+        },
+        {
+          "id": "T49.4",
+          "desc": "Implement Command Code handler with CLI headers, envelope body, and catalog integration inspired by 9router and omniroute",
+          "status": "DONE"
+        },
+        {
+          "id": "T49.5",
+          "desc": "Fix YCKCEO repository parsing, download URL format, live debounced search, and unit tests",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P50",
+      "name": "Phase 50 - Online Book Source Hub Dynamic UI Translation Integration",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T50.1",
+          "desc": "Inject TranslateDynamicUiTextUseCase in BookSourceHubViewModel to automatically translate YCKCEO source names, authors, and relative times",
+          "status": "DONE"
+        },
+        {
+          "id": "T50.2",
+          "desc": "Translate curated Miao Gong Zi source bundle titles, descriptions, and authors into Vietnamese",
+          "status": "DONE"
+        },
+        {
+          "id": "T50.3",
+          "desc": "Observe TranslationConfig.dynamicUiTranslationEnabled to switch seamlessly between translated and raw items",
+          "status": "DONE"
+        },
+        {
+          "id": "T50.4",
+          "desc": "Clean up static UI tab headers and localize card metadata strings in BookSourceHubScreen",
+          "status": "DONE"
+        },
+        {
+          "id": "T50.5",
+          "desc": "Compile, build debug APK, install on Huawei Nova device, and visually verify translated UI",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P51",
+      "name": "Phase 51 - Release Build & Huawei Device Deployment",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T51.1",
+          "desc": "Assemble Release APK with full R8 minification, resource shrinking, and native ABI splits (arm64-v8a)",
+          "status": "DONE"
+        },
+        {
+          "id": "T51.2",
+          "desc": "Install arm64-v8a release APK onto physical Huawei Nova device via ADB",
+          "status": "DONE"
+        },
+        {
+          "id": "T51.3",
+          "desc": "Verify release build launch, onboarding, workspace navigation, and runtime stability",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P52",
+      "name": "Phase 52 - ML Kit Source Language Manual Selection",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T52.1",
+          "desc": "Add mlKitSourceLanguage preference key to PreferKey.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T52.2",
+          "desc": "Add mlKitSourceLanguage property in TranslationConfig.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T52.3",
+          "desc": "Pass configured sourceLanguage to mlKitTranslationGateway.translate in TranslateChapterUseCase.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T52.4",
+          "desc": "Pass configured sourceLanguage to mlKitTranslationGateway in TranslateBrowserPageUseCase.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T52.5",
+          "desc": "Verify and wire sourceLanguage in TranslateMangaPageUseCase.kt if applicable",
+          "status": "DONE"
+        },
+        {
+          "id": "T52.6",
+          "desc": "Add ML Kit Source Language selector dropdown to TranslationConfigScreen.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T52.7",
+          "desc": "Include sourceLanguage in TranslationChapter cache key revision",
+          "status": "DONE"
+        },
+        {
+          "id": "T52.8",
+          "desc": "Unit tests for explicit ML Kit source language translation",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P53",
+      "name": "Phase 53 - Local OPDS Drive Proxy Server & Service Account Support",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T53.1",
+          "desc": "Create OPDS domain models and MIME type constants in domain/model/OpdsModels.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.2",
+          "desc": "Implement OpdsAtomSerializer.kt for generating valid OPDS 1.2 Atom XML feeds",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.3",
+          "desc": "Implement OpdsParser.kt using XmlPullParser for client-side catalog consumption",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.4",
+          "desc": "Implement OpdsDriveMapper.kt to convert drive directory listings into OPDS feeds",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.5",
+          "desc": "Create DriveOpdsProxyServer.kt (embedded Ktor CIO) on dynamic localhost port",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.6",
+          "desc": "Create CloudDriveListingProvider.kt bridging existing WebDAV files to OPDS",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.7",
+          "desc": "Create DriveOpdsService.kt foreground service and DriveOpdsServiceController.kt",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.8",
+          "desc": "Add GOOGLE_DRIVE_SERVICE_ACCOUNT to DriveSourceType and support SA in DriveWebDavConnectionUseCase",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.9",
+          "desc": "Implement ServiceAccountCredentialStore.kt with Android Keystore encryption",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.10",
+          "desc": "Add Service Account tab to AddDriveSourceSheet.kt with JSON picker and validation",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.11",
+          "desc": "Create OpdsClient.kt and OpdsDriveAdapter.kt for DriveLibraryViewModel OPDS browsing",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.12",
+          "desc": "Add OPDS view mode and integration to DriveLibraryContract and UI",
+          "status": "DONE"
+        },
+        {
+          "id": "T53.13",
+          "desc": "Unit and integration tests for OPDS serializer, parser, and proxy server",
           "status": "DONE"
         }
       ]

@@ -835,7 +835,8 @@ val appModule = module {
     single { io.legado.app.data.repository.ManagedSourceRegistry(get()) }
     single { io.legado.app.data.repository.RemoteBookMetadataRepository() }
     single { io.legado.app.domain.usecase.DriveWebDavConnectionUseCase(get(), get()) }
-    viewModel { io.legado.app.ui.drive.DriveLibraryViewModel(get(), get(), get()) }
+    single { io.legado.app.help.drive.OpdsClient() }
+    viewModel { io.legado.app.ui.drive.DriveLibraryViewModel(get(), get(), get(), get()) }
 }
 
 @TargetApi(Build.VERSION_CODES.P)

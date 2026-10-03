@@ -287,6 +287,25 @@ fun DriveLibrarySection(
                                 selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         )
+
+                        if (state.opdsUrl != null) {
+                            FilterChip(
+                                selected = state.viewMode == DriveViewMode.OPDS,
+                                onClick = { onIntent(DriveLibraryIntent.SetViewMode(DriveViewMode.OPDS)) },
+                                label = { Text("OPDS") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Cloud,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -332,7 +351,7 @@ fun DriveLibrarySection(
             // Books List (rendered according to ViewMode)
             if (!state.loading && books.isNotEmpty()) {
                 when (state.viewMode) {
-                    DriveViewMode.CATALOG -> {
+                    DriveViewMode.CATALOG, DriveViewMode.OPDS -> {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(8.dp)

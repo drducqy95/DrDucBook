@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ContentPaste
@@ -41,12 +42,19 @@ fun AddDriveSourceSheet(
     onDismiss: () -> Unit,
     onAddPublicLink: (url: String, name: String) -> Unit,
     onRequestGoogleAuth: () -> Unit,
-    onAddGoogleAccount: (email: String, folderId: String, name: String) -> Unit
+    onAddGoogleAccount: (email: String, folderId: String, name: String) -> Unit,
+    onAddServiceAccount: (jsonContent: String, folderId: String, name: String) -> Unit = { _, _, _ -> }
 ) {
     var selectedTab by remember { mutableIntStateOf(1) } // Default to Public Link
     var publicUrl by remember { mutableStateOf("") }
     var publicName by remember { mutableStateOf("") }
     var detectedProvider by remember { mutableStateOf<String?>(null) }
+
+    var saJson by remember { mutableStateOf("") }
+    var saFolderId by remember { mutableStateOf("") }
+    var saSourceName by remember { mutableStateOf("") }
+    var saEmail by remember { mutableStateOf<String?>(null) }
+    var saValidationError by remember { mutableStateOf<String?>(null) }
 
     var googleEmail by remember { mutableStateOf("") }
     var googleFolderId by remember { mutableStateOf("") }
@@ -82,6 +90,12 @@ fun AddDriveSourceSheet(
                     onClick = { selectedTab = 1 },
                     text = { Text("Public Link") },
                     icon = { Icon(Icons.Default.Link, contentDescription = null) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("Service Account") },
+                    icon = { Icon(Icons.Default.AccountCircle, contentDescription = null) }
                 )
             }
 
@@ -146,7 +160,7 @@ fun AddDriveSourceSheet(
                 ) {
                     Text("Lưu nguồn")
                 }
-            } else {
+            } else if (selectedTab == 1) {
                 // Public Link
                 Text(
                     text = "Hỗ trợ link công khai từ Google Drive, OneDrive, Dropbox, hoặc HTTP autoindex.",
@@ -208,8 +222,107 @@ fun AddDriveSourceSheet(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null)
+                }
+            } else {
+                // Service Account Mode
+                Text(
+                    text = "Truy cập Google Drive riêng tư mà KHÔNG cần đăng nhập Google. Chia sẻ folder với email Service Account (quyền Viewer).",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = saJson,
+                    onValueChange = { input ->
+                        saJson = input
+                        if (input.isNotBlank()) {
+                            val res = io.legado.app.help.drive.ServiceAccountCredentialStore.validate(input)
+                            if (res.isSuccess) {
+                                saEmail = res.getOrNull()
+                                saValidationError = null
+                            } else {
+                                saEmail = null
+                                saValidationError = res.exceptionOrNull()?.message
+                            }
+                        } else {
+                            saEmail = null
+                            saValidationError = null
+                        }
+                    },
+                    label = { Text("Nội dung file JSON Credentials") },
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            val clip = clipboardManager.getText()
+                            if (clip != null && clip.text.isNotBlank()) {
+                                val text = clip.text
+                                saJson = text
+                                val res = io.legado.app.help.drive.ServiceAccountCredentialStore.validate(text)
+                                if (res.isSuccess) {
+                                    saEmail = res.getOrNull()
+                                    saValidationError = null
+                                } else {
+                                    saEmail = null
+                                    saValidationError = res.exceptionOrNull()?.message
+                                }
+                            }
+                        }) {
+                            Icon(Icons.Default.ContentPaste, contentDescription = "Dán")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3,
+                )
+
+                if (saEmail != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "✓ Hợp lệ: $saEmail",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else if (saValidationError != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "⚠ $saValidationError",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = saFolderId,
+                    onValueChange = { saFolderId = it },
+                    label = { Text("Mã thư mục (Folder ID - bắt buộc)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = saSourceName,
+                    onValueChange = { saSourceName = it },
+                    label = { Text("Tên nguồn (tùy chọn)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        if (saJson.isNotBlank() && saFolderId.isNotBlank()) {
+                            onAddServiceAccount(saJson, saFolderId, saSourceName)
+                        }
+                    },
+                    enabled = saJson.isNotBlank() && saFolderId.isNotBlank() && saEmail != null,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Thêm thư viện")
+                    Text("Thêm thư viện Private")
                 }
             }
 

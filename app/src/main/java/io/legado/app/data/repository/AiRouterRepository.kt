@@ -48,12 +48,17 @@ import io.legado.app.domain.usecase.AiRouterPolicy
 import io.legado.app.worker.ModelDiscoveryWorker
 import io.legado.app.utils.GSON
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
 import java.time.Clock
 import java.util.UUID
@@ -74,6 +79,7 @@ class AiRouterRepository(
     private val selector: AiRouteSelector = AiRouteSelector(),
 ) : AiRouterGateway, AiTextGateway {
 
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val targetSemaphores = ConcurrentHashMap<String, TargetSemaphore>()
     private val credentialCursors = ConcurrentHashMap<String, AtomicLong>()
 
@@ -128,31 +134,23 @@ class AiRouterRepository(
             accountLabel = existing?.accountLabel,
             expiresAt = existing?.expiresAt,
             scopes = existing?.scopes,
-            status = if (!shouldProbe) {
-                existing?.status ?: io.legado.app.domain.model.AiCredentialStatus.ACTIVE
-            } else {
-                AiCredentialStatus.VERIFYING
-            },
+            status = AiCredentialStatus.ACTIVE,
             providerDataJson = existing?.providerDataJson,
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
         )
         dao.upsertCredential(entity)
         if (shouldProbe) {
-            runCatching {
-                probeApiCredentialCapabilities(
-                    credential = entity,
-                    secret = secretStore.get(secretRef).orEmpty(),
-                )
-            }.onFailure { error ->
-                dao.updateCredentialStatus(
-                    entity.id,
-                    when {
-                        isCredentialAuthFailure(error) -> AiCredentialStatus.RELOGIN_REQUIRED
-                        else -> AiCredentialStatus.AUTHENTICATED_NOT_READY
-                    },
-                    clock.millis(),
-                )
+            val secret = secretStore.get(secretRef).orEmpty()
+            repositoryScope.launch {
+                runCatching {
+                    withTimeoutOrNull(20_000L) {
+                        probeApiCredentialCapabilities(
+                            credential = entity,
+                            secret = secret,
+                        )
+                    }
+                }
             }
         }
         return entity.toConfig(hasSecret = true)
@@ -694,21 +692,15 @@ class AiRouterRepository(
             .filter { it.providerId == credential.providerId && it.enabled }
         val models = (existingProfiles + discoveredProfiles).distinctBy { it.id }
         if (models.isEmpty()) {
-            dao.updateCredentialStatus(
-                credential.id,
-                AiCredentialStatus.AUTHENTICATED_NOT_READY,
-                clock.millis(),
-            )
             return
         }
         val probes = listOf(
             AiTaskType.CHAT to AiOutputContract.CHAT_TEXT,
             AiTaskType.TRANSLATE_CHAPTER to AiOutputContract.TRANSLATION_JSON,
-            AiTaskType.REWRITE_TEXT to AiOutputContract.REWRITE_TEXT,
         )
         var anyAvailable = false
         var credentialRejected = false
-        models.forEach { profile ->
+        models.take(2).forEach { profile ->
             val modelConfig = profileGateway.getModelConfig(profile.id)
                 ?.copy(provider = provider)
                 ?: return@forEach
@@ -742,15 +734,17 @@ class AiRouterRepository(
                             "Rewrite this sentence naturally in Vietnamese and return plain text only: Hello world."
                         else -> "Reply with OK."
                     }
-                    val response = delegate.generate(
-                        AiGenerateRequest(
-                            model = modelConfig,
-                            messages = listOf(AiMessage(AiMessageRole.USER, prompt)),
-                            params = AiGenerationParams(temperature = 0f, maxOutputTokens = 512),
-                            taskType = taskType,
-                            outputContract = outputContract,
-                        )
-                    ).getOrThrow()
+                    val response = withTimeoutOrNull(10_000L) {
+                        delegate.generate(
+                            AiGenerateRequest(
+                                model = modelConfig,
+                                messages = listOf(AiMessage(AiMessageRole.USER, prompt)),
+                                params = AiGenerationParams(temperature = 0f, maxOutputTokens = 512),
+                                taskType = taskType,
+                                outputContract = outputContract,
+                            )
+                        ).getOrThrow()
+                    } ?: error("Probe timeout")
                     require(response.text.isNotBlank()) { "Credential probe returned empty output" }
                     if (outputContract == AiOutputContract.TRANSLATION_JSON) {
                         val body = response.text.trim().removePrefix("```").removeSuffix("```").trim()
@@ -807,8 +801,7 @@ class AiRouterRepository(
             credential.id,
             when {
                 credentialRejected -> AiCredentialStatus.RELOGIN_REQUIRED
-                anyAvailable -> AiCredentialStatus.ACTIVE
-                else -> AiCredentialStatus.AUTHENTICATED_NOT_READY
+                else -> AiCredentialStatus.ACTIVE
             },
             clock.millis(),
         )
@@ -877,7 +870,11 @@ class AiRouterRepository(
         val now = clock.millis()
         val effectiveBaseUrl = provider.baseUrl
             .ifBlank {
-                if (provider.protocol == AiProtocol.ANTIGRAVITY) ANTIGRAVITY_IDE_BASE_URL else provider.baseUrl
+                when (provider.protocol) {
+                    AiProtocol.ANTIGRAVITY -> ANTIGRAVITY_IDE_BASE_URL
+                    AiProtocol.COMMAND_CODE -> "https://api.commandcode.ai/alpha/generate"
+                    else -> provider.baseUrl
+                }
             }
         if (provider.apiKey.isNotBlank()) {
             return if (effectiveBaseUrl != provider.baseUrl) {

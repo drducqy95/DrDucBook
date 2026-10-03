@@ -234,6 +234,29 @@ object AiProviderCatalog {
             ),
             notice = "Sử dụng Access Token hoặc Cookie phiên ChatGPT Web (chatgpt.com/backend-api/conversation).",
         ),
+        AiProviderCatalogEntry(
+            id = "commandcode",
+            name = "Command Code",
+            category = AiProviderCategory.API_KEY,
+            protocol = AiProtocol.COMMAND_CODE,
+            baseUrl = "https://api.commandcode.ai/alpha/generate",
+            authType = AiProviderAuthType.BEARER,
+            customHeaders = mapOf(
+                "x-command-code-version" to "0.25.7",
+                "x-cli-environment" to "cli",
+                "User-Agent" to "command-code-cli/0.25.7",
+            ),
+            models = listOf(
+                AiCatalogModel("deepseek/deepseek-v4-pro", "DeepSeek V4 Pro", 128_000, 16_384),
+                AiCatalogModel("deepseek/deepseek-chat", "DeepSeek Chat", 64_000, 8_192),
+                AiCatalogModel("deepseek/deepseek-reasoner", "DeepSeek Reasoner", 64_000, 8_192),
+                AiCatalogModel("anthropic/claude-3-7-sonnet", "Claude 3.7 Sonnet", 200_000, 16_384),
+                AiCatalogModel("anthropic/claude-3-5-sonnet", "Claude 3.5 Sonnet", 200_000, 8_192),
+                AiCatalogModel("openai/gpt-4o", "GPT-4o", 128_000, 4_096),
+                AiCatalogModel("google/gemini-2.0-flash", "Gemini 2.0 Flash", 1_000_000, 8_192),
+            ),
+            notice = "Command Code API (AI SDK v5 NDJSON). Hỗ trợ DeepSeek V4 Pro, Claude 3.7 Sonnet, GPT-4o.",
+        ),
     )
 
     private val curatedUpstreamIds = setOf(
@@ -249,6 +272,7 @@ object AiProviderCatalog {
         "openai",
         "anthropic",
         "gemini",
+        "commandcode",
     )
 
     private val compatibleRegistryEntries: List<AiProviderCatalogEntry> =

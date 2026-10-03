@@ -395,6 +395,7 @@ object PreferKey {
     const val llmApiKey = "llmApiKey"
     const val llmModel = "llmModel"
     const val llmTargetLanguage = "llmTargetLanguage"
+    const val mlKitSourceLanguage = "mlKitSourceLanguage"
     const val llmMaxCharsPerChunk = "llmMaxCharsPerChunk"
     const val llmChunkTuningVersion = "llmChunkTuningVersion"
     const val llmConcurrentChunks = "llmConcurrentChunks"

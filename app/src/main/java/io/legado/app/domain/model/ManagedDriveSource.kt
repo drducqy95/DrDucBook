@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 enum class DriveSourceType {
     GOOGLE_DRIVE_ACCOUNT,
     GOOGLE_DRIVE_PUBLIC,
+    GOOGLE_DRIVE_SERVICE_ACCOUNT,
     ONEDRIVE_PUBLIC,
     DROPBOX_PUBLIC,
     HTTP_INDEX
@@ -30,6 +31,7 @@ data class ManagedDriveSource(
     val rootFolderId: String = "",
     val publicUrl: String = "",
     val accountEmail: String = "",
+    val serviceAccountJson: String = "",
     val serverId: Long = 0L,
     val createdAt: Long = System.currentTimeMillis(),
     val lastAccessedAt: Long = System.currentTimeMillis(),

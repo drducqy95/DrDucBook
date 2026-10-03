@@ -50,6 +50,9 @@ supabase/.temp/
 /device-cache-check/
 /*.png
 /.codex-nox-window.xml
+/.brain/*.png
+/.brain/*.xml
+debug_dump.db
 
 # App specific & Secrets
 /app/app

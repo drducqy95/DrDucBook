@@ -275,6 +275,16 @@ object MainNavigator {
 
             is MainRouteEbookPreview -> backStack.add(route)
 
+            MainRouteBookSourceHub -> {
+                if (currentRoute == MainRouteHome) {
+                    backStack.add(route)
+                } else {
+                    backStack.clear()
+                    backStack.add(MainRouteHome)
+                    backStack.add(route)
+                }
+            }
+
             MainRouteAbout -> {
                 if (currentRoute == MainRouteHome) {
                     backStack.add(route)

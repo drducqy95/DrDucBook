@@ -33,7 +33,8 @@ import io.legado.app.help.drive.extractor.CompanionCoverResolver
 class DriveLibraryViewModel(
     private val registry: ManagedSourceRegistry,
     private val connectionUseCase: DriveWebDavConnectionUseCase,
-    private val metadataRepository: RemoteBookMetadataRepository
+    private val metadataRepository: RemoteBookMetadataRepository,
+    private val opdsClient: io.legado.app.help.drive.OpdsClient = io.legado.app.help.drive.OpdsClient(),
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DriveLibraryUiState())
@@ -62,6 +63,15 @@ class DriveLibraryViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            io.legado.app.help.drive.DriveOpdsServiceController.serverInfo.collectLatest { info ->
+                if (info.state == io.legado.app.help.drive.DriveOpdsState.RUNNING && info.opdsUrl.isNotBlank()) {
+                    _uiState.update { it.copy(opdsUrl = info.opdsUrl) }
+                } else if (info.state == io.legado.app.help.drive.DriveOpdsState.STOPPED) {
+                    _uiState.update { it.copy(opdsUrl = null) }
+                }
+            }
+        }
     }
 
     fun onIntent(intent: DriveLibraryIntent) {
@@ -73,7 +83,15 @@ class DriveLibraryViewModel(
             is DriveLibraryIntent.NavigateBreadcrumb -> navigateBreadcrumb(intent.index)
             is DriveLibraryIntent.DownloadAndImport -> downloadAndImport(intent.item)
             is DriveLibraryIntent.OpenBook -> openBook(intent.item)
-            is DriveLibraryIntent.SetViewMode -> _uiState.update { it.copy(viewMode = intent.mode) }
+            is DriveLibraryIntent.SetViewMode -> {
+                val prevMode = _uiState.value.viewMode
+                _uiState.update { it.copy(viewMode = intent.mode) }
+                if (intent.mode == DriveViewMode.OPDS && prevMode != DriveViewMode.OPDS) {
+                    loadDirectoryViaOpds(_uiState.value.currentPath)
+                } else if (intent.mode != DriveViewMode.OPDS && prevMode == DriveViewMode.OPDS) {
+                    loadDirectory(_uiState.value.currentPath)
+                }
+            }
             is DriveLibraryIntent.ShowBookPreview -> _uiState.update {
                 it.copy(previewBook = intent.item, activeSheet = DriveLibrarySheet.BookPreview(intent.item))
             }
@@ -97,6 +115,7 @@ class DriveLibraryViewModel(
             is DriveLibraryIntent.RequestGoogleAuth -> _effects.tryEmit(DriveLibraryEffect.RequestGoogleAuth)
             is DriveLibraryIntent.AddPublicLink -> addPublicLink(intent.url, intent.name)
             is DriveLibraryIntent.AddGoogleAccount -> addGoogleAccount(intent.email, intent.rootFolderId, intent.name)
+            is DriveLibraryIntent.AddServiceAccount -> addServiceAccount(intent.jsonContent, intent.folderId, intent.name)
         }
     }
 
@@ -170,7 +189,11 @@ class DriveLibraryViewModel(
                 breadcrumbs = currentBreadcrumbs.toImmutableList()
             )
         }
-        loadDirectory(folderPath)
+        if (_uiState.value.viewMode == DriveViewMode.OPDS) {
+            loadDirectoryViaOpds(folderPath)
+        } else {
+            loadDirectory(folderPath)
+        }
     }
 
     private fun navigateBreadcrumb(index: Int) {
@@ -184,7 +207,64 @@ class DriveLibraryViewModel(
                     breadcrumbs = newBreadcrumbs
                 )
             }
-            loadDirectory(targetPath)
+            if (_uiState.value.viewMode == DriveViewMode.OPDS) {
+                loadDirectoryViaOpds(targetPath)
+            } else {
+                loadDirectory(targetPath)
+            }
+        }
+    }
+
+    private fun loadDirectoryViaOpds(relPath: String) {
+        val opdsBase = _uiState.value.opdsUrl ?: run {
+            loadDirectory(relPath)
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(loading = true) }
+            try {
+                val fullUrl = if (relPath == "/" || relPath.isBlank() || relPath.startsWith("http")) {
+                    if (relPath.startsWith("http")) relPath else opdsBase
+                } else {
+                    val encoded = java.net.URLEncoder.encode(relPath.trimStart('/'), "UTF-8").replace("+", "%20")
+                    "${opdsBase.trimEnd('/')}/$encoded"
+                }
+                val catalog = opdsClient.fetchCatalog(fullUrl)
+                val items = io.legado.app.help.drive.OpdsDriveAdapter.toDriveCatalogItems(
+                    catalog,
+                    _uiState.value.importedPaths
+                )
+                _uiState.update {
+                    it.copy(
+                        items = items.toImmutableList(),
+                        loading = false
+                    )
+                }
+            } catch (e: Exception) {
+                io.legado.app.utils.LogUtils.e("DriveLibraryViewModel", "OPDS load error: ${e.message}")
+                loadDirectory(relPath)
+            }
+        }
+    }
+
+    private fun addServiceAccount(jsonContent: String, folderId: String, name: String) {
+        viewModelScope.launch {
+            val validated = io.legado.app.help.drive.ServiceAccountCredentialStore.validate(jsonContent)
+            validated.onSuccess { clientEmail ->
+                val source = ManagedDriveSource(
+                    id = "sa_${System.currentTimeMillis()}",
+                    name = name.ifEmpty { "SA ($clientEmail)" },
+                    type = io.legado.app.domain.model.DriveSourceType.GOOGLE_DRIVE_SERVICE_ACCOUNT,
+                    rootFolderId = folderId.trim(),
+                    accountEmail = clientEmail,
+                    serviceAccountJson = io.legado.app.help.drive.ServiceAccountCredentialStore.encrypt(jsonContent),
+                )
+                val saved = registry.addOrUpdateSource(source)
+                _uiState.update { it.copy(activeSheet = null) }
+                connectSource(saved)
+            }.onFailure { error ->
+                _effects.tryEmit(DriveLibraryEffect.ShowToast(error.message ?: "JSON Service Account không hợp lệ"))
+            }
         }
     }
 
@@ -350,33 +430,39 @@ class DriveLibraryViewModel(
     }
 
     private fun downloadAndImport(item: DriveCatalogItem) {
-        val auth = activeWebDavAuth ?: return
+        val isOpds = item.path.startsWith("http://", ignoreCase = true) || item.path.startsWith("https://", ignoreCase = true)
+        val auth = activeWebDavAuth
+        if (!isOpds && auth == null) return
+
         viewModelScope.launch {
             val downloading = _uiState.value.downloadingPaths.toMutableSet()
             downloading.add(item.path)
             _uiState.update { it.copy(downloadingPaths = downloading.toImmutableSet()) }
-
             try {
-                val fullUrl = buildFullUrl(activeBaseUrl, item.path)
                 val savedUri = withContext(Dispatchers.IO) {
-                    val stream = WebDav(fullUrl, auth).downloadInputStream()
+                    val stream = if (isOpds) {
+                        opdsClient.downloadBook(item.path)
+                    } else {
+                        val fullUrl = buildFullUrl(activeBaseUrl, item.path)
+                        WebDav(fullUrl, auth!!).downloadInputStream()
+                    }
                     LocalBook.saveBookFile(stream, item.name)
                 }
 
                 withContext(Dispatchers.IO) {
                     LocalBook.importFiles(listOf(savedUri))
                 }
-                    val imported = _uiState.value.importedPaths.toMutableSet()
-                    imported.add(item.path)
-                    _uiState.update {
-                        it.copy(
-                            importedPaths = imported.toImmutableSet(),
-                            items = it.items.map { i ->
-                                if (i.path == item.path) i.copy(isImported = true) else i
-                            }.toImmutableList()
-                        )
-                    }
-                    _effects.tryEmit(DriveLibraryEffect.ShowToast("Đã tải ${item.name} vào kệ sách"))
+                val imported = _uiState.value.importedPaths.toMutableSet()
+                imported.add(item.path)
+                _uiState.update {
+                    it.copy(
+                        importedPaths = imported.toImmutableSet(),
+                        items = it.items.map { i ->
+                            if (i.path == item.path) i.copy(isImported = true) else i
+                        }.toImmutableList()
+                    )
+                }
+                _effects.tryEmit(DriveLibraryEffect.ShowToast("Đã tải ${item.name} vào kệ sách"))
             } catch (e: Exception) {
                 _effects.tryEmit(DriveLibraryEffect.ShowToast("Lỗi tải: ${e.message}"))
             } finally {

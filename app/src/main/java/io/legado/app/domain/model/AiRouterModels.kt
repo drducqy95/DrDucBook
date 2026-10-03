@@ -41,7 +41,7 @@ object AiCredentialStatus {
     const val AUTHENTICATED_NOT_READY = "authenticated_not_ready"
 
     fun isRouterEligible(status: String): Boolean =
-        status == ACTIVE || status == REFRESHING
+        status == ACTIVE || status == REFRESHING || status == VERIFYING || status == AUTHENTICATED_NOT_READY
 }
 
 @Keep

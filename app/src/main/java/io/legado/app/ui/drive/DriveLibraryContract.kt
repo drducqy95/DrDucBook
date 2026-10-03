@@ -28,7 +28,8 @@ data class DriveCatalogItem(
 enum class DriveViewMode {
     CATALOG,
     GRID,
-    LIST
+    LIST,
+    OPDS
 }
 
 sealed interface DriveLibrarySheet {
@@ -55,7 +56,8 @@ data class DriveLibraryUiState(
     val importedPaths: ImmutableSet<String> = persistentSetOf(),
     val activeSheet: DriveLibrarySheet? = null,
     val activeDialog: DriveLibraryDialog? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val opdsUrl: String? = null,
 )
 
 sealed interface DriveLibraryIntent {
@@ -78,6 +80,7 @@ sealed interface DriveLibraryIntent {
     data object RequestGoogleAuth : DriveLibraryIntent
     data class AddPublicLink(val url: String, val name: String) : DriveLibraryIntent
     data class AddGoogleAccount(val email: String, val rootFolderId: String, val name: String) : DriveLibraryIntent
+    data class AddServiceAccount(val jsonContent: String, val folderId: String, val name: String) : DriveLibraryIntent
 }
 
 sealed interface DriveLibraryEffect {

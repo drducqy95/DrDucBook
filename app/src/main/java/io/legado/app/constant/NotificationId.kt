@@ -16,6 +16,7 @@ object NotificationId {
     const val MediaPlaybackService = 108
     const val MediaDownloadService = 109
     const val DriveWebDavService = 110
+    const val DriveOpdsService = 111
     const val Download = 10000
     const val ExportBook = 201
     const val BookshelfUpdates = 202

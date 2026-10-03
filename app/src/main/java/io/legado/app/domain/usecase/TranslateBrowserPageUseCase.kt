@@ -51,6 +51,9 @@ class TranslateBrowserPageUseCase(
         targetLanguage: String,
     ): TranslationAttempt {
         return try {
+            val configuredSource = io.legado.app.ui.config.translation.TranslationConfig.mlKitSourceLanguage
+                .trim()
+                .takeUnless { it.equals("auto", ignoreCase = true) }
             val translated = withContext(Dispatchers.IO) {
                 buildString {
                     for (chunk in chunkText(node.text)) {
@@ -58,6 +61,7 @@ class TranslateBrowserPageUseCase(
                             mlKitTranslationGateway.translate(
                                 text = chunk,
                                 targetLanguage = targetLanguage,
+                                sourceLanguage = configuredSource,
                             )
                         )
                     }

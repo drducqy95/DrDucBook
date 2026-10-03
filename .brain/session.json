@@ -6,13 +6,13 @@
     "resumed_at": "2026-10-01T15:03:00.000000"
   },
   "working_on": {
-    "feature": "Story Memory, Wiki & Translation Cache System Overhaul",
-    "current_milestone": "P45",
-    "current_plan_path": "plans/261001-1525-story-memory-wiki-cache-refactor/",
-    "current_phase": "phase-01-relationship-logic-and-labels",
-    "total_phases": 8,
-    "phases": ["01", "02", "02b", "03", "04", "05", "06", "07"],
-    "status": "PLANNING_REFINED"
+    "feature": "ML Kit Language Fix + Local OPDS Drive Proxy Server",
+    "current_milestone": "P53",
+    "current_plan_path": "plans/261003-1053-mlkit-fix-opds-server/",
+    "current_phase": "phase-05-testing",
+    "total_phases": 5,
+    "phases": ["01", "02", "03", "04", "05"],
+    "status": "COMPLETED"
   },
   "pending_tasks": [],
   "recent_changes": [

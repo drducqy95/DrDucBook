@@ -50,6 +50,17 @@ class DriveWebDavConnectionUseCase(
                     configMap["google_drive_api_key"] = apiKey
                 }
             }
+            DriveSourceType.GOOGLE_DRIVE_SERVICE_ACCOUNT -> {
+                configMap["provider"] = "google_drive"
+                configMap["mode"] = "service_account"
+                val rawSaJson = io.legado.app.help.drive.ServiceAccountCredentialStore.decrypt(source.serviceAccountJson)
+                if (rawSaJson.isNotBlank()) {
+                    configMap["service_account_json"] = rawSaJson
+                }
+                if (source.rootFolderId.isNotBlank()) {
+                    configMap["root_folder_id"] = source.rootFolderId
+                }
+            }
             DriveSourceType.ONEDRIVE_PUBLIC -> {
                 configMap["provider"] = "onedrive"
                 configMap["mode"] = "public_link"
@@ -93,10 +104,22 @@ class DriveWebDavConnectionUseCase(
 
         val serverId = registry.syncServerEntity(source, port, secret)
         registry.updateStatus(source.id, DriveConnectionStatus.CONNECTED)
+
+        // Start local OPDS server proxy chained to the WebDAV instance
+        io.legado.app.help.drive.DriveOpdsServiceController.start(
+            context = context,
+            sourceId = source.id,
+            sourceName = source.name,
+            webDavBaseUrl = "http://127.0.0.1:$port/",
+            webDavUsername = secret,
+            webDavPassword = secret,
+        )
+
         serverId
     }
 
     suspend fun disconnect() {
+        io.legado.app.help.drive.DriveOpdsServiceController.stop(context)
         DriveWebDavServiceController.stop(context)
         val active = registry.getActiveSource()
         if (active != null) {

@@ -49,15 +49,21 @@ class CommandCodeHandler : AiProtocolHandler {
 
     override suspend fun fetchModels(
         provider: AiProviderConfig,
-    ): Result<List<AiAvailableModel>> = Result.success(emptyList())
+    ): Result<List<AiAvailableModel>> = Result.success(COMMAND_CODE_CURATED_MODELS)
 
     private suspend fun streamInternal(
         request: AiGenerateRequest,
         emitEvent: suspend (AiStreamEvent) -> Unit,
     ) {
         val provider = request.model.provider
-        require(provider.baseUrl.isNotBlank() && provider.apiKey.isNotBlank()) {
-            "Command Code configuration incomplete: endpoint, API key, and model are required"
+        val rawUrl = provider.baseUrl.ifBlank { COMMAND_CODE_DEFAULT_URL }.trimEnd('/')
+        val targetUrl = if (rawUrl.endsWith("/alpha/generate")) {
+            rawUrl
+        } else {
+            "$rawUrl/alpha/generate"
+        }
+        require(provider.apiKey.isNotBlank()) {
+            "Command Code configuration incomplete: API key is required"
         }
         require(request.model.modelId.isNotBlank()) { "Command Code model is required" }
 
@@ -70,7 +76,7 @@ class CommandCodeHandler : AiProtocolHandler {
             keyRotator = keyRotator,
         ) {
             aiOkHttpClient.newCallResponse {
-                url(provider.baseUrl)
+                url(targetUrl)
                 postJson(GSON.toJson(body))
                 addHeaders(commandCodeHeaders(provider, keyRotator.currentKey, sessionId))
             }.also {
@@ -111,13 +117,16 @@ internal fun commandCodeHeaders(
     apiKey: String = provider.apiKey,
     sessionId: String = UUID.randomUUID().toString(),
 ): Map<String, String> = buildMap {
+    put("Content-Type", "application/json")
+    put("Accept", "text/event-stream")
+    put("x-command-code-version", "0.25.7")
+    put("x-cli-environment", "cli")
+    put("User-Agent", "command-code-cli/0.25.7")
+    put("x-session-id", sessionId)
     putAll(provider.headers)
     provider.customHeaders.forEach { (name, value) ->
         put(name, value.replace("{apiKey}", apiKey).replace("${'$'}API_KEY", apiKey))
     }
-    put("Content-Type", "application/json")
-    put("Accept", "text/event-stream")
-    put("x-session-id", sessionId)
     if (apiKey.isNotBlank()) put("Authorization", "Bearer $apiKey")
 }
 
@@ -127,7 +136,7 @@ internal fun buildCommandCodeRequestBody(
     threadId: String = UUID.randomUUID().toString(),
     workingDir: String = System.getProperty("user.dir").orEmpty().ifBlank { "/" },
     date: String = LocalDate.now(ZoneOffset.UTC).toString(),
-    environment: String = "android",
+    environment: String = "cli",
 ): Map<String, Any?> {
     val system = request.messages.asSequence()
         .filter { it.role == AiMessageRole.SYSTEM }
@@ -219,6 +228,52 @@ private fun List<AiToolDefinition>.toCommandCodeTools(): List<Map<String, Any?>>
 
 private const val COMMAND_CODE_DEFAULT_MAX_TOKENS = 64_000
 private const val COMMAND_CODE_DEFAULT_TEMPERATURE = 0.3f
+internal const val COMMAND_CODE_DEFAULT_URL = "https://api.commandcode.ai/alpha/generate"
+
+internal val COMMAND_CODE_CURATED_MODELS = listOf(
+    AiAvailableModel(
+        id = "deepseek/deepseek-v4-pro",
+        name = "DeepSeek V4 Pro",
+        contextWindow = 128_000,
+        maxOutputTokens = 16_384,
+    ),
+    AiAvailableModel(
+        id = "deepseek/deepseek-chat",
+        name = "DeepSeek Chat",
+        contextWindow = 64_000,
+        maxOutputTokens = 8_192,
+    ),
+    AiAvailableModel(
+        id = "deepseek/deepseek-reasoner",
+        name = "DeepSeek Reasoner",
+        contextWindow = 64_000,
+        maxOutputTokens = 8_192,
+    ),
+    AiAvailableModel(
+        id = "anthropic/claude-3-7-sonnet",
+        name = "Claude 3.7 Sonnet",
+        contextWindow = 200_000,
+        maxOutputTokens = 16_384,
+    ),
+    AiAvailableModel(
+        id = "anthropic/claude-3-5-sonnet",
+        name = "Claude 3.5 Sonnet",
+        contextWindow = 200_000,
+        maxOutputTokens = 8_192,
+    ),
+    AiAvailableModel(
+        id = "openai/gpt-4o",
+        name = "GPT-4o",
+        contextWindow = 128_000,
+        maxOutputTokens = 4_096,
+    ),
+    AiAvailableModel(
+        id = "google/gemini-2.0-flash",
+        name = "Gemini 2.0 Flash",
+        contextWindow = 1_000_000,
+        maxOutputTokens = 8_192,
+    ),
+)
 
 /** Converts one AI SDK v5 NDJSON event into the app's provider-neutral stream events. */
 internal fun parseCommandCodeEvent(
@@ -278,6 +333,7 @@ internal fun parseCommandCodeEvent(
             )
         }
         "error" -> error(root.getString("message") ?: root.get("error")?.toString() ?: "Command Code error")
+        "finish", "usage" -> emptyList()
         else -> emptyList()
     }
 }

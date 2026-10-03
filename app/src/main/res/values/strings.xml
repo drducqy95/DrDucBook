@@ -3760,6 +3760,8 @@
     <string name="mlkit_model_downloaded">Language pack downloaded</string>
     <string name="mlkit_model_deleted">Language pack deleted</string>
     <string name="mlkit_batch_finished">Batch operation finished with %1$d errors</string>
+    <string name="mlkit_source_language">ML Kit source language</string>
+    <string name="mlkit_source_language_summary">Select the source language instead of automatic detection if text is incorrectly identified</string>
     <string name="translation_revision_title">Translation revision</string>
     <string name="translation_revision_raw">Original source</string>
     <string name="translation_revision_text">Editable translation</string>
@@ -4203,8 +4205,8 @@
     <!-- Online Book Source Hub -->
     <string name="book_source_hub_title">Book Source Hub</string>
     <string name="book_source_hub_desc">Search and import sources from online repositories</string>
-    <string name="source_hub_tab_yckceo">YCKCEO (源仓库)</string>
-    <string name="source_hub_tab_miaogongzi">Miao Gong Zi (喵公子)</string>
+    <string name="source_hub_tab_yckceo">YCKCEO Hub</string>
+    <string name="source_hub_tab_miaogongzi">Miao Gong Zi Packs</string>
     <string name="source_hub_search_hint">Search sources (name, author, domain)…</string>
     <string name="source_hub_download">Import</string>
     <string name="source_hub_importing">Importing…</string>

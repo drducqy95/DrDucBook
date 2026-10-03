@@ -29,12 +29,17 @@ class OnlineBookSourceRepository {
             "AUDIO" -> "&shengyin=1"
             else -> ""
         }
-        val url = "https://www.yckceo.com/yuedu/shuyuan/index.html?page=$page&keys=$encodedQuery&order1=time&order2=1$categoryParam"
+        val url = if (encodedQuery.isNotBlank()) {
+            "https://www.yckceo.com/yuedu/shuyuan/index.html?page=$page&keys=$encodedQuery&order1=time&order2=1$categoryParam"
+        } else {
+            "https://www.yckceo.com/yuedu/shuyuan/index.html?page=$page&order1=time&order2=1$categoryParam"
+        }
 
         val html = try {
             okHttpClient.newCallStrResponse {
                 url(url)
-                header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                header("Referer", "https://www.yckceo.com/yuedu/shuyuan/index.html")
             }.body ?: return@withContext emptyList()
         } catch (_: Throwable) {
             return@withContext emptyList()
@@ -43,39 +48,52 @@ class OnlineBookSourceRepository {
         parseYckceoHtml(html)
     }
 
-    private fun parseYckceoHtml(html: String): List<OnlineBookSourceItem> {
+    internal fun parseYckceoHtml(html: String): List<OnlineBookSourceItem> {
         val doc = Jsoup.parse(html)
         val items = mutableListOf<OnlineBookSourceItem>()
         val elements = doc.select(".ylist, .list_item, div[class*='ylist']")
         for (el in elements) {
-            val titleLink = el.selectFirst("a[href*='/yuedu/shuyuan/']") ?: continue
+            val titleLink = el.selectFirst("h2 a, a[href*='/yuedu/shuyuan/']") ?: continue
             val href = titleLink.attr("href")
-            val idMatch = Regex("""/yuedu/shuyuan/(\d+)\.html""").find(href)
-            val id = idMatch?.groupValues?.get(1) ?: continue
-            val name = titleLink.text().trim()
-            if (name.isBlank()) continue
+            val id = el.selectFirst("input[name*='ids']")?.attr("value")?.trim()
+                ?.takeIf(String::isNotBlank)
+                ?: Regex("""(?:id/|shuyuan/)(\d+)""").find(href)?.groupValues?.get(1)
+                ?: Regex("""(\d+)\.html""").find(href)?.groupValues?.get(1)
+                ?: continue
 
+            val fullText = titleLink.text().trim()
+            val urlRegex = Regex("""https?://[^\s<>"']+""")
+            val urlMatch = urlRegex.find(fullText)
+            val originUrl = urlMatch?.value ?: ""
+            val name = (if (originUrl.isNotBlank()) {
+                fullText.replace(originUrl, "").trim()
+            } else {
+                fullText
+            }).ifBlank { fullText.ifBlank { "Nguồn #$id" } }
+
+            val badgesText = el.select(".layui-badge-rim, span").text()
             val text = el.text()
-            val badges = el.select(".badge, span, button").map { it.text().trim() }
-            val isVersion3 = badges.any { it.contains("3.") || it.contains("3.X") } || text.contains("3.X")
-            val hasExplore = badges.any { it == "发" || it.contains("发现") } || text.contains("发现")
-            val hasSearch = badges.any { it == "搜" || it.contains("搜索") } || text.contains("搜索")
-            val hasImage = badges.any { it == "图" || it.contains("正文图") } || text.contains("图片")
-            val hasAudio = badges.any { it == "声" || it.contains("音频") } || text.contains("音频")
+            val isVersion3 = badgesText.contains("3.X") || badgesText.contains("3.") || text.contains("3.X")
+            val hasExplore = badgesText.contains("发") || badgesText.contains("发现")
+            val hasSearch = badgesText.contains("搜") || badgesText.contains("搜索")
+            val hasImage = badgesText.contains("图") || badgesText.contains("图片")
+            val hasAudio = badgesText.contains("声") || badgesText.contains("音频")
 
-            val domainMatch = Regex("""域名[：:]\s*([^\s<]+)""").find(text)
-            val originUrl = domainMatch?.groupValues?.get(1) ?: ""
+            val author = el.select(".layui-font-red, [title*='UID'], span:contains(用户)").firstOrNull()
+                ?.text()
+                ?.replace("用户:", "")
+                ?.replace("用户：", "")
+                ?.trim()
 
-            val authorMatch = Regex("""作者[：:]\s*([^\s<]+)""").find(text)
-            val author = authorMatch?.groupValues?.get(1)
+            val downloadCount = el.select(".layui-font-purple, span:contains(下载)").firstOrNull()
+                ?.text()
+                ?.replace("下载:", "")
+                ?.replace("下载：", "")
+                ?.trim()
 
-            val downMatch = Regex("""下载[：:]\s*([^\s<]+)""").find(text)
-            val downloadCount = downMatch?.groupValues?.get(1)
+            val updateTime = el.selectFirst("p.m-right, .m-right")?.text()?.trim()
 
-            val timeMatch = Regex("""时间[：:]\s*([^\s<]+)""").find(text)
-            val updateTime = timeMatch?.groupValues?.get(1)
-
-            val downloadUrl = "https://www.yckceo.com/yuedu/shuyuan/jsons?id=$id"
+            val downloadUrl = "https://www.yckceo.com/yuedu/shuyuan/json/id/$id.json"
 
             items.add(
                 OnlineBookSourceItem(
@@ -161,14 +179,15 @@ class OnlineBookSourceRepository {
     suspend fun importFromUrl(url: String): Int = withContext(Dispatchers.IO) {
         val json = okHttpClient.newCallStrResponse {
             url(url)
-            header("User-Agent", "Mozilla/5.0")
+            header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            header("Referer", "https://www.yckceo.com/")
         }.body ?: throw IllegalStateException("Không nhận được dữ liệu từ máy chủ")
 
         importFromJson(json)
     }
 
     suspend fun importFromJson(jsonStr: String): Int = withContext(Dispatchers.IO) {
-        val trimmed = jsonStr.trim()
+        val trimmed = jsonStr.removePrefix("\uFEFF").trim()
         val sources = when {
             trimmed.startsWith("[") -> {
                 GSON.fromJsonArray<BookSource>(trimmed).getOrThrow()

@@ -47,6 +47,36 @@ object TranslationConfig {
         "zh"
     )
 
+    var mlKitSourceLanguage by prefDelegate(
+        PreferKey.mlKitSourceLanguage,
+        "auto"
+    )
+
+    val mlKitSourceLanguages: List<Pair<String, String>> by lazy {
+        val vietnamese = java.util.Locale.forLanguageTag("vi")
+        val autoOption = listOf("auto" to "Tự động nhận diện")
+        val commonLanguages = listOf(
+            "zh" to "Tiếng Trung (Trung Quốc)",
+            "en" to "Tiếng Anh (English)",
+            "ja" to "Tiếng Nhật (日本語)",
+            "ko" to "Tiếng Hàn (한국어)",
+            "fr" to "Tiếng Pháp (Français)",
+            "de" to "Tiếng Đức (Deutsch)",
+            "es" to "Tiếng Tây Ban Nha (Español)",
+            "ru" to "Tiếng Nga (Русский)",
+        )
+        val others = com.google.mlkit.nl.translate.TranslateLanguage.getAllLanguages()
+            .distinct()
+            .filterNot { lang -> commonLanguages.any { it.first == lang } }
+            .map { lang ->
+                lang to java.util.Locale.forLanguageTag(lang)
+                    .getDisplayName(vietnamese)
+                    .replaceFirstChar { it.titlecase(vietnamese) }
+            }
+            .sortedBy { it.second }
+        autoOption + commonLanguages + others
+    }
+
     private var storedLlmMaxCharsPerChunk by prefDelegate(
         PreferKey.llmMaxCharsPerChunk,
         1000

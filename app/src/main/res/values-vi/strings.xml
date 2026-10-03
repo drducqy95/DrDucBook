@@ -3806,6 +3806,8 @@
     <string name="mlkit_model_downloaded">Đã tải gói ngôn ngữ</string>
     <string name="mlkit_model_deleted">Đã xóa gói ngôn ngữ</string>
     <string name="mlkit_batch_finished">Đã hoàn tất tác vụ, có %1$d lỗi</string>
+    <string name="mlkit_source_language">Ngôn ngữ nguồn ML Kit</string>
+    <string name="mlkit_source_language_summary">Chọn ngôn ngữ nguồn thủ công thay vì tự động nhận diện nếu văn bản bị nhận diện sai</string>
     <string name="ai_agent_nav">Agent</string>
     <string name="ai_agent_pending_summary">%1$d thao tác đang chờ phê duyệt</string>
     <string name="ebook_editor_nav">Ebook</string>
@@ -4202,8 +4204,8 @@
     <!-- Online Book Source Hub -->
     <string name="book_source_hub_title">Kho nguồn trực tuyến</string>
     <string name="book_source_hub_desc">Tra cứu, tìm kiếm và nạp nguồn truyện từ kho trực tuyến</string>
-    <string name="source_hub_tab_yckceo">Kho YCKCEO (源仓库)</string>
-    <string name="source_hub_tab_miaogongzi">Kho 喵公子 (Miao Gong Zi)</string>
+    <string name="source_hub_tab_yckceo">Kho YCKCEO</string>
+    <string name="source_hub_tab_miaogongzi">Kho Miêu Công Tử (Miao Gong Zi)</string>
     <string name="source_hub_search_hint">Tìm kiếm nguồn (tên, tác giả, tên miền)…</string>
     <string name="source_hub_download">Tải về</string>
     <string name="source_hub_importing">Đang nạp nguồn…</string>

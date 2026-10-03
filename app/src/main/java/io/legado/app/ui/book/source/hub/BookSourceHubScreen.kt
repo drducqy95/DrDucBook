@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -146,6 +147,8 @@ private fun YckceoTabContent(
     state: BookSourceHubUiState,
     onIntent: (BookSourceHubIntent) -> Unit,
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = adaptiveContentPadding(top = 12.dp, bottom = 96.dp),
@@ -161,12 +164,19 @@ private fun YckceoTabContent(
                     SearchBar(
                         query = state.searchQuery,
                         onQueryChange = { onIntent(BookSourceHubIntent.ChangeSearchQuery(it)) },
+                        onSearch = {
+                            keyboardController?.hide()
+                            onIntent(BookSourceHubIntent.Search)
+                        },
                         placeholder = stringResource(R.string.source_hub_search_hint),
                         autoFocus = false,
                     )
                 }
                 SmallTonalButton(
-                    onClick = { onIntent(BookSourceHubIntent.Search) },
+                    onClick = {
+                        keyboardController?.hide()
+                        onIntent(BookSourceHubIntent.Search)
+                    },
                     icon = Icons.Default.Search,
                     contentDescription = stringResource(R.string.search),
                     modifier = Modifier.size(44.dp),
@@ -329,14 +339,14 @@ private fun YckceoSourceCard(
             ) {
                 item.author?.let {
                     AppText(
-                        text = "Tác giả: $it",
+                        text = "${stringResource(R.string.author)}: $it",
                         style = LegadoTheme.typography.labelSmall,
                         color = LegadoTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 item.downloadCount?.let {
                     AppText(
-                        text = "$it tải",
+                        text = stringResource(R.string.source_hub_downloads_count, it),
                         style = LegadoTheme.typography.labelSmall,
                         color = LegadoTheme.colorScheme.onSurfaceVariant,
                     )
@@ -472,7 +482,7 @@ private fun MiaoGongZiBundleCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 AppText(
-                    text = "Cập nhật: ${bundle.updateTime}",
+                    text = stringResource(R.string.authoring_updated_at, bundle.updateTime),
                     style = LegadoTheme.typography.labelSmall,
                     color = LegadoTheme.colorScheme.onSurfaceVariant,
                 )
