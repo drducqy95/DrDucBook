@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
+import io.legado.app.data.repository.ApiKeySyncRepository
+import io.legado.app.domain.gateway.AccountAuthGateway
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import splitties.init.appCtx
@@ -25,6 +27,8 @@ class AiConfigViewModel(
     private val aiProfileGateway: AiProfileGateway,
     private val rawAiTextGateway: AiTextGateway,
     private val aiRouterGateway: AiRouterGateway,
+    private val apiKeySyncRepository: ApiKeySyncRepository? = null,
+    private val accountAuthGateway: AccountAuthGateway? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -38,6 +42,42 @@ class AiConfigViewModel(
     val effects = _effects.asSharedFlow()
 
     init {
+        apiKeySyncRepository?.let { repo ->
+            viewModelScope.launch {
+                repo.syncStatus.collect { status ->
+                    _uiState.update { it.copy(syncStatus = status) }
+                }
+            }
+            _uiState.update {
+                it.copy(isAutoSyncEnabled = repo.isAutoSyncEnabled())
+            }
+        }
+
+        accountAuthGateway?.let { auth ->
+            viewModelScope.launch {
+                auth.observeSession().collect { session ->
+                    if (session != null && session.signedIn) {
+                        val repo = apiKeySyncRepository ?: return@collect
+                        if (repo.isAutoSyncEnabled()) {
+                            val localBundle = repo.collectProviderKeys()
+                            if (localBundle.providers.isEmpty()) {
+                                repo.pullFromCloud(session).onSuccess { cloudBundle ->
+                                    val activated = repo.restoreAndAutoActivate(cloudBundle)
+                                    if (activated > 0) {
+                                        _effects.tryEmit(
+                                            AiConfigEffect.ShowMessage(
+                                                appCtx.getString(R.string.api_key_sync_pull_success, activated)
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         viewModelScope.launch {
             combine(
                 aiProfileGateway.observeProviders(),
@@ -162,6 +202,9 @@ class AiConfigViewModel(
             is AiConfigIntent.SetDiscoveryFrequency -> setDiscoveryFrequency(intent.hours)
             is AiConfigIntent.RefreshAllModels -> refreshAllModels()
             is AiConfigIntent.ResetProviderHealth -> resetProviderHealth(intent.providerId)
+            is AiConfigIntent.SyncApiKeys -> syncApiKeys()
+            is AiConfigIntent.RestoreApiKeys -> restoreApiKeys()
+            is AiConfigIntent.SetAutoSyncEnabled -> setAutoSyncEnabled(intent.enabled)
         }
     }
 
@@ -267,5 +310,49 @@ class AiConfigViewModel(
                 )
             }
         }
+    }
+
+    private fun syncApiKeys() {
+        val repo = apiKeySyncRepository ?: return
+        val auth = accountAuthGateway ?: return
+        viewModelScope.launch {
+            val session = auth.currentSession()
+            if (session == null || !session.signedIn) {
+                _effects.tryEmit(AiConfigEffect.ShowMessage(appCtx.getString(R.string.api_key_sync_not_logged_in)))
+                return@launch
+            }
+            repo.pushToCloud(session)
+                .onSuccess { count ->
+                    _effects.tryEmit(AiConfigEffect.ShowMessage(appCtx.getString(R.string.api_key_sync_push_success, count)))
+                }
+                .onFailure { error ->
+                    _effects.tryEmit(AiConfigEffect.ShowMessage(error.message ?: appCtx.getString(R.string.api_key_sync_failed)))
+                }
+        }
+    }
+
+    private fun restoreApiKeys() {
+        val repo = apiKeySyncRepository ?: return
+        val auth = accountAuthGateway ?: return
+        viewModelScope.launch {
+            val session = auth.currentSession()
+            if (session == null || !session.signedIn) {
+                _effects.tryEmit(AiConfigEffect.ShowMessage(appCtx.getString(R.string.api_key_sync_not_logged_in)))
+                return@launch
+            }
+            repo.pullFromCloud(session)
+                .onSuccess { bundle ->
+                    val count = repo.restoreAndAutoActivate(bundle)
+                    _effects.tryEmit(AiConfigEffect.ShowMessage(appCtx.getString(R.string.api_key_sync_pull_success, count)))
+                }
+                .onFailure { error ->
+                    _effects.tryEmit(AiConfigEffect.ShowMessage(error.message ?: appCtx.getString(R.string.api_key_sync_failed)))
+                }
+        }
+    }
+
+    private fun setAutoSyncEnabled(enabled: Boolean) {
+        apiKeySyncRepository?.setAutoSyncEnabled(enabled)
+        _uiState.update { it.copy(isAutoSyncEnabled = enabled) }
     }
 }

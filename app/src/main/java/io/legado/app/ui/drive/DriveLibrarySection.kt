@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.legado.app.domain.model.DriveConnectionStatus
+import io.legado.app.domain.model.DriveSourceType
 import io.legado.app.ui.drive.components.DriveCatalogBookCard
 import io.legado.app.ui.drive.components.DriveFolderItemRow
 import io.legado.app.ui.drive.components.DriveGridBookCard
@@ -144,10 +145,18 @@ fun DriveLibrarySection(
             ) {
                 state.sources.forEach { source ->
                     val isSelected = state.activeSource?.id == source.id
+                    val typeTag = when (source.type) {
+                        DriveSourceType.GOOGLE_DRIVE_ACCOUNT -> "Google Drive"
+                        DriveSourceType.GOOGLE_DRIVE_PUBLIC -> "GDrive Public"
+                        DriveSourceType.GOOGLE_DRIVE_SERVICE_ACCOUNT -> "GDrive SA"
+                        DriveSourceType.ONEDRIVE_PUBLIC -> "OneDrive"
+                        DriveSourceType.DROPBOX_PUBLIC -> "Dropbox"
+                        DriveSourceType.HTTP_INDEX -> "HTTP Index"
+                    }
                     FilterChip(
                         selected = isSelected,
                         onClick = { onIntent(DriveLibraryIntent.SelectSource(source.id)) },
-                        label = { Text(source.name) },
+                        label = { Text("${source.name} ($typeTag)") },
                         leadingIcon = {
                             val dotColor = when (source.status) {
                                 DriveConnectionStatus.CONNECTED -> MaterialTheme.colorScheme.primary
@@ -222,6 +231,8 @@ fun DriveLibrarySection(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     val countSummary = buildString {
+                        val protocolLabel = if (state.viewMode == DriveViewMode.OPDS) "OPDS" else "WebDAV"
+                        append("[$protocolLabel] ")
                         if (folders.isNotEmpty()) append("${folders.size} thư mục")
                         if (folders.isNotEmpty() && books.isNotEmpty()) append(" • ")
                         if (books.isNotEmpty()) append("${books.size} tài liệu")

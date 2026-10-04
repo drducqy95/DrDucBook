@@ -39,6 +39,8 @@ data class AiConfigUiState(
     val chatBubbleEnabled: Boolean = false,
     val discoveryFrequencyHours: Long = 12L,
     val isRefreshingModels: Boolean = false,
+    val syncStatus: io.legado.app.domain.model.ApiKeySyncStatus = io.legado.app.domain.model.ApiKeySyncStatus.NotSynced,
+    val isAutoSyncEnabled: Boolean = true,
 )
 
 @Stable
@@ -74,6 +76,9 @@ sealed interface AiConfigIntent
     data class SetDiscoveryFrequency(val hours: Long) : AiConfigIntent
     data object RefreshAllModels : AiConfigIntent
     data class ResetProviderHealth(val providerId: String) : AiConfigIntent
+    data object SyncApiKeys : AiConfigIntent
+    data object RestoreApiKeys : AiConfigIntent
+    data class SetAutoSyncEnabled(val enabled: Boolean) : AiConfigIntent
 }
 
 sealed interface AiConfigEffect {

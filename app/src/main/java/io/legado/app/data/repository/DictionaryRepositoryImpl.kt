@@ -10,12 +10,20 @@ import io.legado.app.domain.model.normalizedForRuntime
 import io.legado.app.help.book.BookHelp
 import io.legado.app.utils.GSON
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 class DictionaryRepositoryImpl : DictionaryGateway {
 
     private companion object {
         const val DICT_FILE_NAME = "translation_dictionary.json"
     }
+
+    private data class CacheEntry(
+        val lastModified: Long,
+        val dictionary: BookDictionary,
+    )
+
+    private val memoryCache = ConcurrentHashMap<String, CacheEntry>()
 
     private fun getDictFile(book: Book): File {
         val cacheDir = BookHelp.cachePath
@@ -25,14 +33,22 @@ class DictionaryRepositoryImpl : DictionaryGateway {
 
     override fun getBookDictionaries(book: Book): BookDictionary {
         val dictFile = getDictFile(book)
-        return if (dictFile.exists()) {
-            try {
-                val stored = GSON.fromJson(dictFile.readText(), BookDictionary::class.java)
-                    ?: BookDictionary(book.bookUrl)
-                val rawPairs = runCatching { stored.pairs }
-                    .getOrNull()
-                    .orEmpty()
-                    .map(DictPair::normalizedForRuntime)
+        if (!dictFile.exists()) {
+            memoryCache.remove(book.bookUrl)
+            return BookDictionary(book.bookUrl)
+        }
+        val fileLastModified = dictFile.lastModified()
+        val cached = memoryCache[book.bookUrl]
+        if (cached != null && cached.lastModified == fileLastModified) {
+            return cached.dictionary
+        }
+        return try {
+            val stored = GSON.fromJson(dictFile.readText(), BookDictionary::class.java)
+                ?: BookDictionary(book.bookUrl)
+            val rawPairs = runCatching { stored.pairs }
+                .getOrNull()
+                .orEmpty()
+                .map(DictPair::normalizedForRuntime)
                 var hasChanges = false
                 val sanitizedPairs = rawPairs.mapNotNull { pair ->
                     val orig = pair.original.trim()
@@ -68,17 +84,16 @@ class DictionaryRepositoryImpl : DictionaryGateway {
                     )
                     runCatching { saveDictionary(book, updated) }
                 }
-                BookDictionary(
+                val result = BookDictionary(
                     bookUrl = book.bookUrl,
                     pairs = sanitizedPairs,
                     updatedAt = stored.updatedAt,
                 )
+                memoryCache[book.bookUrl] = CacheEntry(fileLastModified, result)
+                result
             } catch (e: Exception) {
                 BookDictionary(book.bookUrl)
             }
-        } else {
-            BookDictionary(book.bookUrl)
-        }
     }
 
     override fun updateBookDic(book: Book, newPairs: List<DictPair>) {
@@ -119,9 +134,11 @@ class DictionaryRepositoryImpl : DictionaryGateway {
         val dictFile = getDictFile(book)
         dictFile.parentFile?.mkdirs()
         dictFile.writeText(GSON.toJson(dictionary))
+        memoryCache[book.bookUrl] = CacheEntry(dictFile.lastModified(), dictionary)
     }
 
     override fun clearBookDictionary(book: Book) {
+        memoryCache.remove(book.bookUrl)
         val dictFile = getDictFile(book)
         if (dictFile.exists()) {
             dictFile.delete()

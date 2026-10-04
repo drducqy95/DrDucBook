@@ -6,13 +6,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.drducbook.app.R
 import io.legado.app.constant.AppLog
+import io.legado.app.data.appDb
+import io.legado.app.data.dao.BookSourceDao
 import io.legado.app.data.repository.online_source.OnlineBookSourceRepository
 import io.legado.app.domain.model.OnlineBookSourceItem
 import io.legado.app.domain.model.OnlineSourceCollectionItem
 import io.legado.app.domain.usecase.TranslateDynamicUiTextUseCase
 import io.legado.app.domain.usecase.containsCjk
 import io.legado.app.ui.config.translation.TranslationConfig
+import io.legado.app.utils.NetworkUtils
+import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -28,6 +33,7 @@ class BookSourceHubViewModel(
     private val application: Application,
     private val repository: OnlineBookSourceRepository,
     private val translateDynamicUiTextUseCase: TranslateDynamicUiTextUseCase,
+    private val bookSourceDao: BookSourceDao = appDb.bookSourceDao,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BookSourceHubUiState())
@@ -45,8 +51,31 @@ class BookSourceHubViewModel(
 
     init {
         loadInitialData()
+        observeInstalledSources()
         observeTranslationSetting()
     }
+
+    private fun observeInstalledSources() {
+        viewModelScope.launch(Dispatchers.IO) {
+            bookSourceDao.flowAll().collect { sources ->
+                val urls = sources.mapNotNull {
+                    it.bookSourceUrl.takeIf(String::isNotBlank)?.let(::normalizeSourceUrl)
+                }.toSet()
+                val names = sources.mapNotNull {
+                    it.bookSourceName.takeIf(String::isNotBlank)?.trim()?.lowercase()
+                }.toSet()
+                _uiState.update {
+                    it.copy(
+                        installedUrls = urls.toImmutableSet(),
+                        installedNames = names.toImmutableSet(),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun normalizeSourceUrl(url: String): String =
+        (NetworkUtils.getBaseUrl(url) ?: url).trimEnd('/').lowercase()
 
     private fun observeTranslationSetting() {
         viewModelScope.launch {
@@ -103,7 +132,31 @@ class BookSourceHubViewModel(
             BookSourceHubIntent.LoadInitialData -> loadInitialData()
             is BookSourceHubIntent.ImportYckceoSource -> importYckceo(intent.item)
             is BookSourceHubIntent.ImportBundle -> importBundle(intent.item)
+            is BookSourceHubIntent.ToggleSelectSource -> toggleSelectSource(intent.id)
+            BookSourceHubIntent.SelectAllSources -> selectAllSources()
+            BookSourceHubIntent.ClearSourceSelection -> clearSourceSelection()
+            BookSourceHubIntent.ImportSelectedSources -> importSelectedSources()
+            BookSourceHubIntent.ToggleFilterUninstalled -> {
+                _uiState.update { it.copy(showOnlyUninstalled = !it.showOnlyUninstalled) }
+            }
         }
+    }
+
+    private fun toggleSelectSource(id: String) {
+        _uiState.update { state ->
+            val selected = state.selectedSourceIds.toMutableSet()
+            if (!selected.add(id)) selected.remove(id)
+            state.copy(selectedSourceIds = selected.toImmutableSet())
+        }
+    }
+
+    private fun selectAllSources() {
+        val allIds = _uiState.value.yckceoSources.map { it.id }.toSet()
+        _uiState.update { it.copy(selectedSourceIds = allIds.toImmutableSet()) }
+    }
+
+    private fun clearSourceSelection() {
+        _uiState.update { it.copy(selectedSourceIds = persistentSetOf()) }
     }
 
     private fun loadInitialData() {
@@ -295,6 +348,54 @@ class BookSourceHubViewModel(
             } finally {
                 _uiState.update { it.copy(importingIds = (it.importingIds - id).toImmutableList()) }
             }
+        }
+    }
+
+    private fun importSelectedSources() {
+        val selectedIds = _uiState.value.selectedSourceIds
+        if (selectedIds.isEmpty() || _uiState.value.isBatchImporting) return
+        val itemsToImport = _uiState.value.yckceoSources.filter { it.id in selectedIds }
+        if (itemsToImport.isEmpty()) return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update {
+                it.copy(
+                    isBatchImporting = true,
+                    batchProgress = 0 to itemsToImport.size,
+                )
+            }
+            var totalImportedCount = 0
+            var successSourceCount = 0
+            var failedSourceCount = 0
+
+            itemsToImport.forEachIndexed { index, item ->
+                _uiState.update { it.copy(batchProgress = (index + 1) to itemsToImport.size) }
+                try {
+                    val count = repository.importFromUrl(item.downloadUrl)
+                    if (count > 0) {
+                        totalImportedCount += count
+                        successSourceCount++
+                    } else {
+                        failedSourceCount++
+                    }
+                } catch (e: Exception) {
+                    AppLog.put("Batch import error for ${item.name}", e)
+                    failedSourceCount++
+                }
+            }
+
+            _uiState.update {
+                it.copy(
+                    isBatchImporting = false,
+                    batchProgress = null,
+                    selectedSourceIds = persistentSetOf(),
+                )
+            }
+            _effects.tryEmit(
+                BookSourceHubEffect.ShowToast(
+                    application.getString(R.string.source_hub_imported_success, totalImportedCount)
+                )
+            )
         }
     }
 }

@@ -12,6 +12,8 @@ import io.legado.app.domain.model.TranslationConstants
 import io.legado.app.domain.model.dictionaryAwareScopeKey
 import io.legado.app.domain.model.toQuickPhoneticPair
 import io.legado.app.domain.model.toQuickTranslationPair
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -27,6 +29,9 @@ class TranslateDynamicUiTextUseCase(
     private val quickTranslationGateway: QuickTranslationGateway,
     private val quickDictionaryGateway: QuickDictionaryGateway,
 ) {
+
+    private val memoryCache = ConcurrentHashMap<String, String>()
+    private val inFlight = ConcurrentHashMap<String, CompletableDeferred<Result<String>>>()
 
     suspend fun execute(
         scopeKey: String,
@@ -52,39 +57,59 @@ class TranslateDynamicUiTextUseCase(
             dictionaryRevision = dictionaryRevision,
             quickTranslationPackVersion = quickTranslationGateway.packVersion,
         )
+        val memKey = "$cacheScopeKey:$originalText"
+
         if (!forceRetranslate) {
+            memoryCache[memKey]?.let { return@withContext Result.success(it) }
             translationCacheGateway.readDynamicUiTranslation(
                 scopeKey = cacheScopeKey,
                 originalText = originalText,
                 targetLanguage = targetLanguage,
                 provider = provider,
-            )?.let { return@withContext Result.success(it) }
+            )?.let {
+                memoryCache[memKey] = it
+                return@withContext Result.success(it)
+            }
         }
 
-        runCatching {
-            val quickEntries = book
-                ?.let { quickDictionaryGateway.getEffectiveEntries(it, contextText) }
-                .orEmpty()
-            val quickTerms = quickEntries.mapNotNull { it.toQuickTranslationPair() }
-            val ignoredTerms = quickTerms
-                .filter { it.translation == QUICK_DICTIONARY_IGNORE_TARGET }
-                .map { it.original }
-            val bookTerms = book?.let(dictionaryGateway::getBookDictionaries)?.pairs.orEmpty()
-            val translated = quickTranslationGateway.translate(
-                text = removeIgnoredTerms(originalText, ignoredTerms),
-                projectTerms = (quickTerms.filterNot {
-                    it.translation == QUICK_DICTIONARY_IGNORE_TARGET
-                } + bookTerms).distinctBy { it.original.trim().lowercase() },
-                customPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() },
-            )
-            translationCacheGateway.writeDynamicUiTranslation(
-                scopeKey = cacheScopeKey,
-                originalText = originalText,
-                targetLanguage = targetLanguage,
-                provider = provider,
-                translatedText = translated,
-            )
-            translated
+        val deferred = CompletableDeferred<Result<String>>()
+        val existing = inFlight.putIfAbsent(memKey, deferred)
+        if (existing != null) {
+            return@withContext existing.await()
+        }
+
+        try {
+            val res = runCatching {
+                val quickEntries = book
+                    ?.let { quickDictionaryGateway.getEffectiveEntries(it, contextText) }
+                    .orEmpty()
+                val quickTerms = quickEntries.mapNotNull { it.toQuickTranslationPair() }
+                val ignoredTerms = quickTerms
+                    .filter { it.translation == QUICK_DICTIONARY_IGNORE_TARGET }
+                    .map { it.original }
+                val bookTerms = book?.let(dictionaryGateway::getBookDictionaries)?.pairs.orEmpty()
+                val translated = quickTranslationGateway.translate(
+                    text = removeIgnoredTerms(originalText, ignoredTerms),
+                    projectTerms = (quickTerms.filterNot {
+                        it.translation == QUICK_DICTIONARY_IGNORE_TARGET
+                    } + bookTerms).distinctBy { it.original.trim().lowercase() },
+                    customPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() },
+                )
+                if (memoryCache.size > 4000) memoryCache.clear()
+                memoryCache[memKey] = translated
+                translationCacheGateway.writeDynamicUiTranslation(
+                    scopeKey = cacheScopeKey,
+                    originalText = originalText,
+                    targetLanguage = targetLanguage,
+                    provider = provider,
+                    translatedText = translated,
+                )
+                translated
+            }
+            deferred.complete(res)
+            res
+        } finally {
+            inFlight.remove(memKey)
         }
     }
 
@@ -111,6 +136,43 @@ class TranslateDynamicUiTextUseCase(
                 dictionaryRevision = dictionaryRevision,
                 quickTranslationPackVersion = quickTranslationGateway.packVersion,
             )
+
+            val results = arrayOfNulls<String>(normalized.size)
+            val missingIndices = ArrayList<Int>()
+
+            for (index in normalized.indices) {
+                val line = normalized[index]
+                if (line.isBlank() || !line.containsCjk()) {
+                    results[index] = line
+                    continue
+                }
+                val lineCacheKey = "$cacheScopeBaseKey:line:$index"
+                val memKey = "$lineCacheKey:$line"
+                if (!forceRetranslate) {
+                    val memHit = memoryCache[memKey]
+                    if (memHit != null) {
+                        results[index] = memHit
+                        continue
+                    }
+                    val diskHit = translationCacheGateway.readDynamicUiTranslation(
+                        scopeKey = lineCacheKey,
+                        originalText = line,
+                        targetLanguage = targetLanguage,
+                        provider = provider,
+                    )
+                    if (diskHit != null) {
+                        memoryCache[memKey] = diskHit
+                        results[index] = diskHit
+                        continue
+                    }
+                }
+                missingIndices.add(index)
+            }
+
+            if (missingIndices.isEmpty()) {
+                return@withContext Result.success(results.map { it.orEmpty() })
+            }
+
             val quickEntries = book
                 ?.let { quickDictionaryGateway.getEffectiveEntries(it, contextText) }
                 .orEmpty()
@@ -124,37 +186,63 @@ class TranslateDynamicUiTextUseCase(
             } + bookTerms).distinctBy { it.original.trim().lowercase() }
             val customPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() }
 
-            Result.success(
-                normalized.mapIndexed { index, line ->
-                    if (line.isBlank() || !line.containsCjk()) {
-                        return@mapIndexed line
-                    }
-                    val lineCacheKey = "$cacheScopeBaseKey:line:$index"
-                    if (!forceRetranslate) {
-                        translationCacheGateway.readDynamicUiTranslation(
-                            scopeKey = lineCacheKey,
-                            originalText = line,
-                            targetLanguage = targetLanguage,
-                            provider = provider,
-                        )?.let { return@mapIndexed it }
-                    }
-                    runCatching {
-                        val translated = quickTranslationGateway.translate(
-                            text = removeIgnoredTerms(line, ignoredTerms),
-                            projectTerms = projectTerms,
-                            customPhonetics = customPhonetics,
-                        )
+            if (missingIndices.size > 1) {
+                val linesToTranslate = missingIndices.map { removeIgnoredTerms(normalized[it], ignoredTerms) }
+                val joined = linesToTranslate.joinToString("\n")
+                val batchedTranslated = runCatching {
+                    quickTranslationGateway.translate(
+                        text = joined,
+                        projectTerms = projectTerms,
+                        customPhonetics = customPhonetics,
+                    )
+                }.getOrNull()
+
+                val split = batchedTranslated?.split("\n")
+                if (split != null && split.size == missingIndices.size) {
+                    for (i in missingIndices.indices) {
+                        val index = missingIndices[i]
+                        val originalLine = normalized[index]
+                        val translatedLine = split[i]
+                        val lineCacheKey = "$cacheScopeBaseKey:line:$index"
+                        val memKey = "$lineCacheKey:$originalLine"
+                        results[index] = translatedLine
+                        memoryCache[memKey] = translatedLine
                         translationCacheGateway.writeDynamicUiTranslation(
                             scopeKey = lineCacheKey,
-                            originalText = line,
+                            originalText = originalLine,
                             targetLanguage = targetLanguage,
                             provider = provider,
-                            translatedText = translated,
+                            translatedText = translatedLine,
                         )
-                        translated
-                    }.getOrElse { line }
+                    }
+                    return@withContext Result.success(results.map { it.orEmpty() })
                 }
-            )
+            }
+
+            for (index in missingIndices) {
+                if (results[index] != null) continue
+                val line = normalized[index]
+                val lineCacheKey = "$cacheScopeBaseKey:line:$index"
+                val memKey = "$lineCacheKey:$line"
+                val translated = runCatching {
+                    quickTranslationGateway.translate(
+                        text = removeIgnoredTerms(line, ignoredTerms),
+                        projectTerms = projectTerms,
+                        customPhonetics = customPhonetics,
+                    )
+                }.getOrElse { line }
+                results[index] = translated
+                memoryCache[memKey] = translated
+                translationCacheGateway.writeDynamicUiTranslation(
+                    scopeKey = lineCacheKey,
+                    originalText = line,
+                    targetLanguage = targetLanguage,
+                    provider = provider,
+                    translatedText = translated,
+                )
+            }
+
+            Result.success(results.map { it.orEmpty() })
         }
     }
 
@@ -297,6 +385,8 @@ class TranslateDynamicUiTextUseCase(
     ).map { titles -> titles.map { it.restructureChapterNumbers().toTitleCase() } }
 
     suspend fun clearCache() {
+        memoryCache.clear()
+        inFlight.clear()
         translationCacheGateway.clearDynamicUiTranslations()
     }
 

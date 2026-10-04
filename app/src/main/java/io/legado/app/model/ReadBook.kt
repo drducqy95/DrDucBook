@@ -756,9 +756,10 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             preserveReadAloudPosition = preserveReadAloudPosition,
         ) {
             success?.invoke()
+            loadContent(durChapterIndex + 1, resetPageOffset = resetPageOffset) {
+                loadContent(durChapterIndex - 1, resetPageOffset = resetPageOffset)
+            }
         }
-        loadContent(durChapterIndex + 1, resetPageOffset = resetPageOffset)
-        loadContent(durChapterIndex - 1, resetPageOffset = resetPageOffset)
     }
 
     fun relayoutContent() {
@@ -781,19 +782,31 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 preserveReadAloudPosition = preserveReadAloudPosition,
             ) {
                 success?.invoke()
+                preloadAdjacentChapters()
             }
         } else {
             callBack?.upContent()
+            preloadAdjacentChapters()
         }
+    }
+
+    private fun preloadAdjacentChapters() {
         val nextChapter = nextTextChapter
         if (nextChapter == null || !nextChapter.isLayoutSizeMatch()) {
             nextTextChapter = null
-            loadContent(durChapterIndex + 1)
-        }
-        val prevChapter = prevTextChapter
-        if (prevChapter == null || !prevChapter.isLayoutSizeMatch()) {
-            prevTextChapter = null
-            loadContent(durChapterIndex - 1)
+            loadContent(durChapterIndex + 1) {
+                val prevChapter = prevTextChapter
+                if (prevChapter == null || !prevChapter.isLayoutSizeMatch()) {
+                    prevTextChapter = null
+                    loadContent(durChapterIndex - 1)
+                }
+            }
+        } else {
+            val prevChapter = prevTextChapter
+            if (prevChapter == null || !prevChapter.isLayoutSizeMatch()) {
+                prevTextChapter = null
+                loadContent(durChapterIndex - 1)
+            }
         }
     }
 
@@ -836,6 +849,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                     chapter,
                     resetPageOffset,
                     preserveReadAloudPosition = preserveReadAloudPosition,
+                    success = success,
                 )
             }
         }.onError {
@@ -1141,7 +1155,9 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         quickTranslationPackVersion: String = quickTranslationGateway.packVersion,
         translate: suspend (String) -> String,
     ): String {
+        val t0 = System.currentTimeMillis()
         val translationSource = TranslationContentSanitizer.sanitize(originalContent)
+        val t1 = System.currentTimeMillis()
         val contentHash = dictionaryAwareContentHash(
             originalContentHash = translationCacheGateway.computeContentHash(translationSource),
             provider = provider,
@@ -1151,14 +1167,21 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             ),
             quickTranslationPackVersion = quickTranslationPackVersion,
         )
+        val t2 = System.currentTimeMillis()
         translationCacheGateway.readCurrentTranslation(
             book = book,
             bookChapter = chapter,
             targetLanguage = VIETNAMESE_LANGUAGE,
             originalContentHash = contentHash,
             provider = provider,
-        )?.let { return TranslationContentSanitizer.sanitize(it) }
+        )?.let {
+            val t3 = System.currentTimeMillis()
+            AppLog.put("QT-PERF resolveLocal ch${chapter.index} CACHE-HIT sanitize=${t1-t0}ms hash=${t2-t1}ms cacheRead=${t3-t2}ms total=${t3-t0}ms")
+            return TranslationContentSanitizer.sanitize(it)
+        }
+        val t3 = System.currentTimeMillis()
         val translated = TranslationContentSanitizer.sanitize(translate(translationSource))
+        val t4 = System.currentTimeMillis()
         translationCacheGateway.writeTranslation(
             book = book,
             bookChapter = chapter,
@@ -1167,6 +1190,8 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             originalContentHash = contentHash,
             provider = provider,
         )
+        val t5 = System.currentTimeMillis()
+        AppLog.put("QT-PERF resolveLocal ch${chapter.index} CACHE-MISS sanitize=${t1-t0}ms hash=${t2-t1}ms cacheRead=${t3-t2}ms translate=${t4-t3}ms cacheWrite=${t5-t4}ms total=${t5-t0}ms len=${translationSource.length}")
         return translated
     }
 

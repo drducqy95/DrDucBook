@@ -594,18 +594,20 @@ class TranslationCacheRepositoryImpl(
         }
         val file = File(dynamicUiDir, "$identity.json")
         file.parentFile?.mkdirs()
-        writeAtomically(
-            file,
-            gson.toJson(
-                DynamicUiTranslationRecord(
-                    scopeKey = scopeKey,
-                    originalContentHash = computeContentHash(originalText),
-                    provider = provider,
-                    targetLanguage = targetLanguage,
-                    translatedText = translatedText,
+        runCatching {
+            file.writeText(
+                gson.toJson(
+                    DynamicUiTranslationRecord(
+                        scopeKey = scopeKey,
+                        originalContentHash = computeContentHash(originalText),
+                        provider = provider,
+                        targetLanguage = targetLanguage,
+                        translatedText = translatedText,
+                    )
                 )
-            ),
-        )
+            )
+        }
+        Unit
     }
 
     override suspend fun clearDynamicUiTranslations() = withContext(Dispatchers.IO) {

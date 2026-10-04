@@ -325,7 +325,8 @@ class TocViewModel(
             val accumulated = mutableMapOf<Int, String>()
             val contextText = chapters.take(200)
                 .joinToString("\n") { it.getDisplayTitle(useReplace = false) }
-            chapters.chunked(50).forEachIndexed { batchIndex, batch ->
+            val batches = chapters.chunked(50)
+            batches.forEachIndexed { batchIndex, batch ->
                 val titles = batch.map { it.getDisplayTitle(useReplace = false) }
                 val translated = translateDynamicUiTextUseCase.executeChapterTitles(
                     scopeKey = "toc:${book.bookUrl}:b$batchIndex",
@@ -337,7 +338,9 @@ class TocViewModel(
                     translated.forEachIndexed { index, title ->
                         accumulated[batch[index].index] = title
                     }
-                    emit(accumulated.toMap())
+                    if (batchIndex == 0 || (batchIndex + 1) % 4 == 0 || batchIndex == batches.lastIndex) {
+                        emit(accumulated.toMap())
+                    }
                 }
             }
         }

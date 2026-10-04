@@ -7,6 +7,7 @@ import com.drducbook.app.R
 import io.legado.app.domain.model.VbookImportAction
 import io.legado.app.domain.model.VbookImportPreview
 import io.legado.app.domain.usecase.ImportVbookRegistryUseCase
+import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.CancellationException
@@ -84,7 +85,7 @@ class VbookImportViewModel(
                                 compatibilityMessage = item.compatibilityMessage,
                             )
                         }.toImmutableList(),
-                        selectedPluginIds = installable.toImmutableSet(),
+                        selectedPluginIds = persistentSetOf(),
                     )
                 }
             } catch (error: CancellationException) {

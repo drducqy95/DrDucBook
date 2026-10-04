@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.source.hub
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,20 +23,28 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,7 +69,9 @@ import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
+import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.toastOnUi
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 
@@ -68,10 +80,10 @@ fun BookSourceHubRouteScreen(
     onBackClick: () -> Unit,
     viewModel: BookSourceHubViewModel = koinViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(viewModel, context) {
+    LaunchedEffect(Unit) {
         viewModel.effects.collectLatest { effect ->
             when (effect) {
                 is BookSourceHubEffect.ShowToast -> context.toastOnUi(effect.message)
@@ -112,31 +124,110 @@ fun BookSourceHubScreen(
             )
         },
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding()),
-        ) {
-            SecondaryTabRow(
-                selectedTabIndex = state.currentTab.ordinal,
-                containerColor = LegadoTheme.colorScheme.surface,
-                contentColor = LegadoTheme.colorScheme.primary,
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = paddingValues.calculateTopPadding()),
             ) {
-                Tab(
-                    selected = state.currentTab == BookSourceHubTab.YCKCEO,
-                    onClick = { onIntent(BookSourceHubIntent.SwitchTab(BookSourceHubTab.YCKCEO)) },
-                    text = { Text(stringResource(R.string.source_hub_tab_yckceo)) },
-                )
-                Tab(
-                    selected = state.currentTab == BookSourceHubTab.MIAOGONGZI,
-                    onClick = { onIntent(BookSourceHubIntent.SwitchTab(BookSourceHubTab.MIAOGONGZI)) },
-                    text = { Text(stringResource(R.string.source_hub_tab_miaogongzi)) },
-                )
+                SecondaryTabRow(
+                    selectedTabIndex = state.currentTab.ordinal,
+                    containerColor = LegadoTheme.colorScheme.surface,
+                    contentColor = LegadoTheme.colorScheme.primary,
+                ) {
+                    Tab(
+                        selected = state.currentTab == BookSourceHubTab.YCKCEO,
+                        onClick = { onIntent(BookSourceHubIntent.SwitchTab(BookSourceHubTab.YCKCEO)) },
+                        text = { Text(stringResource(R.string.source_hub_tab_yckceo)) },
+                    )
+                    Tab(
+                        selected = state.currentTab == BookSourceHubTab.MIAOGONGZI,
+                        onClick = { onIntent(BookSourceHubIntent.SwitchTab(BookSourceHubTab.MIAOGONGZI)) },
+                        text = { Text(stringResource(R.string.source_hub_tab_miaogongzi)) },
+                    )
+                }
+
+                when (state.currentTab) {
+                    BookSourceHubTab.YCKCEO -> YckceoTabContent(state, onIntent)
+                    BookSourceHubTab.MIAOGONGZI -> MiaoGongZiTabContent(state, onIntent)
+                }
             }
 
-            when (state.currentTab) {
-                BookSourceHubTab.YCKCEO -> YckceoTabContent(state, onIntent)
-                BookSourceHubTab.MIAOGONGZI -> MiaoGongZiTabContent(state, onIntent)
+            // Bottom Batch Action Bar
+            if (state.currentTab == BookSourceHubTab.YCKCEO && state.selectedSourceIds.isNotEmpty()) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .navigationBarsPadding(),
+                    color = LegadoTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        if (state.isBatchImporting && state.batchProgress != null) {
+                            val (current, total) = state.batchProgress
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                AppText(
+                                    text = stringResource(R.string.source_hub_batch_importing, current, total),
+                                    style = LegadoTheme.typography.bodyMedium,
+                                    color = LegadoTheme.colorScheme.primary,
+                                )
+                                AppText(
+                                    text = "$current / $total",
+                                    style = LegadoTheme.typography.labelMedium,
+                                    color = LegadoTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            LinearProgressIndicator(
+                                progress = { if (total > 0) current.toFloat() / total.toFloat() else 0f },
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            OutlinedButton(
+                                onClick = { onIntent(BookSourceHubIntent.ClearSourceSelection) },
+                                enabled = !state.isBatchImporting,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                AppText(stringResource(R.string.source_hub_deselect_all))
+                            }
+                            OutlinedButton(
+                                onClick = { onIntent(BookSourceHubIntent.SelectAllSources) },
+                                enabled = !state.isBatchImporting,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                AppText(stringResource(R.string.source_hub_select_all))
+                            }
+                            Button(
+                                onClick = { onIntent(BookSourceHubIntent.ImportSelectedSources) },
+                                enabled = !state.isBatchImporting && state.selectedSourceIds.isNotEmpty(),
+                                modifier = Modifier.weight(1.5f),
+                            ) {
+                                AppText(
+                                    stringResource(
+                                        R.string.source_hub_batch_import,
+                                        state.selectedSourceIds.size,
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -149,9 +240,30 @@ private fun YckceoTabContent(
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    val displayedSources = remember(
+        state.yckceoSources,
+        state.installedUrls,
+        state.installedNames,
+        state.showOnlyUninstalled,
+    ) {
+        if (!state.showOnlyUninstalled) {
+            state.yckceoSources
+        } else {
+            state.yckceoSources.filter { item ->
+                val normUrl = (NetworkUtils.getBaseUrl(item.originUrl) ?: item.originUrl).trimEnd('/').lowercase()
+                val installed = (normUrl.isNotBlank() && state.installedUrls.contains(normUrl)) ||
+                    state.installedNames.contains(item.name.trim().lowercase())
+                !installed
+            }.toImmutableList()
+        }
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = adaptiveContentPadding(top = 12.dp, bottom = 96.dp),
+        contentPadding = adaptiveContentPadding(
+            top = 12.dp,
+            bottom = if (state.selectedSourceIds.isNotEmpty()) 140.dp else 96.dp,
+        ),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item(key = "search_bar") {
@@ -188,6 +300,8 @@ private fun YckceoTabContent(
             CategoryFilterRow(
                 selected = state.selectedCategory,
                 onSelected = { onIntent(BookSourceHubIntent.ChangeCategory(it)) },
+                showOnlyUninstalled = state.showOnlyUninstalled,
+                onToggleUninstalled = { onIntent(BookSourceHubIntent.ToggleFilterUninstalled) },
             )
         }
 
@@ -202,7 +316,7 @@ private fun YckceoTabContent(
                     CircularProgressIndicator(modifier = Modifier.size(36.dp))
                 }
             }
-        } else if (state.yckceoSources.isEmpty()) {
+        } else if (displayedSources.isEmpty()) {
             item(key = "empty") {
                 Box(
                     modifier = Modifier
@@ -219,13 +333,23 @@ private fun YckceoTabContent(
             }
         } else {
             items(
-                items = state.yckceoSources,
+                items = displayedSources,
                 key = OnlineBookSourceItem::id,
             ) { item ->
                 val isImporting = state.importingIds.contains(item.id)
+                val normalizedOriginUrl = remember(item.originUrl) {
+                    (NetworkUtils.getBaseUrl(item.originUrl) ?: item.originUrl).trimEnd('/').lowercase()
+                }
+                val isInstalled = (normalizedOriginUrl.isNotBlank() && state.installedUrls.contains(normalizedOriginUrl)) ||
+                    state.installedNames.contains(item.name.trim().lowercase())
+                val isSelected = state.selectedSourceIds.contains(item.id)
+
                 YckceoSourceCard(
                     item = item,
                     isImporting = isImporting,
+                    isInstalled = isInstalled,
+                    isSelected = isSelected,
+                    onToggleSelect = { onIntent(BookSourceHubIntent.ToggleSelectSource(item.id)) },
                     onImport = { onIntent(BookSourceHubIntent.ImportYckceoSource(item)) },
                 )
             }
@@ -237,6 +361,8 @@ private fun YckceoTabContent(
 private fun CategoryFilterRow(
     selected: String,
     onSelected: (String) -> Unit,
+    showOnlyUninstalled: Boolean,
+    onToggleUninstalled: () -> Unit,
 ) {
     val categories = listOf(
         "ALL" to stringResource(R.string.source_hub_all_sources),
@@ -250,7 +376,19 @@ private fun CategoryFilterRow(
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(end = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        item(key = "filter_uninstalled") {
+            FilterChip(
+                selected = showOnlyUninstalled,
+                onClick = onToggleUninstalled,
+                label = { Text(stringResource(R.string.source_hub_filter_uninstalled)) },
+                leadingIcon = if (showOnlyUninstalled) {
+                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                } else null,
+            )
+        }
+
         items(categories) { (key, label) ->
             FilterChip(
                 selected = selected == key,
@@ -266,9 +404,16 @@ private fun CategoryFilterRow(
 private fun YckceoSourceCard(
     item: OnlineBookSourceItem,
     isImporting: Boolean,
+    isInstalled: Boolean,
+    isSelected: Boolean,
+    onToggleSelect: () -> Unit,
     onImport: () -> Unit,
 ) {
-    NormalCard(modifier = Modifier.fillMaxWidth()) {
+    NormalCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onToggleSelect() },
+    ) {
         Column(
             modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -278,28 +423,57 @@ private fun YckceoSourceCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { onToggleSelect() },
+                )
+
                 Box(
                     modifier = Modifier
                         .size(38.dp)
                         .clip(CircleShape)
-                        .background(LegadoTheme.colorScheme.primaryContainer),
+                        .background(
+                            if (isInstalled) LegadoTheme.colorScheme.tertiaryContainer
+                            else LegadoTheme.colorScheme.primaryContainer
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Language,
+                        imageVector = if (isInstalled) Icons.Default.Check else Icons.Default.Language,
                         contentDescription = null,
-                        tint = LegadoTheme.colorScheme.onPrimaryContainer,
+                        tint = if (isInstalled) LegadoTheme.colorScheme.onTertiaryContainer
+                        else LegadoTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(20.dp),
                     )
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
-                    AppText(
-                        text = item.name,
-                        style = LegadoTheme.typography.titleMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        AppText(
+                            text = item.name,
+                            style = LegadoTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (isInstalled) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(LegadoTheme.colorScheme.tertiaryContainer)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            ) {
+                                AppText(
+                                    text = "✓ " + stringResource(R.string.source_hub_installed),
+                                    style = LegadoTheme.typography.labelSmall,
+                                    color = LegadoTheme.colorScheme.onTertiaryContainer,
+                                )
+                            }
+                        }
+                    }
                     if (item.originUrl.isNotBlank()) {
                         AppText(
                             text = item.originUrl,
@@ -316,7 +490,7 @@ private fun YckceoSourceCard(
                 } else {
                     SmallTonalButton(
                         onClick = onImport,
-                        icon = Icons.Default.CloudDownload,
+                        icon = if (isInstalled) Icons.Default.Done else Icons.Default.CloudDownload,
                         contentDescription = stringResource(R.string.source_hub_download),
                     )
                 }
@@ -451,10 +625,9 @@ private fun MiaoGongZiBundleCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     AppText(
-                        text = stringResource(R.string.source_hub_bundle_sources_count, bundle.sourceCount) + " · " + bundle.author,
+                        text = "${bundle.author} • ${stringResource(R.string.source_hub_bundle_sources_count, bundle.sourceCount)}",
                         style = LegadoTheme.typography.bodySmall,
-                        color = LegadoTheme.colorScheme.primary,
-                        maxLines = 1,
+                        color = LegadoTheme.colorScheme.onSurfaceVariant,
                     )
                 }
 
@@ -469,20 +642,22 @@ private fun MiaoGongZiBundleCard(
                 }
             }
 
-            AppText(
-                text = bundle.description,
-                style = LegadoTheme.typography.bodySmall,
-                color = LegadoTheme.colorScheme.onSurfaceVariant,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (bundle.description.isNotBlank()) {
+                AppText(
+                    text = bundle.description,
+                    style = LegadoTheme.typography.bodySmall,
+                    color = LegadoTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.End,
             ) {
                 AppText(
-                    text = stringResource(R.string.authoring_updated_at, bundle.updateTime),
+                    text = bundle.updateTime,
                     style = LegadoTheme.typography.labelSmall,
                     color = LegadoTheme.colorScheme.onSurfaceVariant,
                 )

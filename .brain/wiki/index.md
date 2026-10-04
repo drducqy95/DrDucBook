@@ -1,8 +1,8 @@
 # 📚 Trinity Wiki Index
 
-_Auto-generated at 2026-09-14T22:49:49. Do not edit manually._
+_Auto-generated at 2026-10-04T08:12:58. Do not edit manually._
 
-**Total Pages:** 32
+**Total Pages:** 34
 
 ## Categories
 
@@ -10,15 +10,15 @@ _Auto-generated at 2026-09-14T22:49:49. Do not edit manually._
 |---|---|---|
 | entities | 2 | Modules, services, components |
 | decisions | 4 | Architecture decision records |
-| patterns | 21 | Reusable code/design patterns |
-| insights | 5 | Lessons learned, tips, gotchas |
+| patterns | 22 | Reusable code/design patterns |
+| insights | 6 | Lessons learned, tips, gotchas |
 
 ## Entities (2)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
 | [Go Local WebDAV and NMT HachimiMT-60-QT](.brain\wiki\entities\go-local-webdav-and-nmt-hachimimt-60-qt.md) | active | 2026-09-12 | webdav, nmt, gomobile, onnx, explore, p34, auto |
-| [Project legado-with-MD3-main](.brain\wiki\entities\project-legado-with-md3-main.md) | active | 2026-09-14 | overview, project, legado-with-MD3-main |
+| [Project legado-with-MD3-main](.brain\wiki\entities\project-legado-with-md3-main.md) | active | 2026-10-04 | overview, project, legado-with-MD3-main |
 
 ## Decisions (4)
 
@@ -29,7 +29,7 @@ _Auto-generated at 2026-09-14T22:49:49. Do not edit manually._
 | [Session Secret HTTP Basic Auth for Localhost WebDAV](.brain\wiki\decisions\session-secret-http-basic-auth-for-localhost-webdav.md) | active | 2026-09-12 | webdav, security, auth, p34, auto |
 | [Use Gomobile AAR for Local WebDAV Proxy](.brain\wiki\decisions\use-gomobile-aar-for-local-webdav-proxy.md) | active | 2026-09-12 | webdav, gomobile, architecture, p34, auto |
 
-## Patterns (21)
+## Patterns (22)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
@@ -50,12 +50,13 @@ _Auto-generated at 2026-09-14T22:49:49. Do not edit manually._
 | [LocalAI Model Import & Path Auto-Detection - CONFIG_AND_UI_STATE_DESYNC Pattern](.brain\wiki\patterns\localai-model-import-path-auto-detection-config-and-ui-state-desync-pattern.md) | active | 2026-08-26 | LocalAI Model Import & Path Auto-Detection, CONFIG_AND_UI_STATE_DESYNC, auto-generated |
 | [LocalAI MT Prompt Language Mapping & Jinja Chat Roles - PROMPT_AND_CHAT_ROLE_FORMATTING Pattern](.brain\wiki\patterns\localai-mt-prompt-language-mapping-jinja-chat-roles-prompt-and-chat-role-formatting-pattern.md) | active | 2026-08-26 | LocalAI MT Prompt Language Mapping & Jinja Chat Roles, PROMPT_AND_CHAT_ROLE_FORMATTING, auto-generated |
 | [LocalAI Native Bridge R8 Proguard Obfuscation - PROGUARD_OBFUSCATION_CRASH Pattern](.brain\wiki\patterns\localai-native-bridge-r8-proguard-obfuscation-proguard-obfuscation-crash-pattern.md) | active | 2026-08-26 | LocalAI Native Bridge R8 Proguard Obfuscation, PROGUARD_OBFUSCATION_CRASH, auto-generated |
+| [QuickTranslation/Performance - PERFORMANCE_GC_THRASHING Pattern](.brain\wiki\patterns\quicktranslationperformance-performance-gc-thrashing-pattern.md) | active | 2026-10-04 | QuickTranslation/Performance, PERFORMANCE_GC_THRASHING, auto-generated |
 | [Reader/PerBookPrompt - LogicError Pattern](.brain\wiki\patterns\readerperbookprompt-logicerror-pattern.md) | active | 2026-09-14 | Reader/PerBookPrompt, LogicError, auto-generated |
 | [Reader/PerBookPrompt - UXDefect Pattern](.brain\wiki\patterns\readerperbookprompt-uxdefect-pattern.md) | active | 2026-09-14 | Reader/PerBookPrompt, UXDefect, auto-generated |
 | [VietnameseTranslationPostProcessor - PatternSyntaxException Pattern](.brain\wiki\patterns\vietnamesetranslationpostprocessor-patternsyntaxexception-pattern.md) | active | 2026-09-12 | VietnameseTranslationPostProcessor, PatternSyntaxException, auto-generated |
 | [WebService TTS - AudioPlaybackLatency Pattern](.brain\wiki\patterns\webservice-tts-audioplaybacklatency-pattern.md) | active | 2026-08-26 | WebService TTS, AudioPlaybackLatency, auto-generated |
 
-## Insights (5)
+## Insights (6)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
@@ -64,3 +65,4 @@ _Auto-generated at 2026-09-14T22:49:49. Do not edit manually._
 | [Session 2026-08-25 23-49-49](.brain\wiki\insights\session-2026-08-25-23-49-49.md) | active | 2026-08-25 | session, checkpoint, legado-with-MD3-main |
 | [Session 2026-09-05 00-06-43](.brain\wiki\insights\session-2026-09-05-00-06-43.md) | active | 2026-09-05 | session, checkpoint, legado-with-MD3-main |
 | [Session 2026-09-12 22-40-26](.brain\wiki\insights\session-2026-09-12-22-40-26.md) | active | 2026-09-12 | session, checkpoint, legado-with-MD3-main |
+| [Session 2026-10-04 08-12-58](.brain\wiki\insights\session-2026-10-04-08-12-58.md) | active | 2026-10-04 | session, checkpoint, legado-with-MD3-main |

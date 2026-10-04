@@ -116,6 +116,37 @@ fun AiConfigScreen(
                 }
             }
 
+            item {
+                val syncDescription = when (val sync = state.syncStatus) {
+                    is io.legado.app.domain.model.ApiKeySyncStatus.Synced -> {
+                        val dateStr = java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault())
+                            .format(java.util.Date(sync.timestamp))
+                        stringResource(R.string.api_key_sync_synced_at, dateStr, sync.providerCount)
+                    }
+                    is io.legado.app.domain.model.ApiKeySyncStatus.Syncing -> stringResource(R.string.loading)
+                    is io.legado.app.domain.model.ApiKeySyncStatus.Error -> sync.message
+                    io.legado.app.domain.model.ApiKeySyncStatus.NotSynced -> stringResource(R.string.api_key_sync_not_synced)
+                }
+
+                SplicedColumnGroup(title = stringResource(R.string.api_key_sync_title)) {
+                    SwitchSettingItem(
+                        title = stringResource(R.string.api_key_sync_auto),
+                        description = stringResource(R.string.api_key_sync_desc),
+                        checked = state.isAutoSyncEnabled,
+                        onCheckedChange = { onIntent(AiConfigIntent.SetAutoSyncEnabled(it)) },
+                    )
+                    ClickableSettingItem(
+                        title = stringResource(R.string.api_key_sync_push),
+                        description = syncDescription,
+                        onClick = { onIntent(AiConfigIntent.SyncApiKeys) },
+                    )
+                    ClickableSettingItem(
+                        title = stringResource(R.string.api_key_sync_pull),
+                        onClick = { onIntent(AiConfigIntent.RestoreApiKeys) },
+                    )
+                }
+            }
+
             if (state.providerHealthList.isNotEmpty()) {
                 item {
                     SplicedColumnGroup(title = stringResource(R.string.ai_provider_health)) {

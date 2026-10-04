@@ -23,6 +23,12 @@ interface AiProfileDao {
     @Query("select * from ai_task_presets order by taskType, sortNumber, createdAt")
     fun observePresets(): Flow<List<AiTaskPreset>>
 
+    @Query("select * from ai_provider_profiles order by createdAt")
+    suspend fun getProviders(): List<AiProviderProfile>
+
+    @Query("UPDATE ai_provider_profiles SET enabled = :enabled, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setProviderEnabled(id: String, enabled: Boolean, updatedAt: Long = System.currentTimeMillis())
+
     @Query("select * from ai_provider_profiles where id = :id")
     suspend fun getProvider(id: String): AiProviderProfile?
 

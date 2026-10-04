@@ -10,6 +10,40 @@ internal class Qt2025Runtime private constructor(
     private val surnames: List<DictionaryEntry>,
     private val suffixes: List<DictionaryEntry>,
 ) {
+    private val surnamesByFirstChar: Map<Char, List<DictionaryEntry>> =
+        surnames.groupBy { it.source.first() }
+    private val suffixesByFirstChar: Map<Char, List<DictionaryEntry>> =
+        suffixes.groupBy { it.source.first() }
+
+    private val nameRulesByChar: Map<Char, List<Rule>>
+    private val nameRulesLeadingWithName: List<Rule>
+
+    private val numberRulesByChar: Map<Char, List<Rule>>
+    private val numberRulesLeadingWithNumber: List<Rule>
+
+    init {
+        val nByChar = HashMap<Char, MutableList<Rule>>()
+        val nName = mutableListOf<Rule>()
+        for (rule in nameRules) {
+            rule.filter.chars.forEach { c ->
+                nByChar.getOrPut(c) { mutableListOf() }.add(rule)
+            }
+            if (rule.filter.allowsName) nName.add(rule)
+        }
+        nameRulesByChar = nByChar
+        nameRulesLeadingWithName = nName
+
+        val numByChar = HashMap<Char, MutableList<Rule>>()
+        val numNum = mutableListOf<Rule>()
+        for (rule in numberRules) {
+            rule.filter.chars.forEach { c ->
+                numByChar.getOrPut(c) { mutableListOf() }.add(rule)
+            }
+            if (rule.filter.allowsNumber) numNum.add(rule)
+        }
+        numberRulesByChar = numByChar
+        numberRulesLeadingWithNumber = numNum
+    }
 
     internal data class Match(
         val endExclusive: Int,
@@ -24,14 +58,63 @@ internal class Qt2025Runtime private constructor(
         text: String,
         offset: Int,
         resolveName: (start: Int, endExclusive: Int) -> String?,
+        hasNameAtOffset: Boolean = false,
         containsExact: (String) -> Boolean,
     ): Match? {
         if (offset !in text.indices) return null
+        val firstChar = text[offset]
+        val nextChar = text.getOrNull(offset + 1)
+        val isPreposedModifier = (firstChar == '余' || firstChar == '多') &&
+            nextChar != null && nextChar in NUMBER_SECTION_UNITS
+        val effectiveFirstChar = if (isPreposedModifier) nextChar else firstChar
+        val isNumberChar = effectiveFirstChar.isDigit() || effectiveFirstChar in NUMBER_CHARS
+
+        val nameCharRules = nameRulesByChar[effectiveFirstChar]
+        val hasNameRules = nameCharRules != null || (hasNameAtOffset && nameRulesLeadingWithName.isNotEmpty())
+        val hasSurnameCandidate = surnamesByFirstChar.containsKey(firstChar)
+        val numCharRules = numberRulesByChar[effectiveFirstChar]
+        val hasNumRules = numCharRules != null || (isNumberChar && numberRulesLeadingWithNumber.isNotEmpty())
+
+        if (!hasNameRules && !hasSurnameCandidate && !hasNumRules) {
+            return null
+        }
+
         val scanEnd = (offset + MAX_SCAN_CHARS).coerceAtMost(text.length)
         val input = normalizeNumberModifiers(text.substring(offset, scanEnd))
-        matchRule(input, offset, nameRules, resolveName)?.let { return it }
-        matchSurnameSuffix(text, offset, containsExact)?.let { return it }
-        return matchRule(input, offset, numberRules, resolveName)
+
+        if (hasNameRules) {
+            val candidateRules = if (nameCharRules == null) {
+                nameRulesLeadingWithName
+            } else if (!hasNameAtOffset || nameRulesLeadingWithName.isEmpty()) {
+                nameCharRules
+            } else {
+                val combined = ArrayList<Rule>(nameCharRules.size + nameRulesLeadingWithName.size)
+                combined.addAll(nameCharRules)
+                combined.addAll(nameRulesLeadingWithName)
+                combined
+            }
+            matchRule(input, offset, candidateRules, resolveName)?.let { return it }
+        }
+
+        if (hasSurnameCandidate) {
+            matchSurnameSuffix(text, offset, containsExact)?.let { return it }
+        }
+
+        if (hasNumRules) {
+            val candidateRules = if (numCharRules == null) {
+                numberRulesLeadingWithNumber
+            } else if (!isNumberChar || numberRulesLeadingWithNumber.isEmpty()) {
+                numCharRules
+            } else {
+                val combined = ArrayList<Rule>(numCharRules.size + numberRulesLeadingWithNumber.size)
+                combined.addAll(numCharRules)
+                combined.addAll(numberRulesLeadingWithNumber)
+                combined
+            }
+            matchRule(input, offset, candidateRules, resolveName)?.let { return it }
+        }
+
+        return null
     }
 
     private fun normalizeNumberModifiers(text: String): String {
@@ -64,16 +147,25 @@ internal class Qt2025Runtime private constructor(
         rules: List<Rule>,
         resolveName: (start: Int, endExclusive: Int) -> String?,
     ): Match? {
-        rules.forEach { rule ->
-            val match = rule.pattern.find(input) ?: return@forEach
-            if (match.range.first != 0) return@forEach
+        if (input.isEmpty()) return null
+        for (rule in rules) {
+            val match = rule.pattern.matchAt(input, 0) ?: continue
             var rendered = rule.replacement
             var effectiveEndExclusive = sourceOffset + match.value.length
             val values = ArrayList<String>(rule.slots.size)
-            rule.slots.forEachIndexed { index, slot ->
-                val group = match.groups[index + 1] ?: return@forEach
+            var slotFailed = false
+            for (index in rule.slots.indices) {
+                val slot = rule.slots[index]
+                val group = match.groups[index + 1]
+                if (group == null) {
+                    slotFailed = true
+                    break
+                }
                 val raw = group.value.trim()
-                if (raw.isEmpty()) return@forEach
+                if (raw.isEmpty()) {
+                    slotFailed = true
+                    break
+                }
                 val value = when (slot) {
                     Slot.NAME -> {
                         val absoluteStart = sourceOffset + group.range.first
@@ -87,21 +179,39 @@ internal class Qt2025Runtime private constructor(
                                     break
                                 }
                             }
-                            resolved ?: return@forEach
+                            if (resolved == null) {
+                                slotFailed = true
+                                break
+                            }
+                            resolved
                         } else {
-                            resolveName(absoluteStart, absoluteEnd) ?: return@forEach
+                            val resolved = resolveName(absoluteStart, absoluteEnd)
+                            if (resolved == null) {
+                                slotFailed = true
+                                break
+                            }
+                            resolved
                         }
                     }
 
-                    Slot.NUMBER -> Qt2025Numbers.renderForRule(
-                        raw = raw,
-                        sourcePattern = rule.source,
-                        replacement = rule.replacement,
-                        slotNumber = index + 1,
-                    ) ?: return@forEach
+                    Slot.NUMBER -> {
+                        val renderedNum = Qt2025Numbers.renderForRule(
+                            raw = raw,
+                            sourcePattern = rule.source,
+                            replacement = rule.replacement,
+                            slotNumber = index + 1,
+                        )
+                        if (renderedNum == null) {
+                            slotFailed = true
+                            break
+                        }
+                        renderedNum
+                    }
                 }
                 values += value.trim()
             }
+            if (slotFailed || values.size != rule.slots.size) continue
+
             if (rule.slots.size == 1) {
                 rendered = rendered
                     .replace("{n}", values[0])
@@ -145,15 +255,19 @@ internal class Qt2025Runtime private constructor(
         offset: Int,
         containsExact: (String) -> Boolean,
     ): Match? {
-        surnames.forEach { surname ->
-            if (!text.startsWith(surname.source, offset)) return@forEach
+        val firstChar = text.getOrNull(offset) ?: return null
+        val candidateSurnames = surnamesByFirstChar[firstChar] ?: return null
+        for (surname in candidateSurnames) {
+            if (!text.startsWith(surname.source, offset)) continue
             val suffixOffset = offset + surname.source.length
-            suffixes.forEach { suffix ->
-                if (!text.startsWith(suffix.source, suffixOffset)) return@forEach
+            val suffixFirstChar = text.getOrNull(suffixOffset) ?: continue
+            val candidateSuffixes = suffixesByFirstChar[suffixFirstChar] ?: continue
+            for (suffix in candidateSuffixes) {
+                if (!text.startsWith(suffix.source, suffixOffset)) continue
                 val endExclusive = suffixOffset + suffix.source.length
-                if (endExclusive - offset !in 2..MAX_SURNAME_SUFFIX_CHARS) return@forEach
+                if (endExclusive - offset !in 2..MAX_SURNAME_SUFFIX_CHARS) continue
                 val source = text.substring(offset, endExclusive)
-                if (containsExact(source)) return@forEach
+                if (containsExact(source)) continue
                 return Match(
                     endExclusive = endExclusive,
                     translation = "${surname.target.trim()} ${suffix.target.trim()}",
@@ -176,6 +290,13 @@ internal class Qt2025Runtime private constructor(
         val pattern: Regex,
         val slots: List<Slot>,
         val normalizedLength: Int,
+        val filter: LeadFilter,
+    )
+
+    private data class LeadFilter(
+        val chars: Set<Char>,
+        val allowsNumber: Boolean,
+        val allowsName: Boolean,
     )
 
     private enum class Slot { NAME, NUMBER }
@@ -184,6 +305,7 @@ internal class Qt2025Runtime private constructor(
         private const val MAX_SCAN_CHARS = 20
         private const val MAX_SURNAME_SUFFIX_CHARS = 6
         private const val NUMBER_SECTION_UNITS = "百千万亿"
+        private const val NUMBER_CHARS = "零一二三四五六七八九十百千万亿两〇点"
         private const val NAME_RULE_PRIORITY = 185
         private const val SURNAME_SUFFIX_PRIORITY = 175
         private const val NUMBER_RULE_PRIORITY = 165
@@ -192,6 +314,62 @@ internal class Qt2025Runtime private constructor(
         private const val NAME_CAPTURE = "([^,，.。!?！？?\\s]{1,10}?)"
 
         private val TRAILING_NAME_CAPTURE = NAME_CAPTURE.replace("}?)", "})")
+        private val OPT_BRACKET_REGEX = Regex("^\\[([^\\]]+)\\]\\?")
+        private val OPT_PAREN_REGEX = Regex("^\\(([^\\)]+)\\)\\?")
+        private val BRACKET_REGEX = Regex("^\\[([^\\]]+)\\]")
+        private val PAREN_REGEX = Regex("^\\(([^\\)]+)\\)")
+
+        private fun extractLeadFilter(source: String): LeadFilter {
+            val chars = HashSet<Char>()
+            var allowsNumber = false
+            var allowsName = false
+
+            fun parse(s: String) {
+                if (s.isEmpty()) return
+                if (s.startsWith("{s}")) {
+                    allowsNumber = true
+                    return
+                }
+                if (s.startsWith("{n}")) {
+                    allowsName = true
+                    return
+                }
+                val optBracket = OPT_BRACKET_REGEX.find(s)
+                if (optBracket != null && optBracket.range.first == 0) {
+                    val inside = optBracket.groupValues[1]
+                    for (i in inside.indices) chars.add(inside[i])
+                    parse(s.substring(optBracket.range.last + 1))
+                    return
+                }
+                val optParen = OPT_PAREN_REGEX.find(s)
+                if (optParen != null && optParen.range.first == 0) {
+                    val inside = optParen.groupValues[1]
+                    inside.split('|').forEach { alt ->
+                        if (alt.isNotEmpty()) chars.add(alt[0])
+                    }
+                    parse(s.substring(optParen.range.last + 1))
+                    return
+                }
+                val bracket = BRACKET_REGEX.find(s)
+                if (bracket != null && bracket.range.first == 0) {
+                    val inside = bracket.groupValues[1]
+                    for (i in inside.indices) chars.add(inside[i])
+                    return
+                }
+                val paren = PAREN_REGEX.find(s)
+                if (paren != null && paren.range.first == 0) {
+                    val inside = paren.groupValues[1]
+                    inside.split('|').forEach { alt ->
+                        if (alt.isNotEmpty()) chars.add(alt[0])
+                    }
+                    return
+                }
+                chars.add(s[0])
+            }
+
+            parse(source)
+            return LeadFilter(chars, allowsNumber, allowsName)
+        }
 
         fun create(
             rules: List<Pair<String, String>>,
@@ -264,6 +442,7 @@ internal class Qt2025Runtime private constructor(
                     pattern = Regex("^$guardedPattern"),
                     slots = slots,
                     normalizedLength = normalizedRuleLength(source),
+                    filter = extractLeadFilter(source),
                 )
             }.getOrNull()
         }

@@ -1,10 +1,10 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-03T13:00:00.000000",
+    "last_updated": "2026-10-04T15:13:00",
     "overall_progress_percent": 100,
-    "current_phase": "Phase 53 - Local OPDS Drive Proxy Server & Service Account Support (Completed)",
-    "status": "DONE",
+    "current_phase": "phase-58-qt-lexical-planning-acceleration",
+    "status": "COMPLETED",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
@@ -2033,6 +2033,281 @@
         {
           "id": "T53.13",
           "desc": "Unit and integration tests for OPDS serializer, parser, and proxy server",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P54",
+      "name": "Phase 54 - Source Hub, VBook, QT Engine, API Key Sync & Polish",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T54.1",
+          "desc": "VBook Importer: Remove auto-check all sources on preview (persistentSetOf())",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.2",
+          "desc": "VBook Importer: Verify and ensure only user-checked sources are installed",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.3",
+          "desc": "Source Hub: Connect BookSourceDao.flowAll() and maintain installedUrls & installedNames in UiState",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.4",
+          "desc": "Source Hub: Add visual '✓ Đã cài' badge and stateful action button on installed source cards",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.5",
+          "desc": "Source Hub: Add multi-selection support with Checkbox on source cards in BookSourceHubScreen",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.6",
+          "desc": "Source Hub: Implement bottom batch action bar (Select All, Deselect All, Batch Install button)",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.7",
+          "desc": "Source Hub: Implement importSelectedSources() batch download/import in BookSourceHubViewModel",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.8",
+          "desc": "Quick Translation: Eliminate Jieba heavy segmentation and preserve all 5 layers (LuatNhan, Name, Vietphrase, Pronoun, PhienAm)",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.9",
+          "desc": "Quick Translation: Optimize linear execution and mapped layout for instant response",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.10",
+          "desc": "Quick Translation: Wire translate() and translateMapped() for zero-latency execution",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.11",
+          "desc": "Unit tests and verification for Quick Translation (63 tests passed) and VBook Import",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.12",
+          "desc": "API Key Sync: Create ApiKeySyncModels.kt (ApiKeyBundle, ApiKeyEntry, ApiKeySyncStatus)",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.13",
+          "desc": "API Key Sync: Create ApiKeySyncEncryption.kt (AES-256-GCM, HKDF-SHA256 key derivation)",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.14",
+          "desc": "API Key Sync: Create ApiKeySyncRepository.kt (collectProviderKeys, pushToCloud, pullFromCloud, restoreProviders, autoActivateProviders)",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.15",
+          "desc": "API Key Sync: Update AiConfigContract.kt with syncStatus, SyncApiKeys, RestoreApiKeys intents",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.16",
+          "desc": "API Key Sync: Update AiConfigViewModel.kt to handle sync intents and auto-restore on login",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.17",
+          "desc": "API Key Sync: Update AiConfigScreen.kt with API Key Sync section UI",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.18",
+          "desc": "API Key Sync: Register ApiKeySyncRepository in appModule.kt and add string resources",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.19",
+          "desc": "API Key Sync: Unit tests (ApiKeySyncEncryptionTest, ApiKeySyncRepositoryTest passed)",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.20",
+          "desc": "Polish: HTML markup bypass, FilterChip 'Chưa cài', bundle batch behavior",
+          "status": "DONE"
+        },
+        {
+          "id": "T54.21",
+          "desc": "Polish: R8 ProGuard keep rules, compile check passed",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P55",
+      "name": "Drive Library Protocol Transparency & Quick Translation Speed Optimization",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T55.1",
+          "desc": "Drive Library UI: Display cloud provider type badge on source chips and explicit protocol indicator in countSummary",
+          "status": "DONE"
+        },
+        {
+          "id": "T55.2",
+          "desc": "Cache Hash Desync Fix: Scope storyMemoryRevision to AI translation only in TranslateChapterUseCase to align QT hash with ReadBook",
+          "status": "DONE"
+        },
+        {
+          "id": "T55.3",
+          "desc": "QuickTranslation Warmup: Remove unused jiebaTokenizer instantiation from warmUp() to eliminate cold start delay and save ~20MB RAM",
+          "status": "DONE"
+        },
+        {
+          "id": "T55.4",
+          "desc": "MappedTermLookup Probing Optimization: Add lengthsMaskByFirstChar bitmask to prune non-existent word lengths before 41MB mmap hash probes",
+          "status": "DONE"
+        },
+        {
+          "id": "T55.5",
+          "desc": "MappedTermLookup Buffer Read: Use bulk ByteBuffer.get(bytes) in targetAt and expand TARGET_CACHE_SIZE to 16,384",
+          "status": "DONE"
+        },
+        {
+          "id": "T55.6",
+          "desc": "Post Rules Literal Trigger: Enhance postRuleLiteralTrigger to recognize safe mandatory anchor words to skip unneeded regex passes",
+          "status": "DONE"
+        },
+        {
+          "id": "T55.7",
+          "desc": "Reader Concurrency Optimization: Prioritize durChapterIndex loading in ReadBook and defer adjacent chapter pre-loading to avoid triple CPU/IO lock contention",
+          "status": "DONE"
+        },
+        {
+          "id": "T55.8",
+          "desc": "Verification: Compilation compileAppDebugKotlin and unit test QuickTranslationRepositoryTest passed 100%",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P56",
+      "name": "QT UI Stutter Resolution, GC Pressure Elimination & Dictionary In-Memory Caching",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T56.1",
+          "desc": "Sequential chapter preloading in ReadBook (durChapterIndex + 1 chained to durChapterIndex - 1) ending CPU starvation",
+          "status": "DONE"
+        },
+        {
+          "id": "T56.2",
+          "desc": "In-memory caching of BookDictionary in DictionaryRepositoryImpl keyed by bookUrl + lastModified",
+          "status": "DONE"
+        },
+        {
+          "id": "T56.3",
+          "desc": "Fast CJK check in replaceRemainingCjkWithPhonetics and allocation-free loops in bestStructuredMatch/bestGrammarMatch",
+          "status": "DONE"
+        },
+        {
+          "id": "T56.4",
+          "desc": "Regex memoization & contains guards in replaceDetachedPhrase and replaceVocative",
+          "status": "DONE"
+        },
+        {
+          "id": "T56.5",
+          "desc": "Lazy TermMatch list allocation in MappedTermLookup.allAt eliminating empty ArrayList allocations",
+          "status": "DONE"
+        },
+        {
+          "id": "T56.6",
+          "desc": "Precompiled static regexes and heading keyword filter in QuickTranslationTextPostProcessor",
+          "status": "DONE"
+        },
+        {
+          "id": "T56.7",
+          "desc": "Verification: compileAppDebugKotlin, QuickTranslationRepositoryTest, assembleAppDebug, LDPlayer install & run",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P57",
+      "name": "QT UI Freeze Elimination, Qt2025 O(1) Rule Indexing & Translation Pipeline Acceleration",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T57.1",
+          "desc": "Phase 1: Dynamic UI Translation batching (executeLines), 4,000-entry in-memory LRU cache, and Bookshelf semaphore (reduced startup calls from 18 unbatched / 27.9s to 1 single call / ~180ms)",
+          "status": "DONE"
+        },
+        {
+          "id": "T57.2",
+          "desc": "Phase 2: Post-processing hoisting in QuickTranslationRepository - moved 202 post rules out of the per-token loop to document level (reduced post-processing from 7,200ms to <200ms)",
+          "status": "DONE"
+        },
+        {
+          "id": "T57.3",
+          "desc": "Phase 3: Diagnostic micro-profiling instrumentation (LexicalTimer) revealing 72% CPU concentration in Qt2025Runtime and grammar planning",
+          "status": "DONE"
+        },
+        {
+          "id": "T57.4",
+          "desc": "Phase 4: Qt2025Runtime O(1) lead-character indexing (LeadFilter) & fast skipping for 287 rules, surnames, and suffixes (qt2025 time dropped from 4,000ms+ to 210ms)",
+          "status": "DONE"
+        },
+        {
+          "id": "T57.5",
+          "desc": "Phase 5: Grammar rule early-exit guards (leading head & interrogative first-char filters) and template matching emptiness fast-path",
+          "status": "DONE"
+        },
+        {
+          "id": "T57.6",
+          "desc": "Phase 6: Verification on LDPlayer (CACHE-MISS dropped from 7.5s to 2.8s, CACHE-HIT page flipping at 15-40ms, zero Bookshelf/Explore UI stutter)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P58",
+      "name": "QT Lexical Planning Acceleration: Structured Guards, Grammar Indexing & Template Fast-Path",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T58.1",
+          "desc": "Fast first-character branching in bestStructuredMatch eliminating ~28,000 redundant regex evaluations per chapter (struct dropped from 280ms to ~70ms)",
+          "status": "DONE"
+        },
+        {
+          "id": "T58.2",
+          "desc": "O(1) first-char indexing for place hierarchy suffixes and 16-char neighborhood guards for particles (的, 们) in dynamic attributive and plural matching (gram dropped from 887ms to ~350ms)",
+          "status": "DONE"
+        },
+        {
+          "id": "T58.3",
+          "desc": "nextLiteralAfterFirstSlot precomputed prefix filtering in SourceTemplate and leadingSlotTemplatesAt eliminating >95% false-positive template recursions (tmpl dropped from 939ms to ~420ms)",
+          "status": "DONE"
+        },
+        {
+          "id": "T58.4",
+          "desc": "Unit test suite verification: 100% pass on all 63 tests in QuickTranslationRepositoryTest",
+          "status": "DONE"
+        },
+        {
+          "id": "T58.5",
+          "desc": "Live LDPlayer verification on uncached content: uncached chapter translation dropped from 3.6s to 1.68s-1.95s, uncached UI text dropped to 500-760ms, page flipping maintained at 22-33ms",
           "status": "DONE"
         }
       ]

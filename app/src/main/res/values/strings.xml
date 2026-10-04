@@ -4220,4 +4220,22 @@
     <string name="source_hub_category_search">Search</string>
     <string name="source_hub_category_comic">Comic/Manga</string>
     <string name="source_hub_category_audio">Audio</string>
+    <string name="source_hub_installed">Installed</string>
+    <string name="source_hub_batch_import">Install selected (%1$d)</string>
+    <string name="source_hub_batch_importing">Importing source %1$d/%2$d…</string>
+    <string name="source_hub_select_all">Select all</string>
+    <string name="source_hub_deselect_all">Deselect all</string>
+    <string name="source_hub_filter_uninstalled">Not installed</string>
+    <string name="source_hub_selected_count">%1$d selected</string>
+    <string name="api_key_sync_title">API Key Cloud Sync</string>
+    <string name="api_key_sync_desc">Securely encrypt and sync API keys with your cloud account to auto-activate when signing in on a new device</string>
+    <string name="api_key_sync_push">Sync to cloud</string>
+    <string name="api_key_sync_pull">Restore from cloud</string>
+    <string name="api_key_sync_auto">Auto-sync</string>
+    <string name="api_key_sync_not_logged_in">Please sign in to your cloud account first</string>
+    <string name="api_key_sync_push_success">Synced %1$d API keys to cloud</string>
+    <string name="api_key_sync_pull_success">Restored and activated %1$d AI providers</string>
+    <string name="api_key_sync_failed">Cloud sync failed</string>
+    <string name="api_key_sync_synced_at">Synced %1$s (%2$d keys)</string>
+    <string name="api_key_sync_not_synced">Not synced</string>
 </resources>

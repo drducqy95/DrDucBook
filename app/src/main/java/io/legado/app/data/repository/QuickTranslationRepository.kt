@@ -1,6 +1,7 @@
 package io.legado.app.data.repository
 
 import android.app.ActivityManager
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.gateway.QuickTranslationGateway
 import io.legado.app.domain.model.DictPair
@@ -27,6 +28,7 @@ import java.nio.channels.FileChannel
 import java.util.ArrayDeque
 import java.util.IdentityHashMap
 import java.util.LinkedHashMap
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -98,7 +100,6 @@ class QuickTranslationRepository(
 
     override fun warmUp() {
         pack()
-        jiebaTokenizer
     }
 
     fun translate(text: String, projectTerms: List<DictPair>): String {
@@ -119,50 +120,77 @@ class QuickTranslationRepository(
     ): String {
         if (text.isEmpty()) return text
         if (text.codePoints().noneMatch(::isCjk)) return text
+        val tStart = System.currentTimeMillis()
         val externalEntries = externalPackStore?.matchEntries(
             context = text,
             projectKey = "",
             activeUniverseKey = "",
         ).orEmpty()
-        val safeProjectTerms = (
-            projectTerms + externalEntries.mapNotNull { it.toQuickTranslationPair() }
-            ).map(DictPair::normalizedForRuntime)
-        val safeCustomPhonetics = (
-            customPhonetics + externalEntries.mapNotNull { it.toQuickPhoneticPair() }
-            ).map(DictPair::normalizedForRuntime)
+        val safeProjectTerms = if (projectTerms.isEmpty() && externalEntries.isEmpty()) {
+            emptyList()
+        } else {
+            (projectTerms + externalEntries.mapNotNull { it.toQuickTranslationPair() })
+                .map(DictPair::normalizedForRuntime)
+        }
+        val safeCustomPhonetics = if (customPhonetics.isEmpty() && externalEntries.isEmpty()) {
+            emptyList()
+        } else {
+            (customPhonetics + externalEntries.mapNotNull { it.toQuickPhoneticPair() })
+                .map(DictPair::normalizedForRuntime)
+        }
+        val tPrep = System.currentTimeMillis()
         val pack = pack()
+        val tPack = System.currentTimeMillis()
         val resolvedPronounMode = resolvedPronounMode(pronounMode)
         val projectRuntime = projectRuntimeFor(safeProjectTerms, pack)
         val projectTrie = projectRuntime.trie
-        val customPhoneticMap = safeCustomPhonetics.asSequence()
-            .filter { it.original.isNotBlank() && it.translation.isNotBlank() }
-            .filter { it.original.codePointCount(0, it.original.length) == 1 }
-            .distinctBy { it.original }
-            .associate { it.original to it.translation.trim() }
+        val tTrie = System.currentTimeMillis()
+        val customPhoneticMap = if (safeCustomPhonetics.isEmpty()) {
+            emptyMap()
+        } else {
+            safeCustomPhonetics.asSequence()
+                .filter { it.original.isNotBlank() && it.translation.isNotBlank() }
+                .filter { it.original.codePointCount(0, it.original.length) == 1 }
+                .distinctBy { it.original }
+                .associate { it.original to it.translation.trim() }
+        }
         val protected = protectMarkup(text)
         val pronounContext = PronounContextTracker()
         val translatedTokenCache = HashMap<TranslationTokenCacheKey, String>()
+        val tSetup = System.currentTimeMillis()
+        val lexicalTimer = LexicalTimer()
+        var totalLexicalTime = 0L
+        var totalPostTime = 0L
         val translated = protected.layout.tokens.joinToString(separator = "") { token ->
             when (token) {
                 is TranslationTextToken.TextToken -> {
-                    val pronounHints = pronounContext.hintsFor(token.raw)
-                    translatedTokenCache.getOrPut(
-                        TranslationTokenCacheKey(token.raw, pronounHints)
-                    ) {
-                        val lexical = translateProtected(
-                            text = token.raw,
-                            projectRuntime = projectRuntime,
-                            pack = pack,
-                            customPhonetics = customPhoneticMap,
-                        )
-                        postProcessTranslatedText(
-                            sourceText = token.raw,
-                            text = lexical,
-                            pack = pack,
-                            customPhonetics = customPhoneticMap,
-                            pronounMode = resolvedPronounMode,
-                            pronounHints = pronounHints,
-                        )
+                    if (token.raw.codePoints().noneMatch(::isCjk)) {
+                        token.raw
+                    } else {
+                        val pronounHints = pronounContext.hintsFor(token.raw)
+                        translatedTokenCache.getOrPut(
+                            TranslationTokenCacheKey(token.raw, pronounHints)
+                        ) {
+                            val t0 = System.currentTimeMillis()
+                            val lexical = translateProtected(
+                                text = token.raw,
+                                projectRuntime = projectRuntime,
+                                pack = pack,
+                                customPhonetics = customPhoneticMap,
+                                timer = lexicalTimer,
+                            )
+                            val t1 = System.currentTimeMillis()
+                            totalLexicalTime += (t1 - t0)
+                            val tokenPost = postProcessToken(
+                                sourceText = token.raw,
+                                text = lexical,
+                                pronounMode = resolvedPronounMode,
+                                pronounHints = pronounHints,
+                            )
+                            val t2 = System.currentTimeMillis()
+                            totalPostTime += (t2 - t1)
+                            tokenPost
+                        }
                     }
                 }
 
@@ -170,11 +198,24 @@ class QuickTranslationRepository(
                 else -> token.raw
             }
         }
-        return protected.restore(
+        val tTokensDone = System.currentTimeMillis()
+        val fullPost = postProcessFullText(
+            text = translated,
+            pack = pack,
+            customPhonetics = customPhoneticMap,
+        )
+        val tFullPost = System.currentTimeMillis()
+        val result = protected.restore(
             QuickTranslationTextPostProcessor.cleanHeadingArtifacts(
-                QuickTranslationTextPostProcessor.capitalizeSentenceStarts(translated)
+                QuickTranslationTextPostProcessor.capitalizeSentenceStarts(fullPost)
             )
         )
+        val tPost = System.currentTimeMillis()
+        val total = tPost - tStart
+        if (total > 500) {
+            AppLog.put("QT-PERF translate() prep=${tPrep-tStart}ms pack=${tPack-tPrep}ms trie=${tTrie-tPack}ms setup=${tSetup-tTrie}ms lexical=${totalLexicalTime}ms (base=${lexicalTimer.baseMatch}ms proj=${lexicalTimer.projMatch}ms plan=${lexicalTimer.plan}ms [struct=${lexicalTimer.structured}ms qt2025=${lexicalTimer.qt2025}ms gram=${lexicalTimer.grammar}ms tmpl=${lexicalTimer.template}ms]) tokenPost=${totalPostTime}ms fullPost=${tFullPost-tTokensDone}ms finalize=${tPost-tFullPost}ms TOTAL=${total}ms len=${text.length} tokens=${protected.layout.tokens.size}")
+        }
+        return result
     }
 
     override fun translateMapped(
@@ -457,25 +498,49 @@ class QuickTranslationRepository(
         return result
     }
 
+    private class LexicalTimer {
+        var baseMatch: Long = 0
+        var projMatch: Long = 0
+        var plan: Long = 0
+        var structured: Long = 0
+        var qt2025: Long = 0
+        var grammar: Long = 0
+        var template: Long = 0
+    }
+
     private fun translateProtected(
         text: String,
         projectRuntime: ProjectTrieCache,
         pack: QuickPack,
         customPhonetics: Map<String, String>,
+        timer: LexicalTimer? = null,
     ): String {
+        val t0 = System.currentTimeMillis()
+        val projectMatches = projectRuntime.trie.allMatchesByStart(text)
+        val t1 = System.currentTimeMillis()
+        val baseMatches = pack.baseTrie.allMatchesByStart(text)
+        val t2 = System.currentTimeMillis()
+        timer?.let {
+            it.projMatch += (t1 - t0)
+            it.baseMatch += (t2 - t1)
+        }
         val matches = RuntimeMatchIndex(
             text = text,
-            projectMatches = projectRuntime.trie.allMatchesByStart(text),
-            baseMatches = pack.baseTrie.allMatchesByStart(text),
-            jiebaTokens = jiebaTokenizer?.tokenize(text).orEmpty(),
+            projectMatches = projectMatches,
+            baseMatches = baseMatches,
+            jiebaTokens = emptyList(),
         )
+        val tPlan0 = System.currentTimeMillis()
         val plan = bestTranslationPlan(
             text = text,
             projectRuntime = projectRuntime,
             pack = pack,
             customPhonetics = customPhonetics,
             matches = matches,
+            timer = timer,
         )
+        val tPlan1 = System.currentTimeMillis()
+        timer?.let { it.plan += (tPlan1 - tPlan0) }
         val output = StringBuilder(text.length * 2)
         var offset = 0
         while (offset < text.length) {
@@ -560,7 +625,7 @@ class QuickTranslationRepository(
             text = text,
             projectMatches = projectRuntime.trie.allMatchesByStart(text),
             baseMatches = pack.baseTrie.allMatchesByStart(text),
-            jiebaTokens = jiebaTokenizer?.tokenize(text).orEmpty(),
+            jiebaTokens = emptyList(),
         )
         val plan = bestTranslationPlan(
             text = text,
@@ -610,6 +675,29 @@ class QuickTranslationRepository(
         return output.build()
     }
 
+    private fun postProcessToken(
+        sourceText: String,
+        text: String,
+        pronounMode: QuickTranslationPronounMode,
+        pronounHints: PronounHints = PronounHints(),
+    ): String = normalizeNarratorThirdPerson(
+        sourceText = sourceText,
+        translatedText = applyPronounProfile(sourceText, text, pronounMode, pronounHints),
+        mode = pronounMode,
+    )
+
+    private fun postProcessFullText(
+        text: String,
+        pack: QuickPack,
+        customPhonetics: Map<String, String>,
+    ): String = QuickTranslationTextPostProcessor.normalizeNumericSpacing(
+        replaceRemainingCjkWithPhonetics(
+            text = applyPostRules(text, pack.postRules),
+            customPhonetics = customPhonetics,
+            bundledPhonetics = pack.phonetics,
+        )
+    )
+
     private fun postProcessTranslatedText(
         sourceText: String,
         text: String,
@@ -617,20 +705,10 @@ class QuickTranslationRepository(
         customPhonetics: Map<String, String>,
         pronounMode: QuickTranslationPronounMode,
         pronounHints: PronounHints = PronounHints(),
-    ): String = QuickTranslationTextPostProcessor.normalizeNumericSpacing(
-        replaceRemainingCjkWithPhonetics(
-            text = normalizeNarratorThirdPerson(
-                sourceText = sourceText,
-                translatedText = applyPostRules(
-                    applyPronounProfile(sourceText, text, pronounMode, pronounHints),
-                    pack.postRules,
-                ),
-                mode = pronounMode,
-            ),
-            customPhonetics = customPhonetics,
-            bundledPhonetics = pack.phonetics,
-        )
-    )
+    ): String {
+        val tokenPass = postProcessToken(sourceText, text, pronounMode, pronounHints)
+        return postProcessFullText(tokenPass, pack, customPhonetics)
+    }
 
     private fun remapProcessedSegments(
         sourceText: String,
@@ -706,6 +784,7 @@ class QuickTranslationRepository(
         pack: QuickPack,
         customPhonetics: Map<String, String>,
         matches: RuntimeMatchIndex,
+        timer: LexicalTimer? = null,
     ): Array<TranslationCandidate?> {
         val bestScores = LongArray(text.length + 1) { Long.MIN_VALUE / 4 }
         val plan = arrayOfNulls<TranslationCandidate>(text.length)
@@ -720,6 +799,7 @@ class QuickTranslationRepository(
                 pack = pack,
                 customPhonetics = customPhonetics,
                 matches = matches,
+                timer = timer,
             ).forEach { candidate ->
                 val tailScore = bestScores.getOrElse(candidate.endExclusive) {
                     Long.MIN_VALUE / 4
@@ -750,6 +830,7 @@ class QuickTranslationRepository(
         pack: QuickPack,
         customPhonetics: Map<String, String>,
         matches: RuntimeMatchIndex,
+        timer: LexicalTimer? = null,
     ): List<TranslationCandidate> {
         if (offset >= text.length) return emptyList()
         val candidates = ArrayList<TranslationCandidate>(8)
@@ -760,6 +841,7 @@ class QuickTranslationRepository(
             }
             .forEach { match -> candidates += lexicalCandidate(match, matches) }
         val insideProjectTerm = matches.isInsideProjectTerm(offset)
+        val tS0 = System.currentTimeMillis()
         val structuredMatch = if (!insideProjectTerm &&
             mayStartStructured(text, offset) &&
             matches.projectTermsAt(offset).isEmpty()
@@ -768,11 +850,14 @@ class QuickTranslationRepository(
         } else {
             null
         }
+        timer?.let { it.structured += (System.currentTimeMillis() - tS0) }
         if (!insideProjectTerm && matches.projectTermsAt(offset).isEmpty()) {
+            val tQ0 = System.currentTimeMillis()
             pack.qt2025Runtime?.matchAt(
                 text = text,
                 offset = offset,
                 resolveName = matches::qt2025NameTarget,
+                hasNameAtOffset = matches.hasQt2025Name(offset),
                 containsExact = pack.baseTrie::containsExact,
             )?.let { runtime ->
                 val coveredByStructured = structuredMatch?.endExclusive
@@ -795,6 +880,7 @@ class QuickTranslationRepository(
                     )
                 }
             }
+            timer?.let { it.qt2025 += (System.currentTimeMillis() - tQ0) }
         }
         if (!insideProjectTerm && matches.projectTermsAt(offset).isEmpty()) {
             structuredMatch?.let { structured ->
@@ -809,6 +895,7 @@ class QuickTranslationRepository(
             }
         }
         if (!insideProjectTerm) {
+            val tG0 = System.currentTimeMillis()
             bestGrammarMatch(
                 text = text,
                 offset = offset,
@@ -832,25 +919,33 @@ class QuickTranslationRepository(
                     )
                 }
             }
+            timer?.let { it.grammar += (System.currentTimeMillis() - tG0) }
         }
-        bestTemplateMatch(
-            text = text,
-            offset = offset,
-            indexedTemplates = projectRuntime.indexedTemplatesAt(text, offset) +
-                pack.indexedTemplatesAt(text, offset),
-            leadingSlotTemplates = if (!insideProjectTerm && matches.termsAt(offset).isNotEmpty()) {
-                leadingSlotTemplatesAt(
-                    text = text,
-                    offset = offset,
-                    matches = matches,
-                    projectIndex = projectRuntime.leadingSlotTemplateIndex,
-                    packIndex = pack.leadingSlotTemplateIndex,
-                )
-            } else {
-                emptyList()
-            },
-            matches = matches,
-        )?.let { template ->
+        val tT0 = System.currentTimeMillis()
+        val termsAtOffset = matches.termsAt(offset)
+        val hasLeadingSlotTemplates = !insideProjectTerm && termsAtOffset.isNotEmpty() &&
+            (projectRuntime.leadingSlotTemplateIndex.isNotEmpty() || pack.leadingSlotTemplateIndex.isNotEmpty())
+        val indexedProject = projectRuntime.indexedTemplatesAt(text, offset)
+        val indexedPack = pack.indexedTemplatesAt(text, offset)
+        val leadingTemplates = if (hasLeadingSlotTemplates) {
+            leadingSlotTemplatesAt(
+                text = text,
+                offset = offset,
+                matches = matches,
+                projectIndex = projectRuntime.leadingSlotTemplateIndex,
+                packIndex = pack.leadingSlotTemplateIndex,
+            )
+        } else {
+            emptyList()
+        }
+        if (indexedProject.isNotEmpty() || indexedPack.isNotEmpty() || leadingTemplates.isNotEmpty()) {
+            bestTemplateMatch(
+                text = text,
+                offset = offset,
+                indexedTemplates = if (indexedProject.isEmpty()) indexedPack else indexedProject + indexedPack,
+                leadingSlotTemplates = leadingTemplates,
+                matches = matches,
+            )?.let { template ->
             val coveredByBaseLexicalTerm = matches.termsAt(offset).any { lexical ->
                 !lexical.term.projectOwned &&
                     lexical.term.sourceQuality != TermSourceQuality.LEGACY &&
@@ -876,6 +971,8 @@ class QuickTranslationRepository(
                 )
             }
         }
+    }
+    timer?.let { it.template += (System.currentTimeMillis() - tT0) }
         jiebaFallbackCandidatesAt(
             text = text,
             offset = offset,
@@ -1253,11 +1350,20 @@ class QuickTranslationRepository(
      * remainder one code point at a time so Phonetic keeps its fallback-only semantics and never
      * competes with Name/VietPhrase phrase matching.
      */
+    private fun hasAnyCjk(text: String): Boolean {
+        for (i in text.indices) {
+            val code = text[i].code
+            if (code in 0x3400..0x4DBF || code in 0x4E00..0x9FFF) return true
+        }
+        return false
+    }
+
     private fun replaceRemainingCjkWithPhonetics(
         text: String,
         customPhonetics: Map<String, String>,
         bundledPhonetics: Map<String, String>,
     ): String {
+        if (!hasAnyCjk(text)) return text
         val output = StringBuilder(text.length * 2)
         var offset = 0
         while (offset < text.length) {
@@ -1281,6 +1387,7 @@ class QuickTranslationRepository(
         leadingSlotTemplates: List<SourceTemplate>,
         matches: RuntimeMatchIndex,
     ): TemplateMatch? {
+        if (indexedTemplates.isEmpty() && leadingSlotTemplates.isEmpty()) return null
         var best: TemplateMatch? = null
         fun consider(template: SourceTemplate) {
             val candidate = matchTemplate(
@@ -1309,34 +1416,54 @@ class QuickTranslationRepository(
         projectIndex: LeadingSlotTemplateIndex,
         packIndex: LeadingSlotTemplateIndex,
     ): List<SourceTemplate> {
-        val nextCharacters = LinkedHashSet<Char>()
-        matches.termsAt(offset)
-            .asSequence()
-            .take(MAX_SLOT_CANDIDATES)
-            .map(TermMatch::endExclusive)
-            .forEach { end -> text.getOrNull(end)?.let(nextCharacters::add) }
-        grammarPhraseCandidateAt(
+        if (projectIndex.isEmpty() && packIndex.isEmpty()) return emptyList()
+        val terms = matches.termsAt(offset)
+        if (terms.isEmpty()) return emptyList()
+        val termEnds = ArrayList<Int>(minOf(terms.size, MAX_SLOT_CANDIDATES) + 1)
+        for (i in 0 until minOf(terms.size, MAX_SLOT_CANDIDATES)) {
+            val end = terms[i].endExclusive
+            if (!termEnds.contains(end)) termEnds.add(end)
+        }
+        val grammarPhraseEnd = grammarPhraseCandidateAt(
             text = text,
             start = offset,
             acceptedPos = emptySet(),
             matches = matches,
-        )?.endExclusive?.let { end -> text.getOrNull(end)?.let(nextCharacters::add) }
+        )?.endExclusive
+        if (grammarPhraseEnd != null && !termEnds.contains(grammarPhraseEnd)) {
+            termEnds.add(grammarPhraseEnd)
+        }
 
-        val candidates = ArrayList<SourceTemplate>(
-            projectIndex.unindexed.size + packIndex.unindexed.size + nextCharacters.size * 4
-        )
-        fun addFrom(index: LeadingSlotTemplateIndex) {
-            candidates += index.unindexed
-            nextCharacters.forEach { character ->
-                index.byNextLiteralChar[character]?.let(candidates::addAll)
-                val lower = character.lowercaseChar()
-                if (lower != character) {
-                    index.byNextLiteralChar[lower]?.let(candidates::addAll)
+        val candidates = ArrayList<SourceTemplate>()
+        fun addMatching(index: LeadingSlotTemplateIndex) {
+            candidates.addAll(index.unindexed)
+            for (end in termEnds) {
+                val ch = text.getOrNull(end) ?: continue
+                val templates = index.byNextLiteralChar[ch]
+                if (templates != null) {
+                    for (template in templates) {
+                        val literal = template.nextLiteralAfterFirstSlot
+                        if (literal == null || text.startsWith(literal, end)) {
+                            candidates.add(template)
+                        }
+                    }
+                }
+                val lower = ch.lowercaseChar()
+                if (lower != ch) {
+                    val lowerTemplates = index.byNextLiteralChar[lower]
+                    if (lowerTemplates != null) {
+                        for (template in lowerTemplates) {
+                            val literal = template.nextLiteralAfterFirstSlot
+                            if (literal == null || text.startsWith(literal, end)) {
+                                candidates.add(template)
+                            }
+                        }
+                    }
                 }
             }
         }
-        addFrom(projectIndex)
-        addFrom(packIndex)
+        addMatching(projectIndex)
+        addMatching(packIndex)
         return candidates
     }
 
@@ -1406,10 +1533,10 @@ class QuickTranslationRepository(
     ): List<TermMatch> {
         if (cursor !in text.indices) return emptyList()
         return matches.cachedSlotMatches(cursor, part.acceptedPos) {
-            val result = LinkedHashMap<String, TermMatch>()
+            val result = LinkedHashMap<RuntimeMatchIndex.TermSlotDedupKey, TermMatch>()
             fun add(match: TermMatch) {
                 if (match.term.target.isBlank() || !part.accepts(posOf(match, matches))) return
-                val key = "${normalize(match.term.source)}\u0000${match.endExclusive}"
+                val key = RuntimeMatchIndex.TermSlotDedupKey(normalize(match.term.source), match.endExclusive)
                 val current = result[key]
                 if (current == null || isBetterTermMatch(match, current)) {
                     result[key] = match
@@ -1499,24 +1626,45 @@ class QuickTranslationRepository(
     }
 
     private fun bestStructuredMatch(text: String, offset: Int): StructuredMatch? {
-        return listOfNotNull(
-            matchChapterHeading(text, offset),
-            matchOrdinalNoun(text, offset),
-            matchOrdinalPlace(text, offset),
-            matchWeekdayFullDate(text, offset),
-            matchFullDate(text, offset),
-            matchYearMonth(text, offset),
-            matchMonthDay(text, offset),
-            matchWeekday(text, offset),
-            matchDigitalTime(text, offset),
-            matchChineseTime(text, offset),
-            matchPercent(text, offset),
-            matchNumberUnit(text, offset),
-            matchDecimalNumber(text, offset),
-        ).maxWithOrNull(
-            compareBy<StructuredMatch> { it.priority }
-                .thenBy { it.endExclusive }
-        )
+        val firstChar = text.getOrNull(offset) ?: return null
+        var best: StructuredMatch? = null
+        fun consider(candidate: StructuredMatch?) {
+            if (candidate == null) return
+            val cur = best
+            if (cur == null || candidate.priority > cur.priority ||
+                (candidate.priority == cur.priority && candidate.endExclusive > cur.endExclusive)
+            ) {
+                best = candidate
+            }
+        }
+        if (firstChar == '第') {
+            consider(matchChapterHeading(text, offset))
+            consider(matchOrdinalNoun(text, offset))
+            consider(matchOrdinalPlace(text, offset))
+        } else if (firstChar in CHAPTER_HEADING_NON_DI_FIRST_CHARS) {
+            consider(matchChapterHeading(text, offset))
+        }
+
+        if (firstChar in WEEKDAY_FIRST_CHARS) {
+            consider(matchWeekdayFullDate(text, offset))
+            consider(matchWeekday(text, offset))
+        }
+
+        if (firstChar in TIME_PREFIX_FIRST_CHARS) {
+            consider(matchChineseTime(text, offset))
+        }
+
+        if (firstChar in NUMBER_FIRST_CHARS) {
+            consider(matchFullDate(text, offset))
+            consider(matchYearMonth(text, offset))
+            consider(matchMonthDay(text, offset))
+            consider(matchDigitalTime(text, offset))
+            consider(matchChineseTime(text, offset))
+            consider(matchPercent(text, offset))
+            consider(matchNumberUnit(text, offset))
+            consider(matchDecimalNumber(text, offset))
+        }
+        return best
     }
 
     private fun bestGrammarMatch(
@@ -1524,18 +1672,31 @@ class QuickTranslationRepository(
         offset: Int,
         matches: RuntimeMatchIndex,
     ): StructuredMatch? {
-        return listOfNotNull(
-            matchPlaceHierarchy(text, offset, matches),
-            matchLeadingHeadPhrase(text, offset, matches),
-            matchPossessiveOrdinalNoun(text, offset, matches),
-            matchDynamicAttributiveDe(text, offset, matches),
-            matchPluralSuffix(text, offset, matches),
-            matchModifierHeadPhrase(offset, matches),
-            matchInterrogativePattern(text, offset, matches),
-        ).maxWithOrNull(
-            compareBy<StructuredMatch> { it.priority }
-                .thenBy { it.endExclusive }
-        )
+        var best: StructuredMatch? = null
+        fun consider(candidate: StructuredMatch?) {
+            if (candidate == null) return
+            val cur = best
+            if (cur == null || candidate.priority > cur.priority ||
+                (candidate.priority == cur.priority && candidate.endExclusive > cur.endExclusive)
+            ) {
+                best = candidate
+            }
+        }
+        val firstChar = text.getOrNull(offset) ?: return null
+        if (matches.termsAt(offset).isNotEmpty()) {
+            consider(matchPlaceHierarchy(text, offset, matches))
+            consider(matchDynamicAttributiveDe(text, offset, matches))
+            consider(matchPluralSuffix(text, offset, matches))
+            consider(matchModifierHeadPhrase(offset, matches))
+            consider(matchPossessiveOrdinalNoun(text, offset, matches))
+        }
+        if (firstChar == '为') {
+            consider(matchLeadingHeadPhrase(text, offset, matches))
+        }
+        if (firstChar in INTERROGATIVE_FIRST_CHARS) {
+            consider(matchInterrogativePattern(text, offset, matches))
+        }
+        return best
     }
 
     private fun matchPlaceHierarchy(
@@ -1586,7 +1747,9 @@ class QuickTranslationRepository(
             .filter { it.term.target.isNotBlank() }
             .take(MAX_SLOT_CANDIDATES)
         ) {
-            for ((suffix, label) in PLACE_HIERARCHY_SUFFIX_LABELS) {
+            val nextChar = text.getOrNull(name.endExclusive) ?: continue
+            val suffixes = PLACE_HIERARCHY_SUFFIXES_BY_FIRST_CHAR[nextChar] ?: continue
+            for ((suffix, label) in suffixes) {
                 if (!text.startsWith(suffix, name.endExclusive)) continue
                 val rendered = renderPlaceHierarchySegment(name.term.target, label)
                 val candidate = PlaceHierarchySegment(
@@ -1802,6 +1965,8 @@ class QuickTranslationRepository(
         offset: Int,
         matches: RuntimeMatchIndex,
     ): StructuredMatch? {
+        val nextDe = text.indexOf(ATTRIBUTIVE_DE_LITERAL, offset + 1)
+        if (nextDe == -1 || nextDe > offset + 16) return null
         var best: StructuredMatch? = null
         matches.termsAt(offset)
             .asSequence()
@@ -1842,6 +2007,8 @@ class QuickTranslationRepository(
         offset: Int,
         matches: RuntimeMatchIndex,
     ): StructuredMatch? {
+        val nextMen = text.indexOf(PLURAL_SUFFIX, offset + 1)
+        if (nextMen == -1 || nextMen > offset + 16) return null
         if (matches.termsAt(offset).any { it.term.source.endsWith(PLURAL_SUFFIX) }) return null
         var best: StructuredMatch? = null
         matches.termsAt(offset)
@@ -1885,9 +2052,12 @@ class QuickTranslationRepository(
         offset: Int,
         matches: RuntimeMatchIndex,
     ): StructuredMatch? {
+        val terms = matches.termsAt(offset)
+        if (terms.none { it.term.target.isNotBlank() && (renderPersonModifier(it) != null || posOf(it, matches) == TermPos.ADJECTIVE) }) {
+            return null
+        }
         var best: StructuredMatch? = null
-        matches.termsAt(offset)
-            .asSequence()
+        terms.asSequence()
             .filter { it.term.target.isNotBlank() }
             .mapNotNull { modifier ->
                 renderHeadModifier(modifier, matches)?.let { renderedModifier ->
@@ -2190,6 +2360,8 @@ class QuickTranslationRepository(
         offset: Int,
         matches: RuntimeMatchIndex,
     ): StructuredMatch? {
+        val nextDe = text.indexOf(ATTRIBUTIVE_DE_LITERAL, offset + 1)
+        if (nextDe == -1 || nextDe > offset + 16) return null
         return matches.termsAt(offset)
             .asSequence()
             .filter(::isPossessiveOwner)
@@ -2952,6 +3124,7 @@ class QuickTranslationRepository(
 
     private fun String.hasDirectAddress(vararg terms: String): Boolean =
         terms.any { term ->
+            if (!contains(term)) return@any false
             val escaped = Regex.escape(term)
             Regex("(^|[\\s\"'“”‘’（(])$escaped(?=\\s*(?:[啊呀吶呐呢哟喲])?\\s*[，,、。！？!?])")
                 .containsMatchIn(this)
@@ -2981,27 +3154,38 @@ class QuickTranslationRepository(
     private fun String.indexOfFemalePronoun(): Int =
         indexOf('她')
 
+    private val vocativeRegexCache = ConcurrentHashMap<String, Regex>()
+    private fun getVocativeRegex(label: String): Regex =
+        vocativeRegexCache.computeIfAbsent(label) {
+            Regex("(^|[\\n.!?]\\s*)${Regex.escape(it)}\\s*[,，]", setOf(RegexOption.IGNORE_CASE))
+        }
+
     private fun replaceVocative(text: String, labels: List<String>, vocative: String): String {
         var output = text
         labels.forEach { label ->
-            output = Regex(
-                "(^|[\\n.!?]\\s*)${Regex.escape(label)}\\s*[,，]",
-                setOf(RegexOption.IGNORE_CASE),
-            ).replace(output) { match ->
-                "${match.groupValues[1]}$vocative"
+            if (output.contains(label, ignoreCase = true)) {
+                output = getVocativeRegex(label).replace(output) { match ->
+                    "${match.groupValues[1]}$vocative"
+                }
             }
         }
         return output
     }
 
+    private val detachedRegexCache = ConcurrentHashMap<String, Regex>()
+    private fun getDetachedRegex(phrase: String): Regex =
+        detachedRegexCache.computeIfAbsent(phrase) {
+            Regex("(?<![\\p{L}\\p{N}])${Regex.escape(it)}(?![\\p{L}\\p{N}])", setOf(RegexOption.IGNORE_CASE))
+        }
+
     private fun replaceDetachedPhrase(
         text: String,
         phrase: String,
         replacement: String,
-    ): String = Regex(
-        "(?<![\\p{L}\\p{N}])${Regex.escape(phrase)}(?![\\p{L}\\p{N}])",
-        setOf(RegexOption.IGNORE_CASE),
-    ).replace(text, replacement)
+    ): String {
+        if (!text.contains(phrase, ignoreCase = true)) return text
+        return getDetachedRegex(phrase).replace(text, replacement)
+    }
 
     private fun compilePostRule(
         pattern: String,
@@ -3017,11 +3201,33 @@ class QuickTranslationRepository(
     }.getOrNull()
 
     private fun postRuleLiteralTrigger(pattern: String): String? {
-        val candidate = pattern.removePrefix("\\b").removeSuffix("\\b").trim()
-        if (candidate.length < 3 || candidate.any { it in POST_RULE_META_CHARS } || '\\' in candidate) {
-            return null
+        val trimmed = pattern.trim()
+        for (c in CHINESE_PUNCTUATION_CHARS) {
+            if (trimmed.contains(c)) return c.toString()
         }
-        return candidate
+        val duplicateMatch = DUPLICATE_SPACE_PATTERN.matchEntire(trimmed)
+        if (duplicateMatch != null) {
+            return duplicateMatch.groupValues[1].removePrefix("\\b").removeSuffix("\\b").trim()
+        }
+        val candidate = trimmed.removePrefix("\\b").removeSuffix("\\b").trim()
+        if (candidate.length >= 3 && !candidate.any { it in POST_RULE_META_CHARS } && '\\' !in candidate) {
+            return candidate
+        }
+        if (trimmed.contains("thế giới", ignoreCase = true)) {
+            return "thế giới"
+        }
+        if (trimmed.contains("của", ignoreCase = true) && !trimmed.contains("|của", ignoreCase = true) && !trimmed.contains("của|", ignoreCase = true)) {
+            return "của"
+        }
+        for (kw in KNOWN_TRIGGER_WORDS) {
+            if (trimmed.contains(kw, ignoreCase = true)) {
+                return kw
+            }
+        }
+        if (trimmed.contains("?")) return "?"
+        if (trimmed.contains("!")) return "!"
+        if (trimmed.startsWith(",(?=")) return ","
+        return null
     }
 
     private fun String.withUnicodeWordBoundaries(): String {
@@ -3578,7 +3784,10 @@ class QuickTranslationRepository(
     private data class LeadingSlotTemplateIndex(
         val byNextLiteralChar: Map<Char, List<SourceTemplate>> = emptyMap(),
         val unindexed: List<SourceTemplate> = emptyList(),
-    )
+    ) {
+        fun isEmpty(): Boolean = byNextLiteralChar.isEmpty() && unindexed.isEmpty()
+        fun isNotEmpty(): Boolean = !isEmpty()
+    }
     private data class TermMatch(
         val term: Term,
         val start: Int,
@@ -3699,6 +3908,20 @@ class QuickTranslationRepository(
         val priority: Int,
         val category: String = "",
         val contiguousScore: Boolean = false,
+        val nextLiteralAfterFirstSlot: String? = run {
+            val firstSlot = parts.indexOfFirst { it is TemplatePart.Slot }
+            if (firstSlot < 0) null
+            else {
+                for (i in (firstSlot + 1) until parts.size) {
+                    val p = parts[i]
+                    if (p is TemplatePart.Slot) break
+                    if (p is TemplatePart.Literal && p.value.isNotEmpty()) {
+                        return@run p.value
+                    }
+                }
+                null
+            }
+        },
     )
     private sealed interface TemplatePart {
         data class Literal(val value: String) : TemplatePart
@@ -3847,6 +4070,12 @@ class QuickTranslationRepository(
                     match.term.type in QT2025_NAME_SLOT_TYPES
             }?.term?.target
 
+        fun hasQt2025Name(start: Int): Boolean =
+            termsAt(start).any { match ->
+                match.term.target.isNotBlank() &&
+                    match.term.type in QT2025_NAME_SLOT_TYPES
+            }
+
         fun cachedPos(match: TermMatch): TermPos? = termPosCache[match]
 
         fun cachePos(match: TermMatch, pos: TermPos) {
@@ -3956,6 +4185,11 @@ class QuickTranslationRepository(
         private data class SlotMatchCacheKey(
             val cursor: Int,
             val acceptedPos: Set<TermPos>,
+        )
+
+        internal data class TermSlotDedupKey(
+            val source: String,
+            val endExclusive: Int,
         )
     }
     private data class JiebaToken(
@@ -4188,6 +4422,7 @@ class QuickTranslationRepository(
         private val bucketCount: Int,
         private val maxSourceChars: Int,
         private val firstSourceChars: BooleanArray,
+        private val lengthsMaskByFirstChar: LongArray,
     ) : TermLookup {
 
         private val hashScratch = ThreadLocal.withInitial { IntArray(maxSourceChars) }
@@ -4209,17 +4444,22 @@ class QuickTranslationRepository(
         override fun allAt(text: String, offset: Int): List<TermMatch> {
             val available = (text.length - offset).coerceAtMost(maxSourceChars)
             if (available <= 0) return emptyList()
-            if (!firstSourceChars[text[offset].lowercaseChar().code]) return emptyList()
+            val firstCode = text[offset].lowercaseChar().code
+            if (!firstSourceChars[firstCode]) return emptyList()
+            val lengthMask = lengthsMaskByFirstChar[firstCode]
+            if (lengthMask == 0L) return emptyList()
             val hashes = checkNotNull(hashScratch.get())
             var hash = FNV_OFFSET_BASIS
             for (length in 1..available) {
                 hash = (hash xor text[offset + length - 1].lowercaseChar().code) * FNV_PRIME
                 hashes[length - 1] = hash
             }
-            val matches = mutableListOf<TermMatch>()
+            var matches: MutableList<TermMatch>? = null
             for (length in available downTo 1) {
+                if (length < 63 && (lengthMask and (1L shl length)) == 0L) continue
                 val entryOffset = findEntry(text, offset, length, hashes[length - 1])
                 if (entryOffset >= 0) {
+                    if (matches == null) matches = mutableListOf()
                     matches += TermMatch(
                         term = Term(
                             source = text.substring(offset, offset + length),
@@ -4233,7 +4473,7 @@ class QuickTranslationRepository(
                     )
                 }
             }
-            return matches
+            return matches ?: emptyList()
         }
 
         private fun findEntry(
@@ -4287,9 +4527,7 @@ class QuickTranslationRepository(
                 "Invalid QT2020 target length: $targetLength"
             }
             val bytes = ByteArray(targetLength)
-            repeat(targetLength) { index ->
-                bytes[index] = buffer.get(targetOffset + index)
-            }
+            (buffer.duplicate().position(targetOffset) as ByteBuffer).get(bytes, 0, targetLength)
             return cleanQuickDictionaryTarget(bytes.toString(Charsets.UTF_8)).also { target ->
                 synchronized(targetCache) {
                     targetCache[entryOffset] = target
@@ -4324,7 +4562,7 @@ class QuickTranslationRepository(
             private const val FORMAT_VERSION = 1
             private const val FNV_OFFSET_BASIS = -2128831035
             private const val FNV_PRIME = 16777619
-            private const val TARGET_CACHE_SIZE = 4_096
+            private const val TARGET_CACHE_SIZE = 16_384
             private const val MAX_TARGET_BYTES = 1 shl 20
             private const val MAPPED_TYPE_NAME = 1
             private const val MAPPED_TYPE_PRONOUN = 2
@@ -4342,17 +4580,25 @@ class QuickTranslationRepository(
                         }
                     }.order(ByteOrder.LITTLE_ENDIAN)
                     validate(mapped)
+                    val charIndex = scanSourceCharIndex(mapped)
                     MappedTermLookup(
                         buffer = mapped,
                         bucketCount = mapped.getInt(BUCKET_COUNT_OFFSET),
                         maxSourceChars = mapped.getInt(MAX_SOURCE_CHARS_OFFSET),
-                        firstSourceChars = firstSourceChars(mapped),
+                        firstSourceChars = charIndex.firstSourceChars,
+                        lengthsMaskByFirstChar = charIndex.lengthsMask,
                     )
                 }.getOrNull()
             }
 
-            private fun firstSourceChars(buffer: ByteBuffer): BooleanArray {
+            private class SourceCharIndex(
+                val firstSourceChars: BooleanArray,
+                val lengthsMask: LongArray,
+            )
+
+            private fun scanSourceCharIndex(buffer: ByteBuffer): SourceCharIndex {
                 val chars = BooleanArray(Char.MAX_VALUE.code + 1)
+                val lengthsMask = LongArray(Char.MAX_VALUE.code + 1)
                 val bucketCount = buffer.getInt(BUCKET_COUNT_OFFSET)
                 repeat(bucketCount) { bucket ->
                     val entryOffset = buffer.getInt(HEADER_SIZE + bucket * Int.SIZE_BYTES)
@@ -4360,11 +4606,17 @@ class QuickTranslationRepository(
                         val sourceLength = buffer.getShort(entryOffset + Int.SIZE_BYTES).toInt() and 0xffff
                         if (sourceLength > 0) {
                             val sourceOffset = entryOffset + ENTRY_HEADER_SIZE
-                            chars[buffer.getChar(sourceOffset).lowercaseChar().code] = true
+                            val charCode = buffer.getChar(sourceOffset).lowercaseChar().code
+                            chars[charCode] = true
+                            if (sourceLength < 63) {
+                                lengthsMask[charCode] = lengthsMask[charCode] or (1L shl sourceLength)
+                            } else {
+                                lengthsMask[charCode] = lengthsMask[charCode] or (1L shl 62)
+                            }
                         }
                     }
                 }
-                return chars
+                return SourceCharIndex(chars, lengthsMask)
             }
 
             private fun validate(buffer: ByteBuffer) {
@@ -4416,6 +4668,15 @@ class QuickTranslationRepository(
         private const val MAX_SLOT_CANDIDATES = 8
         private const val PROJECT_TRIE_CACHE_SIZE = 8
         private const val POST_RULE_META_CHARS = "[]()|+*?{}^$."
+        private val CHINESE_PUNCTUATION_CHARS = charArrayOf('。', '，', '、', '：', '；', '！', '？')
+        private val DUPLICATE_SPACE_PATTERN = Regex("""^\\b([^\\]+?)\\s\+\1\\b$""")
+        private val KNOWN_TRIGGER_WORDS = listOf(
+            "thụ mệt mỏi", "không lớn", "Bạn sống", "Có chuyện", "bạn đang", "Phật Đà",
+            "giờ trái phải", "tương lai", "Viễn Tử", "Hổ Tử", "Thạch Đầu", "năm",
+            "anh ấy", "cô ấy", "chúng tôi", "có thể", "dần dần", "không ngừng",
+            "Đại Thiền", "Thiếu Lâm", "Bạch Mã", "Lan Nhược", "Huyền Thiên", "Kim Các", "Bảo Tích", "Trấn Hải",
+            "trong tự", "tự trong", "trong", "các", "những", "được", "Chương", "Quyển", "Tiết", "tại", "ở"
+        )
         private val CORRECTION_SOURCE_QUALITIES = setOf(
             TermSourceQuality.LATEST_CORRECTION,
             TermSourceQuality.CORRECTION,
@@ -4659,6 +4920,7 @@ class QuickTranslationRepository(
             Triple("能不能", 3, "có thể"),
             Triple("可不可以", 4, "có thể"),
         )
+        private val INTERROGATIVE_FIRST_CHARS = setOf('有', '会', '是', '能', '可')
         private const val MAX_PLACE_HIERARCHY_SEGMENTS = 8
         private const val MIN_SINGLE_PLACE_HIERARCHY_CHARS = 3
         private val PLACE_COUNTRY_SOURCES = setOf(
@@ -4688,6 +4950,8 @@ class QuickTranslationRepository(
             "\u8DEF" to "\u0111\u01B0\u1EDDng",
             "\u5DF7" to "ng\u00F5",
         )
+        private val PLACE_HIERARCHY_SUFFIXES_BY_FIRST_CHAR: Map<Char, List<Pair<String, String>>> =
+            PLACE_HIERARCHY_SUFFIX_LABELS.groupBy { it.first[0] }
         private val NOUN_COMPATIBLE_POS = setOf(
             TermPos.NOUN,
             TermPos.PERSON,
@@ -5265,6 +5529,22 @@ class QuickTranslationRepository(
             "日" to "chủ nhật",
             "天" to "chủ nhật",
         )
+        private val NUMBER_FIRST_CHARS: Set<Char> = setOf(
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+            '０', '１', '２', '３', '４', '５', '６', '７', '８', '９',
+            '零', '〇', '一', '壹', '二', '贰', '貳', '两', '兩', '三', '叁', '參',
+            '四', '肆', '五', '伍', '六', '陆', '陸', '七', '柒', '八', '捌',
+            '九', '玖', '十', '拾', '百', '佰', '千', '仟', '万', '萬', '亿', '億', '兆',
+            '点', '點', '.', '．',
+        )
+        private val TIME_PREFIX_FIRST_CHARS: Set<Char> = setOf(
+            '早', '上', '中', '下', '傍', '晚', '深', '凌', '半',
+        )
+        private val WEEKDAY_FIRST_CHARS: Set<Char> = setOf('星', '周', '週', '礼', '禮')
+        private val CHAPTER_HEADING_NON_DI_FIRST_CHARS: Set<Char> = buildSet {
+            CHAPTER_LABELS.keys.forEach { if (it.isNotEmpty()) add(it[0]) }
+            SPECIAL_CHAPTER_HEADINGS.keys.forEach { if (it.isNotEmpty()) add(it[0]) }
+        }
         private val DIGITAL_TIME_PATTERN = Regex("(\\d{1,2})\\s*[:：]\\s*(\\d{1,2})(?:\\s*[:：]\\s*(\\d{1,2}))?")
         private val TIME_PREFIX_TRANSLATIONS = mapOf(
             "" to "",
@@ -5582,12 +5862,22 @@ internal object QuickTranslationTextPostProcessor {
             previous in inlineTerminators
     }
 
+    private val ROGUE_BOOLEAN_REGEX = Regex("(?<=\\s|^)(?:true|false)(?=\\s|$|[.,!?;:\"'”’])", RegexOption.IGNORE_CASE)
+    private val MULTI_SPACE_REGEX = Regex(" {2,}")
+    private val COMMA_DIGIT_REGEX = Regex("(?<=\\d)[ \\t]*([,])[ \\t]*(?=\\d)")
+    private val SPACE_DIGIT_REGEX = Regex("(?<=\\d)[ \\t]+(?=\\d)")
+    private val HEADING_KEYWORDS = arrayOf(
+        "Chương", "chương", "Quyển", "quyển", "Tiết", "tiết", "Phần", "phần",
+        "Thiên", "thiên", "Tập", "tập", "Hồi", "hồi", "Màn", "màn", "Mùa", "mùa",
+        "Chính văn", "chính văn", "Ngoại truyện", "ngoại truyện"
+    )
+
     internal fun cleanRogueBooleanLiterals(text: String): String {
         if (text.isEmpty() || (!text.contains("true", ignoreCase = true) && !text.contains("false", ignoreCase = true))) {
             return text
         }
-        return text.replace(Regex("(?<=\\s|^)(?:true|false)(?=\\s|$|[.,!?;:\"'”’])", RegexOption.IGNORE_CASE), "")
-            .replace(Regex(" {2,}"), " ")
+        return text.replace(ROGUE_BOOLEAN_REGEX, "")
+            .replace(MULTI_SPACE_REGEX, " ")
             .trim()
     }
 
@@ -5595,9 +5885,9 @@ internal object QuickTranslationTextPostProcessor {
         return cleanRogueBooleanLiterals(
             collapseDecimalPointSpacing(
                 dedupeRepeatedHeadings(value)
-                    .replace(Regex("(?<=\\d)[ \\t]*([,])[ \\t]*(?=\\d)"), "$1")
+                    .replace(COMMA_DIGIT_REGEX, "$1")
             )
-                .replace(Regex("(?<=\\d)[ \\t]+(?=\\d)"), "")
+                .replace(SPACE_DIGIT_REGEX, "")
         )
     }
 
@@ -5636,6 +5926,15 @@ internal object QuickTranslationTextPostProcessor {
     }
 
     private fun dedupeRepeatedHeadings(value: String): String {
+        var hasHeadingKeyword = false
+        for (kw in HEADING_KEYWORDS) {
+            if (value.contains(kw)) {
+                hasHeadingKeyword = true
+                break
+            }
+        }
+        if (!hasHeadingKeyword) return value
+
         var output = value
         repeatedHeadingLabelPatterns.forEach { pattern ->
             output = pattern.replace(output) { match ->

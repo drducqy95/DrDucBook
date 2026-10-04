@@ -424,34 +424,42 @@ class TranslateChapterUseCase(
                 context = originalContent,
             )
 
-            // Story memory is a cache dependency, not merely optional prompt context. Load it
+            val isAiTranslation = provider == TranslationConstants.PROVIDER_APP_AI ||
+                provider == TranslationConstants.PROVIDER_REWRITE
+            // Story memory is a cache dependency for AI providers, not merely optional prompt context. Load it
             // before any cache lookup so a user-edited target immediately invalidates related
             // chapter/chunk translations.
             val bookDictionary = dictionaryGateway.getBookDictionaries(book)
             val storyContext = try {
-                translationStoryMemoryUseCase?.prepareForTranslation(
-                    book = book,
-                    currentChapter = bookChapter,
-                    currentContent = originalContent,
-                    preset = preset,
-                    baseDictionary = bookDictionary.pairs,
-                ) ?: AiTranslationStoryContext()
+                if (isAiTranslation) {
+                    translationStoryMemoryUseCase?.prepareForTranslation(
+                        book = book,
+                        currentChapter = bookChapter,
+                        currentContent = originalContent,
+                        preset = preset,
+                        baseDictionary = bookDictionary.pairs,
+                    ) ?: AiTranslationStoryContext()
+                } else {
+                    AiTranslationStoryContext()
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Throwable) {
                 AiTranslationStoryContext()
             }
-            var storyMemoryRevision = GSON.toJson(storyContext)
-            onProgress(
-                TranslationProgress(
-                    0,
-                    1,
-                    stage = "STORY_CONTEXT_LOADED entities=${storyContext.currentEntities.size} " +
-                        "relationships=${storyContext.currentRelationships.size} " +
-                        "world=${storyContext.currentWorldBuilding.size} " +
-                        "timelines=${storyContext.recentTimelines.size}",
+            var storyMemoryRevision = if (isAiTranslation) GSON.toJson(storyContext) else ""
+            if (isAiTranslation) {
+                onProgress(
+                    TranslationProgress(
+                        0,
+                        1,
+                        stage = "STORY_CONTEXT_LOADED entities=${storyContext.currentEntities.size} " +
+                            "relationships=${storyContext.currentRelationships.size} " +
+                            "world=${storyContext.currentWorldBuilding.size} " +
+                            "timelines=${storyContext.recentTimelines.size}",
+                    )
                 )
-            )
+            }
 
             val rawContentHash = translationCacheGateway.computeContentHash(originalContent)
             val dictionaryContentHash = dictionaryAwareContentHash(
@@ -465,7 +473,7 @@ class TranslateChapterUseCase(
                 providerConfigurationRevision = providerConfigRevision,
                 computeHash = translationCacheGateway::computeContentHash,
             ).let { baseHash ->
-                if (storyMemoryRevision.isBlank()) baseHash
+                if (!isAiTranslation || storyMemoryRevision.isBlank()) baseHash
                 else "$baseHash|story-memory:${translationCacheGateway.computeContentHash(storyMemoryRevision)}"
             }
 
@@ -492,8 +500,6 @@ class TranslateChapterUseCase(
                 return@withContext Result.success(displayTranslation)
             }
 
-            val isAiTranslation = provider == TranslationConstants.PROVIDER_APP_AI ||
-                provider == TranslationConstants.PROVIDER_REWRITE
             if (retrofitWithExistingDraft && isAiTranslation) {
                 val existingRevision = translationCacheGateway.getCurrentRevision(
                     book = book,

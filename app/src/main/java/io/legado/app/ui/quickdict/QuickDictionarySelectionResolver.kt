@@ -518,7 +518,7 @@ private fun findTranslatedRange(
     if (targetReading.isBlank()) return null
     val targetWordCount = targetReading.split(' ').count(String::isNotBlank).coerceAtLeast(1)
     val minChars = (targetWordCount / 2).coerceAtLeast(1)
-    val maxChars = (targetWordCount * 2 + 2).coerceIn(2, MAX_TRANSLATED_CANDIDATE_CHARS)
+    val maxChars = (targetWordCount + 2).coerceIn(minChars, 6)
     val windowStart = searchWindow.start.coerceAtLeast(0)
     val windowEnd = searchWindow.endInclusive.coerceAtMost(sourceText.lastIndex)
     if (windowEnd < windowStart) return null
@@ -527,6 +527,7 @@ private fun findTranslatedRange(
     val starts = (windowStart..windowEnd)
         .filter { sourceText[it].isPhraseChar() }
         .sortedBy { abs(it - searchWindow.approximatePosition) }
+        .take(40)
 
     var best: ScoredRange? = null
     val readingCache = HashMap<String, List<String>>()

@@ -95,6 +95,7 @@ import io.legado.app.data.repository.SupabaseAccountAuthRepository
 import io.legado.app.data.repository.SupabaseAccountAccessRepository
 import io.legado.app.data.repository.AnonymousAccountQuotaRepository
 import io.legado.app.data.repository.SupabaseAccountCloudBackupRepository
+import io.legado.app.data.repository.ApiKeySyncRepository
 import io.legado.app.data.repository.SupabaseCloudSyncRepository
 import io.legado.app.data.repository.sourcehealth.BookSourceHealthProbeRepository
 import io.legado.app.data.repository.sourcehealth.RssSourceHealthProbeRepository
@@ -436,6 +437,15 @@ val appModule = module {
         )
     }
     singleOf(::AccountCloudBackupUseCase)
+    single {
+        ApiKeySyncRepository(
+            context = androidContext(),
+            aiProfileDao = get(),
+            secretStore = get(),
+            accountAuthGateway = get(),
+            config = get(),
+        )
+    }
     single<AssetDeliveryGateway> { AssetDeliveryRepository(androidContext()) }
     single<AssetDeliveryImportGateway> {
         AssetDeliveryImportRepository(
@@ -711,7 +721,15 @@ val appModule = module {
     viewModelOf(::ThemeManageViewModel)
     viewModelOf(::PersonalizationViewModel)
     viewModelOf(::BackupConfigViewModel)
-    viewModel { AiConfigViewModel(get(), get(named(RAW_AI_TEXT_GATEWAY)), get()) }
+    viewModel {
+        AiConfigViewModel(
+            aiProfileGateway = get(),
+            rawAiTextGateway = get(named(RAW_AI_TEXT_GATEWAY)),
+            aiRouterGateway = get(),
+            apiKeySyncRepository = getOrNull(),
+            accountAuthGateway = getOrNull(),
+        )
+    }
     viewModelOf(::AiRouterViewModel)
     viewModelOf(::AgentDashboardViewModel)
     viewModelOf(::CustomAgentToolManagerViewModel)

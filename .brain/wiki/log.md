@@ -64,3 +64,8 @@ _Append-only operation history._
 - `2026-09-14T20:48:25` — UPDATE [entity] project-legado-with-md3-main
 - `2026-09-14T22:49:49` — CREATE [pattern] AssetDelivery/ZeroTTS - INTEGRITY_AND_CHECKSUM_DESYNC Pattern → .brain\wiki\patterns\assetdeliveryzerotts-integrity-and-checksum-desync-pattern.md
 - `2026-09-14T22:49:49` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-04T08:12:54` — CREATE [pattern] QuickTranslation/Performance - PERFORMANCE_GC_THRASHING Pattern → .brain\wiki\patterns\quicktranslationperformance-performance-gc-thrashing-pattern.md
+- `2026-10-04T08:12:55` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-04T08:12:58` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-04T08:12:58` — CREATE [insight] Session 2026-10-04 08-12-58 → .brain\wiki\insights\session-2026-10-04-08-12-58.md
+- `2026-10-04T08:12:58` — UPDATE [entity] project-legado-with-md3-main

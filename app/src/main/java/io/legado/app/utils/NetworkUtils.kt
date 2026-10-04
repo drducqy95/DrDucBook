@@ -161,6 +161,7 @@ object NetworkUtils {
      */
     fun getAbsoluteURL(baseURL: String?, relativePath: String): String {
         if (baseURL.isNullOrEmpty()) return relativePath.trim()
+        if (baseURL.isDataUrl()) return relativePath.trim()
         var absoluteUrl: URL? = null
         try {
             absoluteUrl = URL(baseURL.substringBefore(","))

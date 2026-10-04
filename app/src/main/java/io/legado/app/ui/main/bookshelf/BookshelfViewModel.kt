@@ -28,6 +28,10 @@ import io.legado.app.domain.usecase.RefreshTocUseCase
 import io.legado.app.domain.usecase.UpdateBooksGroupUseCase
 import io.legado.app.domain.usecase.TranslateChapterUseCase
 import io.legado.app.domain.usecase.TranslateDynamicUiTextUseCase
+import io.legado.app.domain.usecase.restructureChapterNumbers
+import io.legado.app.domain.usecase.toTitleCase
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
@@ -115,6 +119,7 @@ class BookshelfViewModel(
     private val translatedBooksFlow = MutableStateFlow<Map<String, BookShelfItem>>(emptyMap())
     private val translationFingerprints = ConcurrentHashMap<String, String>()
     private val translationJobs = ConcurrentHashMap<String, Job>()
+    private val shelfTranslationSemaphore = Semaphore(2)
     @Volatile
     private var latestShelfBooks: List<BookShelfItem> = emptyList()
 
@@ -650,12 +655,14 @@ class BookshelfViewModel(
             ) return@forEach
             translationJobs.remove(book.bookUrl)?.cancel()
             translationJobs[book.bookUrl] = viewModelScope.launch(Dispatchers.IO) {
-                val display = translateShelfBook(book)
-                if (book.dynamicUiFingerprint() == fingerprint) {
-                    translationFingerprints[book.bookUrl] = fingerprint
-                    translatedBooksFlow.value = translatedBooksFlow.value + (book.bookUrl to display)
+                shelfTranslationSemaphore.withPermit {
+                    val display = translateShelfBook(book)
+                    if (book.dynamicUiFingerprint() == fingerprint) {
+                        translationFingerprints[book.bookUrl] = fingerprint
+                        translatedBooksFlow.value = translatedBooksFlow.value + (book.bookUrl to display)
+                    }
+                    translationJobs.remove(book.bookUrl)
                 }
-                translationJobs.remove(book.bookUrl)
             }
         }
     }
@@ -672,61 +679,56 @@ class BookshelfViewModel(
             book.latestChapterTitle,
         ).joinToString("\n")
         val scopeKey = "book:${book.bookUrl}"
-        suspend fun translated(value: String?): String? {
-            if (value.isNullOrBlank()) return value
-            return translateChapterUseCase.executeDynamicUiText(
-                scopeKey = scopeKey,
-                originalText = value,
-                book = dictionaryBook,
-                contextText = contextText,
-            ).getOrElse { value }
+
+        val sourceValues = listOf(
+            book.name,              // 0
+            book.author,            // 1
+            book.originName,        // 2
+            book.durChapterTitle,   // 3
+            book.latestChapterTitle,// 4
+            book.intro,             // 5
+            book.kind,              // 6
+            book.customTag,         // 7
+            book.wordCount,         // 8
+        )
+        val populatedValues = sourceValues.mapIndexedNotNull { index, value ->
+            value?.takeIf(String::isNotBlank)?.let { index to it }
+        }
+        val translatedValues = translateDynamicUiTextUseCase.executeLines(
+            scopeKey = scopeKey,
+            originalLines = populatedValues.map(Pair<Int, String>::second),
+            book = dictionaryBook,
+            contextText = contextText,
+        ).getOrElse { populatedValues.map(Pair<Int, String>::second) }
+
+        val displayValues = sourceValues.toMutableList().apply {
+            populatedValues.zip(translatedValues).forEach { (source, translated) ->
+                this[source.first] = translated
+            }
         }
 
-        val translatedAuthor = book.author.takeIf(String::isNotBlank)?.let { author ->
-            translateDynamicUiTextUseCase.executeAuthorName(
-                scopeKey = scopeKey,
-                originalText = author,
-                book = dictionaryBook,
-            ).getOrElse { translated(book.author).orEmpty() }
-        } ?: translated(book.author).orEmpty()
-
-        val translatedDurChapter = book.durChapterTitle?.takeIf(String::isNotBlank)?.let { title ->
-            translateDynamicUiTextUseCase.executeChapterTitle(
-                scopeKey = scopeKey,
-                originalText = title,
-                book = dictionaryBook,
-                contextText = contextText,
-            ).getOrElse { translated(book.durChapterTitle) }
-        } ?: translated(book.durChapterTitle)
-
-        val translatedLatestChapter = book.latestChapterTitle?.takeIf(String::isNotBlank)?.let { title ->
-            translateDynamicUiTextUseCase.executeChapterTitle(
-                scopeKey = scopeKey,
-                originalText = title,
-                book = dictionaryBook,
-                contextText = contextText,
-            ).getOrElse { translated(book.latestChapterTitle) }
-        } ?: translated(book.latestChapterTitle)
-
-        val translatedName = book.name.takeIf(String::isNotBlank)?.let { name ->
-            translateDynamicUiTextUseCase.executeBookName(
-                scopeKey = scopeKey,
-                originalText = name,
-                book = dictionaryBook,
-                contextText = contextText,
-            ).getOrElse { translated(book.name).orEmpty() }
-        } ?: translated(book.name).orEmpty()
+        val translatedName = displayValues[0]?.takeIf(String::isNotBlank)?.toTitleCase()
+            ?: book.name
+        val translatedAuthor = displayValues[1]?.takeIf(String::isNotBlank)?.let {
+            it.restructureChapterNumbers().toTitleCase()
+        } ?: book.author
+        val translatedDurChapter = displayValues[3]?.takeIf(String::isNotBlank)?.let {
+            it.restructureChapterNumbers().toTitleCase()
+        } ?: book.durChapterTitle
+        val translatedLatestChapter = displayValues[4]?.takeIf(String::isNotBlank)?.let {
+            it.restructureChapterNumbers().toTitleCase()
+        } ?: book.latestChapterTitle
 
         return book.copy(
             name = translatedName,
             author = translatedAuthor,
-            originName = translated(book.originName).orEmpty(),
+            originName = displayValues[2].orEmpty(),
             durChapterTitle = translatedDurChapter,
             latestChapterTitle = translatedLatestChapter,
-            intro = translated(book.intro),
-            kind = translated(book.kind),
-            customTag = translated(book.customTag),
-            wordCount = translated(book.wordCount),
+            intro = displayValues[5],
+            kind = displayValues[6],
+            customTag = displayValues[7],
+            wordCount = displayValues[8],
         )
     }
 

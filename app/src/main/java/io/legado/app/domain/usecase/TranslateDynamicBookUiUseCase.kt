@@ -50,37 +50,16 @@ class TranslateDynamicBookUiUseCase(
             }
         }
 
-        // Book name uses QT + Title Case
-        val translatedName = sourceBook.name.takeIf(String::isNotBlank)?.let {
-            translateDynamicUiTextUseCase.executeBookName(
-                scopeKey = scopeKey,
-                originalText = it,
-                book = dictionaryBook,
-                contextText = context,
-                forceRetranslate = forceRetranslate,
-            ).getOrElse { displayValues[0].orEmpty() }
-        } ?: displayValues[0].orEmpty()
+        val translatedName = displayValues[0]?.takeIf(String::isNotBlank)?.toTitleCase()
+            ?: sourceBook.name
 
-        // Author uses QT with dictionary terms + Title Case
-        val translatedAuthor = sourceBook.author.takeIf(String::isNotBlank)?.let {
-            translateDynamicUiTextUseCase.executeAuthorName(
-                scopeKey = scopeKey,
-                originalText = it,
-                book = dictionaryBook,
-                forceRetranslate = forceRetranslate,
-            ).getOrElse { displayValues[1].orEmpty() }
-        } ?: displayValues[1].orEmpty()
+        val translatedAuthor = displayValues[1]?.takeIf(String::isNotBlank)?.let {
+            it.restructureChapterNumbers().toTitleCase()
+        } ?: sourceBook.author
 
-        // Latest chapter title uses QT + Title Case
-        val translatedLatestChapter = sourceBook.latestChapterTitle?.takeIf(String::isNotBlank)?.let {
-            translateDynamicUiTextUseCase.executeChapterTitle(
-                scopeKey = scopeKey,
-                originalText = it,
-                book = dictionaryBook,
-                contextText = context,
-                forceRetranslate = forceRetranslate,
-            ).getOrElse { displayValues[5].orEmpty() }
-        } ?: displayValues[5]
+        val translatedLatestChapter = displayValues[5]?.takeIf(String::isNotBlank)?.let {
+            it.restructureChapterNumbers().toTitleCase()
+        } ?: sourceBook.latestChapterTitle
 
         return sourceBook.copy(
             name = translatedName,
