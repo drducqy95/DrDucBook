@@ -14,4 +14,5 @@ interface AiSkillGateway {
     suspend fun setEnabled(skillId: String, enabled: Boolean): AgentSkillSnapshot
     suspend fun activateVersion(skillId: String, versionId: String): AgentSkillSnapshot
     suspend fun rollback(skillId: String): AgentSkillSnapshot
+    suspend fun ensureDefaultSkills()
 }

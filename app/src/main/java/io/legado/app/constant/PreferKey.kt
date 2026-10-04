@@ -48,6 +48,7 @@ object PreferKey {
     const val showDiscovery = "showDiscovery"
     const val enableReview = "enableReview"
     const val showRss = "showRss"
+    const val autoDetectClipboardUrl = "autoDetectClipboardUrl"
     const val mainNavigationOrder = "mainNavigationOrder"
     const val showStatusBar = "showStatusBar"
     const val swipeAnimation = "swipeAnimation"

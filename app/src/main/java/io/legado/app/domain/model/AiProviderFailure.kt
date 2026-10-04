@@ -26,6 +26,11 @@ enum class AiFailureKind(
         "Xác thực hoặc quyền truy cập bị từ chối",
         "Kiểm tra API key, token đăng nhập và quyền dùng model.",
     ),
+    VALIDATION_REQUIRED(
+        false,
+        "Tài khoản Google yêu cầu xác minh",
+        "Mở liên kết xác minh để tiếp tục sử dụng Google Antigravity.",
+    ),
     RATE_LIMIT(
         true,
         "Provider đang giới hạn tần suất",
@@ -90,9 +95,21 @@ data class AiProviderFailure(
     val retryAfterMillis: Long? = null,
     val routeName: String = "",
     val targetSummary: String = "",
+    val actionUrl: String? = null,
 ) {
     val userMessage: String
         get() = buildString {
+            if (kind == AiFailureKind.VALIDATION_REQUIRED) {
+                append(provider.ifBlank { "Google Antigravity" })
+                append(" · ").append(model.ifBlank { "model" })
+                append(" · lần thử ").append(attempt.coerceAtLeast(1))
+                append(": ").append(kind.vietnameseLabel)
+                statusCode?.let { append(" (HTTP ").append(it).append(')') }
+                actionUrl?.takeIf(String::isNotBlank)?.let {
+                    append(".\n👉 Nhấn vào liên kết để xác minh tài khoản: ").append(it)
+                } ?: append(". ").append(kind.vietnameseAction)
+                return@buildString
+            }
             if (kind == AiFailureKind.ROUTE_UNAVAILABLE) {
                 append(routeName.ifBlank { "AI Router" })
                 append(": ").append(kind.vietnameseLabel)
@@ -191,9 +208,23 @@ object AiProviderFailureClassifier {
             .mapNotNull { throwable -> httpStatusPattern.find(throwable.message.orEmpty()) }
             .mapNotNull { it.groupValues.getOrNull(1)?.toIntOrNull() }
             .firstOrNull()
+        val isValidationRequired = normalized.contains("validation_required") ||
+            normalized.contains("verify your account") ||
+            (statusCode == 403 && normalized.contains("validation_url"))
+        val validationUrl = if (isValidationRequired) {
+            chain.asSequence()
+                .mapNotNull { it.message }
+                .mapNotNull { msg ->
+                    Regex("""validation_url[=":\s]+([^\s"'\\]+)""").find(msg)?.groupValues?.getOrNull(1)
+                        ?: Regex("""https://accounts\.google\.com/signin/continue[^\s"'\\]+""").find(msg)?.value
+                }
+                .firstOrNull()
+        } else null
+
         val kind = when {
             chain.any { it is CancellationException } -> AiFailureKind.CANCELLED
             routeUnavailable != null -> AiFailureKind.ROUTE_UNAVAILABLE
+            isValidationRequired -> AiFailureKind.VALIDATION_REQUIRED
             normalized.containsAny(quotaTerms) || statusCode == 402 -> AiFailureKind.QUOTA
             statusCode == 401 || statusCode == 403 || normalized.containsAny(
                 listOf(
@@ -315,6 +346,7 @@ object AiProviderFailureClassifier {
             retryAfterMillis = routeUnavailable?.retryAfterMillis,
             routeName = routeUnavailable?.routeName.orEmpty(),
             targetSummary = routeUnavailable?.targetSummary.orEmpty(),
+            actionUrl = validationUrl,
         )
         return AiProviderException(failure, root)
     }

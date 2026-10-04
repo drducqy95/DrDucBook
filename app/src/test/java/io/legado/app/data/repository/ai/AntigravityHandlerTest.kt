@@ -84,6 +84,33 @@ class AntigravityHandlerTest {
         assertEquals("application/json", generationConfig["responseMimeType"])
     }
 
+    @Test
+    fun stripsToolsAndToolConfigForGptOssModels() {
+        val ossRequest = request(
+            tools = listOf(
+                AiToolDefinition(
+                    name = "search_books",
+                    description = "Search books",
+                    inputSchema = mapOf("type" to "object"),
+                )
+            )
+        ).copy(
+            model = request().model.copy(
+                modelId = "gpt-oss-120b-medium",
+            )
+        )
+        val body = buildAntigravityRequestEnvelope(
+            request = ossRequest,
+            projectId = "cloud-project",
+            sessionId = "session-123",
+            currentTimeMillis = 1_700_000_000_000L,
+        )
+
+        val nestedRequest = body["request"] as Map<*, *>
+        assertFalse(nestedRequest.containsKey("tools"))
+        assertFalse(nestedRequest.containsKey("toolConfig"))
+    }
+
     private fun request(
         tools: List<AiToolDefinition> = emptyList(),
         taskType: String? = null,

@@ -42,12 +42,23 @@ interface BaseBook : RuleDataInterface {
     fun getKindList(): List<String> {
         val kindList = arrayListOf<String>()
         wordCount?.let {
-            if (it.isNotBlank()) kindList.add(it)
+            if (isValidWordCount(it)) kindList.add(it.trim())
         }
         kind?.let {
             val kinds = it.splitNotBlank(",", "\n")
             kindList.addAll(kinds)
         }
         return kindList
+    }
+
+    companion object {
+        fun isValidWordCount(raw: String?): Boolean {
+            if (raw.isNullOrBlank()) return false
+            val trimmed = raw.trim()
+            if (trimmed.length > 30) return false
+            if (trimmed.contains("...") || trimmed.contains("…") || trimmed.contains("\n")) return false
+            if (trimmed.contains("：") || trimmed.contains(": ") || trimmed.contains("栏目") || trimmed.contains("获赞")) return false
+            return true
+        }
     }
 }

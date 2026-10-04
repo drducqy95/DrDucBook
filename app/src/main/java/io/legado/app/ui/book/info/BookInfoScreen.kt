@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -35,6 +36,8 @@ import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Share
@@ -1236,27 +1239,33 @@ private fun BookInfoSummary(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        val rawIntro = book.displayIntro.orEmpty().ifBlank {
-            stringResource(R.string.intro_show_null)
+        val displayIntro = remember(book.displayIntro) {
+            book.displayIntro.orEmpty().ifBlank { null }
+        } ?: stringResource(R.string.intro_show_null)
+        val sourceIntro = remember(book.sourceIntro, displayIntro) {
+            book.sourceIntro.orEmpty().ifBlank { displayIntro }
         }
-        val displayIntro = remember(rawIntro) {
-            try {
-                HtmlCompat.fromHtml(rawIntro, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
-            } catch (_: Throwable) {
-                rawIntro.trim()
+
+        var expanded by remember(book.bookUrl) { mutableStateOf(false) }
+        val isLongIntro = remember(displayIntro) {
+            displayIntro.length > 280 || displayIntro.count { it == '\n' } > 5
+        }
+
+        val (visibleDisplayText, visibleSourceText) = remember(displayIntro, sourceIntro, expanded, isLongIntro) {
+            if (!isLongIntro || expanded) {
+                displayIntro to sourceIntro
+            } else {
+                val lines = displayIntro.lines()
+                val truncatedDisplay = lines.take(5).joinToString("\n") + "..."
+                val sourceLines = sourceIntro.lines()
+                val truncatedSource = sourceLines.take(5).joinToString("\n") + "..."
+                truncatedDisplay to truncatedSource
             }
         }
-        val rawSourceIntro = book.sourceIntro.orEmpty().ifBlank { displayIntro }
-        val sourceIntro = remember(rawSourceIntro) {
-            try {
-                HtmlCompat.fromHtml(rawSourceIntro, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
-            } catch (_: Throwable) {
-                rawSourceIntro.trim()
-            }
-        }
+
         QuickDictionarySelectableText(
-            displayText = displayIntro,
-            sourceText = sourceIntro,
+            displayText = visibleDisplayText,
+            sourceText = visibleSourceText,
             bookUrl = book.bookUrl,
             sourceLocation = "${book.name} · $introLabel",
             onQuickDictionaryRequest = onQuickDictionaryRequest,
@@ -1264,6 +1273,30 @@ private fun BookInfoSummary(
             color = LegadoTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.fillMaxWidth(),
         )
+
+        if (isLongIntro) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = if (expanded) stringResource(R.string.collapse) else stringResource(R.string.expand),
+                    style = LegadoTheme.typography.labelMedium,
+                    color = LegadoTheme.colorScheme.primary,
+                )
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = LegadoTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        }
     }
 }
 @Composable

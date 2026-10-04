@@ -16,13 +16,31 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.rule.ContentRule
-import io.legado.app.constant.BookSourceType
+import io.legado.app.data.entities.rule.BookInfoRule
+import io.legado.app.data.entities.rule.ExploreRule
+import io.legado.app.data.entities.rule.SearchRule
+import io.legado.app.data.entities.rule.TocRule
 import io.legado.app.data.repository.sourcehealth.SourceCheckEngine
 import io.legado.app.data.repository.sourcehealth.SourceCheckRepository
+import io.legado.app.constant.BookSourceType
+import io.legado.app.constant.EventBus
 import io.legado.app.domain.agent.AgentActionApproval
 import io.legado.app.domain.agent.AgentPermissionBroker
 import io.legado.app.domain.agent.AgentSkillDraft
 import io.legado.app.domain.agent.AgentSkillSnapshot
+import io.legado.app.domain.gateway.AiTextGateway
+import io.legado.app.domain.model.AiGenerateRequest
+import io.legado.app.domain.model.AiMessage
+import io.legado.app.domain.model.AiMessageRole
+import io.legado.app.domain.model.AiTranslationStoryEntity
+import io.legado.app.domain.model.AiTranslationStoryRelationship
+import io.legado.app.domain.model.AiTranslationWorldEntry
+import io.legado.app.domain.model.StoryChroniclePeriod
+import io.legado.app.domain.usecase.containsCjk
+import io.legado.app.domain.usecase.StoryIllustrationUseCase
+import io.legado.app.domain.usecase.TranslateChapterUseCase
+import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
+import io.legado.app.utils.postEvent
 import io.legado.app.domain.agent.withCanonicalToolName
 import io.legado.app.domain.gateway.AiMemoryGateway
 import io.legado.app.domain.gateway.AiProfileGateway
@@ -116,6 +134,10 @@ class AiToolRepository(
     private val sourceCheckEngine: SourceCheckEngine,
     private val sourceCheckRepository: SourceCheckRepository,
     private val customAgentToolGateway: CustomAgentToolGateway? = null,
+    private val translationStoryMemoryUseCase: TranslationStoryMemoryUseCase? = null,
+    private val aiTextGateway: AiTextGateway? = null,
+    private val translateChapterUseCase: TranslateChapterUseCase? = null,
+    private val storyIllustrationUseCase: StoryIllustrationUseCase? = null,
 ) : AiToolGateway {
 
     override fun registeredTools(): List<AiToolDefinition> =
@@ -208,6 +230,24 @@ class AiToolRepository(
             TOOL_DELETE_DICTIONARY_ENTRY -> deleteDictionaryEntry(args)
             TOOL_GET_BOOKSHELF_AUTOMATION -> getBookshelfAutomation()
             TOOL_SET_BOOKSHELF_AUTOMATION -> setBookshelfAutomation(args)
+            TOOL_CREATE_STORY_MEMORY -> createStoryMemory(args)
+            TOOL_GET_STORY_MEMORY -> getStoryMemory(args)
+            TOOL_RETROFIT_STORY_TRANSLATIONS -> retrofitStoryTranslations(args)
+            TOOL_GET_STORY_CHRONICLE -> getStoryChronicle(args)
+            TOOL_SYNTHESIZE_STORY_CHRONICLE -> synthesizeStoryChronicle(args)
+            TOOL_SAVE_STORY_CHRONICLE -> saveStoryChronicle(args)
+            TOOL_UPSERT_STORY_WIKI_ENTITY -> upsertStoryWikiEntity(args)
+            TOOL_DELETE_STORY_WIKI_ENTITY -> deleteStoryWikiEntity(args)
+            TOOL_UPSERT_STORY_WIKI_WORLD -> upsertStoryWikiWorld(args)
+            TOOL_DELETE_STORY_WIKI_WORLD -> deleteStoryWikiWorld(args)
+            TOOL_UPSERT_STORY_WIKI_RELATIONSHIP -> upsertStoryWikiRelationship(args)
+            TOOL_DELETE_STORY_WIKI_RELATIONSHIP -> deleteStoryWikiRelationship(args)
+            TOOL_GET_STORY_WIKI -> getStoryWiki(args)
+            TOOL_SAVE_BOOK_SOURCE -> saveBookSource(args)
+            TOOL_TEST_BOOK_SOURCE_RULE -> testBookSourceRule(args)
+            TOOL_GENERATE_CHARACTER_IMAGE -> generateCharacterImage(args)
+            TOOL_GENERATE_BOOK_COVER -> generateBookCover(args)
+            TOOL_GENERATE_WORLD_IMAGE -> generateWorldImage(args)
             else -> error("Unhandled registered tool: ${canonicalCall.name}")
         }
         AiToolResult(
@@ -588,6 +628,86 @@ class AiToolRepository(
                 }
             }
 
+            args.string("bookSourceName")?.takeIf { it.isNotBlank() }?.let {
+                if (source.bookSourceName != it) {
+                    source.bookSourceName = it
+                    changes += "bookSourceName"
+                }
+            }
+            args.string("bookSourceGroup")?.let {
+                if (source.bookSourceGroup != it) {
+                    source.bookSourceGroup = it
+                    changes += "bookSourceGroup"
+                }
+            }
+            args.string("bookSourceUrl")?.takeIf { it.isNotBlank() }?.let {
+                if (source.bookSourceUrl != it) {
+                    source.bookSourceUrl = it
+                    changes += "bookSourceUrl"
+                }
+            }
+            args.string("searchUrl")?.let {
+                if (source.searchUrl != it) {
+                    source.searchUrl = it
+                    changes += "searchUrl"
+                }
+            }
+            args.string("exploreUrl")?.let {
+                if (source.exploreUrl != it) {
+                    source.exploreUrl = it
+                    changes += "exploreUrl"
+                }
+            }
+            args.string("header")?.let {
+                if (source.header != it) {
+                    source.header = it
+                    changes += "header"
+                }
+            }
+            args.string("loginUrl")?.let {
+                if (source.loginUrl != it) {
+                    source.loginUrl = it
+                    changes += "loginUrl"
+                }
+            }
+            args.intOrNull("weight")?.let {
+                if (source.weight != it) {
+                    source.weight = it
+                    changes += "weight"
+                }
+            }
+
+            if (args.has("ruleSearch")) {
+                val elem = args.get("ruleSearch")
+                val rule = if (elem.isJsonObject) GSON.fromJson(elem, SearchRule::class.java) else GSON.fromJson(elem.asString, SearchRule::class.java)
+                source.ruleSearch = rule
+                changes += "ruleSearch"
+            }
+            if (args.has("ruleBookInfo")) {
+                val elem = args.get("ruleBookInfo")
+                val rule = if (elem.isJsonObject) GSON.fromJson(elem, BookInfoRule::class.java) else GSON.fromJson(elem.asString, BookInfoRule::class.java)
+                source.ruleBookInfo = rule
+                changes += "ruleBookInfo"
+            }
+            if (args.has("ruleToc")) {
+                val elem = args.get("ruleToc")
+                val rule = if (elem.isJsonObject) GSON.fromJson(elem, TocRule::class.java) else GSON.fromJson(elem.asString, TocRule::class.java)
+                source.ruleToc = rule
+                changes += "ruleToc"
+            }
+            if (args.has("ruleContent")) {
+                val elem = args.get("ruleContent")
+                val rule = if (elem.isJsonObject) GSON.fromJson(elem, ContentRule::class.java) else GSON.fromJson(elem.asString, ContentRule::class.java)
+                source.ruleContent = rule
+                changes += "ruleContent"
+            }
+            if (args.has("ruleExplore")) {
+                val elem = args.get("ruleExplore")
+                val rule = if (elem.isJsonObject) GSON.fromJson(elem, ExploreRule::class.java) else GSON.fromJson(elem.asString, ExploreRule::class.java)
+                source.ruleExplore = rule
+                changes += "ruleExplore"
+            }
+
             if (args.boolean("repairVbookCompatibility", true) && source.isVbookInstalledSource()) {
                 if (VbookPluginImporter.reconcileInstalledSourceType(appCtx, source)) {
                     changes += "vbookSourceType"
@@ -640,12 +760,741 @@ class AiToolRepository(
                     "after" to source.toToolMap(),
                     "run" to run?.toToolMap(),
                     "stages" to stages.map { it.toToolMap() },
-                    "note" to "This tool repairs local source metadata and VBook compatibility stubs. It does not rewrite source JavaScript; use create_vbook_plugin_draft for script-level fixes.",
+                    "note" to "Source rules and metadata updated successfully.",
                 )
             )
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
             toolError("Book source repair failed", error)
+        }
+    }
+
+    private fun saveBookSource(args: JsonObject): String {
+        return try {
+            val sourceJson = args.string("sourceJson")
+            val source = if (!sourceJson.isNullOrBlank()) {
+                parseAgentLegadoBookSourceJson(sourceJson)
+            } else {
+                val url = args.string("bookSourceUrl")?.trim().orEmpty()
+                val name = args.string("bookSourceName")?.trim().orEmpty()
+                require(url.isNotBlank()) { "bookSourceUrl is required" }
+                require(name.isNotBlank()) { "bookSourceName is required" }
+                val existing = bookSourceDao.getBookSource(url) ?: BookSource(bookSourceUrl = url, bookSourceName = name)
+                existing.bookSourceName = name
+                args.string("bookSourceGroup")?.let { existing.bookSourceGroup = it }
+                args.string("searchUrl")?.let { existing.searchUrl = it }
+                args.string("exploreUrl")?.let { existing.exploreUrl = it }
+                args.string("header")?.let { existing.header = it }
+                args.string("loginUrl")?.let { existing.loginUrl = it }
+                args.intOrNull("weight")?.let { existing.weight = it }
+                existing
+            }
+            val enableAfterSave = args.boolean("enableAfterSave", true)
+            source.enabled = enableAfterSave
+            if (enableAfterSave) source.enabledExplore = true
+            SourceHelp.insertBookSource(source)
+            GSON.toJson(
+                mapOf(
+                    "saved" to true,
+                    "bookSourceName" to source.bookSourceName,
+                    "bookSourceUrl" to source.bookSourceUrl,
+                    "enabled" to source.enabled,
+                    "enabledExplore" to source.enabledExplore,
+                )
+            )
+        } catch (error: Throwable) {
+            toolError("Save book source failed", error)
+        }
+    }
+
+    private suspend fun testBookSourceRule(args: JsonObject): String {
+        return try {
+            val source = resolveBookSource(args)
+                ?: if (!args.string("sourceJson").isNullOrBlank()) {
+                    parseAgentLegadoBookSourceJson(args.string("sourceJson").orEmpty())
+                } else {
+                    return """{"error":"sourceUrl, sourceName, or sourceJson is required"}"""
+                }
+            val testType = args.string("testType")?.uppercase() ?: "SEARCH"
+            val targetUrl = args.string("targetUrl").orEmpty().trim()
+            val keyword = args.string("keyword")?.trim().orEmpty().ifBlank { "test" }
+
+            when (testType) {
+                "SEARCH" -> {
+                    val results = io.legado.app.model.webBook.WebBook.searchBookAwait(
+                        bookSource = source,
+                        key = keyword,
+                        page = 1,
+                    )
+                    GSON.toJson(
+                        mapOf(
+                            "success" to true,
+                            "testType" to "SEARCH",
+                            "keyword" to keyword,
+                            "resultsCount" to results.size,
+                            "sampleResults" to results.take(3).map {
+                                mapOf(
+                                    "name" to it.name,
+                                    "author" to it.author,
+                                    "bookUrl" to it.bookUrl,
+                                    "latestChapterTitle" to it.latestChapterTitle,
+                                    "intro" to it.intro?.take(100),
+                                )
+                            }
+                        )
+                    )
+                }
+                "TOC" -> {
+                    val sampleBook = Book(
+                        bookUrl = targetUrl.ifBlank { source.bookSourceUrl },
+                        origin = source.bookSourceUrl,
+                        originName = source.bookSourceName,
+                        name = "Test Book",
+                    )
+                    val chapters = io.legado.app.model.webBook.WebBook.getChapterListAwait(
+                        bookSource = source,
+                        book = sampleBook,
+                    ).getOrThrow()
+                    GSON.toJson(
+                        mapOf(
+                            "success" to true,
+                            "testType" to "TOC",
+                            "chaptersCount" to chapters.size,
+                            "sampleChapters" to chapters.take(5).map {
+                                mapOf(
+                                    "index" to it.index,
+                                    "title" to it.title,
+                                    "url" to it.url,
+                                )
+                            }
+                        )
+                    )
+                }
+                "CONTENT" -> {
+                    val sampleBook = Book(
+                        bookUrl = source.bookSourceUrl,
+                        origin = source.bookSourceUrl,
+                        originName = source.bookSourceName,
+                        name = "Test Book",
+                    )
+                    val sampleChapter = io.legado.app.data.entities.BookChapter(
+                        url = targetUrl.ifBlank { source.bookSourceUrl },
+                        title = "Test Chapter",
+                        bookUrl = sampleBook.bookUrl,
+                        index = 0,
+                    )
+                    val content = io.legado.app.model.webBook.WebBook.getContentAwait(
+                        bookSource = source,
+                        book = sampleBook,
+                        bookChapter = sampleChapter,
+                    )
+                    GSON.toJson(
+                        mapOf(
+                            "success" to true,
+                            "testType" to "CONTENT",
+                            "contentLength" to content.length,
+                            "sampleContent" to content.take(300),
+                        )
+                    )
+                }
+                "INFO" -> {
+                    val sampleBook = Book(
+                        bookUrl = targetUrl.ifBlank { source.bookSourceUrl },
+                        origin = source.bookSourceUrl,
+                        originName = source.bookSourceName,
+                        name = "Test Book",
+                    )
+                    val bookInfo = io.legado.app.model.webBook.WebBook.getBookInfoAwait(
+                        bookSource = source,
+                        book = sampleBook,
+                    )
+                    GSON.toJson(
+                        mapOf(
+                            "success" to true,
+                            "testType" to "INFO",
+                            "book" to mapOf(
+                                "name" to bookInfo.name,
+                                "author" to bookInfo.author,
+                                "intro" to bookInfo.intro?.take(150),
+                                "tocUrl" to bookInfo.tocUrl,
+                                "coverUrl" to bookInfo.coverUrl,
+                            )
+                        )
+                    )
+                }
+                else -> """{"error":"Unsupported testType: $testType. Supported: SEARCH, TOC, CONTENT, INFO"}"""
+            }
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            toolError("Book source rule test failed", error)
+        }
+    }
+
+    private suspend fun createStoryMemory(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved from bookUrl or bookName"}"""
+        val content = args.string("content")?.trim().orEmpty()
+        val chapterIndex = args.intOrNull("chapterIndex") ?: book.durChapterIndex
+        val chapterCount = args.int("chapterCount", 1).coerceIn(1, 10)
+        val chapterTitle = args.string("chapterTitle")?.trim().orEmpty()
+
+        val preset = aiProfileGateway.getTaskPreset(AiTaskType.EXTRACT_STORY_MEMORY)
+            ?: aiProfileGateway.getTaskPreset(AiTaskType.TRANSLATE_CHAPTER)
+            ?: aiProfileGateway.getTaskPreset(AiTaskType.CHAT)
+            ?: return """{"error":"No AI task preset available"}"""
+
+        return try {
+            if (content.isNotBlank()) {
+                val resolvedTitle = if (chapterTitle.isNotBlank()) {
+                    useCase.formatVietnameseChapterTitle(book.bookUrl, chapterIndex, chapterTitle)
+                } else {
+                    useCase.formatVietnameseChapterTitle(book.bookUrl, chapterIndex, "")
+                }
+                val analysisResult = useCase.analyzeTextContent(book, content, preset)
+                if (analysisResult.isFailure) {
+                    return toolError("Analyze text content failed", analysisResult.exceptionOrNull() ?: Exception("Unknown error"))
+                }
+                val analysis = analysisResult.getOrThrow()
+                GSON.toJson(
+                    mapOf(
+                        "success" to true,
+                        "bookName" to book.name,
+                        "chapterTitle" to resolvedTitle,
+                        "entitiesCount" to analysis.entities.size,
+                        "relationshipsCount" to analysis.relationships.size,
+                        "worldEntriesCount" to analysis.worldBuilding.size,
+                        "hasTimeline" to (analysis.timeline != null),
+                    )
+                )
+            } else {
+                val range = chapterIndex until (chapterIndex + chapterCount)
+                val countResult = useCase.batchAnalyzeChapters(book, range, preset, force = true)
+                GSON.toJson(
+                    mapOf(
+                        "success" to true,
+                        "bookName" to book.name,
+                        "analyzedChapters" to (countResult.getOrNull() ?: 0),
+                        "requestedRange" to "${range.first}..${range.last}",
+                    )
+                )
+            }
+        } catch (error: Throwable) {
+            if (error is CancellationException) throw error
+            toolError("Create story memory failed", error)
+        }
+    }
+
+    private suspend fun getStoryMemory(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved from bookUrl or bookName"}"""
+        val filter = args.string("filter")?.lowercase() ?: "all"
+        val limit = args.int("limit", 50).coerceIn(1, 200)
+
+        val snapshot = useCase.loadSnapshotWithSeriesInheritance(book)
+        val data = mutableMapOf<String, Any>()
+        data["bookName"] = book.name
+        data["bookUrl"] = book.bookUrl
+
+        if (filter == "all" || filter == "entities") {
+            data["entities"] = snapshot.entities.take(limit).map {
+                mapOf(
+                    "raw" to it.raw,
+                    "target" to it.target,
+                    "type" to it.type,
+                    "description" to it.description,
+                    "aliases" to it.aliases,
+                )
+            }
+        }
+        if (filter == "all" || filter == "world") {
+            data["worldBuilding"] = snapshot.worldBuilding.take(limit).map {
+                mapOf(
+                    "raw" to it.raw,
+                    "target" to it.target,
+                    "category" to it.category,
+                    "description" to it.description,
+                )
+            }
+        }
+        if (filter == "all" || filter == "relationships") {
+            data["relationships"] = snapshot.relationships.take(limit).map {
+                mapOf(
+                    "source" to it.source,
+                    "target" to it.target,
+                    "relationship" to it.relationship,
+                    "description" to it.description,
+                )
+            }
+        }
+        if (filter == "all" || filter == "timeline") {
+            data["timelines"] = snapshot.timelines.take(limit).map { tl ->
+                val displayTitle = useCase.formatVietnameseChapterTitle(book.bookUrl, tl.chapterIndex, tl.chapterTitle)
+                mapOf(
+                    "chapterIndex" to tl.chapterIndex,
+                    "chapterTitle" to displayTitle,
+                    "summary" to tl.summary,
+                    "events" to tl.events,
+                    "characters" to tl.characters.map { it.target.ifBlank { it.raw } },
+                )
+            }
+        }
+        return GSON.toJson(data)
+    }
+
+    private suspend fun retrofitStoryTranslations(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val translateUseCase = translateChapterUseCase
+            ?: return """{"error":"TranslateChapterUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved from bookUrl or bookName"}"""
+        val dryRun = args.boolean("dryRun", false)
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        if (dryRun) {
+            return GSON.toJson(
+                mapOf(
+                    "dryRun" to true,
+                    "bookName" to book.name,
+                    "analyzedChapters" to snapshot.analyzedChapterIndices.size,
+                    "canonicalTerms" to snapshot.canonicalMemory.size,
+                )
+            )
+        }
+        val chapterIndex = args.intOrNull("chapterIndex")
+        val chapterCount = args.int("chapterCount", 1).coerceIn(1, 100)
+        val chapterIndices = if (chapterIndex != null) {
+            (chapterIndex until (chapterIndex + chapterCount)).toList()
+        } else {
+            snapshot.analyzedChapterIndices.sorted().ifEmpty { listOf(book.durChapterIndex) }
+        }
+        val affected = useCase.retrofitChapterTranslations(book, chapterIndices, translateUseCase).getOrThrow()
+        postEvent(EventBus.REFRESH_BOOK_CONTENT, true)
+        return GSON.toJson(
+            mapOf(
+                "success" to true,
+                "bookName" to book.name,
+                "retrofittedChapters" to affected,
+            )
+        )
+    }
+
+    private suspend fun getStoryChronicle(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val periods = useCase.getChroniclePeriods(book.bookUrl)
+        val includeRaw = args.boolean("includeRawTimelines", false)
+        val data = mutableMapOf<String, Any>(
+            "bookName" to book.name,
+            "bookUrl" to book.bookUrl,
+            "chroniclePeriodsCount" to periods.size,
+            "chroniclePeriods" to periods,
+        )
+        if (includeRaw) {
+            val snapshot = useCase.loadSnapshot(book.bookUrl)
+            data["rawTimelines"] = snapshot.timelines.map { tl ->
+                mapOf(
+                    "chapterIndex" to tl.chapterIndex,
+                    "chapterTitle" to useCase.formatVietnameseChapterTitle(book.bookUrl, tl.chapterIndex, tl.chapterTitle),
+                    "summary" to tl.summary,
+                    "events" to tl.events,
+                )
+            }
+        }
+        return GSON.toJson(data)
+    }
+
+    private suspend fun synthesizeStoryChronicle(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val textGateway = aiTextGateway
+            ?: return """{"error":"AiTextGateway is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val directive = args.string("directive")?.trim().orEmpty()
+        val startChapter = args.int("startChapter", 0)
+        val endChapter = args.intOrNull("endChapter")
+
+        val snapshot = useCase.loadSnapshot(book.bookUrl)
+        val timelines = snapshot.timelines
+            .filter { it.chapterIndex >= startChapter && (endChapter == null || it.chapterIndex <= endChapter) }
+            .sortedBy { it.chapterIndex }
+
+        if (timelines.isEmpty()) {
+            return GSON.toJson(
+                mapOf(
+                    "error" to "No timelines found in specified range to synthesize chronicle",
+                    "hint" to "Use create_story_memory to analyze chapters first.",
+                )
+            )
+        }
+
+        val timelineDigest = timelines.joinToString("\n---\n") { tl ->
+            val title = useCase.formatVietnameseChapterTitle(book.bookUrl, tl.chapterIndex, tl.chapterTitle)
+            "Chương ${tl.chapterIndex + 1} ($title): ${tl.summary}\nSự kiện: ${tl.events.joinToString("; ")}\nNhân vật: ${tl.characters.joinToString(", ") { it.target.ifBlank { it.raw } }}"
+        }
+
+        val prompt = buildString {
+            appendLine("Bạn là chuyên gia biên niên sử và tổng hợp cốt truyện tiểu thuyết (Story Chronicler).")
+            appendLine("Dưới đây là dòng thời gian các chương truyện của cuốn sách '${book.name}':")
+            appendLine(timelineDigest)
+            appendLine()
+            if (directive.isNotBlank()) {
+                appendLine("YÊU CẦU ĐẶC BIỆT TỪ NGƯỜI DÙNG: $directive")
+            }
+            appendLine("HÃY TỔNG HỢP VÀ VIẾT LẠI THÀNH CÁC THỜI KỲ / GIAI ĐOẠN / QUYỂN LỚN (Eras / Story Arcs) MẠCH LẠC:")
+            appendLine("QUY TẮC:")
+            appendLine("1. KHÔNG được chép nguyên văn timeline từng chương vụn vặt.")
+            appendLine("2. Phân chia cốt truyện thành các Thời kỳ/Giai đoạn hợp lý theo diễn biến thế giới, cảnh giới, hoặc biến cố trọng đại.")
+            appendLine("3. Trả về đúng MỘT MẢNG JSON thuần túy, không Markdown:")
+            appendLine("""[{"eraTitle":"Tên thời kỳ","chapterRange":"Chương X - Chương Y","eraSummary":"Tóm lược biến chuyển cốt truyện...","milestoneEvents":["Sự kiện 1","Sự kiện 2"],"keyCharacters":["Tên 1","Tên 2"],"startChapterIndex":0,"endChapterIndex":50}]""")
+        }
+
+        val preset = aiProfileGateway.getTaskPreset(AiTaskType.EXTRACT_STORY_MEMORY)
+            ?: aiProfileGateway.getTaskPreset(AiTaskType.CHAT)
+            ?: return """{"error":"No AI task preset configured"}"""
+        val request = AiGenerateRequest(
+            model = preset.model,
+            messages = listOf(AiMessage(AiMessageRole.USER, prompt)),
+            params = preset.params,
+            taskType = preset.taskType.ifBlank { AiTaskType.EXTRACT_STORY_MEMORY },
+            routeProfileId = preset.runtimeOptions.routeProfileId,
+        )
+        val responseResult = textGateway.generate(request)
+        if (responseResult.isFailure) {
+            return toolError("Generate chronicle failed", responseResult.exceptionOrNull() ?: Exception("Unknown error"))
+        }
+        val response = responseResult.getOrThrow().text
+        val jsonCleaned = response.substringAfter("[").substringBeforeLast("]")
+        val jsonArrayStr = if (jsonCleaned.isNotBlank()) "[$jsonCleaned]" else response
+        val periods = runCatching {
+            val type = object : com.google.gson.reflect.TypeToken<List<StoryChroniclePeriod>>() {}.type
+            GSON.fromJson<List<StoryChroniclePeriod>>(jsonArrayStr, type)
+        }.getOrNull().orEmpty()
+
+        periods.forEach { period ->
+            useCase.upsertChroniclePeriod(book.bookUrl, period)
+        }
+
+        return GSON.toJson(
+            mapOf(
+                "success" to true,
+                "bookName" to book.name,
+                "periodsCreated" to periods.size,
+                "periods" to periods,
+            )
+        )
+    }
+
+    private suspend fun saveStoryChronicle(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val eraTitle = args.string("eraTitle")?.trim().orEmpty()
+        require(eraTitle.isNotBlank()) { "eraTitle is required" }
+        val chapterRange = args.string("chapterRange")?.trim().orEmpty()
+        val eraSummary = args.string("eraSummary")?.trim().orEmpty()
+        val milestoneEvents = args.stringList("milestoneEvents")
+        val keyCharacters = args.stringList("keyCharacters")
+        val startChapterIndex = args.int("startChapterIndex", 0)
+        val endChapterIndex = args.int("endChapterIndex", 0)
+        val id = args.string("id")?.trim().orEmpty().ifBlank { UUID.randomUUID().toString().take(8) }
+
+        val period = StoryChroniclePeriod(
+            id = id,
+            bookUrl = book.bookUrl,
+            eraTitle = eraTitle,
+            chapterRange = chapterRange,
+            eraSummary = eraSummary,
+            milestoneEvents = milestoneEvents,
+            keyCharacters = keyCharacters,
+            startChapterIndex = startChapterIndex,
+            endChapterIndex = endChapterIndex,
+        )
+        useCase.upsertChroniclePeriod(book.bookUrl, period)
+        return GSON.toJson(
+            mapOf(
+                "success" to true,
+                "period" to period,
+            )
+        )
+    }
+
+    private suspend fun upsertStoryWikiEntity(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val raw = args.string("raw")?.trim().orEmpty()
+        val target = args.string("target")?.trim().orEmpty()
+        require(raw.isNotBlank()) { "raw is required" }
+        require(target.isNotBlank()) { "target is required" }
+        val senseKey = args.string("senseKey")?.trim().orEmpty()
+        val kind = args.string("kind")?.trim().orEmpty().ifBlank { "character" }
+        val summary = args.string("summary")?.trim().orEmpty()
+        val aliases = args.stringList("aliases")
+
+        val entity = AiTranslationStoryEntity(
+            raw = raw,
+            target = target,
+            senseKey = senseKey,
+            type = kind,
+            description = summary,
+            aliases = aliases,
+            userEdited = true,
+        )
+        useCase.upsertEntity(book.bookUrl, entity)
+        return GSON.toJson(mapOf("success" to true, "entity" to entity))
+    }
+
+    private suspend fun deleteStoryWikiEntity(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val raw = args.string("raw")?.trim().orEmpty()
+        require(raw.isNotBlank()) { "raw is required" }
+        val senseKey = args.string("senseKey")?.trim().orEmpty()
+        useCase.deleteEntity(book.bookUrl, raw, senseKey)
+        return GSON.toJson(mapOf("success" to true, "deleted" to raw))
+    }
+
+    private suspend fun upsertStoryWikiWorld(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val term = args.string("term")?.trim().orEmpty()
+        val vietnamese = args.string("vietnamese")?.trim().orEmpty()
+        require(term.isNotBlank()) { "term is required" }
+        require(vietnamese.isNotBlank()) { "vietnamese is required" }
+        val category = args.string("category")?.trim().orEmpty().ifBlank { "other" }
+        val description = args.string("description")?.trim().orEmpty()
+
+        val entry = AiTranslationWorldEntry(
+            raw = term,
+            target = vietnamese,
+            category = category,
+            description = description,
+            userEdited = true,
+        )
+        useCase.upsertWorldEntry(book.bookUrl, entry)
+        return GSON.toJson(mapOf("success" to true, "worldEntry" to entry))
+    }
+
+    private suspend fun deleteStoryWikiWorld(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val term = args.string("term")?.trim().orEmpty()
+        require(term.isNotBlank()) { "term is required" }
+        val entry = AiTranslationWorldEntry(raw = term)
+        useCase.deleteWorldEntry(book.bookUrl, entry)
+        return GSON.toJson(mapOf("success" to true, "deleted" to term))
+    }
+
+    private suspend fun upsertStoryWikiRelationship(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val source = args.string("source")?.trim().orEmpty()
+        val target = args.string("target")?.trim().orEmpty()
+        val relationship = args.string("relationship")?.trim().orEmpty()
+        require(source.isNotBlank()) { "source is required" }
+        require(target.isNotBlank()) { "target is required" }
+        require(relationship.isNotBlank()) { "relationship is required" }
+        val description = args.string("description")?.trim().orEmpty()
+        val chapterIndex = args.int("chapterIndex", -1)
+
+        val rel = AiTranslationStoryRelationship(
+            source = source,
+            target = target,
+            relationship = relationship,
+            description = description,
+            chapterIndex = chapterIndex,
+        )
+        useCase.upsertRelationship(book.bookUrl, rel)
+        return GSON.toJson(mapOf("success" to true, "relationship" to rel))
+    }
+
+    private suspend fun deleteStoryWikiRelationship(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val source = args.string("source")?.trim().orEmpty()
+        val target = args.string("target")?.trim().orEmpty()
+        val relationship = args.string("relationship")?.trim().orEmpty()
+        val rel = AiTranslationStoryRelationship(
+            source = source,
+            target = target,
+            relationship = relationship,
+        )
+        useCase.deleteRelationship(book.bookUrl, rel)
+        return GSON.toJson(mapOf("success" to true, "deleted" to "$source -> $target ($relationship)"))
+    }
+
+    private suspend fun getStoryWiki(args: JsonObject): String {
+        val useCase = translationStoryMemoryUseCase
+            ?: return """{"error":"TranslationStoryMemoryUseCase is not available"}"""
+        val book = resolveBook(args)
+            ?: return """{"error":"Book could not be resolved"}"""
+        val tab = args.string("tab")?.uppercase() ?: "ALL"
+        val query = args.string("query")?.trim().orEmpty().lowercase()
+
+        val snapshot = useCase.loadSnapshotWithSeriesInheritance(book)
+        val data = mutableMapOf<String, Any>(
+            "bookName" to book.name,
+            "bookUrl" to book.bookUrl,
+        )
+        if (tab == "ALL" || tab == "ENTITY") {
+            val entities = snapshot.entities.filter { query.isBlank() || it.raw.lowercase().contains(query) || it.target.lowercase().contains(query) }
+            data["entities"] = entities
+        }
+        if (tab == "ALL" || tab == "WORLD") {
+            val world = snapshot.worldBuilding.filter { query.isBlank() || it.raw.lowercase().contains(query) || it.target.lowercase().contains(query) }
+            data["worldBuilding"] = world
+        }
+        if (tab == "ALL" || tab == "RELATIONSHIP") {
+            val rels = snapshot.relationships.filter { query.isBlank() || it.source.lowercase().contains(query) || it.target.lowercase().contains(query) || it.relationship.lowercase().contains(query) }
+            data["relationships"] = rels
+        }
+        if (tab == "ALL" || tab == "CHRONICLE") {
+            val periods = useCase.getChroniclePeriods(book.bookUrl).filter { query.isBlank() || it.eraTitle.lowercase().contains(query) || it.eraSummary.lowercase().contains(query) }
+            data["chronicle"] = periods
+        }
+        return GSON.toJson(data)
+    }
+
+    private suspend fun generateCharacterImage(args: JsonObject): String {
+        val useCase = storyIllustrationUseCase ?: return """{"error":"Story illustration engine is unavailable"}"""
+        val bookUrl = args.string("bookUrl")?.trim().orEmpty()
+        val entityRaw = args.string("entityRaw")?.trim().orEmpty()
+        if (bookUrl.isBlank() || entityRaw.isBlank()) {
+            return """{"error":"bookUrl and entityRaw are required"}"""
+        }
+        val force = args.boolean("force", true)
+        return try {
+            val imagePath = useCase.generateEntity(bookUrl, entityRaw, force)
+            GSON.toJson(
+                mapOf(
+                    "success" to true,
+                    "bookUrl" to bookUrl,
+                    "entityRaw" to entityRaw,
+                    "imagePath" to imagePath,
+                )
+            )
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
+            toolError("Generate character image failed", e)
+        }
+    }
+
+    private suspend fun generateBookCover(args: JsonObject): String {
+        val useCase = storyIllustrationUseCase ?: return """{"error":"Story illustration engine is unavailable"}"""
+        val bookUrl = args.string("bookUrl")?.trim().orEmpty()
+        if (bookUrl.isBlank()) {
+            return """{"error":"bookUrl is required"}"""
+        }
+        val book = bookDao.getBook(bookUrl)
+        var title = args.string("title")?.trim()?.takeIf(String::isNotBlank)
+        var author = args.string("author")?.trim()?.takeIf(String::isNotBlank)
+
+        if (title == null && book != null) {
+            val bookName = book.name.trim()
+            title = if (bookName.containsCjk()) {
+                translateChapterUseCase?.executeDynamicUiText("book:$bookUrl:bookname", bookName, book)
+                    ?.getOrNull()?.takeIf(String::isNotBlank) ?: bookName
+            } else {
+                bookName
+            }
+        }
+
+        if (author == null && book != null) {
+            val bookAuthor = book.getRealAuthor().trim().ifBlank { book.author.trim() }
+            author = if (bookAuthor.containsCjk()) {
+                translateChapterUseCase?.executeDynamicUiText("book:$bookUrl:author", bookAuthor, book)
+                    ?.getOrNull()?.takeIf(String::isNotBlank) ?: bookAuthor
+            } else {
+                bookAuthor
+            }
+        }
+
+        val prompt = args.string("prompt")?.trim()
+        val force = args.boolean("force", true)
+        return try {
+            val imagePath = useCase.generateBookCover(
+                bookUrl = bookUrl,
+                customPrompt = prompt,
+                title = title,
+                author = author,
+                force = force,
+            )
+            if (book != null) {
+                book.customCoverUrl = imagePath
+                bookDao.update(book)
+            }
+            GSON.toJson(
+                mapOf(
+                    "success" to true,
+                    "bookUrl" to bookUrl,
+                    "bookName" to book?.name,
+                    "coverTitle" to title,
+                    "coverAuthor" to author,
+                    "coverPath" to imagePath,
+                    "updatedBookshelf" to (book != null),
+                )
+            )
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
+            toolError("Generate book cover failed", e)
+        }
+    }
+
+    private suspend fun generateWorldImage(args: JsonObject): String {
+        val useCase = storyIllustrationUseCase ?: return """{"error":"Story illustration engine is unavailable"}"""
+        val bookUrl = args.string("bookUrl")?.trim().orEmpty()
+        val raw = args.string("raw")?.trim().orEmpty()
+        val category = args.string("category")?.trim().orEmpty().lowercase()
+        if (bookUrl.isBlank()) {
+            return """{"error":"bookUrl is required"}"""
+        }
+        val force = args.boolean("force", true)
+        return try {
+            val imagePath = if (category == "world_map" || raw == StoryIllustrationUseCase.WORLD_MAP_RAW) {
+                useCase.generateWorldMap(bookUrl, force)
+            } else {
+                if (raw.isBlank()) return """{"error":"raw entry name is required for world image"}"""
+                val snapshot = translationStoryMemoryUseCase?.loadSnapshot(bookUrl)
+                val entry = snapshot?.worldBuilding?.firstOrNull { it.raw.equals(raw, ignoreCase = true) }
+                    ?: AiTranslationWorldEntry(
+                        raw = raw,
+                        target = raw,
+                        category = category.ifBlank { "concept" },
+                        description = args.string("description").orEmpty(),
+                    )
+                useCase.generateWorldEntry(bookUrl, entry, force)
+            }
+            GSON.toJson(
+                mapOf(
+                    "success" to true,
+                    "bookUrl" to bookUrl,
+                    "raw" to raw,
+                    "category" to category,
+                    "imagePath" to imagePath,
+                )
+            )
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
+            toolError("Generate world image failed", e)
         }
     }
 
@@ -1901,6 +2750,10 @@ class AiToolRepository(
         return runCatching { get(name)?.takeIf { !it.isJsonNull }?.asInt }.getOrNull() ?: defaultValue
     }
 
+    private fun JsonObject.intOrNull(name: String): Int? {
+        return runCatching { get(name)?.takeIf { !it.isJsonNull }?.asInt }.getOrNull()
+    }
+
     private fun JsonObject.boolean(name: String, defaultValue: Boolean): Boolean {
         return booleanOrNull(name) ?: defaultValue
     }
@@ -2106,6 +2959,24 @@ class AiToolRepository(
         const val TOOL_DELETE_DICTIONARY_ENTRY = "delete_dictionary_entry"
         const val TOOL_GET_BOOKSHELF_AUTOMATION = "get_bookshelf_automation"
         const val TOOL_SET_BOOKSHELF_AUTOMATION = "set_bookshelf_automation"
+        const val TOOL_SAVE_BOOK_SOURCE = "save_book_source"
+        const val TOOL_TEST_BOOK_SOURCE_RULE = "test_book_source_rule"
+        const val TOOL_CREATE_STORY_MEMORY = "create_story_memory"
+        const val TOOL_GET_STORY_MEMORY = "get_story_memory"
+        const val TOOL_RETROFIT_STORY_TRANSLATIONS = "retrofit_story_translations"
+        const val TOOL_GET_STORY_CHRONICLE = "get_story_chronicle"
+        const val TOOL_SYNTHESIZE_STORY_CHRONICLE = "synthesize_story_chronicle"
+        const val TOOL_SAVE_STORY_CHRONICLE = "save_story_chronicle"
+        const val TOOL_UPSERT_STORY_WIKI_ENTITY = "upsert_story_wiki_entity"
+        const val TOOL_DELETE_STORY_WIKI_ENTITY = "delete_story_wiki_entity"
+        const val TOOL_UPSERT_STORY_WIKI_WORLD = "upsert_story_wiki_world"
+        const val TOOL_DELETE_STORY_WIKI_WORLD = "delete_story_wiki_world"
+        const val TOOL_UPSERT_STORY_WIKI_RELATIONSHIP = "upsert_story_wiki_relationship"
+        const val TOOL_DELETE_STORY_WIKI_RELATIONSHIP = "delete_story_wiki_relationship"
+        const val TOOL_GET_STORY_WIKI = "get_story_wiki"
+        const val TOOL_GENERATE_CHARACTER_IMAGE = "generate_character_image"
+        const val TOOL_GENERATE_BOOK_COVER = "generate_book_cover"
+        const val TOOL_GENERATE_WORLD_IMAGE = "generate_world_image"
 
         internal val toolDefinitions = listOf(
             AiToolDefinition(
@@ -2190,7 +3061,7 @@ class AiToolRepository(
             ),
             AiToolDefinition(
                 name = TOOL_REPAIR_BOOK_SOURCE,
-                description = "Repair local source metadata and VBook compatibility placeholders for one installed source. Requires user confirmation.",
+                description = "Repair local source metadata, selector rules, and VBook compatibility placeholders for one installed source. Requires user confirmation.",
                 inputSchema = objectSchema(
                     "sourceUrl" to stringSchema("Exact source URL/id from search_book_sources."),
                     "sourceName" to stringSchema("Source display name when sourceUrl is unavailable."),
@@ -2200,7 +3071,20 @@ class AiToolRepository(
                     "repairVbookCompatibility" to boolSchema("For VBook sources, reconcile type and vbook:// rule placeholders. Defaults to true."),
                     "runHealthCheck" to boolSchema("Run a diagnosis after repair. Defaults to true."),
                     "profile" to stringSchema("QUICK, STANDARD, or FULL diagnosis profile used after repair."),
-                    "timeoutMs" to intSchema("Post-repair diagnosis timeout in milliseconds, 5000 to 180000.")
+                    "timeoutMs" to intSchema("Post-repair diagnosis timeout in milliseconds, 5000 to 180000."),
+                    "bookSourceName" to stringSchema("Optional updated source name."),
+                    "bookSourceGroup" to stringSchema("Optional source group."),
+                    "bookSourceUrl" to stringSchema("Optional updated source URL."),
+                    "searchUrl" to stringSchema("Optional updated search URL."),
+                    "exploreUrl" to stringSchema("Optional updated explore URL."),
+                    "header" to stringSchema("Optional custom HTTP headers JSON or string."),
+                    "loginUrl" to stringSchema("Optional login URL."),
+                    "weight" to intSchema("Optional source priority weight."),
+                    "ruleSearch" to openObjectSchema("Optional updated search rule JSON object."),
+                    "ruleBookInfo" to openObjectSchema("Optional updated book info rule JSON object."),
+                    "ruleToc" to openObjectSchema("Optional updated table of contents rule JSON object."),
+                    "ruleContent" to openObjectSchema("Optional updated content rule JSON object."),
+                    "ruleExplore" to openObjectSchema("Optional updated explore rule JSON object.")
                 )
             ),
             AiToolDefinition(
@@ -2596,6 +3480,224 @@ class AiToolRepository(
                     "intervalHours" to intSchema("Check interval in hours, from 1 to 168."),
                     "autoDownloadNewChapters" to boolSchema("Download newly discovered chapters automatically."),
                     "notifyNewChapters" to boolSchema("Show a notification when new chapters are found.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_SAVE_BOOK_SOURCE,
+                description = "Save or update a Legado book source directly in the database. Can accept a full sourceJson or individual fields (bookSourceUrl, bookSourceName, rules, etc.). Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "sourceJson" to stringSchema("Optional complete standard Legado BookSource JSON object."),
+                    "bookSourceUrl" to stringSchema("Book source unique URL/key."),
+                    "bookSourceName" to stringSchema("Book source display name."),
+                    "bookSourceGroup" to stringSchema("Optional source group."),
+                    "searchUrl" to stringSchema("Optional search URL."),
+                    "exploreUrl" to stringSchema("Optional explore URL."),
+                    "header" to stringSchema("Optional custom HTTP headers JSON or string."),
+                    "loginUrl" to stringSchema("Optional login URL."),
+                    "weight" to intSchema("Optional priority weight."),
+                    "enableAfterSave" to boolSchema("Whether to enable the source immediately after saving. Defaults to true.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_TEST_BOOK_SOURCE_RULE,
+                description = "Test a specific rule (SEARCH, TOC, CONTENT, INFO) on a book source before or after saving.",
+                inputSchema = objectSchema(
+                    "sourceUrl" to stringSchema("Installed book source URL to test."),
+                    "sourceName" to stringSchema("Book source name when sourceUrl is omitted."),
+                    "query" to stringSchema("Fallback keyword to find book source."),
+                    "sourceJson" to stringSchema("Optional in-memory book source JSON to test without installing first."),
+                    "testType" to stringSchema("Type of test to run: SEARCH, TOC, CONTENT, or INFO. Defaults to SEARCH."),
+                    "targetUrl" to stringSchema("Target chapter or book URL for TOC/CONTENT/INFO tests."),
+                    "keyword" to stringSchema("Keyword to use for SEARCH test. Defaults to 'test'.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_CREATE_STORY_MEMORY,
+                description = "Extract and build Story Memory (entities, world-building, relationships, and chapter timeline) by analyzing chapter content or reading chapters from the novel. Automatically translates CJK titles to natural Vietnamese chapter titles.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "content" to stringSchema("Optional raw text content of the chapter to analyze directly."),
+                    "chapterIndex" to intSchema("Starting chapter index (0-based) to analyze. Defaults to current reading chapter."),
+                    "chapterCount" to intSchema("Number of chapters to analyze in batch (1 to 10) when content is omitted. Defaults to 1."),
+                    "chapterTitle" to stringSchema("Optional chapter title.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_GET_STORY_MEMORY,
+                description = "Retrieve Story Memory items (entities, worldBuilding, relationships, or timelines) for a book. Timeline chapter titles are always formatted in natural Vietnamese.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "filter" to stringSchema("Filter category: all, entities, world, relationships, or timeline. Defaults to all."),
+                    "limit" to intSchema("Maximum items to return, 1 to 200. Defaults to 50.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_RETROFIT_STORY_TRANSLATIONS,
+                description = "Retrofit previously translated chapters by applying current story memory entities and canonical terms. Refreshes reader content.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "dryRun" to boolSchema("If true, only reports how many chapters and terms would be affected without modifying translations.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_GET_STORY_CHRONICLE,
+                description = "Retrieve the synthesized story chronicle (eras/arcs) for a book. Unlike raw chapter timelines, chronicles summarize broader historical periods and world changes.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "includeRawTimelines" to boolSchema("Whether to also include chapter-level raw timeline events.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_SYNTHESIZE_STORY_CHRONICLE,
+                description = "Analyze the story timeline and synthesize it into coherent chronological eras/story arcs (niên biểu / đại sự ký) instead of copying raw chapter timelines. Saves the periods to the story chronicle.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "directive" to stringSchema("Optional guidance or focus for the chronicle synthesis (e.g. focus on realm ascension, warfare, secret realms)."),
+                    "startChapter" to intSchema("Starting chapter index (0-based) to include. Defaults to 0."),
+                    "endChapter" to intSchema("Optional ending chapter index (0-based) to include.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_SAVE_STORY_CHRONICLE,
+                description = "Save or update a specific story chronicle era/period record. Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "eraTitle" to stringSchema("Title of the era/story arc (e.g. 'Thời Kỳ Luyện Khí Kỳ - Thanh Vân Môn')."),
+                    "chapterRange" to stringSchema("Human-readable chapter range string (e.g. 'Chương 1 - Chương 45')."),
+                    "eraSummary" to stringSchema("Narrative summary of key developments and milestones during this era."),
+                    "milestoneEvents" to arraySchema("Key milestone events that occurred in this period.", stringSchema("Event description.")),
+                    "keyCharacters" to arraySchema("Key active characters in this period.", stringSchema("Character name.")),
+                    "startChapterIndex" to intSchema("Starting chapter index (0-based)."),
+                    "endChapterIndex" to intSchema("Ending chapter index (0-based)."),
+                    "id" to stringSchema("Optional period id when editing an existing era.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_UPSERT_STORY_WIKI_ENTITY,
+                description = "Add or update an entity (character, sect, item, pet) in the Story Wiki. Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "raw" to stringSchema("Original source term / name (e.g. Hanzi or original text)."),
+                    "target" to stringSchema("Vietnamese translation / canonical name."),
+                    "senseKey" to stringSchema("Optional sense or context disambiguation key."),
+                    "kind" to stringSchema("Entity kind: character, sect, item, pet, or other. Defaults to character."),
+                    "summary" to stringSchema("Description or profile of the entity."),
+                    "aliases" to arraySchema("Known aliases or alternate names.", stringSchema("Alias name."))
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_DELETE_STORY_WIKI_ENTITY,
+                description = "Delete an entity from the Story Wiki by original term. Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "raw" to stringSchema("Original term of the entity to delete."),
+                    "senseKey" to stringSchema("Optional sense key of the entity.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_UPSERT_STORY_WIKI_WORLD,
+                description = "Add or update a world-building entry (realms, laws, geography, organizations) in the Story Wiki. Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "term" to stringSchema("Original term (e.g. Hanzi or concept name)."),
+                    "vietnamese" to stringSchema("Vietnamese translation / canonical concept name."),
+                    "category" to stringSchema("Category: realm, law, geography, organization, or other. Defaults to other."),
+                    "description" to stringSchema("Description and lore of the concept.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_DELETE_STORY_WIKI_WORLD,
+                description = "Delete a world-building entry from the Story Wiki by original term. Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "term" to stringSchema("Original term of the world-building concept to delete.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_UPSERT_STORY_WIKI_RELATIONSHIP,
+                description = "Add or update an interpersonal or faction relationship in the Story Wiki. Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "source" to stringSchema("Source character or faction name."),
+                    "target" to stringSchema("Target character or faction name."),
+                    "relationship" to stringSchema("Type of relationship (e.g. sư đồ, huynh đệ, kẻ thù, đồng minh)."),
+                    "description" to stringSchema("Context or details of the relationship."),
+                    "chapterIndex" to intSchema("Optional chapter index where the relationship was established.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_DELETE_STORY_WIKI_RELATIONSHIP,
+                description = "Delete a relationship entry from the Story Wiki. Requires user confirmation.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "source" to stringSchema("Source character or faction name."),
+                    "target" to stringSchema("Target character or faction name."),
+                    "relationship" to stringSchema("Optional relationship type to match.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_GET_STORY_WIKI,
+                description = "Query the full Story Wiki for a book, including entities, world-building, relationships, and chronicle periods.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Exact bookshelf book URL/id."),
+                    "bookName" to stringSchema("Book title when bookUrl is unavailable."),
+                    "bookAuthor" to stringSchema("Book author."),
+                    "tab" to stringSchema("Category tab to fetch: ALL, ENTITY, WORLD, RELATIONSHIP, or CHRONICLE. Defaults to ALL."),
+                    "query" to stringSchema("Optional search keyword to filter items.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_GENERATE_CHARACTER_IMAGE,
+                description = "Generate an AI concept portrait for a character entity from verified story memory facts. Returns the saved local image path.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Book URL."),
+                    "entityRaw" to stringSchema("Raw character/entity name as stored in story memory."),
+                    "force" to boolSchema("Optional. Force generation even if verified details are brief. Defaults to true.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_GENERATE_BOOK_COVER,
+                description = "Generate a cinematic vertical 2:3 book cover illustration for a bookshelf novel with the translated book title and author credit prominently rendered. Automatically sets the novel's custom cover.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Book URL."),
+                    "title" to stringSchema("Optional translated book title in Vietnamese to display prominently on the cover (user-edited or confirmed with user). Defaults to the book's translated name."),
+                    "author" to stringSchema("Optional author name to display on the cover. Defaults to the book's author."),
+                    "prompt" to stringSchema("Optional custom illustration prompt. If omitted, synthesized from story memory."),
+                    "force" to boolSchema("Optional. Force generation. Defaults to true.")
+                )
+            ),
+            AiToolDefinition(
+                name = TOOL_GENERATE_WORLD_IMAGE,
+                description = "Generate an AI concept illustration for a world-building entry (weapon, technique, location, faction) or the entire world map.",
+                inputSchema = objectSchema(
+                    "bookUrl" to stringSchema("Book URL."),
+                    "raw" to stringSchema("Raw key of the world entry (or '__story_world_map__' for world map)."),
+                    "category" to stringSchema("Optional category, e.g. location, faction, weapon, technique, world_map."),
+                    "force" to boolSchema("Optional. Force generation. Defaults to true.")
                 )
             )
         )

@@ -22,22 +22,24 @@ object TranslationConstants {
     )
 
     val providerDisplayNames = listOf(
-        "Google Translate",
-        "Google ML Kit",
+        "Hán Việt",
         "Quick Translator",
-        "NMT Offline",
         "AI Provider",
         "Local AI",
         "AI Rewrite",
+        "NMT Offline",
+        "Google Translate",
+        "Google ML Kit",
     )
     val providerValues = listOf(
-        PROVIDER_GOOGLE,
-        PROVIDER_ML_KIT,
+        PROVIDER_HAN_VIET,
         PROVIDER_QUICK_TRANSLATOR,
-        PROVIDER_NMT,
         PROVIDER_APP_AI,
         PROVIDER_LOCAL_AI,
         PROVIDER_REWRITE,
+        PROVIDER_NMT,
+        PROVIDER_GOOGLE,
+        PROVIDER_ML_KIT,
     )
 
     val targetLanguages = listOf(
@@ -54,7 +56,7 @@ object TranslationConstants {
     )
 
     fun targetLanguagesForProvider(provider: String): List<Pair<String, String>> {
-        return if (provider == PROVIDER_QUICK_TRANSLATOR || provider == PROVIDER_NMT || provider == PROVIDER_REWRITE) {
+        return if (provider == PROVIDER_QUICK_TRANSLATOR || provider == PROVIDER_NMT || provider == PROVIDER_REWRITE || provider == PROVIDER_HAN_VIET) {
             targetLanguages.filter { it.first == TARGET_VIETNAMESE }
         } else {
             targetLanguages
@@ -82,7 +84,8 @@ object TranslationConstants {
         return provider != PROVIDER_QUICK_TRANSLATOR &&
             provider != PROVIDER_NMT &&
             provider != PROVIDER_ML_KIT &&
-            provider != PROVIDER_LOCAL_AI
+            provider != PROVIDER_LOCAL_AI &&
+            provider != PROVIDER_HAN_VIET
     }
 
     /**

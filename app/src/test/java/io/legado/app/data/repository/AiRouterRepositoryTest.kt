@@ -119,6 +119,44 @@ class AiRouterRepositoryTest {
     }
 
     @Test
+    fun generateStreamTreatsToolCallDeltaAsValidContent() = runBlocking {
+        val dao = FakeAiRouterDao()
+        dao.routes["route_chat"] = chatRoute().copy(maxAttempts = 1)
+        dao.credentials["credential_codex"] = oauthCredential()
+        dao.targets["target_codex"] = AiRouteTargetEntity(
+            id = "target_codex",
+            routeProfileId = "route_chat",
+            modelProfileId = "model_codex",
+            credentialId = "credential_codex",
+            sortNumber = 0,
+        )
+        val profileGateway = FakeAiProfileGateway().apply {
+            modelConfigs["model_codex"] = oauthModel()
+        }
+        val toolCall = AiStreamEvent.ToolCallDelta(
+            id = "call_1",
+            index = 0,
+            name = "search_online_books",
+            argumentsDelta = "{\"query\":\"test\"}",
+            rawType = "function",
+        )
+        val delegate = ScriptedAiTextGateway(
+            streamScripts = listOf(listOf(toolCall)),
+        )
+        val repository = repository(
+            dao = dao,
+            profileGateway = profileGateway,
+            oauthGateway = FakeAiOAuthGateway { "access-token" },
+            delegate = delegate,
+        )
+
+        val events = repository.generateStream(chatRequest()).toList()
+
+        assertEquals(listOf(toolCall), events)
+        assertEquals(1, delegate.streamRequests.size)
+    }
+
+    @Test
     fun chatRouteSkipsUnresolvableTargetBeforeOauth() = runBlocking {
         val dao = FakeAiRouterDao()
         dao.routes["route_chat"] = chatRoute().copy(maxAttempts = 1)

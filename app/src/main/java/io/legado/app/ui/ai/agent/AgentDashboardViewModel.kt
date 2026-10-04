@@ -17,9 +17,12 @@ import io.legado.app.domain.gateway.AiSkillGateway
 import io.legado.app.domain.gateway.AiToolGateway
 import io.legado.app.domain.model.AiToolDefinition
 import io.legado.app.help.config.AiChatBubbleConfig
+import io.legado.app.help.config.ChatbotToolCategory
+import io.legado.app.help.config.ChatbotToolPermissionConfig
 import io.legado.app.ui.ai.context.AiScreenContextRegistry
 import io.legado.app.ui.ai.context.AiScreenContextSnapshot
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -38,20 +41,23 @@ class AgentDashboardViewModel(
     private val aiMemoryGateway: AiMemoryGateway,
     private val aiSkillGateway: AiSkillGateway,
     private val permissionBroker: AgentPermissionBroker,
+    private val toolPermissionConfig: ChatbotToolPermissionConfig,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(createUiState())
-    val uiState = _uiState.asStateFlow()
-
-    private val _effects = MutableSharedFlow<AgentDashboardEffect>(extraBufferCapacity = 16)
-    val effects = _effects.asSharedFlow()
     private var recentRuns: List<AiAgentRun> = emptyList()
     private var recentMemories: List<AiMemory> = emptyList()
     private var pendingProposalCount: Int = 0
     private var recentProposals: List<AiAgentProposal> = emptyList()
     private var recentAudits: List<AiAgentAudit> = emptyList()
     private var skills: List<AgentSkillSnapshot> = emptyList()
+    private var toolPermissions: Map<ChatbotToolCategory, Boolean> = toolPermissionConfig.permissionsFlow.value
     private var traceJob: Job? = null
+
+    private val _uiState = MutableStateFlow(createUiState())
+    val uiState = _uiState.asStateFlow()
+
+    private val _effects = MutableSharedFlow<AgentDashboardEffect>(extraBufferCapacity = 16)
+    val effects = _effects.asSharedFlow()
 
     init {
         viewModelScope.launch {
@@ -73,7 +79,10 @@ class AgentDashboardViewModel(
                     )
                 },
                 aiSkillGateway.observeSkills(),
-            ) { snapshot, observedSkills -> snapshot.copy(skills = observedSkills) }
+                toolPermissionConfig.permissionsFlow,
+            ) { snapshot, observedSkills, permissions ->
+                snapshot.copy(skills = observedSkills, toolPermissions = permissions)
+            }
                 .onEach { snapshot ->
                 recentRuns = snapshot.recentRuns
                 recentMemories = snapshot.recentMemories
@@ -81,6 +90,7 @@ class AgentDashboardViewModel(
                 recentProposals = snapshot.recentProposals
                 recentAudits = snapshot.recentAudits
                 skills = snapshot.skills
+                toolPermissions = snapshot.toolPermissions
                 val current = _uiState.value
                 _uiState.value = createUiState(
                     context = snapshot.context,
@@ -90,6 +100,8 @@ class AgentDashboardViewModel(
                     recentProposals = snapshot.recentProposals,
                     recentAudits = snapshot.recentAudits,
                     skills = snapshot.skills,
+                    toolPermissions = snapshot.toolPermissions,
+                    showToolSettingsSheet = current.showToolSettingsSheet,
                     selectedSkillId = current.selectedSkill?.id,
                     selectedRunId = current.selectedRun?.id,
                     selectedRunTrace = current.selectedRunTrace,
@@ -112,6 +124,12 @@ class AgentDashboardViewModel(
         when (intent) {
             AgentDashboardIntent.Refresh -> refresh()
             is AgentDashboardIntent.SetChatBubbleEnabled -> setChatBubbleEnabled(intent.enabled)
+            is AgentDashboardIntent.SetToolCategoryApproved -> {
+                toolPermissionConfig.setCategoryAutoApproved(intent.category, intent.approved)
+            }
+            AgentDashboardIntent.ToggleToolSettingsSheet -> {
+                _uiState.update { it.copy(showToolSettingsSheet = !it.showToolSettingsSheet) }
+            }
             is AgentDashboardIntent.OpenSkill -> openSkill(intent.skillId)
             AgentDashboardIntent.DismissSkill -> _uiState.update { it.copy(selectedSkill = null) }
             is AgentDashboardIntent.OpenRun -> openRun(intent.runId)
@@ -138,6 +156,8 @@ class AgentDashboardViewModel(
             recentProposals = recentProposals,
             recentAudits = recentAudits,
             skills = skills,
+            toolPermissions = toolPermissions,
+            showToolSettingsSheet = _uiState.value.showToolSettingsSheet,
             selectedSkillId = _uiState.value.selectedSkill?.id,
             selectedRunId = _uiState.value.selectedRun?.id,
             selectedRunTrace = _uiState.value.selectedRunTrace,
@@ -302,6 +322,8 @@ class AgentDashboardViewModel(
         recentProposals: List<AiAgentProposal> = emptyList(),
         recentAudits: List<AiAgentAudit> = emptyList(),
         skills: List<AgentSkillSnapshot> = emptyList(),
+        toolPermissions: Map<ChatbotToolCategory, Boolean> = this.toolPermissions,
+        showToolSettingsSheet: Boolean = false,
         selectedSkillId: String? = null,
         selectedRunId: String? = null,
         selectedRunTrace: List<AgentTraceUi> = emptyList(),
@@ -320,6 +342,8 @@ class AgentDashboardViewModel(
             recentProposals = recentProposals,
             recentAudits = recentAudits,
             skills = skills,
+            toolPermissions = toolPermissions,
+            showToolSettingsSheet = showToolSettingsSheet,
             selectedSkillId = selectedSkillId,
             selectedRunId = selectedRunId,
             selectedRunTrace = selectedRunTrace,
@@ -339,6 +363,7 @@ class AgentDashboardViewModel(
         val recentProposals: List<AiAgentProposal>,
         val recentAudits: List<AiAgentAudit>,
         val skills: List<AgentSkillSnapshot> = emptyList(),
+        val toolPermissions: Map<ChatbotToolCategory, Boolean> = emptyMap(),
     )
 
     companion object {
@@ -360,6 +385,8 @@ internal fun buildAgentDashboardUiState(
     recentProposals: List<AiAgentProposal> = emptyList(),
     recentAudits: List<AiAgentAudit> = emptyList(),
     skills: List<AgentSkillSnapshot> = emptyList(),
+    toolPermissions: Map<ChatbotToolCategory, Boolean> = emptyMap(),
+    showToolSettingsSheet: Boolean = false,
     selectedSkillId: String? = null,
     selectedRunId: String? = null,
     selectedRunTrace: List<AgentTraceUi> = emptyList(),
@@ -405,6 +432,8 @@ internal fun buildAgentDashboardUiState(
         recentMemories = recentMemories.map { it.toUi() }.toImmutableList(),
         tools = toolItems,
         skills = skillItems,
+        toolPermissions = toolPermissions.toImmutableMap(),
+        showToolSettingsSheet = showToolSettingsSheet,
         selectedSkill = skillItems.firstOrNull { it.id == selectedSkillId },
         selectedRun = recentRuns.firstOrNull { it.id == selectedRunId }?.toUi(),
         selectedRunTrace = selectedRunTrace.toImmutableList(),

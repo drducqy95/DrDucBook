@@ -2368,6 +2368,7 @@
     <string name="ai_agent_risk_bulk">Hàng loạt</string>
     <string name="ai_agent_risk_plugin_install">Cài plugin</string>
     <string name="ai_chat">Trò chuyện AI</string>
+    <string name="chatbot_tool_permissions_title">Quyền công cụ Chatbot</string>
     <string name="ai_recent_chats">Cuộc trò chuyện gần đây</string>
     <string name="ai_new_chat">Cuộc trò chuyện mới</string>
     <string name="ai_replying">AI đang trả lời…</string>

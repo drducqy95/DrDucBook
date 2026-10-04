@@ -341,7 +341,7 @@ class AiTranslationRefinePipelineTest {
             retryInstruction = "",
             protectedInstruction = "",
         )
-        assertTrue("System prompt should contain Hard Rule 13", prompt.contains("13. pronouns_addressing maps"))
+        assertTrue("System prompt should contain Hard Rule 15", prompt.contains("15. pronouns_addressing maps"))
     }
 
     @Test
@@ -380,7 +380,7 @@ class AiTranslationRefinePipelineTest {
             retryInstruction = "",
             protectedInstruction = "",
         )
-        assertTrue("System prompt should contain Hard Rule 14", prompt.contains("14. Translate Chinese internet, webnovel, and pop-culture slang"))
+        assertTrue("System prompt should contain Hard Rule 16", prompt.contains("16. Translate Chinese internet, webnovel, and pop-culture slang"))
     }
 
     @Test

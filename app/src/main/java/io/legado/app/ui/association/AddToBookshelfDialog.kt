@@ -79,21 +79,35 @@ class AddToBookshelfDialog() : BaseDialogFragment(R.layout.dialog_add_to_bookshe
             toastOnUi(it)
             dismiss()
         }
-        viewModel.load(bookUrl) {
-            viewModel.saveSearchBook(it) {
+        viewModel.load(
+            bookUrl = bookUrl,
+            onExplore = { explore ->
                 startActivity(
-                    MainActivity.createBookInfoIntent(
+                    MainActivity.createExploreShowIntent(
                         context = requireContext(),
-                        name = it.name,
-                        author = it.author,
-                        bookUrl = it.bookUrl,
-                        origin = it.origin,
-                        coverPath = it.coverUrl
+                        exploreName = explore.title,
+                        sourceUrl = explore.bookSource.bookSourceUrl,
+                        exploreUrl = explore.exploreUrl,
                     )
                 )
                 dismiss()
+            },
+            onSuccess = { book ->
+                viewModel.saveSearchBook(book) {
+                    startActivity(
+                        MainActivity.createBookInfoIntent(
+                            context = requireContext(),
+                            name = book.name,
+                            author = book.author,
+                            bookUrl = book.bookUrl,
+                            origin = book.origin,
+                            coverPath = book.coverUrl
+                        )
+                    )
+                    dismiss()
+                }
             }
-        }
+        )
         binding.tvCancel.setOnClickListener {
             dismiss()
         }
@@ -101,72 +115,53 @@ class AddToBookshelfDialog() : BaseDialogFragment(R.layout.dialog_add_to_bookshe
 
     class ViewModel(application: Application) : BaseViewModel(application) {
 
+        private val resolver: io.legado.app.domain.usecase.ExternalUrlResolverUseCase by lazy {
+            org.koin.java.KoinJavaComponent.get(io.legado.app.domain.usecase.ExternalUrlResolverUseCase::class.java)
+        }
+
         val loadStateLiveData = MutableLiveData<Boolean>()
         val loadErrorLiveData = MutableLiveData<String>()
         var book: Book? = null
 
-        fun load(bookUrl: String, success: (book: Book) -> Unit) {
+        fun load(
+            bookUrl: String,
+            onExplore: (io.legado.app.domain.usecase.ResolvedExternalUrl.ExploreCategory) -> Unit,
+            onSuccess: (book: Book) -> Unit
+        ) {
             execute {
-                appDb.bookDao.getBook(bookUrl)?.let {
-                    throw NoStackTraceException(
-                        context.getString(R.string.book_already_in_shelf, it.name)
-                    )
-                }
-                val baseUrl = NetworkUtils.getBaseUrl(bookUrl)
-                    ?: throw NoStackTraceException(context.getString(R.string.invalid_book_url))
-                val urlMatcher = AnalyzeUrl.paramPattern.matcher(bookUrl)
-                if (urlMatcher.find()) {
-                    val origin = GSON.fromJsonObject<AnalyzeUrl.UrlOption>(
-                        bookUrl.substring(urlMatcher.end())
-                    ).getOrNull()?.getOrigin()
-                    origin?.let {
-                        val source = appDb.bookSourceDao.getBookSource(it)
-                        source?.let {
-                            getBookInfo(bookUrl, source)?.let { book ->
-                                return@execute book
-                            }
+                when (val resolved = resolver.resolve(bookUrl)) {
+                    is io.legado.app.domain.usecase.ResolvedExternalUrl.BookDetail -> {
+                        if (resolved.inBookshelf) {
+                            throw NoStackTraceException(
+                                context.getString(R.string.book_already_in_shelf, resolved.book.name)
+                            )
                         }
+                        resolved
+                    }
+                    is io.legado.app.domain.usecase.ResolvedExternalUrl.ExploreCategory -> resolved
+                    is io.legado.app.domain.usecase.ResolvedExternalUrl.Unmatched -> {
+                        throw NoStackTraceException(context.getString(R.string.matching_source_not_found))
                     }
                 }
-                appDb.bookSourceDao.getBookSourceAddBook(baseUrl)?.let { source ->
-                    getBookInfo(bookUrl, source)?.let { book ->
-                        return@execute book
-                    }
-                }
-                appDb.bookSourceDao.hasBookUrlPattern.forEach { source ->
-                    try {
-                        val bs = source.getBookSource()!!
-                        if (bookUrl.matches(bs.bookUrlPattern!!.toRegex())) {
-                            getBookInfo(bookUrl, bs)?.let { book ->
-                                return@execute book
-                            }
-                        }
-                    } catch (_: Exception) {
-                    }
-                }
-                throw NoStackTraceException(context.getString(R.string.matching_source_not_found))
             }.onError {
                 AppLog.put("添加书籍 $bookUrl 出错", it)
                 loadErrorLiveData.postValue(it.localizedMessage)
             }.onSuccess {
-                book = it
-                success.invoke(it)
+                when (it) {
+                    is io.legado.app.domain.usecase.ResolvedExternalUrl.BookDetail -> {
+                        book = it.book
+                        onSuccess.invoke(it.book)
+                    }
+                    is io.legado.app.domain.usecase.ResolvedExternalUrl.ExploreCategory -> {
+                        onExplore.invoke(it)
+                    }
+                    else -> {}
+                }
             }.onStart {
                 loadStateLiveData.postValue(true)
             }.onFinally {
                 loadStateLiveData.postValue(false)
             }
-        }
-
-        private suspend fun getBookInfo(bookUrl: String, source: BookSource): Book? {
-            return kotlin.runCatching {
-                val book = Book(
-                    bookUrl = bookUrl,
-                    origin = source.bookSourceUrl,
-                    originName = source.bookSourceName
-                )
-                WebBook.getBookInfoAwait(source, book)
-            }.getOrNull()
         }
 
         fun saveSearchBook(book: Book, success: () -> Unit) {

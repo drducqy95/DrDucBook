@@ -26,6 +26,7 @@ class TranslationConstantsTest {
                 TranslationConstants.PROVIDER_APP_AI,
                 TranslationConstants.PROVIDER_LOCAL_AI,
                 TranslationConstants.PROVIDER_REWRITE,
+                TranslationConstants.PROVIDER_HAN_VIET,
             ),
             TranslationConstants.providerValues.toSet(),
         )

@@ -2034,6 +2034,7 @@
     <string name="ai_agent_risk_bulk">批量</string>
     <string name="ai_agent_risk_plugin_install">插件安装</string>
     <string name="ai_chat">AI 对话</string>
+    <string name="chatbot_tool_permissions_title">工具权限</string>
     <string name="ai_recent_chats">最近对话</string>
     <string name="ai_new_chat">新建对话</string>
     <string name="ai_replying">AI 正在回复…</string>

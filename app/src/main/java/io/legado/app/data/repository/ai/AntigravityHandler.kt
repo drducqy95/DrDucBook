@@ -83,14 +83,26 @@ class AntigravityHandler : AiProtocolHandler {
             sessionId = sessionId,
         )
         val tokenRotator = KeyRotator(provider.apiKey)
+        val isInteractive = request.taskType == io.legado.app.domain.model.AiTaskType.CHAT ||
+            request.outputContract == io.legado.app.domain.model.AiOutputContract.AGENT_TOOL_CALL
+        val effectiveClient = if (isInteractive) {
+            aiOkHttpClient.newBuilder()
+                .connectTimeout(15L, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(25L, java.util.concurrent.TimeUnit.SECONDS)
+                .callTimeout(50L, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+        } else {
+            aiOkHttpClient
+        }
+        val maxAttempts = if (isInteractive) 1 else tokenRotator.attemptsAtLeast(2)
         var lastException: Exception? = null
         var activeResponse: okhttp3.Response? = null
 
         for (targetBaseUrl in candidateBaseUrls) {
             try {
                 Log.d("AntigravityHandler", "Calling Antigravity endpoint $targetBaseUrl for model ${request.model.modelId}")
-                activeResponse = retryWithBackoff(maxAttempts = tokenRotator.attemptsAtLeast(2), keyRotator = tokenRotator) {
-                    aiOkHttpClient.newCallResponse {
+                activeResponse = retryWithBackoff(maxAttempts = maxAttempts, keyRotator = tokenRotator) {
+                    effectiveClient.newCallResponse {
                         url("$targetBaseUrl/v1internal:streamGenerateContent?alt=sse")
                         postJson(GSON.toJson(body))
                         addHeaders(
@@ -103,11 +115,17 @@ class AntigravityHandler : AiProtocolHandler {
                         )
                     }.also { resp ->
                         if (!resp.isSuccessful) {
-                            val message = resp.body.string().take(1000)
+                            val rawBody = resp.body.string().take(4000)
                             resp.close()
-                            Log.e("AntigravityHandler", "Antigravity HTTP ${resp.code} on $targetBaseUrl: $message")
-                            AppLog.put("Antigravity HTTP ${resp.code} on $targetBaseUrl: $message")
-                            error("HTTP ${resp.code}: ${message.ifBlank { resp.message }}")
+                            Log.e("AntigravityHandler", "Antigravity HTTP ${resp.code} on $targetBaseUrl: $rawBody")
+                            AppLog.put("Antigravity HTTP ${resp.code} on $targetBaseUrl: $rawBody")
+                            val validationUrl = extractValidationUrl(rawBody)
+                            val finalMsg = if (!validationUrl.isNullOrBlank()) {
+                                "HTTP ${resp.code}: VALIDATION_REQUIRED validation_url=\"$validationUrl\" ${rawBody.take(500)}"
+                            } else {
+                                "HTTP ${resp.code}: ${rawBody.ifBlank { resp.message }}"
+                            }
+                            error(finalMsg)
                         }
                     }
                 }
@@ -115,6 +133,10 @@ class AntigravityHandler : AiProtocolHandler {
             } catch (e: Exception) {
                 lastException = e
                 Log.w("AntigravityHandler", "Endpoint $targetBaseUrl failed: ${e.message}, attempting next candidate if available")
+                if (e.message?.contains("VALIDATION_REQUIRED") == true) {
+                    // Validation challenges are account-level; fail fast to allow user verification or immediate route failover
+                    break
+                }
             }
         }
         val response = activeResponse ?: throw (lastException ?: Exception("All Antigravity endpoints failed"))
@@ -212,12 +234,13 @@ internal fun buildAntigravityRequestEnvelope(
     currentTimeMillis: Long = System.currentTimeMillis(),
 ): Map<String, Any?> {
     val isClaude = request.model.modelId.contains("claude", ignoreCase = true)
+    val isGptOss = request.model.modelId.contains("gpt-oss", ignoreCase = true)
     val requestBody = buildGeminiRequestBody(request)
-        .toAntigravityRequest(isClaude = isClaude)
+        .toAntigravityRequest(isClaude = isClaude, isGptOss = isGptOss)
         .toMutableMap()
         .apply {
             put("sessionId", sessionId)
-            if ((get("tools") as? List<*>)?.isNotEmpty() == true) {
+            if (!isGptOss && (get("tools") as? List<*>)?.isNotEmpty() == true) {
                 put(
                     "toolConfig",
                     mapOf("functionCallingConfig" to mapOf("mode" to "VALIDATED")),
@@ -329,8 +352,15 @@ private fun JsonObject.antigravityParts(): List<JsonObject> {
 }
 
 /** Remove fields accepted by Gemini public API but rejected by Cloud Code Assist. */
-private fun Map<String, Any?>.toAntigravityRequest(isClaude: Boolean = false): Map<String, Any?> {
+private fun Map<String, Any?>.toAntigravityRequest(
+    isClaude: Boolean = false,
+    isGptOss: Boolean = false,
+): Map<String, Any?> {
     val result = toMutableMap()
+    if (isGptOss) {
+        result.remove("tools")
+        result.remove("toolConfig")
+    }
     val generationConfig = (result["generationConfig"] as? Map<*, *>)
         ?.entries
         ?.associate { (key, value) -> key.toString() to value }
@@ -358,4 +388,20 @@ private fun Map<String, Any?>.toAntigravityRequest(isClaude: Boolean = false): M
         result.remove("thinkingConfig")
     }
     return result
+}
+
+private fun extractValidationUrl(jsonText: String): String? {
+    return runCatching {
+        val root = GSON.fromJson(jsonText, JsonObject::class.java)
+        val details = root.getAsJsonObject("error")?.getAsJsonArray("details")
+        details?.forEach { elem ->
+            val obj = elem.asJsonObject
+            val reason = obj.get("reason")?.asString
+            if (reason.equals("VALIDATION_REQUIRED", ignoreCase = true)) {
+                val metadata = obj.getAsJsonObject("metadata")
+                return@runCatching metadata?.get("validation_url")?.asString
+            }
+        }
+        null
+    }.getOrNull() ?: Regex("""https://accounts\.google\.com/signin/continue[^\s"'\\]+""").find(jsonText)?.value
 }

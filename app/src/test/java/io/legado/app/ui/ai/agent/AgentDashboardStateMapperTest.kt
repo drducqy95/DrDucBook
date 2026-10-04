@@ -203,4 +203,28 @@ class AgentDashboardStateMapperTest {
         assertFalse(state.tools.single { it.name == "list_agent_skills" }.enabled)
         assertFalse(state.tools.single { it.name == "save_memory" }.enabled)
     }
+
+    @Test
+    fun buildStateIncludesToolPermissionsAndDynamicApproval() {
+        val state = buildAgentDashboardUiState(
+            chatBubbleEnabled = false,
+            context = null,
+            tools = listOf(
+                AiToolDefinition("add_book_to_bookshelf", "Add book", emptyMap()),
+                AiToolDefinition("search_books", "Search books", emptyMap()),
+            ),
+            toolPermissions = mapOf(
+                io.legado.app.help.config.ChatbotToolCategory.BOOKSHELF_AND_READING to true,
+            ),
+            riskFor = { name ->
+                if (name == "add_book_to_bookshelf") AgentActionRisk.WRITE else AgentActionRisk.READ
+            },
+            requiresApproval = { false },
+        )
+
+        assertEquals(2, state.toolCount)
+        assertEquals(0, state.approvalToolCount)
+        assertTrue(state.toolPermissions[io.legado.app.help.config.ChatbotToolCategory.BOOKSHELF_AND_READING] == true)
+        assertFalse(state.tools.single { it.name == "add_book_to_bookshelf" }.requiresApproval)
+    }
 }

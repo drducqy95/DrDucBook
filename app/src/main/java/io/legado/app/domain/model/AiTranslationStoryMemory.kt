@@ -201,6 +201,7 @@ data class AiTranslationStoryMemorySnapshot(
     val relationships: List<AiTranslationStoryRelationship> = emptyList(),
     val worldBuilding: List<AiTranslationWorldEntry> = emptyList(),
     val timelines: List<AiTranslationStoryTimeline> = emptyList(),
+    val chroniclePeriods: List<StoryChroniclePeriod> = emptyList(),
     val analyzedChapterIndices: Set<Int> = emptySet(),
     val pendingChapterIndices: Set<Int> = emptySet(),
     /** Canonical glossary projection. Legacy callers may leave this empty. */
@@ -517,6 +518,20 @@ data class StoryWikiCharacterGraph(
 )
 
 @Keep
+data class StoryChroniclePeriod(
+    val id: String = "",
+    val bookUrl: String = "",
+    val eraTitle: String = "",
+    val chapterRange: String = "",
+    val eraSummary: String = "",
+    val milestoneEvents: List<String> = emptyList(),
+    val keyCharacters: List<String> = emptyList(),
+    val startChapterIndex: Int = 0,
+    val endChapterIndex: Int = 0,
+    val updatedAt: Long = System.currentTimeMillis(),
+)
+
+@Keep
 data class StoryWikiSnapshot(
     val bookUrl: String = "",
     val bookName: String = "",
@@ -524,6 +539,7 @@ data class StoryWikiSnapshot(
     val bookCoverUrl: String = "",
     val glossaryRecords: List<AiTranslationStoryWikiRecord> = emptyList(),
     val timelineRecords: List<AiTranslationStoryWikiRecord> = emptyList(),
+    val chronicleRecords: List<StoryChroniclePeriod> = emptyList(),
     val relationshipTags: List<StoryWikiRelationshipTag> = emptyList(),
     val characterGraph: StoryWikiCharacterGraph = StoryWikiCharacterGraph(),
 )

@@ -1,26 +1,27 @@
 # 📚 Trinity Wiki Index
 
-_Auto-generated at 2026-10-04T08:12:58. Do not edit manually._
+_Auto-generated at 2026-10-04T22:03:19. Do not edit manually._
 
-**Total Pages:** 34
+**Total Pages:** 37
 
 ## Categories
 
 | Category | Pages | Description |
 |---|---|---|
-| entities | 2 | Modules, services, components |
-| decisions | 4 | Architecture decision records |
-| patterns | 22 | Reusable code/design patterns |
+| entities | 3 | Modules, services, components |
+| decisions | 5 | Architecture decision records |
+| patterns | 23 | Reusable code/design patterns |
 | insights | 6 | Lessons learned, tips, gotchas |
 
-## Entities (2)
+## Entities (3)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
 | [Go Local WebDAV and NMT HachimiMT-60-QT](.brain\wiki\entities\go-local-webdav-and-nmt-hachimimt-60-qt.md) | active | 2026-09-12 | webdav, nmt, gomobile, onnx, explore, p34, auto |
+| [P59 UX Auth Tools and Link Routing](.brain\wiki\entities\p59-ux-auth-tools-and-link-routing.md) | active | 2026-10-04 | p59, ux, auth, tools, link, translation, auto |
 | [Project legado-with-MD3-main](.brain\wiki\entities\project-legado-with-md3-main.md) | active | 2026-10-04 | overview, project, legado-with-MD3-main |
 
-## Decisions (4)
+## Decisions (5)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
@@ -28,8 +29,9 @@ _Auto-generated at 2026-10-04T08:12:58. Do not edit manually._
 | [Integrate Drive Library Section directly in Explore Tab](.brain\wiki\decisions\integrate-drive-library-section-directly-in-explore-tab.md) | active | 2026-09-12 | explore, webdav, ui, p34, auto |
 | [Session Secret HTTP Basic Auth for Localhost WebDAV](.brain\wiki\decisions\session-secret-http-basic-auth-for-localhost-webdav.md) | active | 2026-09-12 | webdav, security, auth, p34, auto |
 | [Use Gomobile AAR for Local WebDAV Proxy](.brain\wiki\decisions\use-gomobile-aar-for-local-webdav-proxy.md) | active | 2026-09-12 | webdav, gomobile, architecture, p34, auto |
+| [Use Post Upsert and Pre-Approved Tool Policy](.brain\wiki\decisions\use-post-upsert-and-pre-approved-tool-policy.md) | active | 2026-10-04 | p59, architecture, decision, auto |
 
-## Patterns (22)
+## Patterns (23)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
@@ -50,6 +52,7 @@ _Auto-generated at 2026-10-04T08:12:58. Do not edit manually._
 | [LocalAI Model Import & Path Auto-Detection - CONFIG_AND_UI_STATE_DESYNC Pattern](.brain\wiki\patterns\localai-model-import-path-auto-detection-config-and-ui-state-desync-pattern.md) | active | 2026-08-26 | LocalAI Model Import & Path Auto-Detection, CONFIG_AND_UI_STATE_DESYNC, auto-generated |
 | [LocalAI MT Prompt Language Mapping & Jinja Chat Roles - PROMPT_AND_CHAT_ROLE_FORMATTING Pattern](.brain\wiki\patterns\localai-mt-prompt-language-mapping-jinja-chat-roles-prompt-and-chat-role-formatting-pattern.md) | active | 2026-08-26 | LocalAI MT Prompt Language Mapping & Jinja Chat Roles, PROMPT_AND_CHAT_ROLE_FORMATTING, auto-generated |
 | [LocalAI Native Bridge R8 Proguard Obfuscation - PROGUARD_OBFUSCATION_CRASH Pattern](.brain\wiki\patterns\localai-native-bridge-r8-proguard-obfuscation-proguard-obfuscation-crash-pattern.md) | active | 2026-08-26 | LocalAI Native Bridge R8 Proguard Obfuscation, PROGUARD_OBFUSCATION_CRASH, auto-generated |
+| [QuickDictionarySelectionResolver - MAPPING_ALIGNMENT_DESYNC Pattern](.brain\wiki\patterns\quickdictionaryselectionresolver-mapping-alignment-desync-pattern.md) | active | 2026-10-04 | QuickDictionarySelectionResolver, MAPPING_ALIGNMENT_DESYNC, auto-generated |
 | [QuickTranslation/Performance - PERFORMANCE_GC_THRASHING Pattern](.brain\wiki\patterns\quicktranslationperformance-performance-gc-thrashing-pattern.md) | active | 2026-10-04 | QuickTranslation/Performance, PERFORMANCE_GC_THRASHING, auto-generated |
 | [Reader/PerBookPrompt - LogicError Pattern](.brain\wiki\patterns\readerperbookprompt-logicerror-pattern.md) | active | 2026-09-14 | Reader/PerBookPrompt, LogicError, auto-generated |
 | [Reader/PerBookPrompt - UXDefect Pattern](.brain\wiki\patterns\readerperbookprompt-uxdefect-pattern.md) | active | 2026-09-14 | Reader/PerBookPrompt, UXDefect, auto-generated |

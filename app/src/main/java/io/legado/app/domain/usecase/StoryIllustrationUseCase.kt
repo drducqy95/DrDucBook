@@ -109,6 +109,46 @@ class StoryIllustrationUseCase(
         return path
     }
 
+    suspend fun generateBookCover(
+        bookUrl: String,
+        customPrompt: String? = null,
+        title: String? = null,
+        author: String? = null,
+        force: Boolean = false,
+    ): String {
+        val snapshot = storyMemoryUseCase.loadSnapshot(bookUrl)
+        val prompt = if (!customPrompt.isNullOrBlank()) {
+            buildString {
+                appendLine(customPrompt.trim())
+                if (!title.isNullOrBlank() || !author.isNullOrBlank()) {
+                    appendLine()
+                    appendLine("Cover Typography Requirements:")
+                    if (!title.isNullOrBlank()) {
+                        appendLine("- Book Title: \"$title\" (prominently displayed in elegant, stylized typography).")
+                    }
+                    if (!author.isNullOrBlank()) {
+                        appendLine("- Author Name: \"$author\" (elegantly displayed at the bottom).")
+                    }
+                    appendLine("- Ensure the translated title and author are clearly and artistically integrated into the cover composition.")
+                }
+            }.trim()
+        } else {
+            StoryIllustrationPolicy.bookCoverPrompt(
+                snapshot = snapshot,
+                bookUrl = bookUrl,
+                title = title,
+                author = author,
+            )
+        }
+        val path = generateAndStore(
+            bookUrl = bookUrl,
+            subjectKey = "book_cover",
+            prompt = prompt,
+            size = "1024x1536",
+        )
+        return path
+    }
+
     private suspend fun generateAndStore(
         bookUrl: String,
         subjectKey: String,
@@ -318,4 +358,43 @@ object StoryIllustrationPolicy {
             .filter { it.category.lowercase() in setOf("location", "faction") }
             .take(20)
             .joinToString("; ") { "${it.target.ifBlank { it.raw }}: ${it.description}" }
+
+    fun bookCoverPrompt(
+        snapshot: AiTranslationStoryMemorySnapshot,
+        bookUrl: String,
+        title: String? = null,
+        author: String? = null,
+    ): String = buildString {
+        appendLine("Create a cinematic vertical book cover illustration (2:3 aspect ratio) for a published fiction novel.")
+        appendLine("Art style: professional digital concept art, epic composition, dramatic atmospheric lighting, stunning book cover design.")
+        if (!title.isNullOrBlank()) {
+            appendLine("Title Typography:")
+            appendLine("- Book Title: \"$title\"")
+            appendLine("- Prominently display the translated book title: \"$title\" in stylish, elegant typography suitable for a novel cover (typically positioned at the top or upper third of the cover).")
+        }
+        if (!author.isNullOrBlank()) {
+            appendLine("Author Credit:")
+            appendLine("- Author Name: \"$author\"")
+            appendLine("- Elegantly display the author credit: \"$author\" in a clean, refined font (positioned at the bottom or beneath the title).")
+        }
+        appendLine("Design Guidelines:")
+        if (!title.isNullOrBlank() || !author.isNullOrBlank()) {
+            appendLine("- The cover MUST feature the book title \"${title.orEmpty()}\" and author credit \"${author.orEmpty()}\" beautifully and legibly rendered.")
+        }
+        appendLine("- Strict negative rule: Do NOT render random gibberish words, fake publisher logos, or messy watermarks. Only render the specified title and author.")
+        val mainEntities = snapshot.entities.take(3)
+        if (mainEntities.isNotEmpty()) {
+            appendLine("Main characters / key elements:")
+            mainEntities.forEach {
+                appendLine("- ${it.target.ifBlank { it.raw }} (${it.type}): ${it.description.take(120)}")
+            }
+        }
+        val mainLocations = snapshot.worldBuilding.filter { it.category.lowercase() in setOf("location", "faction") }.take(3)
+        if (mainLocations.isNotEmpty()) {
+            appendLine("Setting & atmosphere:")
+            mainLocations.forEach {
+                appendLine("- [${it.category}] ${it.target.ifBlank { it.raw }}: ${it.description.take(120)}")
+            }
+        }
+    }.trim()
 }

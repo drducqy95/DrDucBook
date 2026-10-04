@@ -107,6 +107,7 @@ internal fun resolveQuickDictionarySelectionResult(
         displayText = display,
         selectionStart = selection.start,
         selectionEnd = selection.end,
+        mappedSelection = mappedSelection,
     )
     val exactRange = findExactSelectionRange(source, display, selection)
         ?: findDirectRange(source, selection.text, searchWindow.approximatePosition)
@@ -205,9 +206,16 @@ internal fun resolveQuickDictionarySelectionResult(
     }
     val alternatives = buildList {
         mappedSelection?.toRange(source)?.let { mappedRange ->
-            add(QuickDictionarySelectionAnchor(source, mappedRange.first, mappedRange.last + 1))
+            val len = mappedRange.last - mappedRange.first + 1
+            if (len <= MAX_TRANSLATED_CANDIDATE_CHARS && !source.substring(mappedRange).contains('\n')) {
+                add(QuickDictionarySelectionAnchor(source, mappedRange.first, mappedRange.last + 1))
+            }
         }
-        heuristicAnchor?.let(::add)
+        heuristicAnchor?.let { anchor ->
+            if (anchor.rawText.length <= MAX_TRANSLATED_CANDIDATE_CHARS && !anchor.rawText.contains('\n')) {
+                add(anchor)
+            }
+        }
     }.distinctBy { it.start to it.end }
     return QuickDictionarySelectionResolution(
         anchor = null,
@@ -218,7 +226,10 @@ internal fun resolveQuickDictionarySelectionResult(
 
 private fun MappedSelection.highConfidenceRange(source: String): IntRange? {
     if (confidence < MappedSelection.HIGH_CONFIDENCE_MAPPING) return null
-    return toRange(source)
+    val range = toRange(source) ?: return null
+    if (range.last - range.first + 1 > MAX_TRANSLATED_CANDIDATE_CHARS) return null
+    if (source.substring(range).contains('\n')) return null
+    return range
 }
 
 private fun MappedSelection.toRange(source: String): IntRange? {
@@ -276,6 +287,27 @@ private data class ScoredRange(
     val confidence: Float,
 )
 
+private fun findNearestOccurrence(
+    text: String,
+    needle: String,
+    preferredPosition: Int,
+): Int? {
+    if (needle.isBlank() || text.isBlank()) return null
+    var match = text.indexOf(needle)
+    if (match < 0) return null
+    var closest = match
+    var closestDistance = abs(match - preferredPosition)
+    while (match >= 0) {
+        val distance = abs(match - preferredPosition)
+        if (distance < closestDistance) {
+            closest = match
+            closestDistance = distance
+        }
+        match = text.indexOf(needle, match + 1)
+    }
+    return closest
+}
+
 private fun trimmedSelection(
     request: QuickDictionaryRequest,
     displayLength: Int,
@@ -284,9 +316,16 @@ private fun trimmedSelection(
     val first = selected.indexOfFirst { !it.isWhitespace() }
     if (first < 0) return TrimmedSelection("", request.selectionStart, request.selectionStart)
     val last = selected.indexOfLast { !it.isWhitespace() }
-    val start = (request.selectionStart + first).coerceIn(0, displayLength)
-    val end = (request.selectionStart + last + 1).coerceIn(start, displayLength)
-    return TrimmedSelection(selected.substring(first, last + 1), start, end)
+    val trimmed = selected.substring(first, last + 1)
+    val rawStart = (request.selectionStart + first).coerceIn(0, displayLength)
+    val rawEnd = (request.selectionStart + last + 1).coerceIn(rawStart, displayLength)
+    val calibratedStart = findNearestOccurrence(
+        text = request.displayText,
+        needle = trimmed,
+        preferredPosition = rawStart,
+    ) ?: rawStart
+    val calibratedEnd = (calibratedStart + trimmed.length).coerceIn(calibratedStart, displayLength)
+    return TrimmedSelection(trimmed, calibratedStart, calibratedEnd)
 }
 
 private fun findExactSelectionRange(
@@ -306,9 +345,20 @@ private fun sourceSearchWindow(
     displayText: String,
     selectionStart: Int,
     selectionEnd: Int,
+    mappedSelection: MappedSelection? = null,
 ): SourceSearchWindow {
     if (sourceText.length <= 1) {
         return SourceSearchWindow(0, sourceText.lastIndex.coerceAtLeast(0), 0)
+    }
+    if (mappedSelection != null && mappedSelection.sourceStart != null && mappedSelection.sourceEnd != null) {
+        val mStart = mappedSelection.sourceStart.coerceIn(0, sourceText.lastIndex)
+        val mEnd = mappedSelection.sourceEnd.coerceIn(mStart, sourceText.length)
+        val approx = ((mStart + mEnd) / 2).coerceIn(0, sourceText.lastIndex)
+        return SourceSearchWindow(
+            start = (mStart - SEARCH_RADIUS).coerceAtLeast(0),
+            endInclusive = (mEnd + SEARCH_RADIUS).coerceAtMost(sourceText.lastIndex),
+            approximatePosition = approx,
+        )
     }
     val fallbackApproximate = scalePosition(
         displayPosition = selectionStart,
@@ -320,12 +370,35 @@ private fun sourceSearchWindow(
     val displaySegmentIndex = displaySegments.segmentIndexAt(selectionStart)
     val selectionEndPosition = (selectionEnd - 1).coerceAtLeast(selectionStart)
     val displayEndSegmentIndex = displaySegments.segmentIndexAt(selectionEndPosition)
-    val sourceSegment = sourceSegments.getOrNull(displaySegmentIndex)
-    val sourceEndSegment = sourceSegments.getOrNull(displayEndSegmentIndex)
+
+    if (sourceSegments.isEmpty() || displaySegments.isEmpty()) {
+        return SourceSearchWindow(
+            start = (fallbackApproximate - SEARCH_RADIUS).coerceAtLeast(0),
+            endInclusive = (fallbackApproximate + SEARCH_RADIUS).coerceAtMost(sourceText.lastIndex),
+            approximatePosition = fallbackApproximate,
+        )
+    }
+
+    val targetSourceIndex = if (sourceSegments.size == displaySegments.size) {
+        displaySegmentIndex
+    } else {
+        ((displaySegmentIndex.toDouble() / displaySegments.size.toDouble()) * sourceSegments.size.toDouble())
+            .toInt()
+            .coerceIn(0, sourceSegments.lastIndex)
+    }
+    val targetSourceEndIndex = if (sourceSegments.size == displaySegments.size) {
+        displayEndSegmentIndex
+    } else {
+        ((displayEndSegmentIndex.toDouble() / displaySegments.size.toDouble()) * sourceSegments.size.toDouble())
+            .toInt()
+            .coerceIn(0, sourceSegments.lastIndex)
+    }
+
+    val sourceSegment = sourceSegments.getOrNull(targetSourceIndex)
+    val sourceEndSegment = sourceSegments.getOrNull(targetSourceEndIndex)
     val displaySegment = displaySegments.getOrNull(displaySegmentIndex)
     val displayEndSegment = displaySegments.getOrNull(displayEndSegmentIndex)
-    if (sourceSegments.size != displaySegments.size ||
-        sourceSegment == null ||
+    if (sourceSegment == null ||
         sourceEndSegment == null ||
         displaySegment == null ||
         displayEndSegment == null ||
@@ -355,10 +428,8 @@ private fun sourceSearchWindow(
         .roundToInt()
         .coerceIn(sourceEndSegment.start, sourceEndSegment.end.coerceAtMost(sourceText.lastIndex))
     val start = (minOf(approximate, approximateEnd) - SEARCH_RADIUS)
-        .coerceAtLeast(sourceSegment.start)
         .coerceAtLeast(0)
     val end = (maxOf(approximate, approximateEnd) + SEARCH_RADIUS)
-        .coerceAtMost(sourceEndSegment.endInclusive.coerceAtLeast(sourceEndSegment.start))
         .coerceAtMost(sourceText.lastIndex)
     return SourceSearchWindow(
         start = start,
@@ -518,7 +589,7 @@ private fun findTranslatedRange(
     if (targetReading.isBlank()) return null
     val targetWordCount = targetReading.split(' ').count(String::isNotBlank).coerceAtLeast(1)
     val minChars = (targetWordCount / 2).coerceAtLeast(1)
-    val maxChars = (targetWordCount + 2).coerceIn(minChars, 6)
+    val maxChars = (targetWordCount + 2).coerceIn(minChars, 10)
     val windowStart = searchWindow.start.coerceAtLeast(0)
     val windowEnd = searchWindow.endInclusive.coerceAtMost(sourceText.lastIndex)
     if (windowEnd < windowStart) return null
@@ -527,7 +598,7 @@ private fun findTranslatedRange(
     val starts = (windowStart..windowEnd)
         .filter { sourceText[it].isPhraseChar() }
         .sortedBy { abs(it - searchWindow.approximatePosition) }
-        .take(40)
+        .take(80)
 
     var best: ScoredRange? = null
     val readingCache = HashMap<String, List<String>>()
@@ -713,9 +784,9 @@ private fun Char.isPhraseChar(): Boolean = isLetterOrDigit() ||
     code in 0x3400..0x4DBF || code in 0x4E00..0x9FFF || code in 0xF900..0xFAFF
 
 private const val CONTEXT_CHARS = 400
-private const val SEARCH_RADIUS = 192
-private const val SEARCH_RADIUS_FALLBACK = 320
+private const val SEARCH_RADIUS = 512
+private const val SEARCH_RADIUS_FALLBACK = 1024
 private const val MAX_TRANSLATED_CANDIDATE_CHARS = 16
-private const val MAX_GLOBAL_ALIGNMENT_SOURCE_CHARS = 2_400
+private const val MAX_GLOBAL_ALIGNMENT_SOURCE_CHARS = 20_000
 private const val PARTIAL_MATCH_MIN_CHARS = 4
 private const val PARTIAL_MATCH_SCORE_OFFSET = 10_000

@@ -116,7 +116,7 @@ class ApiKeySyncRepository(
             val userId = CloudSyncClientContract.normalizeUuid(session.userId, "userId")
             val objectPath = CloudSyncClientContract.userAssetObjectPath(userId, API_KEYS_RELATIVE_PATH)
 
-            rest.putFile(
+            rest.postFile(
                 path = "storage/v1/object/${CloudSyncClientContract.USER_ASSET_BUCKET}/$objectPath",
                 source = tempFile,
                 upsert = true,

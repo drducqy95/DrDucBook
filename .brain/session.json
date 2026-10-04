@@ -1,24 +1,22 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-10-04T08:12:58.458249",
-    "saved_at": "2026-10-04T08:12:58.458222",
-    "resumed_at": "2026-10-03T14:30:00.000000"
+    "last_active": "2026-10-05T01:00:00.000000",
+    "saved_at": "2026-10-05T01:00:00.000000",
+    "resumed_at": "2026-10-04T20:00:00.000000"
   },
   "working_on": {
-    "feature": "QuickTranslation Optimization & LDPlayer Verification",
-    "current_milestone": "P54",
-    "current_plan_path": "plans/261003-1400-hub-vbook-qt-fast/",
-    "current_phase": "phase-07-polish-verification",
-    "total_phases": 7,
+    "feature": "Agent Story Memory, Story Wiki Chronicle Synthesis & Enhanced Source Creation/Repair Tools",
+    "current_milestone": "P60",
+    "current_plan_path": "plans/261004-2000-agent-story-memory-wiki-source-tools/",
+    "current_phase": "phase-05-verification-and-testing",
+    "total_phases": 5,
     "phases": [
       "01",
       "02",
       "03",
       "04",
-      "05",
-      "06",
-      "07"
+      "05"
     ],
     "status": "completed"
   },
@@ -256,6 +254,16 @@
       "files": [
         "app/src/main/java/io/legado/app/data/repository/QuickTranslationRepository.kt"
       ]
+    },
+    {
+      "type": "debug",
+      "description": "QuickDictionarySelectionResolver: Raw mapping error when adding QT dictionary entry: whole paragraph offered and raw field left blank",
+      "files": [
+        "app/src/main/java/io/legado/app/domain/model/MappedDisplayText.kt",
+        "app/src/main/java/io/legado/app/ui/quickdict/QuickDictionarySelectionResolver.kt",
+        "app/src/main/java/io/legado/app/ui/book/read/ReadBookViewModel.kt"
+      ],
+      "error_id": "ERR_0044"
     }
   ],
   "context_notes": [

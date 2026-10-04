@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import io.legado.app.domain.agent.AgentApprovalScope
 import io.legado.app.domain.model.AiMessagePart
 import io.legado.app.domain.model.AiReasoningLevel
+import io.legado.app.help.config.ChatbotToolCategory
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -15,7 +16,8 @@ data class AiChatUiState(
     val reasoningLevel: AiReasoningLevel = AiReasoningLevel.AUTO,
     val isSending: Boolean = false,
     val streamingMessage: AiChatMessageUi? = null,
-    val pendingToolConfirmation: AiToolConfirmationUi? = null
+    val pendingToolConfirmation: AiToolConfirmationUi? = null,
+    val showToolSettingsSheet: Boolean = false,
 )
 
 @Stable
@@ -77,6 +79,8 @@ sealed interface AiChatIntent {
     data class SwitchBranch(val messageId: String) : AiChatIntent
     data class DeleteConversation(val id: String) : AiChatIntent
     data class RenameConversation(val id: String, val title: String) : AiChatIntent
+    data object ToggleToolSettingsSheet : AiChatIntent
+    data class SetToolCategoryApproved(val category: ChatbotToolCategory, val approved: Boolean) : AiChatIntent
 }
 
 sealed interface AiChatEffect {

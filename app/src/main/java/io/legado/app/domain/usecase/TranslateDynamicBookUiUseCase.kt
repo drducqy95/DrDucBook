@@ -11,6 +11,9 @@ class TranslateDynamicBookUiUseCase(
         sourceBook: SearchBook,
         forceRetranslate: Boolean = false,
     ): SearchBook {
+        val safeWordCount = sourceBook.wordCount?.takeIf { io.legado.app.data.entities.BaseBook.isValidWordCount(it) }
+        val safeChapterWordCountText = sourceBook.chapterWordCountText?.takeIf { io.legado.app.data.entities.BaseBook.isValidWordCount(it) }
+
         val context = listOfNotNull(
             sourceBook.name,
             sourceBook.author,
@@ -18,8 +21,8 @@ class TranslateDynamicBookUiUseCase(
             sourceBook.kind,
             sourceBook.intro,
             sourceBook.latestChapterTitle,
-            sourceBook.wordCount,
-            sourceBook.chapterWordCountText,
+            safeWordCount,
+            safeChapterWordCountText,
         ).joinToString("\n")
         val dictionaryBook = sourceBook.toBook()
         val scopeKey = "book:${sourceBook.bookUrl}"
@@ -31,8 +34,8 @@ class TranslateDynamicBookUiUseCase(
             sourceBook.kind,
             sourceBook.intro,
             sourceBook.latestChapterTitle,
-            sourceBook.wordCount,
-            sourceBook.chapterWordCountText,
+            safeWordCount,
+            safeChapterWordCountText,
         )
         val populatedValues = sourceValues.mapIndexedNotNull { index, value ->
             value?.takeIf(String::isNotBlank)?.let { index to it }
@@ -68,8 +71,8 @@ class TranslateDynamicBookUiUseCase(
             kind = displayValues[3],
             intro = displayValues[4],
             latestChapterTitle = translatedLatestChapter,
-            wordCount = displayValues[6],
-            chapterWordCountText = displayValues[7],
+            wordCount = displayValues[6]?.takeIf { io.legado.app.data.entities.BaseBook.isValidWordCount(it) },
+            chapterWordCountText = displayValues[7]?.takeIf { io.legado.app.data.entities.BaseBook.isValidWordCount(it) },
         ).also { displayCopy ->
             displayCopy.infoHtml = sourceBook.infoHtml
             displayCopy.tocHtml = sourceBook.tocHtml

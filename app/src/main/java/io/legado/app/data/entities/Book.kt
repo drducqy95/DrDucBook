@@ -128,6 +128,7 @@ data class Book(
 ) : Parcelable, BaseBook {
 
     init {
+        bookUrl = io.legado.app.utils.UrlSanitizer.sanitizeBookUrl(bookUrl)
         kind = kind?.take(1000)
         intro = intro?.take(5000)
         customTag = customTag?.take(1000)

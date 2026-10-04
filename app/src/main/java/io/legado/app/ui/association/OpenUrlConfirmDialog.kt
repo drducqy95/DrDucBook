@@ -8,15 +8,18 @@ import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
 import androidx.core.net.toUri
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import com.drducbook.app.R
 import io.legado.app.base.BaseDialogFragment
 import io.legado.app.constant.AppLog
 import com.drducbook.app.databinding.DialogOpenUrlConfirmBinding
 import io.legado.app.lib.dialogs.alert
-//import io.legado.app.lib.theme.primaryColor
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 
 class OpenUrlConfirmDialog() : BaseDialogFragment(R.layout.dialog_open_url_confirm),
@@ -71,6 +74,52 @@ class OpenUrlConfirmDialog() : BaseDialogFragment(R.layout.dialog_open_url_confi
         binding.btnPositive.setOnClickListener {
             openUrl()
             dismiss()
+        }
+
+        lifecycleScope.launch(Dispatchers.Main) {
+            val resolver = org.koin.java.KoinJavaComponent.get<io.legado.app.domain.usecase.ExternalUrlResolverUseCase>(
+                io.legado.app.domain.usecase.ExternalUrlResolverUseCase::class.java
+            )
+            val resolved = withContext(Dispatchers.IO) {
+                resolver.resolve(viewModel.uri)
+            }
+            when (resolved) {
+                is io.legado.app.domain.usecase.ResolvedExternalUrl.BookDetail -> {
+                    val srcName = resolved.bookSource.bookSourceName
+                    binding.message.text = "Phát hiện liên kết truyện từ nguồn [$srcName]. Bạn có muốn mở sách trong ứng dụng?"
+                    binding.btnPositive.text = "Mở sách"
+                    binding.btnPositive.setOnClickListener {
+                        startActivity(
+                            io.legado.app.ui.main.MainActivity.createBookInfoIntent(
+                                context = requireContext(),
+                                name = resolved.book.name,
+                                author = resolved.book.author,
+                                bookUrl = resolved.book.bookUrl,
+                                origin = resolved.book.origin,
+                                coverPath = resolved.book.coverUrl,
+                            )
+                        )
+                        dismiss()
+                    }
+                }
+                is io.legado.app.domain.usecase.ResolvedExternalUrl.ExploreCategory -> {
+                    val srcName = resolved.bookSource.bookSourceName
+                    binding.message.text = "Phát hiện liên kết khám phá từ nguồn [$srcName]. Bạn có muốn mở trong ứng dụng?"
+                    binding.btnPositive.text = "Khám phá"
+                    binding.btnPositive.setOnClickListener {
+                        startActivity(
+                            io.legado.app.ui.main.MainActivity.createExploreShowIntent(
+                                context = requireContext(),
+                                exploreName = resolved.title,
+                                sourceUrl = resolved.bookSource.bookSourceUrl,
+                                exploreUrl = resolved.exploreUrl,
+                            )
+                        )
+                        dismiss()
+                    }
+                }
+                is io.legado.app.domain.usecase.ResolvedExternalUrl.Unmatched -> {}
+            }
         }
     }
 

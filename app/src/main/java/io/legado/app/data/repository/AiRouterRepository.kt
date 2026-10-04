@@ -369,12 +369,21 @@ class AiRouterRepository(
                         ensureCandidateCurrentlyEligible(candidate)
                         attemptedCandidate = true
                         delegate.generateStream(routedRequest).collect { event ->
-                            if (event is AiStreamEvent.Content &&
-                                event.text.isNotBlank() &&
-                                firstEventAt == null
-                            ) {
-                                firstEventAt = clock.millis()
-                                hasContent = true
+                            if (firstEventAt == null) {
+                                when (event) {
+                                    is AiStreamEvent.Content -> if (event.text.isNotBlank()) firstEventAt = clock.millis()
+                                    is AiStreamEvent.ToolCallDelta -> firstEventAt = clock.millis()
+                                    is AiStreamEvent.Reasoning -> if (event.text.isNotBlank()) firstEventAt = clock.millis()
+                                    else -> Unit
+                                }
+                            }
+                            if (!hasContent) {
+                                when (event) {
+                                    is AiStreamEvent.Content -> if (event.text.isNotBlank()) hasContent = true
+                                    is AiStreamEvent.ToolCallDelta -> hasContent = true
+                                    is AiStreamEvent.Reasoning -> if (event.text.isNotBlank()) hasContent = true
+                                    else -> Unit
+                                }
                             }
                             if (bufferedEvents != null) {
                                 bufferedEvents += event
@@ -541,6 +550,9 @@ class AiRouterRepository(
         now: Long,
     ): Boolean {
         if (model == null) return false
+        if (outputContract == AiOutputContract.AGENT_TOOL_CALL && model.modelId.startsWith("gpt-oss")) {
+            return false
+        }
         if (entity.credentialId == null &&
             (model.provider.authType == AiProviderAuthType.NONE || model.provider.apiKey.isNotBlank())
         ) return true
@@ -570,6 +582,9 @@ class AiRouterRepository(
         outputContract: String,
         now: Long,
     ): List<RouteCandidate> {
+        if (outputContract == AiOutputContract.AGENT_TOOL_CALL && model.modelId.startsWith("gpt-oss")) {
+            return emptyList()
+        }
         if (explicitCredential != null) {
             val capability = dao.getCapability(
                 credentialId = explicitCredential.id,

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Upload
@@ -38,11 +41,14 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
+import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -472,29 +478,31 @@ private fun StoryMemoryEditorDialog(
                             value = draft.secondary,
                             onValueChange = { onChange(draft.copy(secondary = it)) },
                         )
-                        Text(
-                            text = stringResource(R.string.quick_dictionary_translation_provider),
-                        )
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TranslationConstants.providerValues
-                                .zip(TranslationConstants.providerDisplayNames)
-                                .forEach { (provider, label) ->
-                                    FilterChip(
-                                        selected = draft.selectedProvider == provider,
-                                        enabled = !draft.isSuggesting,
-                                        onClick = { onRequestSuggestion(provider) },
-                                        label = { Text(label) },
-                                    )
-                                }
+                        val providerOptions = remember {
+                            TranslationConstants.providerValues.zip(TranslationConstants.providerDisplayNames)
                         }
+                        val currentProviderLabel = providerOptions.firstOrNull { it.first == draft.selectedProvider }?.second
+                            ?: draft.selectedProvider
+                        StoryMemoryDropdownField(
+                            value = currentProviderLabel,
+                            label = stringResource(R.string.quick_dictionary_translation_provider),
+                            items = providerOptions,
+                            itemLabel = { it.second },
+                            onItemSelected = { onRequestSuggestion(it.first) },
+                            enabled = !draft.isSuggesting,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         if (draft.isSuggesting) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }
                         if (draft.suggestions.isNotEmpty()) {
-                            Text(stringResource(R.string.quick_dictionary_suggestions))
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = stringResource(R.string.quick_dictionary_suggestions),
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 draft.suggestions.forEach { suggestion ->
-                                    TextButton(
+                                    OutlinedButton(
                                         onClick = { onApplySuggestion(suggestion.text) },
                                         modifier = Modifier.fillMaxWidth(),
                                     ) {
@@ -709,6 +717,59 @@ private fun EditorField(
         minLines = if (singleLine) 1 else 3,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
     )
+}
+
+@Composable
+private fun <T> StoryMemoryDropdownField(
+    value: String,
+    label: String,
+    items: List<T>,
+    itemLabel: @Composable (T) -> String,
+    onItemSelected: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = { Text(label) },
+            trailingIcon = {
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        if (enabled) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable { expanded = !expanded },
+            )
+        }
+        RoundDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) { dismiss ->
+            items.forEach { item ->
+                val text = itemLabel(item)
+                RoundDropdownMenuItem(
+                    text = text,
+                    isSelected = text == value,
+                    onClick = {
+                        dismiss()
+                        onItemSelected(item)
+                    },
+                )
+            }
+        }
+    }
 }
 
 @Composable

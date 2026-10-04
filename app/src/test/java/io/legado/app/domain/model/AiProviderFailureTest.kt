@@ -73,6 +73,21 @@ class AiProviderFailureTest {
     }
 
     @Test
+    fun classifiesValidationRequiredFailureWithActionUrl() {
+        val rawError = Exception("""HTTP 403: VALIDATION_REQUIRED validation_url="https://accounts.google.com/signin/continue?sarp=1&scc=1&continue=https://developers" {"error":{"code":403,"message":"Verify your account to continue.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"VALIDATION_REQUIRED"}]}}""")
+        val failure = AiProviderFailureClassifier.classify(
+            error = rawError,
+            provider = "Google Antigravity",
+            model = "gemini-3.7-flash-medium",
+        ).failure
+
+        assertEquals(AiFailureKind.VALIDATION_REQUIRED, failure.kind)
+        assertEquals("https://accounts.google.com/signin/continue?sarp=1&scc=1&continue=https://developers", failure.actionUrl)
+        assertTrue(failure.userMessage.contains("Tài khoản Google yêu cầu xác minh"))
+        assertTrue(failure.userMessage.contains("https://accounts.google.com/signin/continue"))
+    }
+
+    @Test
     fun routeUnavailablePreservesComboNameAndRetryDelay() {
         val failure = AiProviderFailureClassifier.classify(
             error = AiRouteUnavailableException(

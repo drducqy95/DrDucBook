@@ -61,6 +61,18 @@ internal class SupabaseAuthenticatedRestClient(
         execute(builder)
     }
 
+    suspend fun postFile(
+        path: String,
+        source: File,
+        upsert: Boolean = false,
+    ) {
+        val builder = Request.Builder()
+            .url(url(path))
+            .header("x-upsert", upsert.toString())
+            .post(source.asRequestBody(OCTET_STREAM_MEDIA_TYPE))
+        execute(builder)
+    }
+
     /**
      * Uploads large objects using Supabase Storage's TUS endpoint. A single failed
      * request is retried after refreshing the access token; each retry starts from

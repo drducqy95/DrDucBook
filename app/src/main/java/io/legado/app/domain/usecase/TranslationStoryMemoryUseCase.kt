@@ -801,6 +801,7 @@ class TranslationStoryMemoryUseCase(
             bookCoverUrl = bookCoverUrl,
             glossaryRecords = glossary,
             timelineRecords = timelines,
+            chronicleRecords = snapshot.chroniclePeriods,
             relationshipTags = relationshipTags,
             characterGraph = StoryWikiCharacterGraph(graphNodeMap.values.toList(), graphEdges),
         )
@@ -811,11 +812,19 @@ class TranslationStoryMemoryUseCase(
         chapterIndex: Int,
         title: String,
     ): String {
-        if (title.isBlank()) return "Chương ${chapterIndex + 1}"
-        if (!title.containsCjk()) {
-            return title.restructureChapterNumbers().toTitleCase()
+        val rawTitle = if (title.isNotBlank()) {
+            title
+        } else {
+            runCatching {
+                appDb.bookChapterDao.getChapter(bookUrl, chapterIndex)?.title
+            }.getOrNull().orEmpty()
         }
-        val translated = quickTranslationGateway.translate(title)
+        if (rawTitle.isBlank()) return "Chương ${chapterIndex + 1}"
+        val translated = if (rawTitle.containsCjk()) {
+            quickTranslationGateway.translate(rawTitle)
+        } else {
+            rawTitle
+        }
         return translated.restructureChapterNumbers().toTitleCase()
     }
 
@@ -938,6 +947,8 @@ class TranslationStoryMemoryUseCase(
             worldBuilding = healedWorld,
             timelines = decodeValues<AiTranslationStoryTimeline>(TIMELINE_PREFIX)
                 .sortedBy(AiTranslationStoryTimeline::chapterIndex),
+            chroniclePeriods = decodeValues<io.legado.app.domain.model.StoryChroniclePeriod>(CHRONICLE_PREFIX)
+                .sortedBy(io.legado.app.domain.model.StoryChroniclePeriod::startChapterIndex),
             analyzedChapterIndices = asSequence()
                 .map(AiMemory::key)
                 .filter { it.startsWith(ANALYSIS_PREFIX) }
@@ -1209,6 +1220,28 @@ class TranslationStoryMemoryUseCase(
 
     suspend fun deleteTimeline(bookUrl: String, chapterIndex: Int) =
         deleteBookMemory(bookUrl, timelineKey(chapterIndex))
+
+    suspend fun upsertChroniclePeriod(bookUrl: String, period: io.legado.app.domain.model.StoryChroniclePeriod) = withBookLock(bookUrl) {
+        val id = period.id.ifBlank { stableId(period.eraTitle) }
+        val target = period.copy(id = id, bookUrl = bookUrl, updatedAt = System.currentTimeMillis())
+        upsertBookMemory(
+            bookUrl = bookUrl,
+            key = chronicleKey(id),
+            type = AiMemory.TYPE_SUMMARY,
+            value = target,
+        )
+    }
+
+    suspend fun deleteChroniclePeriod(bookUrl: String, periodId: String) = withBookLock(bookUrl) {
+        deleteBookMemory(bookUrl, chronicleKey(periodId))
+    }
+
+    suspend fun getChroniclePeriods(bookUrl: String): List<io.legado.app.domain.model.StoryChroniclePeriod> {
+        val memories = aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
+        return memories.filter { it.key.startsWith(CHRONICLE_PREFIX) }
+            .mapNotNull { it.decodeValue<io.legado.app.domain.model.StoryChroniclePeriod>() }
+            .sortedBy { it.startChapterIndex }
+    }
 
     suspend fun clear(bookUrl: String) {
         aiMemoryGateway.getByScope(AiMemory.SCOPE_BOOK, bookUrl)
@@ -1714,6 +1747,7 @@ class TranslationStoryMemoryUseCase(
         private const val TIMELINE_PREFIX = "translation-story:timeline:"
         private const val ANALYSIS_PREFIX = "translation-story:analysis:"
         private const val PENDING_PREFIX = "translation-story:pending:"
+        private const val CHRONICLE_PREFIX = "translation-story:chronicle:"
 
         fun entityKey(raw: String, senseKey: String = ""): String =
             ENTITY_PREFIX + stableId(TranslationMemoryCanonicalizer.identity(raw, senseKey))
@@ -1730,6 +1764,9 @@ class TranslationStoryMemoryUseCase(
 
         fun timelineKey(chapterIndex: Int): String =
             TIMELINE_PREFIX + chapterIndex.toString().padStart(8, '0')
+
+        fun chronicleKey(id: String): String =
+            CHRONICLE_PREFIX + stableId(id)
 
         fun stripVietnameseDiacritics(text: String): String {
             if (text.isBlank()) return ""

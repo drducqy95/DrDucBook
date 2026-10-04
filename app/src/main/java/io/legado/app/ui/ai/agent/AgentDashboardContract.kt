@@ -2,8 +2,11 @@ package io.legado.app.ui.ai.agent
 
 import androidx.compose.runtime.Stable
 import io.legado.app.domain.agent.AgentActionRisk
+import io.legado.app.help.config.ChatbotToolCategory
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.ImmutableMap
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.persistentMapOf
 
 @Stable
 data class AgentDashboardUiState(
@@ -28,6 +31,8 @@ data class AgentDashboardUiState(
     val recentMemories: ImmutableList<AgentMemoryUi> = persistentListOf(),
     val tools: ImmutableList<AgentToolUi> = persistentListOf(),
     val skills: ImmutableList<AgentSkillUi> = persistentListOf(),
+    val toolPermissions: ImmutableMap<ChatbotToolCategory, Boolean> = persistentMapOf(),
+    val showToolSettingsSheet: Boolean = false,
     val selectedSkill: AgentSkillUi? = null,
     val selectedRun: AgentRunUi? = null,
     val selectedRunTrace: ImmutableList<AgentTraceUi> = persistentListOf(),
@@ -152,6 +157,8 @@ data class AgentSkillUi(
 sealed interface AgentDashboardIntent {
     data object Refresh : AgentDashboardIntent
     data class SetChatBubbleEnabled(val enabled: Boolean) : AgentDashboardIntent
+    data class SetToolCategoryApproved(val category: ChatbotToolCategory, val approved: Boolean) : AgentDashboardIntent
+    data object ToggleToolSettingsSheet : AgentDashboardIntent
     data class OpenSkill(val skillId: String) : AgentDashboardIntent
     data object DismissSkill : AgentDashboardIntent
     data class OpenRun(val runId: String) : AgentDashboardIntent

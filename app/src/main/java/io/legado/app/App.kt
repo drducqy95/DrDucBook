@@ -41,6 +41,7 @@ import io.legado.app.data.entities.rule.ContentRule
 import io.legado.app.data.entities.rule.ExploreRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.data.repository.SettingsRepository
+import io.legado.app.domain.gateway.AiSkillGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
 import io.legado.app.domain.gateway.SourceCookieGateway
 import io.legado.app.domain.usecase.AppStartupMaintenanceUseCase
@@ -240,6 +241,11 @@ open class App : Application(), ImageLoaderFactory {
                 val settingsRepository = get<SettingsRepository>()
                 settingsRepository.postMigrationSync()
                 migrateAgentToolFeaturePolicy(settingsRepository)
+            }
+            kotlin.runCatching {
+                get<AiSkillGateway>().ensureDefaultSkills()
+            }.onFailure { error ->
+                LogUtils.e("App", "Ensure default skills failed: ${error.message}")
             }
             kotlin.runCatching {
                 val migratedCookies = get<SourceCookieGateway>().migrateLegacyCookies()

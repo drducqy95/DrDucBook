@@ -17,10 +17,13 @@ import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.TranslationConstants
 import io.legado.app.domain.gateway.AiProfileGateway
 import io.legado.app.domain.gateway.CachedChapterGateway
+import io.legado.app.domain.gateway.QuickTranslationGateway
 import io.legado.app.domain.usecase.TranslationStoryMemoryUseCase
 import io.legado.app.domain.usecase.StoryIllustrationUseCase
 import io.legado.app.domain.usecase.TranslateChapterUseCase
 import io.legado.app.ui.translation.applyTranslationCaseTransform
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CancellationException
@@ -41,6 +44,7 @@ class BookStoryMemoryViewModel(
     private val cachedChapterGateway: CachedChapterGateway,
     private val aiProfileGateway: AiProfileGateway,
     private val translateChapterUseCase: TranslateChapterUseCase,
+    private val quickTranslationGateway: QuickTranslationGateway,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(BookStoryMemoryUiState())
@@ -113,13 +117,35 @@ class BookStoryMemoryViewModel(
         }
     }
 
+    private fun computeInitialSuggestions(raw: String): ImmutableList<TranslationSuggestionUi> {
+        val trimmed = raw.trim()
+        if (trimmed.isBlank()) return persistentListOf<TranslationSuggestionUi>()
+        val hanViet = runCatching { quickTranslationGateway.hanViet(trimmed) }.getOrNull()?.trim().orEmpty()
+        return if (hanViet.isNotBlank()) {
+            persistentListOf(
+                TranslationSuggestionUi(
+                    provider = TranslationConstants.PROVIDER_HAN_VIET,
+                    providerLabel = "Hán Việt",
+                    text = hanViet,
+                )
+            )
+        } else {
+            persistentListOf<TranslationSuggestionUi>()
+        }
+    }
+
     private fun updateEditor(value: StoryMemoryEditorDraft) {
         val previous = _uiState.value.editor
         if (previous?.primary?.trim() != value.primary.trim()) {
             suggestionJob?.cancel()
+            val initialSuggestions = if (value.kind in setOf(AiTranslationStoryMemoryKind.ENTITY, AiTranslationStoryMemoryKind.WORLD_BUILDING)) {
+                computeInitialSuggestions(value.primary)
+            } else {
+                persistentListOf<TranslationSuggestionUi>()
+            }
             _uiState.update {
                 it.copy(
-                    editor = value.copy(suggestions = kotlinx.collections.immutable.persistentListOf(), isSuggesting = false),
+                    editor = value.copy(suggestions = initialSuggestions, isSuggesting = false),
                 )
             }
         } else {
@@ -134,6 +160,24 @@ class BookStoryMemoryViewModel(
         val raw = _uiState.value.editor?.primary?.trim().orEmpty()
         if (raw.isBlank()) return
         suggestionJob?.cancel()
+        if (provider == TranslationConstants.PROVIDER_HAN_VIET) {
+            val hanViet = runCatching { quickTranslationGateway.hanViet(raw) }.getOrNull()?.trim().orEmpty()
+            if (hanViet.isNotBlank()) {
+                _uiState.update { state ->
+                    val current = state.editor ?: return@update state
+                    state.copy(
+                        editor = current.copy(
+                            selectedProvider = provider,
+                            isSuggesting = false,
+                            suggestions = (current.suggestions.filterNot { it.provider == provider } +
+                                TranslationSuggestionUi(provider, "Hán Việt", hanViet))
+                                .toImmutableList(),
+                        )
+                    )
+                }
+            }
+            return
+        }
         _uiState.update { state ->
             state.copy(editor = state.editor?.copy(selectedProvider = provider, isSuggesting = true))
         }
@@ -169,7 +213,8 @@ class BookStoryMemoryViewModel(
     }
 
     private fun providerLabel(provider: String): String =
-        TranslationConstants.providerValues.zip(TranslationConstants.providerDisplayNames)
+        if (provider == TranslationConstants.PROVIDER_HAN_VIET) "Hán Việt"
+        else TranslationConstants.providerValues.zip(TranslationConstants.providerDisplayNames)
             .firstOrNull { it.first == provider }?.second ?: provider
 
     private fun publishItems() {
@@ -244,11 +289,16 @@ class BookStoryMemoryViewModel(
                     }
                 }.joinToString(" · ")
 
+                val displayTitle = storyMemoryUseCase.formatVietnameseChapterTitle(
+                    bookUrl = bookUrl,
+                    chapterIndex = timeline.chapterIndex,
+                    title = timeline.chapterTitle,
+                )
                 add(
                     StoryMemoryItemUi(
                         id = TranslationStoryMemoryUseCase.timelineKey(timeline.chapterIndex),
                         kind = AiTranslationStoryMemoryKind.TIMELINE,
-                        title = timeline.chapterTitle.ifBlank { "Chương ${timeline.chapterIndex + 1}" },
+                        title = displayTitle,
                         subtitle = details.ifBlank { timeline.summary },
                         chapterIndex = timeline.chapterIndex.takeIf { it >= 0 },
                     )
@@ -290,7 +340,14 @@ class BookStoryMemoryViewModel(
                 .firstOrNull { TranslationStoryMemoryUseCase.timelineKey(it.chapterIndex) == item.id }
                 ?.toDraft(item.id)
         }
-        if (draft != null) _uiState.update { it.copy(editor = draft) }
+        if (draft != null) {
+            val initialSuggestions = if (draft.kind in setOf(AiTranslationStoryMemoryKind.ENTITY, AiTranslationStoryMemoryKind.WORLD_BUILDING)) {
+                computeInitialSuggestions(draft.primary)
+            } else {
+                persistentListOf<TranslationSuggestionUi>()
+            }
+            _uiState.update { it.copy(editor = draft.copy(suggestions = initialSuggestions)) }
+        }
     }
 
     private fun saveEditor() = runMutation {
@@ -640,7 +697,7 @@ class BookStoryMemoryViewModel(
     private fun AiTranslationStoryTimeline.toDraft(id: String) = StoryMemoryEditorDraft(
         originalId = id,
         kind = AiTranslationStoryMemoryKind.TIMELINE,
-        primary = chapterTitle,
+        primary = storyMemoryUseCase.formatVietnameseChapterTitle(bookUrl, chapterIndex, chapterTitle),
         description = summary,
         chapterIndexText = chapterIndex.toString(),
         eventsText = events.joinToString("\n"),

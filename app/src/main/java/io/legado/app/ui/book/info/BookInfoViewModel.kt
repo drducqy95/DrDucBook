@@ -1732,11 +1732,8 @@ class BookInfoViewModel(
 
     private fun formatIntro(raw: String?): String? {
         if (raw.isNullOrBlank()) return raw
-        return try {
-            HtmlCompat.fromHtml(raw, HtmlCompat.FROM_HTML_MODE_COMPACT).toString().trim()
-        } catch (_: Throwable) {
-            raw.trim()
-        }
+        val formatted = io.legado.app.help.book.BookIntroFormatter.format(raw)
+        return formatted.fullFormattedText.ifBlank { raw.trim() }
     }
 
     private fun Book.dynamicUiFingerprint(): String = listOfNotNull(

@@ -2282,6 +2282,7 @@
     <string name="ai_agent_risk_bulk">Bulk</string>
     <string name="ai_agent_risk_plugin_install">Plugin install</string>
     <string name="ai_chat">AI Chat</string>
+    <string name="chatbot_tool_permissions_title">Tool permissions</string>
     <string name="ai_recent_chats">Recent Chats</string>
     <string name="ai_new_chat">New Chat</string>
     <string name="ai_replying">AI is replying…</string>

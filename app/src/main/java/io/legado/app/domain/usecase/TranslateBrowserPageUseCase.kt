@@ -16,6 +16,13 @@ import kotlinx.coroutines.withTimeout
 
 class TranslateBrowserPageUseCase(
     private val mlKitTranslationGateway: MlKitTranslationGateway,
+    private val sourceLanguageProvider: () -> String? = {
+        runCatching {
+            io.legado.app.ui.config.translation.TranslationConfig.mlKitSourceLanguage
+                .trim()
+                .takeUnless { it.equals("auto", ignoreCase = true) }
+        }.getOrNull()
+    },
 ) {
 
     suspend fun execute(
@@ -51,9 +58,7 @@ class TranslateBrowserPageUseCase(
         targetLanguage: String,
     ): TranslationAttempt {
         return try {
-            val configuredSource = io.legado.app.ui.config.translation.TranslationConfig.mlKitSourceLanguage
-                .trim()
-                .takeUnless { it.equals("auto", ignoreCase = true) }
+            val configuredSource = sourceLanguageProvider()
             val translated = withContext(Dispatchers.IO) {
                 buildString {
                     for (chunk in chunkText(node.text)) {

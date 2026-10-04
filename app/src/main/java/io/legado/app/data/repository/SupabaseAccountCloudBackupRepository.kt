@@ -95,9 +95,10 @@ class SupabaseAccountCloudBackupRepository(
                     source = archive,
                 )
             } else {
-                rest.putFile(
+                rest.postFile(
                     path = "storage/v1/object/${currentDescriptor.storageBucket}/${currentDescriptor.storagePath}",
                     source = archive,
+                    upsert = true,
                 )
             }
             uploaded = true

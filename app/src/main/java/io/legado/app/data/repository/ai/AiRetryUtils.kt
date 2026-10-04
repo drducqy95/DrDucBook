@@ -123,6 +123,7 @@ private fun isCredentialFailure(e: Exception): Boolean {
         ).failure.kind
     ) {
         AiFailureKind.AUTHENTICATION,
+        AiFailureKind.VALIDATION_REQUIRED,
         AiFailureKind.QUOTA,
         AiFailureKind.RATE_LIMIT -> true
         else -> false

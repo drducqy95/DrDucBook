@@ -524,6 +524,7 @@ class AiChatGenerationUseCaseTest {
     ) : AiSkillGateway {
         override fun observeSkills(): Flow<List<AgentSkillSnapshot>> = flowOf(enabledSkills)
         override suspend fun getEnabledSkills(): List<AgentSkillSnapshot> = enabledSkills
+        override suspend fun ensureDefaultSkills(): Unit = Unit
         override suspend fun createDraft(
             draft: AgentSkillDraft,
             availableTools: Set<String>,

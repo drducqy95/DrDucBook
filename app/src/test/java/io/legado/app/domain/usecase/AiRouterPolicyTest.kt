@@ -19,6 +19,7 @@ class AiRouterPolicyTest {
     fun `provider availability failures may fall back before output`() {
         listOf(
             AiFailureKind.AUTHENTICATION,
+            AiFailureKind.VALIDATION_REQUIRED,
             AiFailureKind.QUOTA,
             AiFailureKind.RATE_LIMIT,
             AiFailureKind.SERVER,
@@ -58,9 +59,22 @@ class AiRouterPolicyTest {
     }
 
     @Test
+    fun `validation required has short 5-minute cooldown instead of 24h auth lockout`() {
+        assertEquals(
+            5L * 60_000L,
+            AiRouterPolicy.cooldownMillis(AiFailureKind.VALIDATION_REQUIRED, consecutiveFailures = 1),
+        )
+        assertEquals(
+            5L * 60_000L,
+            AiRouterPolicy.cooldownMillis(AiFailureKind.VALIDATION_REQUIRED, consecutiveFailures = 5),
+        )
+    }
+
+    @Test
     fun `only account scoped failures quarantine a credential`() {
         listOf(
             AiFailureKind.AUTHENTICATION,
+            AiFailureKind.VALIDATION_REQUIRED,
             AiFailureKind.RATE_LIMIT,
             AiFailureKind.QUOTA,
         ).forEach { kind ->

@@ -6,6 +6,7 @@ object AiRouterPolicy {
 
     fun affectsCredential(kind: AiFailureKind): Boolean = when (kind) {
         AiFailureKind.AUTHENTICATION,
+        AiFailureKind.VALIDATION_REQUIRED,
         AiFailureKind.RATE_LIMIT,
         AiFailureKind.QUOTA -> true
 
@@ -16,6 +17,7 @@ object AiRouterPolicy {
         if (outputStarted) return false
         return when (kind) {
             AiFailureKind.AUTHENTICATION,
+            AiFailureKind.VALIDATION_REQUIRED,
             AiFailureKind.RATE_LIMIT,
             AiFailureKind.QUOTA,
             AiFailureKind.TIMEOUT,
@@ -41,6 +43,8 @@ object AiRouterPolicy {
         return when (kind) {
             AiFailureKind.AUTHENTICATION,
             AiFailureKind.QUOTA -> 24L * 60L * 60L * 1_000L
+
+            AiFailureKind.VALIDATION_REQUIRED -> 5L * 60_000L
 
             AiFailureKind.RATE_LIMIT -> multiplier * 60_000L
             AiFailureKind.SERVER -> multiplier * 30_000L

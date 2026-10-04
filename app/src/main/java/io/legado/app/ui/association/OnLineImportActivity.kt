@@ -51,8 +51,15 @@ class OnLineImportActivity :
         }
         intent.data?.let {
             val url = it.getQueryParameter("src")
+                ?: if (it.scheme == "http" || it.scheme == "https") it.toString() else null
             if (url.isNullOrEmpty()) {
                 finish()
+                return
+            }
+            if (it.scheme == "http" || it.scheme == "https") {
+                showDialogFragment(
+                    AddToBookshelfDialog(url, true)
+                )
                 return
             }
             when (it.path) {

@@ -170,29 +170,69 @@ fun alignedParagraphMapping(
     }
     val sourceLines = sourceText.lineRanges()
     val displayLines = displayText.lineRanges()
-    val segments = if (sourceLines.size == displayLines.size) {
-        sourceLines.zip(displayLines).map { (source, display) ->
-            val exact = sourceText.substring(source.first, source.last + 1) ==
-                displayText.substring(display.first, display.last + 1)
-            DisplaySourceSegment(
-                sourceStart = source.first,
-                sourceEnd = source.last + 1,
-                displayStart = display.first,
-                displayEnd = display.last + 1,
-                confidence = if (exact) 1f else 0.65f,
-                exactCharacterMapping = exact,
+    val segments = when {
+        sourceLines.size == displayLines.size -> {
+            sourceLines.zip(displayLines).map { (source, display) ->
+                val sourceSub = if (source.isEmpty()) "" else sourceText.substring(source.first, source.last + 1)
+                val displaySub = if (display.isEmpty()) "" else displayText.substring(display.first, display.last + 1)
+                val exact = sourceSub == displaySub
+                DisplaySourceSegment(
+                    sourceStart = source.first,
+                    sourceEnd = source.last + 1,
+                    displayStart = display.first,
+                    displayEnd = display.last + 1,
+                    confidence = if (exact) 1f else 0.65f,
+                    exactCharacterMapping = exact,
+                )
+            }
+        }
+        sourceLines.isNotEmpty() && displayLines.isNotEmpty() -> {
+            val sourceNonBlank = sourceLines.filter { range ->
+                !range.isEmpty() && sourceText.substring(range.first, range.last + 1).isNotBlank()
+            }
+            val displayNonBlank = displayLines.filter { range ->
+                !range.isEmpty() && displayText.substring(range.first, range.last + 1).isNotBlank()
+            }
+            if (sourceNonBlank.size == displayNonBlank.size && sourceNonBlank.isNotEmpty()) {
+                displayNonBlank.mapIndexed { idx, display ->
+                    val source = sourceNonBlank[idx]
+                    DisplaySourceSegment(
+                        sourceStart = source.first,
+                        sourceEnd = source.last + 1,
+                        displayStart = display.first,
+                        displayEnd = display.last + 1,
+                        confidence = 0.75f,
+                    )
+                }
+            } else {
+                val sourcePool = if (sourceNonBlank.isNotEmpty()) sourceNonBlank else sourceLines
+                val displayPool = if (displayNonBlank.isNotEmpty()) displayNonBlank else displayLines
+                displayPool.mapIndexed { i, display ->
+                    val sourceIdx = ((i.toDouble() / displayPool.size.toDouble()) * sourcePool.size.toDouble())
+                        .toInt()
+                        .coerceIn(0, sourcePool.lastIndex)
+                    val source = sourcePool[sourceIdx]
+                    DisplaySourceSegment(
+                        sourceStart = source.first,
+                        sourceEnd = source.last + 1,
+                        displayStart = display.first,
+                        displayEnd = display.last + 1,
+                        confidence = 0.60f,
+                    )
+                }
+            }
+        }
+        else -> {
+            listOf(
+                DisplaySourceSegment(
+                    sourceStart = 0,
+                    sourceEnd = sourceText.length,
+                    displayStart = 0,
+                    displayEnd = displayText.length,
+                    confidence = 0.35f,
+                )
             )
         }
-    } else {
-        listOf(
-            DisplaySourceSegment(
-                sourceStart = 0,
-                sourceEnd = sourceText.length,
-                displayStart = 0,
-                displayEnd = displayText.length,
-                confidence = 0.35f,
-            )
-        )
     }
     return MappedDisplayText(sourceText, displayText, engine, segments)
 }

@@ -233,6 +233,10 @@ class TranslateChapterUseCase(
                 },
             )
             val translated = when (provider) {
+                TranslationConstants.PROVIDER_HAN_VIET -> {
+                    val quickPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() }
+                    quickTranslationGateway.hanViet(source, quickPhonetics)
+                }
                 TranslationConstants.PROVIDER_QUICK_TRANSLATOR -> quickTranslationGateway.translate(
                     text = source,
                     projectTerms = dictionaries,
@@ -1601,7 +1605,8 @@ class TranslateChapterUseCase(
     private fun retryReasonFor(kind: AiFailureKind): RetryReason = when (kind) {
         AiFailureKind.ROUTE_UNAVAILABLE -> RetryReason.ROUTE_UNAVAILABLE
         AiFailureKind.CONFIGURATION -> RetryReason.CONFIG_ERROR
-        AiFailureKind.AUTHENTICATION -> RetryReason.AUTH_ERROR
+        AiFailureKind.AUTHENTICATION,
+        AiFailureKind.VALIDATION_REQUIRED -> RetryReason.AUTH_ERROR
         AiFailureKind.RATE_LIMIT -> RetryReason.RATE_LIMIT
         AiFailureKind.QUOTA -> RetryReason.QUOTA_ERROR
         AiFailureKind.TIMEOUT -> RetryReason.TIMEOUT

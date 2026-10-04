@@ -60,6 +60,7 @@ import io.legado.app.utils.LogUtils
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -178,6 +179,7 @@ open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
     private var latestBackStack: List<NavKey> = emptyList()
     internal var activeReadBookInputHandler: ReadBookInputHandler? = null
     internal var activeReadBookRoute: MainRouteReadBook? = null
+    private var lastCheckedClipboardText: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -447,6 +449,62 @@ open class MainActivity : BaseComposeActivity(), VariableDialog.Callback {
         super.onResume()
         publishCurrentAiContext()
         ChatBubbleCoordinator.refresh()
+        checkClipboardForBookLink()
+    }
+
+    private fun checkClipboardForBookLink() {
+        if (!OtherConfig.autoDetectClipboardUrl) return
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return
+        val clip = clipboard.primaryClip ?: return
+        if (clip.itemCount <= 0) return
+        val text = clip.getItemAt(0)?.text?.toString()?.trim() ?: return
+        if (text.isBlank() || text == lastCheckedClipboardText) return
+        if (!text.startsWith("http://", ignoreCase = true) && !text.startsWith("https://", ignoreCase = true)) return
+        lastCheckedClipboardText = text
+
+        lifecycleScope.launch(Dispatchers.Main) {
+            val resolver = org.koin.java.KoinJavaComponent.get<io.legado.app.domain.usecase.ExternalUrlResolverUseCase>(
+                io.legado.app.domain.usecase.ExternalUrlResolverUseCase::class.java
+            )
+            val resolved = withContext(Dispatchers.IO) { resolver.resolve(text) }
+            when (resolved) {
+                is io.legado.app.domain.usecase.ResolvedExternalUrl.BookDetail -> {
+                    val srcName = resolved.bookSource.bookSourceName
+                    alert("Phát hiện liên kết truyện", "Tìm thấy sách từ nguồn [$srcName]: ${resolved.book.name}. Bạn có muốn mở không?") {
+                        okButton {
+                            startActivity(
+                                createBookInfoIntent(
+                                    context = this@MainActivity,
+                                    name = resolved.book.name,
+                                    author = resolved.book.author,
+                                    bookUrl = resolved.book.bookUrl,
+                                    origin = resolved.book.origin,
+                                    coverPath = resolved.book.coverUrl,
+                                )
+                            )
+                        }
+                        cancelButton()
+                    }
+                }
+                is io.legado.app.domain.usecase.ResolvedExternalUrl.ExploreCategory -> {
+                    val srcName = resolved.bookSource.bookSourceName
+                    alert("Phát hiện liên kết khám phá", "Tìm thấy danh mục từ nguồn [$srcName]. Bạn có muốn mở không?") {
+                        okButton {
+                            startActivity(
+                                createExploreShowIntent(
+                                    context = this@MainActivity,
+                                    exploreName = resolved.title,
+                                    sourceUrl = resolved.bookSource.bookSourceUrl,
+                                    exploreUrl = resolved.exploreUrl,
+                                )
+                            )
+                        }
+                        cancelButton()
+                    }
+                }
+                is io.legado.app.domain.usecase.ResolvedExternalUrl.Unmatched -> {}
+            }
+        }
     }
 
     override fun onPause() {

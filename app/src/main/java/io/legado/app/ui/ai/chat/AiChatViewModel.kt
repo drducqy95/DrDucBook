@@ -45,6 +45,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.legado.app.help.config.ChatbotToolCategory
+import io.legado.app.help.config.ChatbotToolPermissionConfig
 import splitties.init.appCtx
 import java.util.UUID
 
@@ -54,6 +56,7 @@ class AiChatViewModel(
     private val aiProfileGateway: AiProfileGateway,
     private val aiRouterGateway: AiRouterGateway,
     private val generationUseCase: AiChatGenerationUseCase,
+    val toolPermissionConfig: ChatbotToolPermissionConfig,
 ) : ViewModel() {
 
     private val currentConversationId = MutableStateFlow<String?>(null)
@@ -163,6 +166,12 @@ class AiChatViewModel(
             is AiChatIntent.SwitchBranch -> switchBranch(intent.messageId)
             is AiChatIntent.DeleteConversation -> deleteConversation(intent.id)
             is AiChatIntent.RenameConversation -> renameConversation(intent.id, intent.title)
+            AiChatIntent.ToggleToolSettingsSheet -> {
+                _uiState.update { it.copy(showToolSettingsSheet = !it.showToolSettingsSheet) }
+            }
+            is AiChatIntent.SetToolCategoryApproved -> {
+                toolPermissionConfig.setCategoryAutoApproved(intent.category, intent.approved)
+            }
         }
     }
 
@@ -631,14 +640,16 @@ class AiChatViewModel(
                 ChatBubbleSessionStore.markError(currentConversationId.value, failureMessage.orEmpty())
                 _effects.tryEmit(AiChatEffect.ShowMessage(failureMessage))
             } finally {
-                val assistantContent = when {
-                    waitingForToolConfirmation -> null
-                    fullText.isNotEmpty() -> fullText.toString()
-                    !wasCancelled && !failureMessage.isNullOrBlank() -> appCtx.getString(
-                        R.string.ai_request_failed,
-                        failureMessage,
+                val assistantContent = if (waitingForToolConfirmation) {
+                    null
+                } else {
+                    combineAiAssistantFailure(
+                        text = fullText.toString(),
+                        failureText = if (!wasCancelled && !failureMessage.isNullOrBlank()) appCtx.getString(
+                            R.string.ai_request_failed,
+                            failureMessage,
+                        ) else null,
                     )
-                    else -> null
                 }
                 if (conversationIdForMsg != null && assistantContent != null) {
                     val duration = _uiState.value.streamingMessage?.thinkingDuration ?: 0

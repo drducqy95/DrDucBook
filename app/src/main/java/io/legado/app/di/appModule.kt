@@ -215,6 +215,7 @@ import io.legado.app.domain.usecase.ExportBookshelfUseCase
 import io.legado.app.domain.usecase.ExportAuthoringProjectUseCase
 import io.legado.app.domain.usecase.ValidateEbookProjectUseCase
 import io.legado.app.domain.usecase.ExecuteApprovedAgentActionUseCase
+import io.legado.app.domain.usecase.ExternalUrlResolverUseCase
 import io.legado.app.domain.usecase.GenerateChapterSummaryUseCase
 import io.legado.app.domain.usecase.GetChapterContentUseCase
 import io.legado.app.domain.usecase.GoogleDriveBackupUseCase
@@ -497,11 +498,13 @@ val appModule = module {
     single<StoryImageStorageGateway> { StoryImageStorageRepository(androidContext()) }
     single<AiSkillGateway> { AiSkillRepository(get(), get()) }
     single<CustomAgentToolGateway> { CustomAgentToolRepository(get()) }
+    single { io.legado.app.help.config.ChatbotToolPermissionConfig(androidContext()) }
     single {
         AgentPermissionBroker(
             mutationEnabled = { io.legado.app.constant.FeatureFlags.agentMutation },
             skillEnabled = { io.legado.app.constant.FeatureFlags.agentSkill },
             pluginEnabled = { io.legado.app.constant.FeatureFlags.agentPlugin },
+            toolPermissionConfig = get(),
         )
     }
     single<AiPromptPresetGateway> { AiPromptPresetRepository(get()) }
@@ -535,28 +538,32 @@ val appModule = module {
     singleOf(::RepairAiRouteBindingsUseCase)
     single<AiToolGateway> {
         AiToolRepository(
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
-            get(),
+            bookDao = get(),
+            bookSourceDao = get(),
+            bookChapterDao = get(),
+            searchBookDao = get(),
+            bookmarkDao = get(),
+            readRecordDao = get(),
+            aiArtifactDao = get(),
+            aiMemoryGateway = get(),
+            refreshTocUseCase = get(),
+            bookCacheDownloadGateway = get(),
+            searchBooksUseCase = get(),
+            addBookUseCase = get(),
+            addToBookshelfUseCase = get(),
+            quickDictionaryGateway = get(),
+            dictionaryGateway = get(),
+            agentPermissionBroker = get(),
+            aiProfileGateway = get(),
+            aiSkillGateway = get(),
+            authoringProjectGateway = get(),
+            sourceCheckEngine = get(),
+            sourceCheckRepository = get(),
+            customAgentToolGateway = getOrNull(),
+            translationStoryMemoryUseCase = getOrNull(),
+            aiTextGateway = getOrNull(),
+            translateChapterUseCase = getOrNull(),
+            storyIllustrationUseCase = getOrNull(),
         )
     }
     single<AppStartupGateway> { AppStartupRepository(get()) }
@@ -643,6 +650,7 @@ val appModule = module {
     singleOf(::TranslateDynamicBookUiUseCase)
     singleOf(::ResolveBookMediaUseCase)
     singleOf(::AiChatGenerationUseCase)
+    singleOf(::ExternalUrlResolverUseCase)
 
     single<ImageLoader> {
         ImageLoader.Builder(get())
@@ -687,6 +695,7 @@ val appModule = module {
             cachedChapterGateway = get(),
             aiProfileGateway = get(),
             translateChapterUseCase = get(),
+            quickTranslationGateway = get(),
         )
     }
     viewModelOf(::HomeViewModel)

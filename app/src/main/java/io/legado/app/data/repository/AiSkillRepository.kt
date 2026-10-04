@@ -10,9 +10,11 @@ import io.legado.app.domain.agent.AgentSkillValidator
 import io.legado.app.domain.agent.AgentSkillVersionSnapshot
 import io.legado.app.domain.gateway.AiSkillGateway
 import io.legado.app.utils.GSON
+import io.legado.app.utils.LogUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -29,12 +31,74 @@ class AiSkillRepository(
     ) { skills, versions ->
         val versionsBySkill = versions.groupBy(AiSkillVersion::skillId)
         skills.map { skill -> skill.toSnapshot(versionsBySkill[skill.id].orEmpty()) }
+    }.onStart {
+        ensureDefaultSkills()
     }
 
     override suspend fun getEnabledSkills(): List<AgentSkillSnapshot> = withContext(Dispatchers.IO) {
+        ensureDefaultSkills()
         dao.getEnabledSkills().mapNotNull { skill ->
             val snapshot = skill.toSnapshot(dao.getVersions(skill.id))
             snapshot.takeIf { it.activeVersion?.valid == true }
+        }
+    }
+
+    override suspend fun ensureDefaultSkills(): Unit = withContext(Dispatchers.IO) {
+        val availableTools = AiToolRepository.toolDefinitions.map { it.name }.toSet()
+        val defaultSkills = listOf(
+            defaultBookSourceEngineerDraft,
+            defaultStoryWikiArtDirectorDraft,
+        )
+        for (draft in defaultSkills) {
+            val existing = dao.getSkillBySlug(draft.slug)
+            if (existing == null) {
+                runCatching {
+                    val snapshot = createDraft(draft, availableTools)
+                    setEnabled(snapshot.id, true)
+                    LogUtils.d("AiSkillRepository", "Successfully seeded default skill: ${draft.slug}")
+                }.onFailure { error ->
+                    LogUtils.e("AiSkillRepository", "Failed to seed default skill ${draft.slug}: ${error.message ?: error.javaClass.simpleName}")
+                }
+            } else {
+                val versions = dao.getVersions(existing.id)
+                val existingTargetVersion = versions.firstOrNull { it.version == draft.version }
+                if (existingTargetVersion != null) {
+                    runCatching {
+                        if (existing.activeVersionId != existingTargetVersion.id) {
+                            activateVersion(existing.id, existingTargetVersion.id)
+                        }
+                        if (!existing.enabled) {
+                            setEnabled(existing.id, true)
+                        }
+                        LogUtils.d("AiSkillRepository", "Ensured default skill activated to version ${draft.version}: ${draft.slug}")
+                    }.onFailure { error ->
+                        LogUtils.e("AiSkillRepository", "Failed to activate default skill ${draft.slug}: ${error.message ?: error.javaClass.simpleName}")
+                    }
+                } else {
+                    val activeVersion = versions.firstOrNull { it.id == existing.activeVersionId }
+                    if (activeVersion == null || activeVersion.version != draft.version || activeVersion.skillMarkdown != draft.instructions) {
+                        runCatching {
+                            val snapshot = createDraft(draft, availableTools)
+                            val targetVersion = snapshot.versions.firstOrNull { it.version == draft.version }
+                                ?: snapshot.versions.maxByOrNull { it.createdAt }
+                            if (targetVersion != null) {
+                                activateVersion(existing.id, targetVersion.id)
+                            }
+                            setEnabled(existing.id, true)
+                            LogUtils.d("AiSkillRepository", "Successfully updated default skill to version ${draft.version}: ${draft.slug}")
+                        }.onFailure { error ->
+                            LogUtils.e("AiSkillRepository", "Failed to update default skill ${draft.slug}: ${error.message ?: error.javaClass.simpleName}")
+                        }
+                    } else if (!existing.enabled && existing.activeVersionId != null) {
+                        runCatching {
+                            setEnabled(existing.id, true)
+                            LogUtils.d("AiSkillRepository", "Ensured default skill enabled: ${draft.slug}")
+                        }.onFailure { error ->
+                            LogUtils.e("AiSkillRepository", "Failed to enable default skill ${draft.slug}: ${error.message ?: error.javaClass.simpleName}")
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -257,5 +321,90 @@ class AiSkillRepository(
         private const val SKILL_FILE = "SKILL.md"
         private val SKILL_SLUG_PATTERN = Regex("[a-z][a-z0-9_-]{2,63}")
         private val SAFE_ID_PATTERN = Regex("[a-z0-9_-]{3,96}")
+
+        val defaultBookSourceEngineerDraft = AgentSkillDraft(
+            slug = "book-source-engineer",
+            name = "Book Source Engineer",
+            description = "Quy trình chuyên sâu phân tích, tạo mới, kiểm thử và sửa lỗi nguồn truyện cho cả chuẩn Legado BookSource và vBook Extension (Darkrai9x).",
+            version = "1.0.0",
+            instructions = """
+                # KỸ NĂNG: BOOK SOURCE ENGINEER (CHUYÊN GIA NGUỒN TRUYỆN LEGADO & VBOOK)
+
+                1. Khảo sát trước khi viết mã: Luôn dùng fetch_internet_page để xem HTML thực tế, xác định DOM, API và phương thức phân trang.
+                2. Quy trình kiểm thử độc lập qua test_book_source_rule:
+                   - SEARCH: kiểm tra từ khóa, tên truyện, tác giả, link, bìa.
+                   - TOC: kiểm tra danh sách chương, thứ tự từ 1 đến hết, tên chương sạch.
+                   - CONTENT: kiểm tra nội dung chương đủ đoạn văn, sạch quảng cáo/watermark.
+                3. Hỗ trợ chuẩn vBook Extension (Darkrai9x):
+                   - Cấu trúc: plugin.json, icon.png, src/ (config.js, home.js, gen.js, search.js, detail.js, toc.js, chap.js).
+                   - Dùng create_vbook_plugin_draft và install_vbook_plugin.
+                4. Hỗ trợ chuẩn Legado BookSource JSON:
+                   - Cấu trúc: bookSourceName, bookSourceUrl, searchUrl, ruleSearch, ruleBookInfo, ruleToc, ruleContent.
+                   - Hỗ trợ CSS, XPath, JSONPath, Rhino JS (@js:), Regex (##).
+                   - Dùng create_legado_book_source_draft và install_legado_book_source.
+                5. Sửa lỗi nguồn có sẵn:
+                   - Dùng diagnose_book_source để quét lỗi từng giai đoạn (search/detail/toc/content).
+                   - Dùng repair_book_source để sửa trực tiếp URL, headers, selectors.
+            """.trimIndent(),
+            allowedTools = listOf(
+                "fetch_internet_page",
+                "search_internet",
+                "search_book_sources",
+                "diagnose_book_source",
+                "repair_book_source",
+                "test_book_source_rule",
+                "create_vbook_plugin_draft",
+                "install_vbook_plugin",
+                "create_legado_book_source_draft",
+                "install_legado_book_source",
+                "save_book_source",
+            ),
+        )
+
+        val defaultStoryWikiArtDirectorDraft = AgentSkillDraft(
+            slug = "story-wiki-art-director",
+            name = "Story Wiki & Art Director",
+            description = "Chuyên sâu trích xuất và hoàn thiện bộ nhớ dịch, biên tập Story Wiki (hồ sơ nhân vật, thiết lập thế giới, niên biểu diễn tiến theo chương thực tế và tiêu đề dịch), chỉ đạo nghệ thuật tạo hình ảnh nhân vật, bản đồ thế giới và bìa truyện.",
+            version = "1.0.1",
+            instructions = """
+                # KỸ NĂNG: STORY WIKI & ART DIRECTOR (BỘ NHỚ DỊCH, STORY WIKI & NGHỆ THUẬT)
+
+                1. Nguyên tắc cốt lõi:
+                   - Dữ liệu hoàn toàn bám sát nguyên tác (Fact Grounding), không tự bịa đặt.
+                   - Niên biểu đại sự ký: bắt buộc ghi đúng số chương thực tế (chapterIndex) và hiển thị bản dịch tiếng Việt của tiêu đề chương (không để raw). Tóm tắt các giai đoạn/thời kỳ theo bước ngoặt cốt truyện, không đánh số thứ tự cứng nhắc 1, 2, 3, 4.
+                   - Thuật ngữ chuẩn hóa: luôn lưu cặp từ gốc Hán tự (raw) và bản dịch tiếng Việt chuẩn (target).
+                2. Quản lý Bộ nhớ dịch & Wiki:
+                   - Dùng create_story_memory để trích xuất danh từ riêng mới từ chương.
+                   - Dùng retrofit_story_translations để đồng bộ sửa đổi thuật ngữ vào các chương đã dịch.
+                   - Dùng upsert_story_wiki_entity / world / relationship để cập nhật bách khoa toàn thư.
+                   - Dùng synthesize_story_chronicle và save_story_chronicle để tổng hợp niên biểu.
+                3. Chỉ đạo nghệ thuật tạo hình ảnh:
+                   - Tạo chân dung nhân vật: gọi generate_character_image(bookUrl, entityRaw) dựa trên verified facts trong Story Memory.
+                   - Tạo bìa truyện: bắt buộc phải có tên Truyện đã dịch (lấy theo tên người dùng đã sửa trong app, hoặc tự xác nhận rõ ràng với người dùng khi yêu cầu chatbot) và tên tác giả. Gọi generate_book_cover(bookUrl, title, author, prompt) khổ dọc 2:3, tích hợp nghệ thuật tên sách và tác giả trang nhã, tự động cập nhật vào kệ sách.
+                   - Tạo minh họa thế giới & bản đồ: gọi generate_world_image(bookUrl, raw, category).
+                   - Tránh chữ rác ngẫu nhiên, logo mờ hay watermark lạ trên ảnh.
+            """.trimIndent(),
+            allowedTools = listOf(
+                "create_story_memory",
+                "get_story_memory",
+                "retrofit_story_translations",
+                "get_story_chronicle",
+                "synthesize_story_chronicle",
+                "save_story_chronicle",
+                "upsert_story_wiki_entity",
+                "delete_story_wiki_entity",
+                "upsert_story_wiki_world",
+                "delete_story_wiki_world",
+                "upsert_story_wiki_relationship",
+                "delete_story_wiki_relationship",
+                "get_story_wiki",
+                "generate_character_image",
+                "generate_book_cover",
+                "generate_world_image",
+                "get_book_detail",
+                "list_book_chapters",
+                "get_chapter_content",
+            ),
+        )
     }
 }

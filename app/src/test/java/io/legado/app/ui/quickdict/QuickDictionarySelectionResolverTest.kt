@@ -359,6 +359,140 @@ class QuickDictionarySelectionResolverTest {
         assertEquals(rawName, anchor?.rawText)
     }
 
+    @Test
+    fun mapsSelectionWhenSourceAndDisplayLineCountsDiffer() {
+        val rawLines = (1..80).map { i ->
+            if (i == 40) "苏晓站在房顶上看着下方" else "这是第${i}段的内容用来填充章节"
+        }
+        val displayLines = (1..79).map { i ->
+            if (i == 40) "Tô Hiểu đứng trên nóc nhà nhìn xuống dưới" else "Đây là nội dung đoạn thứ $i để làm đầy chương"
+        }
+        val source = rawLines.joinToString("\n")
+        val display = displayLines.joinToString("\n")
+        val selected = "Tô Hiểu"
+        val start = display.indexOf(selected)
+
+        val resolution = resolveQuickDictionarySelectionResult(
+            request = QuickDictionaryRequest(
+                bookUrl = "book",
+                selectedText = selected,
+                sourceText = source,
+                displayText = display,
+                selectionStart = start,
+                selectionEnd = start + selected.length,
+                sourceLocation = "",
+                mappedDisplayText = alignedParagraphMapping(source, display, "reader"),
+            ),
+            quickTranslationGateway = object : QuickTranslationGateway {
+                override val packVersion: String = "test"
+                override fun translate(text: String, projectTerms: List<DictPair>, customPhonetics: List<DictPair>): String =
+                    if (text == "苏晓") "Tô Hiểu" else text
+                override fun hanViet(text: String, customPhonetics: List<DictPair>): String =
+                    if (text == "苏晓") "Tô Hiểu" else if (text == "房顶") "Phòng Đỉnh" else text
+                override fun getBuiltInCatalogs(): List<QuickDictionaryCatalog> = emptyList()
+                override fun searchBuiltInEntries(type: QuickDictionaryType, query: String, limit: Int, catalogId: String?): List<QuickDictionaryCatalogEntry> = emptyList()
+            },
+            candidateTranslator = { candidate ->
+                if (candidate == "苏晓") "Tô Hiểu" else candidate
+            },
+            candidatePhoneticReader = { candidate ->
+                if (candidate == "苏晓") "tô hiểu" else candidate
+            },
+        )
+
+        assertEquals("苏晓", resolution.anchor?.rawText)
+        org.junit.Assert.assertFalse(resolution.requiresConfirmation)
+    }
+
+    @Test
+    fun mapsSelectionWithDriftedSelectionStartDueToIndentation() {
+        val source = "甲甲甲甲甲\n苏晓拔出了长刀"
+        val display = "    Đoạn một có thụt lề rất dài    \n    Tô Hiểu rút ra trường đao"
+        val selected = "Tô Hiểu"
+        val actualStart = display.indexOf(selected)
+        // Simulate a drift of +40 characters in selectionStart
+        val driftedStart = (actualStart + 40).coerceAtMost(display.length)
+
+        val anchor = resolveQuickDictionarySelection(
+            request = QuickDictionaryRequest(
+                bookUrl = "book",
+                selectedText = selected,
+                sourceText = source,
+                displayText = display,
+                selectionStart = driftedStart,
+                selectionEnd = driftedStart + selected.length,
+                sourceLocation = "",
+                mappedDisplayText = alignedParagraphMapping(source, display, "reader"),
+            ),
+            quickTranslationGateway = object : QuickTranslationGateway {
+                override val packVersion: String = "test"
+                override fun translate(text: String, projectTerms: List<DictPair>, customPhonetics: List<DictPair>): String =
+                    if (text == "苏晓") "Tô Hiểu" else text
+                override fun hanViet(text: String, customPhonetics: List<DictPair>): String =
+                    if (text == "苏晓") "tô hiểu" else text
+                override fun getBuiltInCatalogs(): List<QuickDictionaryCatalog> = emptyList()
+                override fun searchBuiltInEntries(type: QuickDictionaryType, query: String, limit: Int, catalogId: String?): List<QuickDictionaryCatalogEntry> = emptyList()
+            },
+            candidateTranslator = { candidate ->
+                if (candidate == "苏晓") "Tô Hiểu" else candidate
+            },
+            candidatePhoneticReader = { candidate ->
+                if (candidate == "苏晓") "tô hiểu" else candidate
+            },
+        )
+
+        assertEquals("苏晓", anchor?.rawText)
+    }
+
+    @Test
+    fun neverOffersWholeParagraphAsAlternativeWhenResolutionIsAmbiguous() {
+        val longParagraph = "这是一个超过十六个字符的长段落用来测试当完全没有匹配时不会把整段当做词典候选项展示给用户"
+        val display = "Đây là một đoạn văn dài hơn mười sáu ký tự để kiểm thử khi hoàn toàn không khớp thì không đưa cả đoạn làm từ điển"
+        val selected = "từ điển"
+        val start = display.indexOf(selected)
+
+        val resolution = resolveQuickDictionarySelectionResult(
+            request = QuickDictionaryRequest(
+                bookUrl = "book",
+                selectedText = selected,
+                sourceText = longParagraph,
+                displayText = display,
+                selectionStart = start,
+                selectionEnd = start + selected.length,
+                sourceLocation = "",
+                mappedDisplayText = alignedParagraphMapping(longParagraph, display, "reader"),
+            ),
+            quickTranslationGateway = FakeQuickTranslationGateway(),
+            candidateTranslator = { "khong-khop" },
+            candidatePhoneticReader = { "khong-khop" },
+        )
+
+        // The alternatives list must NEVER contain the full paragraph of 40+ chars
+        resolution.alternatives.forEach { alternative ->
+            assertTrue(
+                "Alternative should not be longer than 16 chars: ${alternative.rawText}",
+                alternative.rawText.length <= 16,
+            )
+            org.junit.Assert.assertFalse(
+                "Alternative should not contain newline",
+                alternative.rawText.contains('\n'),
+            )
+        }
+    }
+
+    @Test
+    fun alignedParagraphMappingDoesNotCollapseWhenLineCountsDiffer() {
+        val source = (1..80).joinToString("\n") { "段落 $it" }
+        val display = (1..79).joinToString("\n") { "Đoạn $it" }
+
+        val mapped = alignedParagraphMapping(source, display, "test")
+
+        assertTrue("Should have multiple segments, not collapsed to 1", mapped.segments.size > 1)
+        mapped.segments.forEach { segment ->
+            assertTrue("Segment confidence should be >= 0.60f", segment.confidence >= 0.60f)
+        }
+    }
+
     private class FakeQuickTranslationGateway : QuickTranslationGateway {
         override val packVersion: String = "test"
 

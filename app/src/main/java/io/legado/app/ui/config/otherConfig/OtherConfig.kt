@@ -68,6 +68,11 @@ object OtherConfig {
         false
     )
 
+    var autoDetectClipboardUrl by prefDelegate(
+        PreferKey.autoDetectClipboardUrl,
+        true
+    )
+
     var replaceEnableDefault by prefDelegate(
         PreferKey.replaceEnableDefault,
         true

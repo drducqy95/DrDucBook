@@ -47,9 +47,13 @@ import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
+import io.legado.app.help.config.ChatbotToolCategory
+import io.legado.app.help.config.ChatbotToolPermissionConfig
+import io.legado.app.ui.ai.chat.ChatbotToolSettingsSheet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 @Composable
 fun AgentDashboardRouteScreen(
@@ -57,10 +61,12 @@ fun AgentDashboardRouteScreen(
     onNavigateToCustomTools: () -> Unit,
     showNavigationIcon: Boolean = true,
     viewModel: AgentDashboardViewModel = koinViewModel(),
+    toolPermissionConfig: ChatbotToolPermissionConfig = koinInject(),
 ) {
     AgentDashboardScreen(
         state = viewModel.uiState.collectAsStateWithLifecycle().value,
         effects = viewModel.effects,
+        toolPermissionConfig = toolPermissionConfig,
         onIntent = viewModel::onIntent,
         onBackClick = onBackClick,
         onNavigateToCustomTools = onNavigateToCustomTools,
@@ -73,6 +79,7 @@ fun AgentDashboardRouteScreen(
 fun AgentDashboardScreen(
     state: AgentDashboardUiState,
     effects: Flow<AgentDashboardEffect>,
+    toolPermissionConfig: ChatbotToolPermissionConfig? = null,
     onIntent: (AgentDashboardIntent) -> Unit,
     onBackClick: () -> Unit,
     onNavigateToCustomTools: () -> Unit,
@@ -127,6 +134,24 @@ fun AgentDashboardScreen(
                             onIntent(AgentDashboardIntent.SetChatBubbleEnabled(it))
                         },
                     )
+                    val approvedCount = state.toolPermissions.count { it.value }
+                    ClickableSettingItem(
+                        title = "Quyền công cụ Agent & Chatbot",
+                        description = "Tự động duyệt thực thi công cụ mà không cần hỏi lại",
+                        option = "$approvedCount/5 đã bật",
+                        onClick = { onIntent(AgentDashboardIntent.ToggleToolSettingsSheet) },
+                    )
+                    ChatbotToolCategory.entries.forEach { category ->
+                        val isChecked = state.toolPermissions[category] ?: false
+                        SwitchSettingItem(
+                            title = category.title,
+                            description = category.description,
+                            checked = isChecked,
+                            onCheckedChange = {
+                                onIntent(AgentDashboardIntent.SetToolCategoryApproved(category, it))
+                            },
+                        )
+                    }
                     ClickableSettingItem(
                         title = stringResource(R.string.refresh),
                         onClick = { onIntent(AgentDashboardIntent.Refresh) },
@@ -289,11 +314,12 @@ fun AgentDashboardScreen(
                         onClick = onNavigateToCustomTools,
                     )
                     state.tools.forEach { tool ->
+                        val approvalLabel = if (tool.requiresApproval) "Cần duyệt" else "Tự duyệt"
                         SettingItem(
                             title = tool.name,
                             description = tool.description,
                             option = if (tool.enabled) {
-                                tool.risk.riskLabel()
+                                "${tool.risk.riskLabel()} · $approvalLabel"
                             } else {
                                 stringResource(R.string.disabled)
                             },
@@ -302,6 +328,16 @@ fun AgentDashboardScreen(
                 }
             }
         }
+    }
+
+    if (state.showToolSettingsSheet) {
+        ChatbotToolSettingsSheet(
+            config = toolPermissionConfig,
+            onDismissRequest = { onIntent(AgentDashboardIntent.ToggleToolSettingsSheet) },
+            onCategoryToggle = { category, approved ->
+                onIntent(AgentDashboardIntent.SetToolCategoryApproved(category, approved))
+            },
+        )
     }
 
     AgentSkillDialog(

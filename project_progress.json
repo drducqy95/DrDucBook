@@ -1,9 +1,9 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-04T15:13:00",
+    "last_updated": "2026-10-05T01:00:00",
     "overall_progress_percent": 100,
-    "current_phase": "phase-58-qt-lexical-planning-acceleration",
+    "current_phase": "phase-60-agent-story-memory-wiki-source-tools",
     "status": "COMPLETED",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
@@ -2308,6 +2308,104 @@
         {
           "id": "T58.5",
           "desc": "Live LDPlayer verification on uncached content: uncached chapter translation dropped from 3.6s to 1.68s-1.95s, uncached UI text dropped to 500-760ms, page flipping maintained at 22-33ms",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P59",
+      "name": "UX Intro Formatting, Supabase Sync Fix, Antigravity 403 Challenge, Chatbot Tool Permissions, External Link Routing & Translation Normalization",
+      "status": "DONE",
+      "progress": 100,
+      "plan_folder": "plans/261004-1530-ux-auth-tools-link-sync-fix",
+      "tasks": [
+        {
+          "id": "T59.1",
+          "desc": "Phase 01 - Book Intro UI & Typography Formatting (Metadata tag separation, smart newline parsing, expandable text)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.2",
+          "desc": "Phase 02 - Supabase API Key Cloud Sync Fix (Fix NoSuchKey/HTTP 400 with postFile and x-upsert: true in storage API)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.3",
+          "desc": "Phase 03 - Google Antigravity HTTP 403 VALIDATION_REQUIRED Handler & Fallback (Extract validation URL and support route failover)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.4",
+          "desc": "Phase 04 - Chatbot Tool Permissions & Pre-Approval Settings (Config sheet with switches, auto-approval without repeated prompts)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.5",
+          "desc": "Phase 05 - External URL Auto-Detection & BookSource Routing (Auto-detect installed source from web links and route to BookInfo or Explore)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.6",
+          "desc": "Phase 06 - Book Translation URL Normalization & Pinyin Repair (UrlSanitizer, wordCount safety, enforce Sino-Vietnamese names)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.7",
+          "desc": "Phase 07 - Automated Verification & On-Device Testing (Unit tests 100%, compile Kotlin, assemble debug APK, live verify on LDPlayer)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.8",
+          "desc": "Chatbot Tool-Call Loop & Empty Response Stream Fix (Recognize ToolCallDelta & Reasoning as valid stream content in AiRouterRepository, strip unsupported tools from gpt-oss models in AntigravityHandler, verify live on LDPlayer emulator)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.9",
+          "desc": "Chatbot & Agent Dashboard Tool Permissions Bidirectional Synchronization & Fast Interactive Failover (Unified tool category switches, reactive ChatbotToolPermissionConfig flow integration in AgentDashboardViewModel, fix property initialization NPE, interactive 25s timeout and exclude non-tool models, live verified on LDPlayer)",
+          "status": "DONE"
+        },
+        {
+          "id": "T59.10",
+          "desc": "Quick Dictionary Raw Mapping Alignment Desync Fix (Upgraded alignedParagraphMapping with non-blank line alignment (0.75f) and proportional mapping (0.60f), calibrated trimmedSelection using displayText nearest occurrence, centered sourceSearchWindow on mapped coordinates, expanded search radii to 512/1024 and max global alignment source chars to 20,000, filtered alternatives to exclude paragraph-length strings >16 chars, added 4 unit tests covering 80 vs 79 lines, selection drift, and paragraph filtering - all passing)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P60",
+      "name": "Agent Story Memory, Story Wiki Chronicle Synthesis & Enhanced Source Creation/Repair Tools",
+      "status": "DONE",
+      "progress": 100,
+      "plan_folder": "plans/261004-2000-agent-story-memory-wiki-source-tools",
+      "tasks": [
+        {
+          "id": "T60.1",
+          "desc": "Phase 01 - Story Translation Memory Tools (create_story_memory, get_story_memory, retrofit_story_translations) & Translated Chapter Title + Natural Chapter Number Formatting in Story Memory UI",
+          "status": "DONE"
+        },
+        {
+          "id": "T60.2",
+          "desc": "Phase 02 - Story Wiki Editing & Chronicle Synthesis Tools (synthesize_story_chronicle, get_story_chronicle, save_story_chronicle, entity/world/relationship CRUD)",
+          "status": "DONE"
+        },
+        {
+          "id": "T60.3",
+          "desc": "Phase 03 - Enhanced Source Creation & Repair Tools (rule-level repair_book_source, direct save_book_source with validation, test_book_source_rule)",
+          "status": "DONE"
+        },
+        {
+          "id": "T60.4",
+          "desc": "Phase 04 - Permissions, Risk Mapping & Agent Dashboard Integration (AgentPermissionBroker risk assignment, ChatbotToolPermissionConfig category expansion, UI labels sync)",
+          "status": "DONE"
+        },
+        {
+          "id": "T60.5",
+          "desc": "Phase 05 - Verification & Testing (Unit tests for all new tools, compile check, assemble APK, install on LDPlayer and live chatbot prompt verification)",
+          "status": "DONE"
+        },
+        {
+          "id": "T60.6",
+          "desc": "Skills Authoring & Catalog Deployment (book-source-engineer v1.0.0 and story-wiki-art-director v1.0.1 with translated book title and author typography on covers, verified in Room SQLite)",
           "status": "DONE"
         }
       ]

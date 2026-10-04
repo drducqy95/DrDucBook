@@ -44,6 +44,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -94,6 +95,7 @@ import io.legado.app.domain.agent.AgentApprovalScope
 import io.legado.app.domain.model.AiMessagePart
 import io.legado.app.domain.model.AiMessageRole
 import io.legado.app.domain.model.AiReasoningLevel
+import io.legado.app.help.config.ChatbotToolPermissionConfig
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.AppTextField
@@ -125,6 +127,7 @@ fun AiChatRouteScreen(
     AiChatScreen(
         state = viewModel.uiState.collectAsStateWithLifecycle().value,
         effects = viewModel.effects,
+        toolPermissionConfig = viewModel.toolPermissionConfig,
         onIntent = viewModel::onIntent,
         onBackClick = onBackClick,
         onOpenBookInfo = onOpenBookInfo
@@ -136,6 +139,7 @@ fun AiChatRouteScreen(
 fun AiChatScreen(
     state: AiChatUiState,
     effects: Flow<AiChatEffect>,
+    toolPermissionConfig: ChatbotToolPermissionConfig? = null,
     onIntent: (AiChatIntent) -> Unit,
     onBackClick: () -> Unit,
     onOpenBookInfo: (AiChatBookResultUi) -> Unit
@@ -557,6 +561,11 @@ fun AiChatScreen(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             MediumTonalButton(
+                                onClick = { onIntent(AiChatIntent.ToggleToolSettingsSheet) },
+                                icon = Icons.Default.Build,
+                                contentDescription = stringResource(R.string.chatbot_tool_permissions_title)
+                            )
+                            MediumTonalButton(
                                 onClick = { scope.launch { drawerState.open() } },
                                 icon = Icons.Default.Menu,
                                 contentDescription = stringResource(R.string.ai_recent_chats)
@@ -570,6 +579,16 @@ fun AiChatScreen(
                     }
                 }
             }
+        }
+
+        if (state.showToolSettingsSheet) {
+            ChatbotToolSettingsSheet(
+                config = toolPermissionConfig,
+                onDismissRequest = { onIntent(AiChatIntent.ToggleToolSettingsSheet) },
+                onCategoryToggle = { category, approved ->
+                    onIntent(AiChatIntent.SetToolCategoryApproved(category, approved))
+                }
+            )
         }
     }
 }

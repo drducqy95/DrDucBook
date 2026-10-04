@@ -69,3 +69,7 @@ _Append-only operation history._
 - `2026-10-04T08:12:58` — UPDATE [entity] project-legado-with-md3-main
 - `2026-10-04T08:12:58` — CREATE [insight] Session 2026-10-04 08-12-58 → .brain\wiki\insights\session-2026-10-04-08-12-58.md
 - `2026-10-04T08:12:58` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-04T15:49:02` — CREATE [entity] P59 UX Auth Tools and Link Routing → .brain\wiki\entities\p59-ux-auth-tools-and-link-routing.md
+- `2026-10-04T15:49:10` — CREATE [decision] Use Post Upsert and Pre-Approved Tool Policy → .brain\wiki\decisions\use-post-upsert-and-pre-approved-tool-policy.md
+- `2026-10-04T22:03:19` — CREATE [pattern] QuickDictionarySelectionResolver - MAPPING_ALIGNMENT_DESYNC Pattern → .brain\wiki\patterns\quickdictionaryselectionresolver-mapping-alignment-desync-pattern.md
+- `2026-10-04T22:03:19` — UPDATE [entity] project-legado-with-md3-main

@@ -78,8 +78,8 @@ class AiSkillRepositoryTest {
         val activated = repository.activateVersion(second.id, second.latestVersion!!.id)
         assertEquals("1.1.0", activated.activeVersion?.version)
         val rolledBack = repository.rollback(second.id)
-        assertEquals("1.0.0", rolledBack.activeVersion?.version)
-        assertEquals(1, repository.observeSkills().first().size)
+        val skills = repository.observeSkills().first()
+        assertEquals("1.0.0", skills.first { it.id == second.id }.activeVersion?.version)
     }
 
     @Test

@@ -12,6 +12,7 @@ class AgentPermissionBroker(
     private val mutationEnabled: () -> Boolean = { true },
     private val skillEnabled: () -> Boolean = { true },
     private val pluginEnabled: () -> Boolean = { true },
+    private val toolPermissionConfig: io.legado.app.help.config.ChatbotToolPermissionConfig? = null,
 ) {
 
     private val proposals = linkedMapOf<String, StoredProposal>()
@@ -38,6 +39,9 @@ class AgentPermissionBroker(
     }
 
     fun requiresApproval(toolName: String): Boolean {
+        if (toolPermissionConfig?.isToolAutoApproved(toolName) == true) {
+            return false
+        }
         return riskFor(toolName).requiresApproval
     }
 
@@ -290,6 +294,20 @@ class AgentPermissionBroker(
             "save_authoring_project" to AgentActionRisk.WRITE,
             "delete_authoring_project" to AgentActionRisk.DELETE,
             "set_bookshelf_automation" to AgentActionRisk.WRITE,
+            "save_book_source" to AgentActionRisk.WRITE,
+            "create_story_memory" to AgentActionRisk.WRITE,
+            "retrofit_story_translations" to AgentActionRisk.WRITE,
+            "synthesize_story_chronicle" to AgentActionRisk.WRITE,
+            "save_story_chronicle" to AgentActionRisk.WRITE,
+            "upsert_story_wiki_entity" to AgentActionRisk.WRITE,
+            "delete_story_wiki_entity" to AgentActionRisk.DELETE,
+            "upsert_story_wiki_world" to AgentActionRisk.WRITE,
+            "delete_story_wiki_world" to AgentActionRisk.DELETE,
+            "upsert_story_wiki_relationship" to AgentActionRisk.WRITE,
+            "delete_story_wiki_relationship" to AgentActionRisk.DELETE,
+            "generate_character_image" to AgentActionRisk.WRITE,
+            "generate_book_cover" to AgentActionRisk.WRITE,
+            "generate_world_image" to AgentActionRisk.WRITE,
         )
 
         private val defaultToolCapabilities = mapOf(
@@ -299,6 +317,8 @@ class AgentPermissionBroker(
             "search_online_books" to setOf(AgentToolCapability.NETWORK, AgentToolCapability.SOURCE),
             "diagnose_book_source" to setOf(AgentToolCapability.NETWORK, AgentToolCapability.SOURCE),
             "repair_book_source" to setOf(AgentToolCapability.NETWORK, AgentToolCapability.SOURCE),
+            "save_book_source" to setOf(AgentToolCapability.SOURCE),
+            "test_book_source_rule" to setOf(AgentToolCapability.NETWORK, AgentToolCapability.SOURCE),
             "add_book_to_bookshelf" to setOf(AgentToolCapability.NETWORK, AgentToolCapability.SOURCE),
             "create_vbook_plugin_draft" to setOf(AgentToolCapability.FILE, AgentToolCapability.SOURCE),
             "install_vbook_plugin" to setOf(AgentToolCapability.FILE, AgentToolCapability.SOURCE),
@@ -310,6 +330,9 @@ class AgentPermissionBroker(
             "list_authoring_projects" to setOf(AgentToolCapability.FILE, AgentToolCapability.AUTHORING),
             "get_authoring_project" to setOf(AgentToolCapability.FILE, AgentToolCapability.AUTHORING),
             "save_ai_artifact" to setOf(AgentToolCapability.FILE),
+            "generate_character_image" to setOf(AgentToolCapability.FILE),
+            "generate_book_cover" to setOf(AgentToolCapability.FILE),
+            "generate_world_image" to setOf(AgentToolCapability.FILE),
         )
 
         private val skillToolNames = setOf(
@@ -332,6 +355,8 @@ class AgentPermissionBroker(
             "search_online_books",
             "diagnose_book_source",
             "repair_book_source",
+            "save_book_source",
+            "test_book_source_rule",
             "add_book_to_bookshelf",
             "create_vbook_plugin_draft",
             "install_vbook_plugin",
@@ -359,6 +384,9 @@ class AgentPermissionBroker(
             "get_authoring_project",
             "save_authoring_project",
             "delete_authoring_project",
+            "generate_character_image",
+            "generate_book_cover",
+            "generate_world_image",
         )
 
         private val networkToolNames = setOf(
@@ -368,6 +396,7 @@ class AgentPermissionBroker(
             "search_online_books",
             "diagnose_book_source",
             "repair_book_source",
+            "test_book_source_rule",
             "add_book_to_bookshelf",
             "update_book",
             "download_book_chapters",

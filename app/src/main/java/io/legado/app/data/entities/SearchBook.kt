@@ -55,6 +55,7 @@ data class SearchBook(
 ) : Parcelable, BaseBook, Comparable<SearchBook> {
 
     init {
+        bookUrl = io.legado.app.utils.UrlSanitizer.sanitizeBookUrl(bookUrl)
         kind = kind?.take(1000)
         intro = intro?.take(5000)
         latestChapterTitle = latestChapterTitle?.take(200)
