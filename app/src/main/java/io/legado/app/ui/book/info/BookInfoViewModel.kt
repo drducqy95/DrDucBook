@@ -1574,6 +1574,7 @@ class BookInfoViewModel(
                     scopeKey = scopeKey,
                     originalText = title,
                     book = bookSnapshot,
+                    chapterIndex = bookSnapshot.durChapterIndex,
                     contextText = contextText,
                 ).getOrElse { translated(bookSnapshot.durChapterTitle) }
             } ?: translated(bookSnapshot.durChapterTitle)
@@ -1583,6 +1584,7 @@ class BookInfoViewModel(
                     scopeKey = scopeKey,
                     originalText = title,
                     book = bookSnapshot,
+                    chapterIndex = (bookSnapshot.totalChapterNum - 1).coerceAtLeast(0),
                     contextText = contextText,
                 ).getOrElse { translated(bookSnapshot.latestChapterTitle) }
             } ?: translated(bookSnapshot.latestChapterTitle)

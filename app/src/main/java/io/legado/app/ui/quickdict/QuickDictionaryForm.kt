@@ -2,12 +2,15 @@ package io.legado.app.ui.quickdict
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
+import io.legado.app.domain.model.MlKitLanguagePair
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -63,6 +66,7 @@ fun QuickDictionaryForm(
     onHanVietChange: (String) -> Unit,
     onTargetChange: (String) -> Unit,
     onRequestSuggestion: (String) -> Unit,
+    onRequestMlKitPairSuggestion: (MlKitLanguagePair) -> Unit = {},
     onApplySuggestion: (String) -> Unit,
     onTypeChange: (QuickDictionaryType) -> Unit,
     onScopeChange: (QuickDictionaryScope) -> Unit,
@@ -283,6 +287,27 @@ fun QuickDictionaryForm(
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+
+        AppText(
+            text = stringResource(R.string.mlkit_suggestion_title),
+            style = LegadoTheme.typography.labelMedium,
+            color = LegadoTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MlKitLanguagePair.PRESETS.forEach { pair ->
+                FilterChip(
+                    selected = false,
+                    onClick = { onRequestMlKitPairSuggestion(pair) },
+                    label = { AppText(stringResource(pair.labelRes)) },
+                )
+            }
+        }
+
         if (state.isSuggesting) {
             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
         }

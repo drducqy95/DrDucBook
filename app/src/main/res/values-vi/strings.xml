@@ -2487,6 +2487,17 @@
     <string name="ai_delete_model_confirm">Bạn có chắc chắn muốn xóa mô hình này?</string>
     <string name="ai_translation_task">Nhiệm vụ dịch thuật</string>
     <string name="ai_translation_target_language">Ngôn ngữ mục tiêu</string>
+    <string name="ml_kit_source_language_title">Ngôn ngữ nguồn ML Kit (Sách này)</string>
+    <string name="ml_kit_target_language_title">Ngôn ngữ đích ML Kit (Sách này)</string>
+    <string name="ml_kit_lang_auto">Tự động nhận diện</string>
+    <string name="ml_kit_lang_zh">Tiếng Trung</string>
+    <string name="ml_kit_lang_ja">Tiếng Nhật</string>
+    <string name="ml_kit_lang_ko">Tiếng Hàn</string>
+    <string name="ml_kit_lang_en">Tiếng Anh</string>
+    <string name="ml_kit_lang_vi">Tiếng Việt</string>
+    <string name="ml_kit_lang_fr">Tiếng Pháp</string>
+    <string name="ml_kit_lang_ru">Tiếng Nga</string>
+    <string name="ml_kit_lang_de">Tiếng Đức</string>
     <string name="ai_max_input_chars">Ký tự đầu vào tối đa</string>
     <string name="ai_concurrent_requests">Yêu cầu đồng thời</string>
     <string name="ai_retry_count">Đếm lại</string>
@@ -3809,6 +3820,12 @@
     <string name="mlkit_batch_finished">Đã hoàn tất tác vụ, có %1$d lỗi</string>
     <string name="mlkit_source_language">Ngôn ngữ nguồn ML Kit</string>
     <string name="mlkit_source_language_summary">Chọn ngôn ngữ nguồn thủ công thay vì tự động nhận diện nếu văn bản bị nhận diện sai</string>
+    <string name="mlkit_target_language">Ngôn ngữ đích ML Kit</string>
+    <string name="mlkit_pair_zh_ja">Trung - Nhật</string>
+    <string name="mlkit_pair_zh_en">Trung - Anh</string>
+    <string name="mlkit_pair_zh_ko">Trung - Hàn</string>
+    <string name="mlkit_pair_zh_vi">Trung - Việt</string>
+    <string name="mlkit_suggestion_title">Đề xuất ML Kit</string>
     <string name="ai_agent_nav">Agent</string>
     <string name="ai_agent_pending_summary">%1$d thao tác đang chờ phê duyệt</string>
     <string name="ebook_editor_nav">Ebook</string>
@@ -4238,4 +4255,15 @@
     <string name="api_key_sync_failed">Đồng bộ đám mây thất bại</string>
     <string name="api_key_sync_synced_at">Đã đồng bộ %1$s (%2$d khóa)</string>
     <string name="api_key_sync_not_synced">Chưa đồng bộ</string>
+    <string name="chapter_context_copy_title">Sao chép ngữ cảnh chương</string>
+    <string name="chapter_context_copy_subtitle">Chọn phiên bản để sao chép vào bộ nhớ tạm</string>
+    <string name="chapter_context_copy_raw">Bản gốc (Chữ Hán)</string>
+    <string name="chapter_context_copy_chars">%1$d ký tự</string>
+    <string name="chapter_context_copy_copied">Đã sao chép %1$s vào bộ nhớ tạm</string>
+    <string name="chapter_context_copy_empty">Nội dung trống</string>
+    <string name="chapter_context_copy_action">Sao chép</string>
+    <string name="chapter_context_copy_no_versions">Không có phiên bản khả dụng cho chương này</string>
+    <string name="chapter_context_status_user_edited">Đã sửa tay</string>
+    <string name="chapter_context_status_stale">Bản thảo cũ</string>
+    <string name="chapter_context_status_final">Đã chốt</string>
 </resources>

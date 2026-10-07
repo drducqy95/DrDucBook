@@ -18,6 +18,7 @@ import io.legado.app.ui.book.read.sheet.AiTextCleanSheet
 import io.legado.app.ui.book.read.sheet.AiTextRewriteSheet
 import io.legado.app.ui.book.read.sheet.BgTextConfigSheet
 import io.legado.app.ui.book.read.sheet.ChangeChapterSourceSheet
+import io.legado.app.ui.book.read.sheet.ChapterContextCopySheet
 import io.legado.app.ui.book.read.sheet.ChapterSummarySheet
 import io.legado.app.ui.book.read.sheet.CharsetConfigSheet
 import io.legado.app.ui.book.read.sheet.ClickActionConfigSheet
@@ -252,6 +253,12 @@ fun ReadBookScreen(
     TranslationProgressSheet(
         show = state.activeSheet is ReadBookSheet.Translation,
         state = state.translationProgress,
+        onIntent = onIntent,
+        onDismissRequest = dismissSheet,
+    )
+    ChapterContextCopySheet(
+        show = state.activeSheet is ReadBookSheet.ChapterContextCopy,
+        state = state.chapterContextCopy,
         onIntent = onIntent,
         onDismissRequest = dismissSheet,
     )

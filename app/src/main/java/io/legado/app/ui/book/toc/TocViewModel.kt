@@ -332,6 +332,7 @@ class TocViewModel(
                     scopeKey = "toc:${book.bookUrl}:b$batchIndex",
                     originalLines = titles,
                     book = book,
+                    chapterIndices = batch.map { it.index },
                     contextText = contextText,
                 ).getOrNull()
                 if (!translated.isNullOrEmpty()) {

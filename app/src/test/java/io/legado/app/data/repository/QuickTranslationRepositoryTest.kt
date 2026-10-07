@@ -55,6 +55,22 @@ class QuickTranslationRepositoryTest {
     }
 
     @Test
+    fun findMatchingTermsExtractsProperNounsAndProjectTerms() {
+        val repo = QuickTranslationRepository()
+        val projectTerms = listOf(
+            DictPair("苏晓", "Tô Hiểu"),
+            DictPair("轮回乐园", "Luân Hồi Lạc Viên"),
+        )
+        val text = "苏晓进入了轮回乐园"
+        val matches = repo.findMatchingTerms(
+            text = text,
+            projectTerms = projectTerms,
+        )
+        assertTrue("Matches should contain 苏晓: $matches", matches.any { it.original == "苏晓" && it.translation == "Tô Hiểu" })
+        assertTrue("Matches should contain 轮回乐园: $matches", matches.any { it.original == "轮回乐园" && it.translation == "Luân Hồi Lạc Viên" })
+    }
+
+    @Test
     fun literalUrlsNumbersAndLineBreaksRemainIntact() {
         val source = "https://example.com/a1\r\nmodel-X2"
 

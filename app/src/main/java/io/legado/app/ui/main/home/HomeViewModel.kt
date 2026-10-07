@@ -419,6 +419,7 @@ class HomeViewModel(
                 scopeKey = "home:${bookUrl.orEmpty()}",
                 originalText = title,
                 book = book,
+                chapterIndex = book?.durChapterIndex,
                 contextText = contextText,
             ).getOrElse { title }
         }

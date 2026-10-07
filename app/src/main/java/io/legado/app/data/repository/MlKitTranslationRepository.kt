@@ -62,8 +62,17 @@ class MlKitTranslationRepository : MlKitTranslationGateway {
                     .build()
             )
         }
-        return translator.translate(text).await().takeIf(String::isNotBlank)
-            ?: throw MlKitEmptyTranslationException()
+        // If text has no letters (e.g. only dashes ——, ellipses ……, punctuation, numbers),
+        // ML Kit typically outputs empty string. Return text directly to avoid crashing.
+        if (text.none { it.isLetter() }) {
+            return text
+        }
+        val translated = translator.translate(text).await()
+        if (translated.isNotBlank()) return translated
+        // If translated was blank, check if the source has any substantial letters
+        val lettersCount = text.count { it.isLetter() }
+        if (lettersCount <= 1) return text
+        throw MlKitEmptyTranslationException()
     }
 
     override suspend fun getLanguageModels(): List<MlKitLanguageModel> {

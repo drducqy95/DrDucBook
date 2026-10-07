@@ -65,6 +65,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CleanHands
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FindReplace
 import androidx.compose.material.icons.filled.Image
@@ -2036,6 +2037,14 @@ private fun OverflowDropdownMenu(
             text = stringResource(R.string.reverse_content),
             leadingIcon = menuIcon(Icons.Default.SwapVert),
             onClick = { dismiss(); onIntent(ReadBookIntent.MenuReverseContent) },
+        )
+        RoundDropdownMenuItem(
+            text = stringResource(R.string.chapter_context_copy_title),
+            leadingIcon = menuIcon(Icons.Default.ContentCopy),
+            onClick = {
+                dismiss()
+                onIntent(ReadBookIntent.OpenChapterContextCopy)
+            },
         )
 
         PillDivider()

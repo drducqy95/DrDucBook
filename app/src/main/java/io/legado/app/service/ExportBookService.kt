@@ -19,6 +19,8 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.domain.gateway.TranslationCacheGateway
+import io.legado.app.domain.usecase.TranslateDynamicUiTextUseCase
+import io.legado.app.domain.usecase.containsCjk
 import io.legado.app.domain.model.VbookContentLockPolicy
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
@@ -129,6 +131,7 @@ class ExportBookService : BaseService(), KoinComponent {
     }
 
     private val translationCacheRepository: TranslationCacheGateway by inject()
+    private val translateDynamicUiTextUseCase: TranslateDynamicUiTextUseCase by inject()
 
     private val groupKey = "${appCtx.packageName}.exportBook"
     private val waitExportBooks = linkedMapOf<String, ExportConfig>()
@@ -682,10 +685,22 @@ class ExportBookService : BaseService(), KoinComponent {
                 chineseConvert = false,
                 reSegment = false,
             ).toString()
-            val title = chapter.getDisplayTitle(
+            val displayTitle = chapter.getDisplayTitle(
                 contentProcessor.getTitleReplaceRules(),
                 useReplace = useReplace,
             ).replace("\uD83D\uDD12", "")
+            val title = if (source == ContentSource.Translation && displayTitle.containsCjk()) {
+                runCatching {
+                    translateDynamicUiTextUseCase.executeChapterTitle(
+                        scopeKey = TranslateDynamicUiTextUseCase.canonicalChapterTitleScopeKey(book.bookUrl, chapter.index),
+                        originalText = displayTitle,
+                        book = book,
+                        chapterIndex = chapter.index,
+                    ).getOrNull()
+                }.getOrNull() ?: displayTitle
+            } else {
+                displayTitle
+            }
             val images = if (source == ContentSource.Original) {
                 collectExportImages(book, chapter, rawContent)
             } else {
@@ -712,12 +727,46 @@ class ExportBookService : BaseService(), KoinComponent {
         } else {
             imageOptimization
         }
+        val exportTitle = if (source == ContentSource.Translation && book.name.containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.executeBookName(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "name"),
+                    originalText = book.name,
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: book.name
+        } else {
+            book.name
+        }
+        val exportAuthor = if (source == ContentSource.Translation && book.getRealAuthor().containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.executeAuthorName(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "author"),
+                    originalText = book.getRealAuthor(),
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: book.getRealAuthor()
+        } else {
+            book.getRealAuthor()
+        }
+        val introText = book.getDisplayIntro().orEmpty()
+        val exportIntro = if (source == ContentSource.Translation && introText.containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.execute(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "intro"),
+                    originalText = introText,
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: introText
+        } else {
+            introText
+        }
         val payload = EbookExportPayload(
-            title = book.name,
-            author = book.getRealAuthor(),
-            intro = HtmlFormatter.format(book.getDisplayIntro()),
+            title = exportTitle,
+            author = exportAuthor,
+            intro = HtmlFormatter.format(exportIntro),
             language = if (source == ContentSource.Translation) targetLanguage else "zh",
-            description = HtmlFormatter.format(book.getDisplayIntro()),
+            description = HtmlFormatter.format(exportIntro),
             identifier = "urn:drducbook:book:${book.bookUrl.hashCode().toUInt().toString(16)}",
             subjects = listOfNotNull(book.kind, book.customTag)
                 .flatMap { it.split(',', ';', '|') }
@@ -743,7 +792,15 @@ class ExportBookService : BaseService(), KoinComponent {
         val baseName = book.getExportFileName(format.extension)
         val fileName = when (source) {
             ContentSource.Original -> baseName
-            ContentSource.Translation -> getTranslatedFileName(baseName, targetLanguage)
+            ContentSource.Translation -> {
+                if (exportTitle != book.name) {
+                    val safeTitle = exportTitle.replace(Regex("""[\\/:*?"<>|]"""), "_").trim()
+                    val safeAuthor = exportAuthor.replace(Regex("""[\\/:*?"<>|]"""), "_").trim()
+                    "$safeTitle - $safeAuthor.${format.extension}"
+                } else {
+                    getTranslatedFileName(baseName, targetLanguage)
+                }
+            }
         }
         val fileDoc = FileDoc.fromDir(path)
         val writer = EbookExportWriter(
@@ -870,12 +927,46 @@ class ExportBookService : BaseService(), KoinComponent {
     ) = coroutineScope {
         val useReplace = AppConfig.exportUseReplace && book.getUseReplaceRule()
         val contentProcessor = ContentProcessor.get(book.name, book.origin)
-        val qy = "${book.name}\n${
-            getString(R.string.author_show, book.getRealAuthor())
+        val exportBookName = if (source == ContentSource.Translation && book.name.containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.executeBookName(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "name"),
+                    originalText = book.name,
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: book.name
+        } else {
+            book.name
+        }
+        val exportAuthor = if (source == ContentSource.Translation && book.getRealAuthor().containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.executeAuthorName(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "author"),
+                    originalText = book.getRealAuthor(),
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: book.getRealAuthor()
+        } else {
+            book.getRealAuthor()
+        }
+        val introText = book.getDisplayIntro().orEmpty()
+        val exportIntro = if (source == ContentSource.Translation && introText.containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.execute(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "intro"),
+                    originalText = introText,
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: introText
+        } else {
+            introText
+        }
+        val qy = "${exportBookName}\n${
+            getString(R.string.author_show, exportAuthor)
         }\n${
             getString(
                 R.string.intro_show,
-                "\n" + HtmlFormatter.format(book.getDisplayIntro())
+                "\n" + HtmlFormatter.format(exportIntro)
             )
         }"
         append(qy, null)
@@ -932,11 +1023,32 @@ class ExportBookService : BaseService(), KoinComponent {
                 strictTranslation,
             )
         }
+        val effectiveChapter = if (source == ContentSource.Translation) {
+            val displayTitle = chapter.getDisplayTitle(
+                contentProcessor.getTitleReplaceRules(),
+                useReplace = useReplace,
+            ).replace("\uD83D\uDD12", "")
+            if (displayTitle.containsCjk()) {
+                val translatedTitle = runCatching {
+                    translateDynamicUiTextUseCase.executeChapterTitle(
+                        scopeKey = TranslateDynamicUiTextUseCase.canonicalChapterTitleScopeKey(book.bookUrl, chapter.index),
+                        originalText = displayTitle,
+                        book = book,
+                        chapterIndex = chapter.index,
+                    ).getOrNull()
+                }.getOrNull() ?: displayTitle
+                chapter.copy(title = translatedTitle)
+            } else {
+                chapter
+            }
+        } else {
+            chapter
+        }
         val processedContent = contentProcessor
             .getContent(
                 book,
                 // 不导出vip标识
-                chapter.apply { isVip = false },
+                effectiveChapter.apply { isVip = false },
                 content ?: if (chapter.isVolume) "" else "null",
                 includeTitle = !AppConfig.exportNoChapterName,
                 useReplace = useReplace,

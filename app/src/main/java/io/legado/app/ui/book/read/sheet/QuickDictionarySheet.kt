@@ -39,6 +39,9 @@ fun QuickDictionarySheet(
             onRequestSuggestion = {
                 onIntent(ReadBookIntent.RequestQuickDictionarySuggestion(it))
             },
+            onRequestMlKitPairSuggestion = {
+                onIntent(ReadBookIntent.RequestQuickDictionaryMlKitPairSuggestion(it))
+            },
             onApplySuggestion = {
                 onIntent(ReadBookIntent.ApplyQuickDictionarySuggestion(it))
             },

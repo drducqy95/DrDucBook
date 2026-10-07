@@ -81,6 +81,7 @@ class BookStoryMemoryViewModel(
             }
             is BookStoryMemoryIntent.UpdateEditor -> updateEditor(intent.value)
             is BookStoryMemoryIntent.RequestSuggestion -> requestSuggestion(intent.provider)
+            is BookStoryMemoryIntent.RequestMlKitPairSuggestion -> requestMlKitPairSuggestion(intent.pair)
             is BookStoryMemoryIntent.ApplySuggestion -> _uiState.update { state ->
                 state.copy(editor = state.editor?.copy(secondary = intent.value))
             }
@@ -206,6 +207,51 @@ class BookStoryMemoryViewModel(
                 _uiState.update { state ->
                     val current = state.editor
                     if (current == null || current.primary.trim() != raw || current.selectedProvider != provider) state
+                    else state.copy(editor = current.copy(isSuggesting = false), errorMessage = error.localizedMessage)
+                }
+            }
+        }
+    }
+
+    private fun requestMlKitPairSuggestion(pair: io.legado.app.domain.model.MlKitLanguagePair) {
+        val raw = _uiState.value.editor?.primary?.trim().orEmpty()
+        if (raw.isBlank()) return
+        _uiState.update { state ->
+            state.copy(editor = state.editor?.copy(selectedProvider = TranslationConstants.PROVIDER_ML_KIT, isSuggesting = true))
+        }
+        suggestionJob?.cancel()
+        suggestionJob = viewModelScope.launch(Dispatchers.IO) {
+            translateChapterUseCase.executeSuggestion(
+                text = raw,
+                provider = TranslationConstants.PROVIDER_ML_KIT,
+                book = cachedChapterGateway.getBook(bookUrl),
+                targetLanguage = pair.targetLang,
+                sourceLanguage = pair.sourceLang,
+            ).onSuccess { translated ->
+                _uiState.update { state ->
+                    val current = state.editor
+                    if (current == null || current.primary.trim() != raw) {
+                        state
+                    } else {
+                        val suggestion = TranslationSuggestionUi(
+                            provider = "${TranslationConstants.PROVIDER_ML_KIT}_${pair.id}",
+                            providerLabel = "ML Kit (${pair.shortTag})",
+                            text = translated,
+                        )
+                        state.copy(
+                            editor = current.copy(
+                                secondary = translated,
+                                isSuggesting = false,
+                                suggestions = (current.suggestions.filterNot { it.provider == suggestion.provider } + suggestion)
+                                    .toImmutableList(),
+                            )
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                _uiState.update { state ->
+                    val current = state.editor
+                    if (current == null || current.primary.trim() != raw) state
                     else state.copy(editor = current.copy(isSuggesting = false), errorMessage = error.localizedMessage)
                 }
             }

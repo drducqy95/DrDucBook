@@ -67,5 +67,4 @@ fun ReaderContentMode.displaysTranslationProvider(
     else -> translationCacheIdentity(selectedTargetLanguage)?.provider == provider
 }
 
-fun ReaderContentMode.supportsQuickDictionaryEditing(): Boolean =
-    this == ReaderContentMode.QUICK_TRANSLATOR
+fun ReaderContentMode.supportsQuickDictionaryEditing(): Boolean = true

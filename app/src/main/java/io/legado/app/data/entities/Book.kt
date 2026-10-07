@@ -188,6 +188,11 @@ data class Book(
         putVariable(QUICK_TRANSLATION_PRONOUN_MODE_KEY, clean)
     }
 
+    fun getMlKitSourceLanguage(): String? = config.mlKitSourceLanguage
+    fun setMlKitSourceLanguage(lang: String?) { config.mlKitSourceLanguage = lang?.takeIf(String::isNotBlank) }
+    fun getMlKitTargetLanguage(): String? = config.mlKitTargetLanguage
+    fun setMlKitTargetLanguage(lang: String?) { config.mlKitTargetLanguage = lang?.takeIf(String::isNotBlank) }
+
     //自定义简介有自动更新的需求时，可通过更新intro再调用upCustomIntro()完成
     @Suppress("unused")
     fun upCustomIntro() {
@@ -559,6 +564,8 @@ data class Book(
         var translationPromptSourcePresetId: String? = null, // ID preset gốc mà prompt được copy từ (UI only)
         var customRewritePrompt: String? = null, // Prompt viết lại AI đã chỉnh sửa riêng cho sách
         var rewritePromptSourcePresetId: String? = null, // ID preset gốc của rewrite prompt (UI only)
+        var mlKitSourceLanguage: String? = null, // Ngôn ngữ nguồn ML Kit riêng cho sách ("auto", "zh", "ja", "ko", "en", ...)
+        var mlKitTargetLanguage: String? = null, // Ngôn ngữ đích ML Kit riêng cho sách ("vi", "en", "ja", ...)
     ) : Parcelable
 
     class Converters {

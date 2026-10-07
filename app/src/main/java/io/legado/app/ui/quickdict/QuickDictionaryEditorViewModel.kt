@@ -64,6 +64,7 @@ class QuickDictionaryEditorViewModel(
             }
             is QuickDictionaryEditorIntent.SetTarget -> updateForm { copy(target = intent.value) }
             is QuickDictionaryEditorIntent.RequestSuggestion -> requestSuggestion(intent.provider)
+            is QuickDictionaryEditorIntent.RequestMlKitPairSuggestion -> requestMlKitLanguagePairSuggestion(intent.pair)
             is QuickDictionaryEditorIntent.ApplySuggestion -> updateForm { copy(target = intent.value) }
             is QuickDictionaryEditorIntent.SetType -> updateForm {
                 val newCat = if (intent.value == QuickDictionaryType.NAME && memoryCategory == StoryMemoryCategory.TERM) {
@@ -144,9 +145,26 @@ class QuickDictionaryEditorViewModel(
             val universes = quickDictionaryGateway.getUniverses()
             currentBook = book
             mappingAlternatives = resolution.alternatives
-            val anchor = resolution.anchor
+            val anchor = resolution.anchor ?: resolution.alternatives.firstOrNull()
             if (anchor != null) {
                 applyResolvedAnchor(anchor, book, universes)
+                if (resolution.anchor == null) {
+                    _uiState.update {
+                        it.copy(
+                            showSelectionChooser = resolution.requiresConfirmation,
+                            selectionAlternatives = resolution.alternatives.map { alternative ->
+                                QuickDictionarySelectionAlternativeUi(
+                                    raw = alternative.rawText,
+                                    contextBefore = alternative.contextBefore,
+                                    contextAfter = alternative.contextAfter,
+                                )
+                            }.toImmutableList(),
+                            errorMessage = application.getString(
+                                R.string.quick_dictionary_mapping_confirmation_required
+                            ),
+                        )
+                    }
+                }
                 requestSuggestion(TranslationConstants.PROVIDER_QUICK_TRANSLATOR)
             } else {
                 currentAnchor = null
@@ -312,6 +330,53 @@ class QuickDictionaryEditorViewModel(
             }.onFailure { error ->
                 _uiState.update { current ->
                     if (current.raw.trim() != raw || current.selectedProvider != provider) current
+                    else current.copy(
+                        isSuggesting = false,
+                        errorMessage = error.localizedMessage
+                            ?: application.getString(R.string.quick_dictionary_suggestion_failed),
+                    )
+                }
+            }
+        }
+    }
+
+    private fun requestMlKitLanguagePairSuggestion(pair: io.legado.app.domain.model.MlKitLanguagePair) {
+        val raw = _uiState.value.raw.trim()
+        if (raw.isBlank()) return
+        suggestionJob?.cancel()
+        _uiState.update {
+            it.copy(selectedProvider = TranslationConstants.PROVIDER_ML_KIT, isSuggesting = true, errorMessage = null)
+        }
+        val anchor = currentAnchor
+        suggestionJob = viewModelScope.launch(Dispatchers.IO) {
+            translateChapterUseCase.executeSuggestion(
+                text = raw,
+                provider = TranslationConstants.PROVIDER_ML_KIT,
+                book = currentBook,
+                previousContext = anchor?.contextBefore.orEmpty(),
+                nextContext = anchor?.contextAfter.orEmpty(),
+                targetLanguage = pair.targetLang,
+                sourceLanguage = pair.sourceLang,
+            ).onSuccess { translated ->
+                _uiState.update { current ->
+                    if (current.raw.trim() != raw) current
+                    else {
+                        val suggestion = QuickDictionarySuggestionUi(
+                            provider = "${TranslationConstants.PROVIDER_ML_KIT}_${pair.id}",
+                            providerLabel = "ML Kit (${pair.shortTag})",
+                            text = translated,
+                        )
+                        val updated = (current.suggestions.filterNot { it.provider == suggestion.provider } + suggestion)
+                        current.copy(
+                            target = translated,
+                            suggestions = withHanVietSuggestion(updated, current.hanViet),
+                            isSuggesting = false,
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                _uiState.update { current ->
+                    if (current.raw.trim() != raw) current
                     else current.copy(
                         isSuggesting = false,
                         errorMessage = error.localizedMessage

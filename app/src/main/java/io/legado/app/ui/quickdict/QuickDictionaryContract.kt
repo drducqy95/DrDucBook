@@ -142,6 +142,7 @@ sealed interface QuickDictionaryEditorIntent {
     data class SetHanViet(val value: String) : QuickDictionaryEditorIntent
     data class SetTarget(val value: String) : QuickDictionaryEditorIntent
     data class RequestSuggestion(val provider: String) : QuickDictionaryEditorIntent
+    data class RequestMlKitPairSuggestion(val pair: io.legado.app.domain.model.MlKitLanguagePair) : QuickDictionaryEditorIntent
     data class ApplySuggestion(val value: String) : QuickDictionaryEditorIntent
     data class SetType(val value: QuickDictionaryType) : QuickDictionaryEditorIntent
     data class SetScope(val value: QuickDictionaryScope) : QuickDictionaryEditorIntent

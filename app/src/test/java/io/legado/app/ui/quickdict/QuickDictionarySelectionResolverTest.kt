@@ -493,6 +493,33 @@ class QuickDictionarySelectionResolverTest {
         }
     }
 
+    @Test
+    fun resolvesCandidatesEvenWhenUnmappedOrLowConfidence() {
+        val source = "苏晓激活了烙印"
+        val display = "Tô Hiểu kích hoạt thương hiệu"
+        val selected = "thương hiệu"
+        val start = display.indexOf(selected)
+
+        val resolution = resolveQuickDictionarySelectionResult(
+            request = QuickDictionaryRequest(
+                bookUrl = "book",
+                selectedText = selected,
+                sourceText = source,
+                displayText = display,
+                selectionStart = start,
+                selectionEnd = start + selected.length,
+                sourceLocation = "",
+            ),
+            quickTranslationGateway = FakeQuickTranslationGateway(),
+            candidateTranslator = { it },
+            candidatePhoneticReader = { it },
+        )
+
+        val finalAnchor = resolution.anchor ?: resolution.alternatives.firstOrNull()
+        assertTrue("Resolution alternatives or anchor should not be empty", finalAnchor != null)
+        assertTrue("Final anchor rawText should not be blank", finalAnchor!!.rawText.isNotBlank())
+    }
+
     private class FakeQuickTranslationGateway : QuickTranslationGateway {
         override val packVersion: String = "test"
 

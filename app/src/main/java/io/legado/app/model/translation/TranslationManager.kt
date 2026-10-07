@@ -100,7 +100,7 @@ object TranslationManager : KoinComponent {
         book: Book,
         chapter: BookChapter,
         provider: String = TranslationConfig.llmProvider,
-        targetLanguage: String = currentTargetLanguage(),
+        targetLanguage: String = currentTargetLanguage(book, provider),
     ): Boolean {
         return getCachedTranslation(book, chapter, provider, targetLanguage) != null
     }
@@ -112,7 +112,7 @@ object TranslationManager : KoinComponent {
         book: Book,
         chapter: BookChapter,
         provider: String = TranslationConfig.llmProvider,
-        targetLanguage: String = currentTargetLanguage(),
+        targetLanguage: String = currentTargetLanguage(book, provider),
     ): String? {
         val originalContent = BookHelp.getContent(book, chapter)
             ?.let(TranslationContentSanitizer::sanitize)
@@ -301,7 +301,7 @@ object TranslationManager : KoinComponent {
         book: Book,
         chapter: BookChapter,
         provider: String = TranslationConfig.llmProvider,
-        targetLanguage: String = currentTargetLanguage(),
+        targetLanguage: String = currentTargetLanguage(book, provider),
         rawContentHash: String? = null,
     ): TranslationRevision? {
         val resolvedRawHash = rawContentHash ?: BookHelp.getContent(book, chapter)
@@ -330,7 +330,7 @@ object TranslationManager : KoinComponent {
         chapter: BookChapter,
         forceRetranslate: Boolean = false,
         provider: String = TranslationConfig.llmProvider,
-        targetLanguage: String = currentTargetLanguage(),
+        targetLanguage: String = currentTargetLanguage(book, provider),
         onTranslateStarted: () -> Unit = {}
     ): MutableStateFlow<TranslationChapterState>? {
         val key = getChapterKey(book, chapter, provider, targetLanguage)
@@ -584,8 +584,17 @@ object TranslationManager : KoinComponent {
         clearChapterState(book.bookUrl, bookChapter.index, TranslationConstants.PROVIDER_QUICK_TRANSLATOR, targetLanguage)
     }
 
-    private fun currentTargetLanguage(): String {
-        return TranslationConfig.llmTargetLanguage
+    fun currentTargetLanguage(book: Book? = null, provider: String = TranslationConfig.llmProvider): String {
+        return if (provider == TranslationConstants.PROVIDER_ML_KIT) {
+            book?.getMlKitTargetLanguage() ?: TranslationConfig.llmTargetLanguage
+        } else if (provider == TranslationConstants.PROVIDER_QUICK_TRANSLATOR ||
+            provider == TranslationConstants.PROVIDER_NMT ||
+            provider == TranslationConstants.PROVIDER_HAN_VIET
+        ) {
+            TranslationConstants.TARGET_VIETNAMESE
+        } else {
+            TranslationConfig.llmTargetLanguage
+        }
     }
 
     private fun appendLog(

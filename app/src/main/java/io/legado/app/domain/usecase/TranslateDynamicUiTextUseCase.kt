@@ -30,6 +30,14 @@ class TranslateDynamicUiTextUseCase(
     private val quickDictionaryGateway: QuickDictionaryGateway,
 ) {
 
+    companion object {
+        fun canonicalChapterTitleScopeKey(bookUrl: String, chapterIndex: Int): String =
+            "chapter-title:$bookUrl:$chapterIndex"
+
+        fun canonicalBookMetadataScopeKey(bookUrl: String, field: String): String =
+            "book-metadata:$bookUrl:$field"
+    }
+
     private val memoryCache = ConcurrentHashMap<String, String>()
     private val inFlight = ConcurrentHashMap<String, CompletableDeferred<Result<String>>>()
 
@@ -261,13 +269,34 @@ class TranslateDynamicUiTextUseCase(
 
         val provider = TranslationConstants.PROVIDER_QUICK_TRANSLATOR
         val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val effectiveAuthorScopeKey = if (book != null) {
+            "${canonicalBookMetadataScopeKey(book.bookUrl, "author")}:author"
+        } else {
+            "$scopeKey:author"
+        }
+
+        if (!forceRetranslate) {
+            translationCacheGateway.readDynamicUiTranslation(
+                scopeKey = effectiveAuthorScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = TranslationConstants.PROVIDER_APP_AI,
+            )?.let { return@withContext Result.success(it.restructureChapterNumbers().toTitleCase()) }
+            translationCacheGateway.readDynamicUiTranslation(
+                scopeKey = effectiveAuthorScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = TranslationConstants.PROVIDER_LOCAL_AI,
+            )?.let { return@withContext Result.success(it.restructureChapterNumbers().toTitleCase()) }
+        }
+
         val dictionaryRevision = book?.let {
             quickDictionaryGateway.getEffectiveRevision(it, originalText)
         } ?: QuickDictionaryRevision(
             global = quickDictionaryGateway.revisionFor(QuickDictionaryScope.GLOBAL)
         )
         val cacheScopeKey = dictionaryAwareScopeKey(
-            scopeKey = "$scopeKey:author",
+            scopeKey = effectiveAuthorScopeKey,
             provider = provider,
             dictionaryRevision = dictionaryRevision,
             quickTranslationPackVersion = quickTranslationGateway.packVersion,
@@ -315,18 +344,44 @@ class TranslateDynamicUiTextUseCase(
         book: Book? = null,
         contextText: String = originalText,
         forceRetranslate: Boolean = false,
-    ): Result<String> = execute(
-        scopeKey = "$scopeKey:bookname",
-        originalText = originalText,
-        book = book,
-        contextText = contextText,
-        forceRetranslate = forceRetranslate,
-    ).map { it.toTitleCase() }
+    ): Result<String> = withContext(Dispatchers.IO) {
+        if (originalText.isBlank() || !originalText.containsCjk()) {
+            return@withContext Result.success(originalText)
+        }
+        val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val effectiveScopeKey = if (book != null) {
+            "${canonicalBookMetadataScopeKey(book.bookUrl, "name")}:bookname"
+        } else {
+            "$scopeKey:bookname"
+        }
+        if (!forceRetranslate) {
+            translationCacheGateway.readDynamicUiTranslation(
+                scopeKey = effectiveScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = TranslationConstants.PROVIDER_APP_AI,
+            )?.let { return@withContext Result.success(it.toTitleCase()) }
+            translationCacheGateway.readDynamicUiTranslation(
+                scopeKey = effectiveScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = TranslationConstants.PROVIDER_LOCAL_AI,
+            )?.let { return@withContext Result.success(it.toTitleCase()) }
+        }
+        execute(
+            scopeKey = effectiveScopeKey,
+            originalText = originalText,
+            book = book,
+            contextText = contextText,
+            forceRetranslate = forceRetranslate,
+        ).map { it.toTitleCase() }
+    }
 
     suspend fun executeChapterTitle(
         scopeKey: String,
         originalText: String,
         book: Book? = null,
+        chapterIndex: Int? = null,
         contextText: String = originalText,
         forceRetranslate: Boolean = false,
     ): Result<String> = withContext(Dispatchers.IO) {
@@ -334,13 +389,24 @@ class TranslateDynamicUiTextUseCase(
             return@withContext Result.success(originalText)
         }
         val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
-        val titleScopeKey = "$scopeKey:title"
+        val effectiveScopeKey = if (book != null && chapterIndex != null) {
+            canonicalChapterTitleScopeKey(book.bookUrl, chapterIndex)
+        } else {
+            scopeKey
+        }
+        val titleScopeKey = "$effectiveScopeKey:title"
         if (!forceRetranslate) {
             translationCacheGateway.readDynamicUiTranslation(
                 scopeKey = titleScopeKey,
                 originalText = originalText,
                 targetLanguage = targetLanguage,
                 provider = TranslationConstants.PROVIDER_APP_AI,
+            )?.let { return@withContext Result.success(it.restructureChapterNumbers().toTitleCase()) }
+            translationCacheGateway.readDynamicUiTranslation(
+                scopeKey = titleScopeKey,
+                originalText = originalText,
+                targetLanguage = targetLanguage,
+                provider = TranslationConstants.PROVIDER_LOCAL_AI,
             )?.let { return@withContext Result.success(it.restructureChapterNumbers().toTitleCase()) }
         }
         execute(
@@ -356,33 +422,102 @@ class TranslateDynamicUiTextUseCase(
         scopeKey: String,
         originalText: String,
         aiTitle: String,
+        provider: String = TranslationConstants.PROVIDER_APP_AI,
     ) = withContext(Dispatchers.IO) {
         if (originalText.isBlank() || aiTitle.isBlank() || aiTitle.containsCjk()) return@withContext
         val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
-        val titleScopeKey = "$scopeKey:title"
+        val titleScopeKey = if (scopeKey.endsWith(":title")) scopeKey else "$scopeKey:title"
         val formatted = aiTitle.restructureChapterNumbers().toTitleCase()
         translationCacheGateway.writeDynamicUiTranslation(
             scopeKey = titleScopeKey,
             originalText = originalText,
             targetLanguage = targetLanguage,
-            provider = TranslationConstants.PROVIDER_APP_AI,
+            provider = provider,
             translatedText = formatted,
         )
     }
+
+    suspend fun saveAiChapterTitle(
+        bookUrl: String,
+        chapterIndex: Int,
+        originalText: String,
+        aiTitle: String,
+        provider: String = TranslationConstants.PROVIDER_APP_AI,
+    ) = saveAiChapterTitle(
+        scopeKey = canonicalChapterTitleScopeKey(bookUrl, chapterIndex),
+        originalText = originalText,
+        aiTitle = aiTitle,
+        provider = provider,
+    )
 
     suspend fun executeChapterTitles(
         scopeKey: String,
         originalLines: List<String>,
         book: Book? = null,
+        chapterIndices: List<Int>? = null,
         contextText: String = originalLines.joinToString("\n"),
         forceRetranslate: Boolean = false,
-    ): Result<List<String>> = executeLines(
-        scopeKey = scopeKey,
-        originalLines = originalLines,
-        book = book,
-        contextText = contextText,
-        forceRetranslate = forceRetranslate,
-    ).map { titles -> titles.map { it.restructureChapterNumbers().toTitleCase() } }
+    ): Result<List<String>> = withContext(Dispatchers.IO) {
+        if (originalLines.isEmpty()) return@withContext Result.success(emptyList())
+        val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val results = arrayOfNulls<String>(originalLines.size)
+        val missingOriginals = mutableListOf<String>()
+        val missingIndices = mutableListOf<Int>()
+
+        for (i in originalLines.indices) {
+            val line = originalLines[i]
+            if (line.isBlank() || !line.containsCjk()) {
+                results[i] = line
+                continue
+            }
+            var aiHit: String? = null
+            if (!forceRetranslate && book != null && chapterIndices != null && i < chapterIndices.size) {
+                val canonScope = canonicalChapterTitleScopeKey(book.bookUrl, chapterIndices[i])
+                val titleKey = "$canonScope:title"
+                aiHit = translationCacheGateway.readDynamicUiTranslation(
+                    scopeKey = titleKey,
+                    originalText = line,
+                    targetLanguage = targetLanguage,
+                    provider = TranslationConstants.PROVIDER_APP_AI,
+                ) ?: translationCacheGateway.readDynamicUiTranslation(
+                    scopeKey = titleKey,
+                    originalText = line,
+                    targetLanguage = targetLanguage,
+                    provider = TranslationConstants.PROVIDER_LOCAL_AI,
+                )
+            }
+            if (aiHit != null) {
+                results[i] = aiHit.restructureChapterNumbers().toTitleCase()
+            } else {
+                missingIndices.add(i)
+                missingOriginals.add(line)
+            }
+        }
+
+        if (missingIndices.isNotEmpty()) {
+            val batchResult = executeLines(
+                scopeKey = scopeKey,
+                originalLines = missingOriginals,
+                book = book,
+                contextText = contextText,
+                forceRetranslate = forceRetranslate,
+            )
+            batchResult.fold(
+                onSuccess = { translatedLines ->
+                    for (k in missingIndices.indices) {
+                        val origIdx = missingIndices[k]
+                        val translated = translatedLines.getOrNull(k).orEmpty()
+                        results[origIdx] = translated.restructureChapterNumbers().toTitleCase()
+                    }
+                },
+                onFailure = { error ->
+                    return@withContext Result.failure(error)
+                }
+            )
+        }
+
+        Result.success(results.map { it.orEmpty() })
+    }
 
     suspend fun clearCache() {
         memoryCache.clear()

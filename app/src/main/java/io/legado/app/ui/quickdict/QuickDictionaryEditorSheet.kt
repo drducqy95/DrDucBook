@@ -62,6 +62,9 @@ fun QuickDictionaryEditorSheet(
             onRequestSuggestion = {
                 viewModel.onIntent(QuickDictionaryEditorIntent.RequestSuggestion(it))
             },
+            onRequestMlKitPairSuggestion = {
+                viewModel.onIntent(QuickDictionaryEditorIntent.RequestMlKitPairSuggestion(it))
+            },
             onApplySuggestion = {
                 viewModel.onIntent(QuickDictionaryEditorIntent.ApplySuggestion(it))
             },

@@ -98,13 +98,30 @@ fun TranslationProgressSheet(
                     color = LegadoTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            TranslationSelector(
-                title = stringResource(R.string.ai_translation_target_language),
-                selectedValue = state.targetLanguage,
-                options = state.targetLanguageOptions,
-                enabled = state.status != TranslationUiStatus.TRANSLATING,
-                onSelected = { onIntent(ReadBookIntent.SelectTranslationTargetLanguage(it)) },
-            )
+            if (state.provider == TranslationConstants.PROVIDER_ML_KIT) {
+                TranslationSelector(
+                    title = stringResource(R.string.mlkit_source_language),
+                    selectedValue = state.mlKitSourceLanguage,
+                    options = state.mlKitSourceLanguageOptions,
+                    enabled = state.status != TranslationUiStatus.TRANSLATING,
+                    onSelected = { onIntent(ReadBookIntent.SelectMlKitSourceLanguage(it)) },
+                )
+                TranslationSelector(
+                    title = stringResource(R.string.mlkit_target_language),
+                    selectedValue = state.mlKitTargetLanguage,
+                    options = state.mlKitTargetLanguageOptions,
+                    enabled = state.status != TranslationUiStatus.TRANSLATING,
+                    onSelected = { onIntent(ReadBookIntent.SelectMlKitTargetLanguage(it)) },
+                )
+            } else {
+                TranslationSelector(
+                    title = stringResource(R.string.ai_translation_target_language),
+                    selectedValue = state.targetLanguage,
+                    options = state.targetLanguageOptions,
+                    enabled = state.status != TranslationUiStatus.TRANSLATING,
+                    onSelected = { onIntent(ReadBookIntent.SelectTranslationTargetLanguage(it)) },
+                )
+            }
             if (state.provider == TranslationConstants.PROVIDER_QUICK_TRANSLATOR) {
                 TranslationSelector(
                     title = stringResource(R.string.quick_translation_book_pronoun_mode),
@@ -268,12 +285,22 @@ fun TranslationProgressSheet(
                 )
             }
 
-            if (state.hasCachedTranslation) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 TextButton(
-                    onClick = { onIntent(ReadBookIntent.OpenTranslationRevision) },
-                    modifier = Modifier.align(Alignment.End),
+                    onClick = { onIntent(ReadBookIntent.OpenChapterContextCopy) },
                 ) {
-                    AppText(stringResource(R.string.translation_revision_open))
+                    AppText(stringResource(R.string.chapter_context_copy_title))
+                }
+                if (state.hasCachedTranslation) {
+                    TextButton(
+                        onClick = { onIntent(ReadBookIntent.OpenTranslationRevision) },
+                    ) {
+                        AppText(stringResource(R.string.translation_revision_open))
+                    }
                 }
             }
 

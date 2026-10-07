@@ -33,10 +33,16 @@ import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import io.legado.app.domain.usecase.TranslateDynamicUiTextUseCase
+import io.legado.app.domain.usecase.containsCjk
 import splitties.init.appCtx
 import java.io.File
 
 object WebServiceExportController {
+
+    private val translateDynamicUiTextUseCase: TranslateDynamicUiTextUseCase by lazy {
+        org.koin.core.context.GlobalContext.get().get()
+    }
 
     fun sources(request: WebServiceExportSourcesRequest): WebServiceExportFile {
         val keys = WebServiceExportRequests.normalizedKeys(request.sourceKeys)
@@ -146,12 +152,46 @@ object WebServiceExportController {
         val processor = ContentProcessor.get(book.name, book.origin)
         val useReplace = book.getUseReplaceRule()
         val targetLanguage = io.legado.app.ui.config.translation.TranslationConfig.llmTargetLanguage
+        val exportBookTitle = if (contentSource.includesTranslation && book.name.containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.executeBookName(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "name"),
+                    originalText = book.name,
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: book.name
+        } else {
+            book.name
+        }
+        val exportAuthor = if (contentSource.includesTranslation && book.getRealAuthor().containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.executeAuthorName(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "author"),
+                    originalText = book.getRealAuthor(),
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: book.getRealAuthor()
+        } else {
+            book.getRealAuthor()
+        }
+        val introText = book.getDisplayIntro().orEmpty()
+        val exportIntro = if (contentSource.includesTranslation && introText.containsCjk()) {
+            runCatching {
+                translateDynamicUiTextUseCase.execute(
+                    scopeKey = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey(book.bookUrl, "intro"),
+                    originalText = introText,
+                    book = book,
+                ).getOrNull()
+            }.getOrNull() ?: introText
+        } else {
+            introText
+        }
         val payload = EbookExportPayload(
-            title = book.name,
-            author = book.getRealAuthor(),
-            intro = HtmlFormatter.format(book.getDisplayIntro()),
+            title = exportBookTitle,
+            author = exportAuthor,
+            intro = HtmlFormatter.format(exportIntro),
             language = if (contentSource.includesTranslation) targetLanguage else Locale.getDefault().language,
-            description = HtmlFormatter.format(book.getDisplayIntro()),
+            description = HtmlFormatter.format(exportIntro),
             identifier = "urn:drducbook:book:${book.bookUrl.hashCode().toUInt().toString(16)}",
             cover = resolveCover(book),
             chapters = selectedChapters.map { chapter ->
@@ -175,10 +215,23 @@ object WebServiceExportController {
                     chineseConvert = false,
                     reSegment = false,
                 ).toString()
+                val displayTitle = chapter.getDisplayTitle(processor.getTitleReplaceRules(), useReplace)
+                    .replace("🔒", "")
+                val chapterTitle = if (contentSource.includesTranslation && displayTitle.containsCjk()) {
+                    runCatching {
+                        translateDynamicUiTextUseCase.executeChapterTitle(
+                            scopeKey = TranslateDynamicUiTextUseCase.canonicalChapterTitleScopeKey(book.bookUrl, chapter.index),
+                            originalText = displayTitle,
+                            book = book,
+                            chapterIndex = chapter.index,
+                        ).getOrNull()
+                    }.getOrNull() ?: displayTitle
+                } else {
+                    displayTitle
+                }
                 EbookExportChapter(
                     index = chapter.index,
-                    title = chapter.getDisplayTitle(processor.getTitleReplaceRules(), useReplace)
-                        .replace("🔒", ""),
+                    title = chapterTitle,
                     plainText = HtmlFormatter.format(processed),
                     html = processed,
                     images = if (contentSource.includesOriginal) collectImages(book, chapter, original) else emptyList(),
@@ -188,7 +241,11 @@ object WebServiceExportController {
         )
         val format = EbookExportFormat.from(request.format)
         val tempDir = File(appCtx.cacheDir, "web_ebook_export_${System.nanoTime()}").apply { mkdirs() }
-        val outputName = "${safeFileName(book.name)}.${format.extension}"
+        val outputName = if (contentSource.includesTranslation && exportBookTitle != book.name) {
+            "${safeFileName(exportBookTitle)} - ${safeFileName(exportAuthor)}.${format.extension}"
+        } else {
+            "${safeFileName(book.name)}.${format.extension}"
+        }
         val output = EbookExportWriter(
             outputDirectory = FileDoc.fromDir(tempDir.absolutePath),
             charset = Charsets.UTF_8,

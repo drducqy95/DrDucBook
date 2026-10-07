@@ -96,4 +96,13 @@ class TranslateDynamicUiTextUseCaseTest {
         org.junit.Assert.assertEquals("Chương 1: Mở Đầu Kỳ Duyên", result.story_memory?.timeline?.chapterTitle)
         org.junit.Assert.assertEquals("Tóm tắt chương 1", result.story_memory?.timeline?.summary)
     }
+
+    @Test
+    fun canonicalScopeKeysAreWellFormed() {
+        val chapterScope = TranslateDynamicUiTextUseCase.canonicalChapterTitleScopeKey("https://example.com/book/1", 42)
+        org.junit.Assert.assertEquals("chapter-title:https://example.com/book/1:42", chapterScope)
+
+        val metadataScope = TranslateDynamicUiTextUseCase.canonicalBookMetadataScopeKey("https://example.com/book/1", "name")
+        org.junit.Assert.assertEquals("book-metadata:https://example.com/book/1:name", metadataScope)
+    }
 }

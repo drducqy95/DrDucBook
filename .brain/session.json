@@ -1,22 +1,27 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-10-05T01:00:00.000000",
-    "saved_at": "2026-10-05T01:00:00.000000",
-    "resumed_at": "2026-10-04T20:00:00.000000"
+    "last_active": "2026-10-07T09:44:00.000000",
+    "saved_at": "2026-10-07T09:44:00.000000",
+    "resumed_at": "2026-10-07T07:06:05.000000"
   },
   "working_on": {
-    "feature": "Agent Story Memory, Story Wiki Chronicle Synthesis & Enhanced Source Creation/Repair Tools",
-    "current_milestone": "P60",
-    "current_plan_path": "plans/261004-2000-agent-story-memory-wiki-source-tools/",
-    "current_phase": "phase-05-verification-and-testing",
-    "total_phases": 5,
+    "feature": "ML Kit Pivot Polysemy Disambiguation Engine & Advanced Novel Grammar Healing",
+    "current_milestone": "P66",
+    "current_plan_path": "plans/261007-0835-mlkit-pivot-disambiguation-engine/",
+    "current_phase": "phase-04",
+    "total_phases": 4,
     "phases": [
       "01",
       "02",
       "03",
-      "04",
-      "05"
+      "04"
+    ],
+    "completed_phases": [
+      "01",
+      "02",
+      "03",
+      "04"
     ],
     "status": "completed"
   },
@@ -264,6 +269,26 @@
         "app/src/main/java/io/legado/app/ui/book/read/ReadBookViewModel.kt"
       ],
       "error_id": "ERR_0044"
+    },
+    {
+      "type": "debug",
+      "description": "MlKitPronounNeutralizer: Crash NoClassDefFoundError: io.legado.app.domain.model.MlKitPronounNeutralizer due to ExceptionInInitializerError",
+      "files": [
+        "app/src/main/java/io/legado/app/domain/model/MlKitPronounNeutralizer.kt"
+      ],
+      "error_id": "ERR_0046"
+    },
+    {
+      "type": "debug",
+      "description": "ML Kit foreign name suggestions produced raw Japanese Kana (リヨン), Korean Hangul (리옹), or distorted pinyin/hallucinated Latin (yisi bo / Yisi Bouvelle for 宇智波 / 宇智波斑) instead of standard Latin/Romaji",
+      "files": [
+        "app/src/main/java/io/legado/app/domain/model/ForeignScriptRomanizer.kt",
+        "app/src/main/java/io/legado/app/domain/model/SinoForeignNameDetector.kt",
+        "app/src/main/java/io/legado/app/domain/usecase/TranslateChapterUseCase.kt",
+        "app/src/main/java/io/legado/app/ui/config/translation/dictionary/QuickDictionaryManagerViewModel.kt",
+        "app/src/main/java/io/legado/app/ui/translation/memory/BookStoryMemoryViewModel.kt"
+      ],
+      "error_id": "ERR_0047"
     }
   ],
   "context_notes": [

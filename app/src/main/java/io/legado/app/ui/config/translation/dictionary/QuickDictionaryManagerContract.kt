@@ -51,6 +51,8 @@ data class QuickDictionaryEditorUi(
     val scopeKey: String,
     val saving: Boolean = false,
     @StringRes val errorRes: Int? = null,
+    val isSuggesting: Boolean = false,
+    val suggestions: ImmutableList<io.legado.app.ui.quickdict.QuickDictionarySuggestionUi> = persistentListOf(),
 )
 
 @Stable
@@ -97,6 +99,8 @@ sealed interface QuickDictionaryManagerIntent {
     data class UpdateRaw(val value: String) : QuickDictionaryManagerIntent
     data class UpdateHanViet(val value: String) : QuickDictionaryManagerIntent
     data class UpdateTarget(val value: String) : QuickDictionaryManagerIntent
+    data class RequestMlKitSuggestion(val pair: io.legado.app.domain.model.MlKitLanguagePair) : QuickDictionaryManagerIntent
+    data class ApplySuggestion(val value: String) : QuickDictionaryManagerIntent
     data class UpdateEditorType(val type: QuickDictionaryType) : QuickDictionaryManagerIntent
     data class UpdateEditorScope(val scope: QuickDictionaryScope) : QuickDictionaryManagerIntent
     data class UpdateEditorScopeKey(val key: String) : QuickDictionaryManagerIntent

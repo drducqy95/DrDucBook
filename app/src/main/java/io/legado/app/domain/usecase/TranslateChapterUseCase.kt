@@ -1,6 +1,7 @@
 package io.legado.app.domain.usecase
 
 import androidx.annotation.Keep
+import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.TranslationCache
@@ -17,6 +18,13 @@ import io.legado.app.model.translation.HachimiOnnxModelRegistry
 import io.legado.app.domain.gateway.AiPromptPresetGateway
 import io.legado.app.domain.gateway.LocalAiTranslationGateway
 import io.legado.app.domain.gateway.TranslationCacheGateway
+import io.legado.app.domain.model.CanonicalTranslationMemory
+import io.legado.app.domain.model.MlKitDictionaryEnforcer
+import io.legado.app.domain.model.MlKitGrammarPostProcessor
+import io.legado.app.domain.model.MlKitPronounNeutralizer
+import io.legado.app.domain.model.SinoForeignNameDetector
+import io.legado.app.domain.model.JapaneseKanaRomajizer
+import io.legado.app.domain.model.KoreanHangulRomanizer
 import io.legado.app.domain.model.AiGenerateRequest
 import io.legado.app.domain.model.AiOutputContract
 import io.legado.app.domain.model.AiCapability
@@ -202,6 +210,7 @@ class TranslateChapterUseCase(
         previousContext: String = "",
         nextContext: String = "",
         targetLanguage: String = TranslationConstants.TARGET_VIETNAMESE,
+        sourceLanguage: String? = null,
     ): Result<String> = withContext(Dispatchers.IO) {
         if (text.isBlank()) return@withContext Result.failure(IllegalArgumentException("Empty source text"))
         if (!TranslationConstants.supportsTargetLanguage(provider, targetLanguage)) {
@@ -252,11 +261,37 @@ class TranslateChapterUseCase(
                 }
                 TranslationConstants.PROVIDER_GOOGLE -> translateWithGoogle(source, targetLanguage)
                     .getOrThrow()
-                TranslationConstants.PROVIDER_ML_KIT -> mlKitTranslationGateway.translate(
-                    text = source,
-                    targetLanguage = targetLanguage,
-                    sourceLanguage = inferMlKitSourceLanguageHint(source, targetLanguage),
-                )
+                TranslationConstants.PROVIDER_ML_KIT -> {
+                    val candidate = SinoForeignNameDetector.classifyName(source)
+                    val nameMatch = when (targetLanguage) {
+                        "ja" -> candidate?.takeIf { it.origin == "japanese" || it.origin == "western" }?.suggested
+                        "ko" -> candidate?.takeIf { it.origin == "korean" || it.origin == "western" }?.suggested
+                        "en" -> candidate?.takeIf { it.origin == "western" || it.origin == "japanese" || it.origin == "korean" }?.suggested
+                        else -> null
+                    }
+                    val qtLatinMatch = if (targetLanguage in listOf("ja", "en", "ko")) {
+                        dictionaries.firstOrNull {
+                            it.original == source && it.translation.isNotBlank() &&
+                                it.translation.all { c -> c.code < 128 }
+                        }?.translation
+                    } else null
+
+                    val canonicalResolved = nameMatch ?: qtLatinMatch
+                    if (canonicalResolved != null && canonicalResolved.isNotBlank()) {
+                        canonicalResolved
+                    } else {
+                        val raw = mlKitTranslationGateway.translate(
+                            text = source,
+                            targetLanguage = targetLanguage,
+                            sourceLanguage = sourceLanguage ?: inferMlKitSourceLanguageHint(source, targetLanguage),
+                        )
+                        when (targetLanguage) {
+                            "ja" -> JapaneseKanaRomajizer.toRomaji(raw)
+                            "ko" -> KoreanHangulRomanizer.toLatin(raw)
+                            else -> raw
+                        }
+                    }
+                }
                 TranslationConstants.PROVIDER_LOCAL_AI -> {
                     val gateway = localAiTranslationGateway
                         ?: error("Local AI translation gateway is not available")
@@ -324,27 +359,31 @@ class TranslateChapterUseCase(
                 }
                 else -> error("Unknown translation provider: $provider")
             }
-            val repairedTranslation = if (provider == TranslationConstants.PROVIDER_ML_KIT) {
+            val repairedTranslation = if (provider == TranslationConstants.PROVIDER_ML_KIT && targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
                 repairMlKitResidualCjk(
                     text = translated,
                     targetLanguage = targetLanguage,
-                    sourceLanguage = inferMlKitSourceLanguageHint(source, targetLanguage),
+                    sourceLanguage = sourceLanguage ?: inferMlKitSourceLanguageHint(source, targetLanguage),
                     dictionaries = dictionaries,
                     quickPhonetics = quickEntries.mapNotNull { it.toQuickPhoneticPair() },
                 )
             } else {
                 translated
             }
-            translationQualityError(
-                source = source,
-                translated = repairedTranslation,
-                targetLanguage = targetLanguage,
-            )?.let { throw it }
-            postProcessTranslation(
-                repairedTranslation,
-                targetLanguage,
-                isRewrite = provider == TranslationConstants.PROVIDER_REWRITE,
-            )
+            if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+                translationQualityError(
+                    source = source,
+                    translated = repairedTranslation,
+                    targetLanguage = targetLanguage,
+                )?.let { throw it }
+                postProcessTranslation(
+                    repairedTranslation,
+                    targetLanguage,
+                    isRewrite = provider == TranslationConstants.PROVIDER_REWRITE,
+                )
+            } else {
+                repairedTranslation.trim()
+            }
         }
     }
 
@@ -676,9 +715,11 @@ class TranslateChapterUseCase(
                 ) ?: "MEMORY_DISABLED"
                 result.story_memory?.timeline?.chapterTitle?.takeIf { it.isNotBlank() && !it.containsCjk() }?.let { aiTitle ->
                     translateDynamicUiTextUseCase.saveAiChapterTitle(
-                        scopeKey = "chapter-title:${book.bookUrl}:${bookChapter.index}",
+                        bookUrl = book.bookUrl,
+                        chapterIndex = bookChapter.index,
                         originalText = bookChapter.title,
                         aiTitle = aiTitle,
+                        provider = provider,
                     )
                 }
                 onProgress(
@@ -1233,6 +1274,7 @@ class TranslateChapterUseCase(
                 nmtQuality = report
                 onNmtQuality(report)
             },
+            book = book,
         )
         if (result.isSuccess) {
             translationCacheGateway.saveChunk(
@@ -1282,6 +1324,7 @@ class TranslateChapterUseCase(
         onPartialTranslation: (String) -> Unit,
         splitDepth: Int = 0,
         onNmtQuality: (io.legado.app.domain.gateway.NmtQualityReport) -> Unit = {},
+        book: Book? = null,
     ): Result<String> {
         var lastError: Exception? = null
         var lastRetryReason: RetryReason? = null
@@ -1315,6 +1358,9 @@ class TranslateChapterUseCase(
                             fallbackTerms = quickTranslatorTerms,
                         ),
                         quickPhonetics = quickPhonetics,
+                        pronounMode = quickPronounMode ?: QuickTranslationPronounMode.AUTO,
+                        storyMemorySnapshot = storyContextProvider().canonicalMemory,
+                        bookSourceLanguage = book?.getMlKitSourceLanguage(),
                     )
                 }
                 TranslationConstants.PROVIDER_QUICK_TRANSLATOR -> {
@@ -1565,6 +1611,7 @@ class TranslateChapterUseCase(
                         onPartialTranslation = {},
                         splitDepth = splitDepth + 1,
                         onNmtQuality = onNmtQuality,
+                        book = book,
                     )
                     if (splitResult.isFailure) return splitResult
                     translatedSplitChunks += splitChunk.copy(
@@ -1870,7 +1917,8 @@ class TranslateChapterUseCase(
         TranslationConstants.PROVIDER_ML_KIT -> {
             GSON.toJson(
                 linkedMapOf(
-                    "sourceLanguage" to TranslationConfig.mlKitSourceLanguage,
+                    "sourceLanguage" to (book?.getMlKitSourceLanguage() ?: TranslationConfig.mlKitSourceLanguage),
+                    "targetLanguage" to (book?.getMlKitTargetLanguage() ?: TranslationConfig.llmTargetLanguage),
                 )
             )
         }
@@ -1918,43 +1966,181 @@ class TranslateChapterUseCase(
         targetLanguage: String,
         dictionaries: List<DictPair>,
         quickPhonetics: List<DictPair>,
+        pronounMode: QuickTranslationPronounMode = QuickTranslationPronounMode.AUTO,
+        storyMemorySnapshot: List<CanonicalTranslationMemory> = emptyList(),
+        bookSourceLanguage: String? = null,
     ): String {
+        if (sourceContent.isBlank()) return sourceContent
         val paragraphCount = chunk.paragraphSeparators.size + 1
-        val sourceLanguage = inferMlKitSourceLanguageHint(sourceContent, targetLanguage)
+        val sourceLanguage = bookSourceLanguage?.takeIf { it.isNotBlank() && !it.equals("auto", ignoreCase = true) }
+            ?: inferMlKitSourceLanguageHint(sourceContent, targetLanguage)
         val paragraphParts = splitForExpectedParagraphCount(sourceContent, paragraphCount)
-            ?: return repairMlKitResidualCjk(
-                text = mlKitTranslationGateway.translate(
-                    text = sourceContent,
-                    targetLanguage = targetLanguage,
-                    sourceLanguage = sourceLanguage,
-                ),
-                targetLanguage = targetLanguage,
-                sourceLanguage = sourceLanguage,
-                dictionaries = dictionaries,
-                quickPhonetics = emptyList(),
-            )
+            ?: sourceContent.split(Regex("(?:\r?\n)+")).filter { it.isNotEmpty() }
+
         return buildList(paragraphParts.size) {
             for (paragraph in paragraphParts) {
-                val translated = if (paragraph.isBlank()) {
-                    paragraph
-                } else {
-                    mlKitTranslationGateway.translate(
-                        text = paragraph,
-                        targetLanguage = targetLanguage,
-                        sourceLanguage = sourceLanguage,
-                    ).trim()
-                }
-                add(
-                    repairMlKitResidualCjk(
-                        text = translated,
-                        targetLanguage = targetLanguage,
-                        sourceLanguage = sourceLanguage,
-                        dictionaries = dictionaries,
-                        quickPhonetics = quickPhonetics,
-                    )
+                val translated = translateMlKitParagraph(
+                    paragraph = paragraph,
+                    targetLanguage = targetLanguage,
+                    sourceLanguage = sourceLanguage,
+                    dictionaries = dictionaries,
+                    quickPhonetics = quickPhonetics,
+                    storyMemorySnapshot = storyMemorySnapshot,
                 )
+                val neutralized = if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+                    val healedGrammar = MlKitGrammarPostProcessor.process(
+                        text = translated,
+                        sourceCjk = paragraph,
+                        pronounMode = pronounMode,
+                    )
+                    val capitalized = VietnameseTranslationPostProcessor.capitalizeSentences(healedGrammar)
+                    MlKitPronounNeutralizer.neutralize(
+                        text = capitalized,
+                        mode = pronounMode,
+                    )
+                } else {
+                    translated
+                }
+                add(neutralized)
             }
         }.joinToString("\n\n")
+    }
+
+    private suspend fun translateMlKitParagraph(
+        paragraph: String,
+        targetLanguage: String,
+        sourceLanguage: String?,
+        dictionaries: List<DictPair>,
+        quickPhonetics: List<DictPair>,
+        storyMemorySnapshot: List<CanonicalTranslationMemory>,
+    ): String {
+        if (paragraph.isBlank()) return paragraph
+        if (paragraph.none { it.isLetter() }) return paragraph
+
+        if (paragraph.length > 500) {
+            val sentences = paragraph.split(Regex("(?<=[。！？!?\n])")).filter { it.isNotEmpty() }
+                val translatedSentences = ArrayList<String>(sentences.size)
+                for (sentence in sentences) {
+                    translatedSentences.add(
+                        translateMlKitParagraph(
+                            paragraph = sentence,
+                            targetLanguage = targetLanguage,
+                            sourceLanguage = sourceLanguage,
+                            dictionaries = dictionaries,
+                            quickPhonetics = quickPhonetics,
+                            storyMemorySnapshot = storyMemorySnapshot,
+                        )
+                    )
+                }
+                return translatedSentences.joinToString("")
+        }
+
+        val preMaskQtTerms = if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+            quickTranslationGateway.findMatchingTerms(
+                text = paragraph,
+                projectTerms = dictionaries,
+                types = setOf(QuickDictionaryType.NAME, QuickDictionaryType.TERM),
+                minLength = 2,
+            )
+        } else {
+            emptyList()
+        }
+        val preMaskDictionaries = if (preMaskQtTerms.isNotEmpty()) {
+            mergeDictionaryTerms(primaryTerms = dictionaries, fallbackTerms = preMaskQtTerms)
+        } else {
+            dictionaries
+        }
+
+        val postEnforceQtTerms = if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+            quickTranslationGateway.findMatchingTerms(
+                text = paragraph,
+                projectTerms = dictionaries,
+                types = null,
+                minLength = 2,
+            )
+        } else {
+            emptyList()
+        }
+        val postEnforceDictionaries = if (postEnforceQtTerms.isNotEmpty()) {
+            mergeDictionaryTerms(primaryTerms = dictionaries, fallbackTerms = postEnforceQtTerms)
+        } else {
+            dictionaries
+        }
+
+        val maskResult = if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+            MlKitDictionaryEnforcer.maskEntities(paragraph, preMaskDictionaries, storyMemorySnapshot)
+        } else {
+            MlKitDictionaryEnforcer.MaskResult(paragraph, emptyList())
+        }
+
+        val rawTranslated = try {
+            val res = mlKitTranslationGateway.translate(
+                text = maskResult.maskedText,
+                targetLanguage = targetLanguage,
+                sourceLanguage = sourceLanguage,
+            ).trim()
+            val unmasked = if (maskResult.replacements.isNotEmpty()) {
+                MlKitDictionaryEnforcer.unmaskEntities(res, maskResult.replacements)
+            } else {
+                res
+            }
+            if (unmasked.isBlank() && paragraph.isNotBlank()) {
+                if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+                    quickTranslationGateway.translate(paragraph, postEnforceDictionaries, quickPhonetics)
+                } else {
+                    paragraph
+                }
+            } else {
+                unmasked
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            AppLog.put("ML Kit paragraph translation failed: ${e.message}", e)
+            if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+                quickTranslationGateway.translate(paragraph, postEnforceDictionaries, quickPhonetics)
+            } else {
+                paragraph
+            }
+        }
+
+        val repaired = repairMlKitResidualCjk(
+            text = rawTranslated,
+            targetLanguage = targetLanguage,
+            sourceLanguage = sourceLanguage,
+            dictionaries = postEnforceDictionaries,
+            quickPhonetics = quickPhonetics,
+        )
+
+        return if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+            enforceDictionariesForMlKit(
+                sourceCjk = paragraph,
+                translatedVi = repaired,
+                dictionaries = postEnforceDictionaries,
+                canonicalMemory = storyMemorySnapshot,
+                quickPhonetics = quickPhonetics,
+            )
+        } else {
+            repaired
+        }
+    }
+
+    internal fun enforceDictionariesForMlKit(
+        sourceCjk: String,
+        translatedVi: String,
+        dictionaries: List<DictPair>,
+        canonicalMemory: List<CanonicalTranslationMemory> = emptyList(),
+        quickPhonetics: List<DictPair> = emptyList(),
+    ): String {
+        return MlKitDictionaryEnforcer.enforce(
+            sourceCjk = sourceCjk,
+            translatedVi = translatedVi,
+            dictionaries = dictionaries,
+            canonicalMemory = canonicalMemory,
+            hanVietResolver = { raw ->
+                runCatching { quickTranslationGateway.hanViet(raw, quickPhonetics) }.getOrNull().orEmpty()
+            },
+        )
     }
 
     private suspend fun repairMlKitResidualCjk(
@@ -3017,7 +3203,17 @@ internal fun repairResidualCjkForVietnamese(
             ?: run.value
         replacement.withWordBoundariesFor(text, run.range)
     }
-    return normalizeCjkPunctuation(repaired)
+    val withRomaji = if (repaired.any { it.code in 0x3040..0x30FF }) {
+        JapaneseKanaRomajizer.toRomaji(repaired)
+    } else {
+        repaired
+    }
+    val withLatin = if (withRomaji.any { it.code in 0xAC00..0xD7AF }) {
+        KoreanHangulRomanizer.toLatin(withRomaji)
+    } else {
+        withRomaji
+    }
+    return normalizeCjkPunctuation(withLatin)
 }
 
 private fun normalizeCjkPunctuation(text: String): String = buildString(text.length) {

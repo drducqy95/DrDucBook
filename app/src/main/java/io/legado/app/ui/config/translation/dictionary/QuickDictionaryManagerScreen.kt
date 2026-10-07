@@ -633,6 +633,39 @@ private fun DictionaryEditorSheet(
                     label = stringResource(R.string.quick_dictionary_target),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                AppText(
+                    text = stringResource(R.string.mlkit_suggestion_title),
+                    style = LegadoTheme.typography.labelMedium,
+                    color = LegadoTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    io.legado.app.domain.model.MlKitLanguagePair.PRESETS.forEach { pair ->
+                        FilterChip(
+                            selected = false,
+                            onClick = { onIntent(QuickDictionaryManagerIntent.RequestMlKitSuggestion(pair)) },
+                            label = { AppText(stringResource(pair.labelRes)) },
+                        )
+                    }
+                }
+                if (editor.isSuggesting) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                if (editor.suggestions.isNotEmpty()) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        editor.suggestions.forEach { suggestion ->
+                            FilterChip(
+                                selected = false,
+                                onClick = { onIntent(QuickDictionaryManagerIntent.ApplySuggestion(suggestion.text)) },
+                                label = { AppText("${suggestion.providerLabel}: ${suggestion.text}") },
+                            )
+                        }
+                    }
+                }
                 AppText(stringResource(R.string.quick_dictionary_type))
                 Row(
                     modifier = Modifier.horizontalScroll(rememberScrollState()),

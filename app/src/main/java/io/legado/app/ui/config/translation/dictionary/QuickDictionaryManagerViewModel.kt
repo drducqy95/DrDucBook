@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.legado.app.domain.usecase.TranslateChapterUseCase
+import kotlinx.collections.immutable.toImmutableList
 import java.io.File
 import splitties.init.appCtx
 
@@ -33,6 +35,7 @@ class QuickDictionaryManagerViewModel(
     private val translationGateway: QuickTranslationGateway,
     private val bookRepository: BookRepository,
     private val quickDictionaryPackStore: QuickDictionaryPackStore,
+    private val translateChapterUseCase: TranslateChapterUseCase,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(QuickDictionaryManagerUiState())
@@ -44,6 +47,7 @@ class QuickDictionaryManagerViewModel(
     private var allEntries: List<QuickDictionaryEntry> = emptyList()
     private var initialized = false
     private var filterJob: Job? = null
+    private var suggestionJob: Job? = null
 
     private fun startLoading() {
         viewModelScope.launch {
@@ -139,6 +143,8 @@ class QuickDictionaryManagerViewModel(
             is QuickDictionaryManagerIntent.UpdateRaw -> updateEditor { copy(raw = intent.value, errorRes = null) }
             is QuickDictionaryManagerIntent.UpdateHanViet -> updateEditor { copy(hanViet = intent.value, errorRes = null) }
             is QuickDictionaryManagerIntent.UpdateTarget -> updateEditor { copy(target = intent.value, errorRes = null) }
+            is QuickDictionaryManagerIntent.RequestMlKitSuggestion -> requestMlKitSuggestion(intent.pair)
+            is QuickDictionaryManagerIntent.ApplySuggestion -> updateEditor { copy(target = intent.value, errorRes = null) }
             is QuickDictionaryManagerIntent.UpdateEditorType -> updateEditor { copy(type = intent.type, errorRes = null) }
             is QuickDictionaryManagerIntent.UpdateEditorScope -> updateEditorScope(intent.scope)
             is QuickDictionaryManagerIntent.UpdateEditorScopeKey -> updateEditor { copy(scopeKey = intent.key, errorRes = null) }
@@ -484,6 +490,47 @@ class QuickDictionaryManagerViewModel(
         val selected = text.substring(start, end).trim().ifEmpty { text.trim() }
         _uiState.update { it.copy(selectionText = null) }
         openEditor(QuickDictionaryRowUi(raw = selected, type = state.selectedType))
+    }
+
+    private fun requestMlKitSuggestion(pair: io.legado.app.domain.model.MlKitLanguagePair) {
+        val editor = _uiState.value.editor ?: return
+        val raw = editor.raw.trim()
+        if (raw.isBlank()) return
+        suggestionJob?.cancel()
+        updateEditor { copy(isSuggesting = true, errorRes = null) }
+        suggestionJob = viewModelScope.launch(Dispatchers.IO) {
+            val book = (editor.scopeKey.takeIf { editor.scope == QuickDictionaryScope.PROJECT }
+                ?: _uiState.value.selectedScopeKey.takeIf { _uiState.value.selectedScope == QuickDictionaryScope.PROJECT })
+                ?.let { bookRepository.getBook(it) }
+            translateChapterUseCase.executeSuggestion(
+                text = raw,
+                provider = io.legado.app.domain.model.TranslationConstants.PROVIDER_ML_KIT,
+                book = book,
+                targetLanguage = pair.targetLang,
+                sourceLanguage = pair.sourceLang,
+            ).onSuccess { translated ->
+                val suggestion = io.legado.app.ui.quickdict.QuickDictionarySuggestionUi(
+                    provider = "${io.legado.app.domain.model.TranslationConstants.PROVIDER_ML_KIT}_${pair.id}",
+                    providerLabel = "ML Kit (${pair.shortTag})",
+                    text = translated,
+                )
+                updateEditor {
+                    val updated = (suggestions.filterNot { it.provider == suggestion.provider } + suggestion).toImmutableList()
+                    copy(
+                        target = translated,
+                        suggestions = updated,
+                        isSuggesting = false,
+                    )
+                }
+            }.onFailure { error ->
+                updateEditor {
+                    copy(
+                        isSuggesting = false,
+                        errorRes = R.string.quick_dictionary_suggestion_failed,
+                    )
+                }
+            }
+        }
     }
 
     companion object {

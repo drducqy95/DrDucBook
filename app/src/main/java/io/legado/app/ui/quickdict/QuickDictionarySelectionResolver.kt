@@ -209,11 +209,31 @@ internal fun resolveQuickDictionarySelectionResult(
             val len = mappedRange.last - mappedRange.first + 1
             if (len <= MAX_TRANSLATED_CANDIDATE_CHARS && !source.substring(mappedRange).contains('\n')) {
                 add(QuickDictionarySelectionAnchor(source, mappedRange.first, mappedRange.last + 1))
+            } else if (!source.substring(mappedRange).contains('\n')) {
+                val approx = searchWindow.approximatePosition.coerceIn(mappedRange.first, mappedRange.last)
+                for (n in listOf(2, 3, 4)) {
+                    val s = approx.coerceIn(0, (source.length - n).coerceAtLeast(0))
+                    val e = (s + n).coerceAtMost(source.length)
+                    if (e > s && !source.substring(s, e).contains('\n')) {
+                        add(QuickDictionarySelectionAnchor(source, s, e))
+                    }
+                }
             }
         }
         heuristicAnchor?.let { anchor ->
             if (anchor.rawText.length <= MAX_TRANSLATED_CANDIDATE_CHARS && !anchor.rawText.contains('\n')) {
                 add(anchor)
+            }
+        }
+        if (isEmpty() && source.isNotBlank()) {
+            val approx = searchWindow.approximatePosition.coerceIn(0, (source.length - 1).coerceAtLeast(0))
+            val center = nearestPhraseIndex(source, approx) ?: approx
+            for (n in listOf(2, 3, 4, 1)) {
+                val s = center.coerceIn(0, (source.length - n).coerceAtLeast(0))
+                val e = (s + n).coerceAtMost(source.length)
+                if (e > s && !source.substring(s, e).contains('\n')) {
+                    add(QuickDictionarySelectionAnchor(source, s, e))
+                }
             }
         }
     }.distinctBy { it.start to it.end }

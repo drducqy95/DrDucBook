@@ -73,3 +73,7 @@ _Append-only operation history._
 - `2026-10-04T15:49:10` — CREATE [decision] Use Post Upsert and Pre-Approved Tool Policy → .brain\wiki\decisions\use-post-upsert-and-pre-approved-tool-policy.md
 - `2026-10-04T22:03:19` — CREATE [pattern] QuickDictionarySelectionResolver - MAPPING_ALIGNMENT_DESYNC Pattern → .brain\wiki\patterns\quickdictionaryselectionresolver-mapping-alignment-desync-pattern.md
 - `2026-10-04T22:03:19` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-06T15:51:09` — CREATE [pattern] MlKitPronounNeutralizer - PatternSyntaxException Pattern → .brain\wiki\patterns\mlkitpronounneutralizer-patternsyntaxexception-pattern.md
+- `2026-10-06T15:51:09` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-07T07:22:05` — CREATE [decision] ML Kit Dynamic Dictionary & Pure Grammar Architecture → .brain\wiki\decisions\ml-kit-dynamic-dictionary-pure-grammar-architecture.md
+- `2026-10-07T07:22:15` — CREATE [entity] ML Kit Dynamic Dictionary & Grammar Engine → .brain\wiki\entities\ml-kit-dynamic-dictionary-grammar-engine.md

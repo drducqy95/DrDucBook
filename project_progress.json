@@ -1,10 +1,10 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-05T01:00:00",
+    "last_updated": "2026-10-07T09:44:00",
     "overall_progress_percent": 100,
-    "current_phase": "phase-60-agent-story-memory-wiki-source-tools",
-    "status": "COMPLETED",
+    "current_phase": "P66",
+    "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
@@ -2406,6 +2406,200 @@
         {
           "id": "T60.6",
           "desc": "Skills Authoring & Catalog Deployment (book-source-engineer v1.0.0 and story-wiki-art-director v1.0.1 with translated book title and author typography on covers, verified in Room SQLite)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P61",
+      "name": "UI QT Lock, AI Cache Precedence, ML Kit Chapter Pipeline, Multilingual Suggestions & Chapter Context Copy",
+      "status": "DONE",
+      "progress": 100,
+      "plan_folder": "plans/261006-1150-ui-qt-ai-cache-mlkit-chapter-context",
+      "tasks": [
+        {
+          "id": "T61.1",
+          "desc": "Phase 01 - Lock UI translation to QT, canonical scope key alignment, and AI cache overwrite & UI replacement (executeChapterTitle, executeChapterTitles, executeBookName, executeAuthorName, TocViewModel)",
+          "status": "DONE"
+        },
+        {
+          "id": "T61.2",
+          "desc": "Phase 02 - Ebook export data integration (translated chapter titles, book metadata, and translated output filename)",
+          "status": "DONE"
+        },
+        {
+          "id": "T61.3",
+          "desc": "Phase 03 - ML Kit chapter translation pipeline (enforce story memory & project QT dictionaries, neutralize pronouns)",
+          "status": "DONE"
+        },
+        {
+          "id": "T61.4",
+          "desc": "Phase 04 - ML Kit multilingual suggestions (ZH->JA, ZH->EN, ZH->KO, ZH->VI) in dictionary editing, story memory editing, and QT dictionary addition",
+          "status": "DONE"
+        },
+        {
+          "id": "T61.5",
+          "desc": "Phase 05 - Chapter context copy feature (raw content and cached translations by provider) with bottom sheet and one-tap copy",
+          "status": "DONE"
+        },
+        {
+          "id": "T61.6",
+          "desc": "Phase 06 - Unit tests, compilation check, APK assembly, and on-device emulator verification",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P62",
+      "name": "Fix Quick Dictionary Selection Mapping, ML Kit Failures & Quality, and Per-Book ML Kit Language Configuration",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T62.1",
+          "desc": "Phase 01 - Fix ML Kit Empty Translation Failures & Safe Chunking (Safe paragraph/sentence chunking, symbol bypass, empty fallback)",
+          "status": "DONE"
+        },
+        {
+          "id": "T62.2",
+          "desc": "Phase 02 - Per-Book ML Kit Source & Target Language Configuration (Book.ReadConfig persistence, TranslationProgressSheet selectors, ReadBookViewModel)",
+          "status": "DONE"
+        },
+        {
+          "id": "T62.3",
+          "desc": "Phase 03 - Quick Dictionary Selection Mapping Resolution (Proportional intra-paragraph mapping, reverse dictionary lookup, Pinyin matching, non-empty fallback alternatives)",
+          "status": "DONE"
+        },
+        {
+          "id": "T62.4",
+          "desc": "Phase 04 - ML Kit Translation Quality Enhancement (Pre-translation entity masking, Pinyin enforcer, pivot error glossary healing)",
+          "status": "DONE"
+        },
+        {
+          "id": "T62.5",
+          "desc": "Phase 05 - Automated Testing, Build, Deployment & On-Device LDPlayer Verification",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P63",
+      "name": "ML Kit Translation Quality, Grammar Healing, Quick Dictionary Mapping & Anime/Novel Jargon Normalization",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T63.1",
+          "desc": "Phase 01 - Quick Dictionary Selection Mapping Resolution & Non-Empty Fallback (Enable ML_KIT in ReaderContentMode.supportsQuickDictionaryEditing, add approximatePosition N-gram fallback in QuickDictionarySelectionResolver, reverse term lookup, ensure Raw is never empty)",
+          "status": "DONE"
+        },
+        {
+          "id": "T63.2",
+          "desc": "Phase 02 - Romanization & Transliteration for Japanese/Korean and Anime/Fantasy Entities (Hepburn Romaji for Kana, Latin for Hangul, expand SinoForeignNameDetector with Uchiha, Madara, Uzumaki Naruto, Goa Kingdom)",
+          "status": "DONE"
+        },
+        {
+          "id": "T63.3",
+          "desc": "Phase 03 - Game/Novel/System Terminology Glossary in MlKitDictionaryEnforcer (储物空间 -> không gian trữ vật, 烙印 -> lạc ấn, 阶位 -> đẳng cấp/giai vị, 难度 -> độ khó, 未解锁 -> chưa mở khóa, 哥亚王国 -> Vương quốc Goa)",
+          "status": "DONE"
+        },
+        {
+          "id": "T63.4",
+          "desc": "Phase 04 - Post-Translation Vietnamese Grammar & Syntax Healing Engine (MlKitGrammarPostProcessor: fix English-pivot syntactic calques '... một mình', 'rất đơn giản để làm', 'có một số đau đầu', fix mid-sentence capitalization after names, replace 2nd-person pronoun drifts 'bạn', integrate with VietnameseTranslationPostProcessor)",
+          "status": "DONE"
+        },
+        {
+          "id": "T63.5",
+          "desc": "Phase 05 - Integration into TranslateChapterUseCase Pipeline & Safe Fallback Hardening (Wire pre-masking, post-processing, grammar healing into translateMlKitParagraph, auto-fallback to QT on failure/empty output)",
+          "status": "DONE"
+        },
+        {
+          "id": "T63.6",
+          "desc": "Phase 06 - Automated Testing, Build Verification & On-Device LDPlayer Screen Validation (MlKitDictionaryEnforcerTest, MlKitGrammarPostProcessorTest, QuickDictionarySelectionResolverTest, assembleAppDebug, install & test live on emulator-5554)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P64",
+      "name": "ML Kit Neutral Pronoun Engine, Pivot Calque Elimination & Comprehensive Grammar Healing",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T64.1",
+          "desc": "Phase 01 - Neutral Pronoun Normalization in MlKitPronounNeutralizer (normalize 'anh ta'/'hắn ta' -> 'hắn', 'cô ta' -> 'nàng', eliminate narrative 1st/2nd person leaks 'tôi'/'bạn'/'của bạn' outside dialogue, clean subject token repetition)",
+          "status": "DONE"
+        },
+        {
+          "id": "T64.2",
+          "desc": "Phase 02 - English-Pivot Calque Healing in MlKitDictionaryEnforcer & MlKitGrammarPostProcessor (heal 'con bê'/'gai dầu' -> 'bắp chân'/'tê rần', 'máu miễn phí' -> 'chảy máu', 'Căn hộ' -> 'tiếp đất', 'sự im lặng' -> 'ống giảm thanh', 'nếp nhăn màu nâu' -> 'nhíu mày', 'Yu Guang' -> 'khoé mắt', 'hãy để' -> 'khiến')",
+          "status": "DONE"
+        },
+        {
+          "id": "T64.3",
+          "desc": "Phase 03 - Generalized Mid-Sentence Verb Decapitalization & Compound Verb De-duplication in MlKitGrammarPostProcessor (decapitalize general verbs following subjects, de-duplicate split verbs like 'Ngồi xổm Ngồi' -> 'Ngồi xổm', remove placeholder residues '___')",
+          "status": "DONE"
+        },
+        {
+          "id": "T64.4",
+          "desc": "Phase 04 - Automated Unit Testing, Build Verification & On-Device Re-translation Validation on LDPlayer (verify MlKitPronounNeutralizerTest, MlKitGrammarPostProcessorTest, assembleAppDebug, install, re-translate chapter 1 live on emulator-5554)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P65",
+      "name": "ML Kit Dynamic QT Dictionary, Story Memory Integration & Pure Vietnamese Grammar Engine",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T65.1",
+          "desc": "Phase 01 - QT Trie Dynamic Term Matcher Gateway (implement findMatchingTerms in QuickTranslationGateway & QuickTranslationRepository to dynamically scan CJK text against QT Name/VietPhrase trie pack with zero hardcoding)",
+          "status": "DONE"
+        },
+        {
+          "id": "T65.2",
+          "desc": "Phase 02 - Story Memory & Dynamic QT Pipeline in ML Kit (wire Story Memory entities + Room QuickDictionary + QT Trie dynamic matches into TranslateChapterUseCase & MlKitDictionaryEnforcer, eliminate hardcoded novel-specific replacements, ensure unmasking & alignment)",
+          "status": "DONE"
+        },
+        {
+          "id": "T65.3",
+          "desc": "Phase 03 - Pure Vietnamese Grammar & Syntax Healing Engine (refactor MlKitGrammarPostProcessor & MlKitPronounNeutralizer to focus purely on Vietnamese grammar rules: pronoun neutrality, mid-sentence decapitalization, NMT syntactic adverbial/copula/passive calques, clean formatting)",
+          "status": "DONE"
+        },
+        {
+          "id": "T65.4",
+          "desc": "Phase 04 - Automated Testing, Build Verification & On-Device Validation (unit tests in MlKitDictionaryEnforcerTest, MlKitGrammarPostProcessorTest, QuickTranslationRepositoryTest, assembleAppDebug, install, re-translate chapter 1 live on emulator-5554)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P66",
+      "name": "ML Kit Pivot Polysemy Disambiguation Engine & Advanced Novel Grammar Healing",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T66.1",
+          "desc": "Phase 01 - Pivot Semantic Disambiguator in MlKitDictionaryEnforcer (map English-pivot polysemic calques using CJK source + QT Trie/Memory target without hardcoding chapter text)",
+          "status": "DONE"
+        },
+        {
+          "id": "T66.2",
+          "desc": "Phase 02 - Separation of Pre-Masking (Name/Term only) & Post-Enforcement (all matching terms) in TranslateChapterUseCase",
+          "status": "DONE"
+        },
+        {
+          "id": "T66.3",
+          "desc": "Phase 03 - Pure Vietnamese Grammar Polish & Deduplication in MlKitGrammarPostProcessor (de-duplicate repetitive syntactic words, heal English calques 'của squat', 'đầu của cái đầu', 'nhân viên quân sự', bracket/quote normalization and isolation)",
+          "status": "DONE"
+        },
+        {
+          "id": "T66.4",
+          "desc": "Phase 04 - Automated Testing, Build & Live On-Device Validation on LDPlayer emulator-5554 (100% unit tests passed, built APK installed, chapter 1 translated live with flawless novel terminology)",
           "status": "DONE"
         }
       ]

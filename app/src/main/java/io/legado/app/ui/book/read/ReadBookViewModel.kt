@@ -59,6 +59,8 @@ import io.legado.app.domain.model.ReaderContentMode
 import io.legado.app.domain.model.ReaderContentSnapshot
 import io.legado.app.domain.model.rebaseDisplayText
 import io.legado.app.domain.model.supportsQuickDictionaryEditing
+import io.legado.app.domain.model.ChapterContextCopyUiState
+import io.legado.app.domain.model.ChapterContextVersionUi
 import io.legado.app.domain.model.QuickDictionaryEntry
 import io.legado.app.domain.model.VietnameseTranslationPostProcessor
 import io.legado.app.domain.model.QuickDictionaryScope
@@ -90,6 +92,7 @@ import io.legado.app.help.DefaultData
 import io.legado.app.help.importFontFile
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
+import io.legado.app.domain.model.TranslationContentSanitizer
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
@@ -521,6 +524,12 @@ class ReadBookViewModel(
             is ReadBookIntent.SelectQuickTranslationPronounMode -> {
                 setQuickTranslationPronounModeForBook(intent.mode)
             }
+            is ReadBookIntent.SelectMlKitSourceLanguage -> {
+                setMlKitSourceLanguageForBook(intent.language)
+            }
+            is ReadBookIntent.SelectMlKitTargetLanguage -> {
+                setMlKitTargetLanguageForBook(intent.language)
+            }
             is ReadBookIntent.SetAutoTranslateEnabled -> {
                 TranslationConfig.autoTranslateEnabled = intent.enabled
                 _uiState.update {
@@ -615,6 +624,12 @@ class ReadBookViewModel(
             is ReadBookIntent.OpenTranslationRevision -> {
                 openTranslationRevision()
             }
+            is ReadBookIntent.OpenChapterContextCopy -> {
+                openChapterContextCopy()
+            }
+            is ReadBookIntent.CopyChapterContext -> {
+                copyChapterContext(intent.versionId)
+            }
             is ReadBookIntent.OpenQuickDictionary -> openQuickDictionary(
                 selectedText = intent.selectedText,
                 chapterIndex = intent.chapterIndex,
@@ -630,6 +645,9 @@ class ReadBookViewModel(
             is ReadBookIntent.SetQuickDictionaryTarget -> updateQuickDictionary { copy(target = intent.value) }
             is ReadBookIntent.RequestQuickDictionarySuggestion -> {
                 requestQuickDictionarySuggestion(intent.provider)
+            }
+            is ReadBookIntent.RequestQuickDictionaryMlKitPairSuggestion -> {
+                requestQuickDictionaryMlKitPairSuggestion(intent.pair)
             }
             is ReadBookIntent.ApplyQuickDictionarySuggestion -> updateQuickDictionary {
                 copy(target = intent.value)
@@ -6515,8 +6533,10 @@ class ReadBookViewModel(
                 displayText = displayContent,
             )
             if (requestGeneration != quickDictionaryRequestGeneration) return@launch
-            val anchor = resolution.anchor
-            val raw = anchor?.rawText.orEmpty()
+            val anchor = resolution.anchor ?: resolution.alternatives.firstOrNull()
+            val raw = anchor?.rawText.orEmpty().ifBlank {
+                if (selectedText.trim().any { it.code in 0x3400..0x9FFF }) selectedText.trim() else ""
+            }
             val hanViet = raw.takeIf(String::isNotBlank)
                 ?.let(quickTranslationGateway::hanViet)
                 .orEmpty()
@@ -6838,6 +6858,67 @@ class ReadBookViewModel(
         }
     }
 
+    private fun requestQuickDictionaryMlKitPairSuggestion(pair: io.legado.app.domain.model.MlKitLanguagePair) {
+        val raw = _uiState.value.quickDictionary.raw.trim()
+        if (raw.isEmpty()) return
+        _uiState.update {
+            it.copy(
+                quickDictionary = it.quickDictionary.copy(
+                    selectedProvider = TranslationConstants.PROVIDER_ML_KIT,
+                    isSuggesting = true,
+                    errorMessage = null,
+                )
+            )
+        }
+        val anchor = pendingQuickDictionaryAnchor
+        val book = ReadBook.book
+        viewModelScope.launch(IO) {
+            translateChapterUseCase.executeSuggestion(
+                text = raw,
+                provider = TranslationConstants.PROVIDER_ML_KIT,
+                book = book,
+                previousContext = anchor?.contextBefore.orEmpty(),
+                nextContext = anchor?.contextAfter.orEmpty(),
+                targetLanguage = pair.targetLang,
+                sourceLanguage = pair.sourceLang,
+            ).onSuccess { translated ->
+                _uiState.update { current ->
+                    val form = current.quickDictionary
+                    if (form.raw.trim() != raw) current
+                    else {
+                        val suggestion = QuickDictionarySuggestionUi(
+                            provider = "${TranslationConstants.PROVIDER_ML_KIT}_${pair.id}",
+                            providerLabel = "ML Kit (${pair.shortTag})",
+                            text = translated,
+                        )
+                        val updatedSuggestions = (form.suggestions.filterNot {
+                            it.provider == suggestion.provider
+                        } + suggestion)
+                        current.copy(
+                            quickDictionary = form.copy(
+                                target = translated,
+                                suggestions = withHanVietSuggestion(updatedSuggestions, form.hanViet),
+                                isSuggesting = false,
+                            )
+                        )
+                    }
+                }
+            }.onFailure { error ->
+                _uiState.update { current ->
+                    val form = current.quickDictionary
+                    if (form.raw.trim() != raw) current
+                    else current.copy(
+                        quickDictionary = form.copy(
+                            isSuggesting = false,
+                            errorMessage = error.localizedMessage
+                                ?: context.getString(R.string.quick_dictionary_suggestion_failed),
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     private fun quickDictionaryProviderOptions(): ImmutableList<QuickDictionaryProviderUi> =
         TranslationConstants.providerValues
             .zip(TranslationConstants.providerDisplayNames)
@@ -7065,6 +7146,172 @@ class ReadBookViewModel(
         }
     }
 
+    private fun openChapterContextCopy() {
+        val book = ReadBook.book ?: run {
+            context.toastOnUi(R.string.chapter_context_copy_empty)
+            return
+        }
+        val chapterIndex = ReadBook.durChapterIndex
+        _uiState.update {
+            it.copy(
+                activeSheet = ReadBookSheet.ChapterContextCopy,
+                chapterContextCopy = ChapterContextCopyUiState(
+                    chapterTitle = ReadBook.curTextChapter?.chapter?.title.orEmpty(),
+                    isLoading = true,
+                ),
+            )
+        }
+        viewModelScope.launch {
+            val chapter = ReadBook.curTextChapter?.chapter
+                ?: appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+            if (chapter == null) {
+                _uiState.update {
+                    it.copy(
+                        chapterContextCopy = it.chapterContextCopy.copy(
+                            isLoading = false,
+                        )
+                    )
+                }
+                return@launch
+            }
+
+            val targetLanguage = TranslationConfig.llmTargetLanguage
+            val versions = withContext(IO) {
+                val list = mutableListOf<ChapterContextVersionUi>()
+
+                // 1. Raw Chinese source
+                val rawContent = BookHelp.getContent(book, chapter)
+                    ?.let(TranslationContentSanitizer::sanitize)
+                    ?.takeIf(String::isNotBlank)
+                if (rawContent != null) {
+                    list.add(
+                        ChapterContextVersionUi(
+                            id = "raw",
+                            title = context.getString(R.string.chapter_context_copy_raw),
+                            provider = null,
+                            charCount = rawContent.length,
+                            statusDescription = null,
+                            isAvailable = true,
+                            previewText = rawContent.take(120).replace("\n", " ").trim(),
+                        )
+                    )
+                }
+
+                // 2. Discover provider caches
+                val cachedList = TranslationManager.listProviderCachesForChapter(book, chapter, targetLanguage)
+                val seenProviders = mutableSetOf<String>()
+
+                cachedList.forEach { cacheInfo ->
+                    val providerIndex = TranslationConstants.providerValues.indexOf(cacheInfo.provider)
+                    val providerName = if (providerIndex >= 0) {
+                        TranslationConstants.providerDisplayNames[providerIndex]
+                    } else {
+                        cacheInfo.provider
+                    }
+                    seenProviders.add(cacheInfo.provider)
+
+                    val statusDesc = when {
+                        cacheInfo.hasUserEdits -> context.getString(R.string.chapter_context_status_user_edited)
+                        cacheInfo.isStale -> context.getString(R.string.chapter_context_status_stale)
+                        else -> null
+                    }
+
+                    val preview = TranslationManager.getCachedTranslation(book, chapter, cacheInfo.provider, targetLanguage)
+                        ?.take(120)?.replace("\n", " ")?.trim().orEmpty()
+
+                    list.add(
+                        ChapterContextVersionUi(
+                            id = "provider:${cacheInfo.provider}",
+                            title = providerName,
+                            provider = cacheInfo.provider,
+                            charCount = cacheInfo.charCount,
+                            statusDescription = statusDesc,
+                            isAvailable = cacheInfo.charCount > 0,
+                            previewText = preview,
+                        )
+                    )
+                }
+
+                // 3. Fallback check for any other providers with cache (e.g. rewrite or unindexed caches)
+                for (provider in TranslationConstants.providerValues) {
+                    if (provider !in seenProviders) {
+                        val content = TranslationManager.getCachedTranslation(book, chapter, provider, targetLanguage)
+                        if (!content.isNullOrBlank()) {
+                            val pIndex = TranslationConstants.providerValues.indexOf(provider)
+                            val providerName = if (pIndex >= 0) {
+                                TranslationConstants.providerDisplayNames[pIndex]
+                            } else {
+                                provider
+                            }
+                            list.add(
+                                ChapterContextVersionUi(
+                                    id = "provider:$provider",
+                                    title = providerName,
+                                    provider = provider,
+                                    charCount = content.length,
+                                    statusDescription = null,
+                                    isAvailable = true,
+                                    previewText = content.take(120).replace("\n", " ").trim(),
+                                )
+                            )
+                        }
+                    }
+                }
+
+                list.toImmutableList()
+            }
+
+            _uiState.update {
+                it.copy(
+                    chapterContextCopy = ChapterContextCopyUiState(
+                        chapterTitle = chapter.title,
+                        versions = versions,
+                        isLoading = false,
+                    )
+                )
+            }
+        }
+    }
+
+    private fun copyChapterContext(versionId: String) {
+        val book = ReadBook.book ?: return
+        val chapterIndex = ReadBook.durChapterIndex
+        viewModelScope.launch {
+            val chapter = ReadBook.curTextChapter?.chapter
+                ?: appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)
+                ?: return@launch
+
+            val targetLanguage = TranslationConfig.llmTargetLanguage
+            val content = withContext(IO) {
+                when {
+                    versionId == "raw" -> {
+                        BookHelp.getContent(book, chapter)
+                            ?.let(TranslationContentSanitizer::sanitize)
+                    }
+                    versionId.startsWith("provider:") -> {
+                        val provider = versionId.removePrefix("provider:")
+                        TranslationManager.getCachedTranslation(book, chapter, provider, targetLanguage)
+                    }
+                    versionId == "rewrite" -> {
+                        TranslationManager.getCachedTranslation(
+                            book,
+                            chapter,
+                            TranslationConstants.PROVIDER_REWRITE,
+                            targetLanguage,
+                        )
+                    }
+                    else -> null
+                }
+            }
+
+            if (content.isNullOrBlank()) {
+                context.toastOnUi(R.string.chapter_context_copy_empty)
+            } else {
+                context.sendToClip(content)
+            }
+        }
+    }
+
     private fun setQuickTranslationPronounModeForBook(mode: String) {
         val book = ReadBook.book ?: return
         val selected = mode
@@ -7075,6 +7322,44 @@ class ReadBookViewModel(
             val updated = withContext(IO) {
                 val current = appDb.bookDao.getBook(book.bookUrl) ?: book
                 current.putQuickTranslationPronounModeOverride(selected)
+                appDb.bookDao.update(current)
+                current
+            }
+            if (ReadBook.book?.bookUrl == updated.bookUrl) {
+                ReadBook.book = updated
+            }
+            openTranslationSheet()
+            maybeStartAutoTranslationQueue()
+        }
+    }
+
+    private fun setMlKitSourceLanguageForBook(lang: String) {
+        val book = ReadBook.book ?: return
+        val selected = lang.takeIf(String::isNotBlank)?.takeIf { it != "auto" }
+        stopAutoTranslationQueue()
+        viewModelScope.launch {
+            val updated = withContext(IO) {
+                val current = appDb.bookDao.getBook(book.bookUrl) ?: book
+                current.setMlKitSourceLanguage(selected)
+                appDb.bookDao.update(current)
+                current
+            }
+            if (ReadBook.book?.bookUrl == updated.bookUrl) {
+                ReadBook.book = updated
+            }
+            openTranslationSheet()
+            maybeStartAutoTranslationQueue()
+        }
+    }
+
+    private fun setMlKitTargetLanguageForBook(lang: String) {
+        val book = ReadBook.book ?: return
+        val selected = lang.takeIf(String::isNotBlank)
+        stopAutoTranslationQueue()
+        viewModelScope.launch {
+            val updated = withContext(IO) {
+                val current = appDb.bookDao.getBook(book.bookUrl) ?: book
+                current.setMlKitTargetLanguage(selected)
                 appDb.bookDao.update(current)
                 current
             }
@@ -7160,6 +7445,14 @@ class ReadBookViewModel(
                             .toImmutableList(),
                         quickTranslationPronounMode = book.getQuickTranslationPronounModeOverrideValue(),
                         quickTranslationPronounModeOptions = quickTranslationPronounModeOptions(),
+                        mlKitSourceLanguage = book.getMlKitSourceLanguage() ?: "auto",
+                        mlKitSourceLanguageOptions = TranslationConfig.mlKitSourceLanguages
+                            .map { (value, label) -> TranslationOptionUi(value, label) }
+                            .toImmutableList(),
+                        mlKitTargetLanguage = book.getMlKitTargetLanguage() ?: "vi",
+                        mlKitTargetLanguageOptions = TranslationConfig.mlKitTargetLanguages
+                            .map { (value, label) -> TranslationOptionUi(value, label) }
+                            .toImmutableList(),
                         status = if (hasCache) {
                             TranslationUiStatus.COMPLETED
                         } else {

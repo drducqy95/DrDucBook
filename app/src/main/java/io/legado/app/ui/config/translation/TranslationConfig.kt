@@ -57,6 +57,7 @@ object TranslationConfig {
         val autoOption = listOf("auto" to "Tự động nhận diện")
         val commonLanguages = listOf(
             "zh" to "Tiếng Trung (Trung Quốc)",
+            "vi" to "Tiếng Việt",
             "en" to "Tiếng Anh (English)",
             "ja" to "Tiếng Nhật (日本語)",
             "ko" to "Tiếng Hàn (한국어)",
@@ -75,6 +76,10 @@ object TranslationConfig {
             }
             .sortedBy { it.second }
         autoOption + commonLanguages + others
+    }
+
+    val mlKitTargetLanguages: List<Pair<String, String>> by lazy {
+        mlKitSourceLanguages.filterNot { it.first == "auto" }
     }
 
     private var storedLlmMaxCharsPerChunk by prefDelegate(

@@ -76,4 +76,15 @@ interface QuickTranslationGateway {
 
     /** Exact, allocation-bounded lookup used to skip duplicates during large user imports. */
     fun containsBuiltInEntry(type: QuickDictionaryType, raw: String): Boolean = false
+
+    /**
+     * Scans CJK text against QT base Trie and project terms, returning matched dictionary pairs.
+     * Used by NMT pipelines (e.g. ML Kit) to extract dynamic proper nouns and terminology.
+     */
+    fun findMatchingTerms(
+        text: String,
+        projectTerms: List<DictPair> = emptyList(),
+        types: Set<QuickDictionaryType>? = null,
+        minLength: Int = 2,
+    ): List<DictPair> = emptyList()
 }

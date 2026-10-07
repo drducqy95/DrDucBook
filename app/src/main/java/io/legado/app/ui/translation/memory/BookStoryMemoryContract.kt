@@ -105,6 +105,7 @@ sealed interface BookStoryMemoryIntent {
     data class Add(val kind: AiTranslationStoryMemoryKind) : BookStoryMemoryIntent
     data class UpdateEditor(val value: StoryMemoryEditorDraft) : BookStoryMemoryIntent
     data class RequestSuggestion(val provider: String) : BookStoryMemoryIntent
+    data class RequestMlKitPairSuggestion(val pair: io.legado.app.domain.model.MlKitLanguagePair) : BookStoryMemoryIntent
     data class ApplySuggestion(val value: String) : BookStoryMemoryIntent
     data class ApplyCaseTransform(val transform: TranslationCaseTransform) : BookStoryMemoryIntent
     data object DismissEditor : BookStoryMemoryIntent

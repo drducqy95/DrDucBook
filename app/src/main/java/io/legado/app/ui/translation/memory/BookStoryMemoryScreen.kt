@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -322,6 +323,7 @@ fun BookStoryMemoryScreen(
             onDelete = { onIntent(BookStoryMemoryIntent.DeleteEditor) },
             onGenerateImage = { onIntent(BookStoryMemoryIntent.GenerateEditorImage) },
             onRequestSuggestion = { provider -> onIntent(BookStoryMemoryIntent.RequestSuggestion(provider)) },
+            onRequestMlKitPairSuggestion = { pair -> onIntent(BookStoryMemoryIntent.RequestMlKitPairSuggestion(pair)) },
             onApplySuggestion = { value -> onIntent(BookStoryMemoryIntent.ApplySuggestion(value)) },
             onDismiss = { onIntent(BookStoryMemoryIntent.DismissEditor) },
         )
@@ -353,6 +355,7 @@ private fun StoryMemoryEditorDialog(
     onDelete: () -> Unit,
     onGenerateImage: () -> Unit,
     onRequestSuggestion: (String) -> Unit,
+    onRequestMlKitPairSuggestion: (io.legado.app.domain.model.MlKitLanguagePair) -> Unit = {},
     onApplySuggestion: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -492,6 +495,25 @@ private fun StoryMemoryEditorDialog(
                             enabled = !draft.isSuggesting,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        Text(
+                            text = stringResource(R.string.mlkit_suggestion_title),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            io.legado.app.domain.model.MlKitLanguagePair.PRESETS.forEach { pair ->
+                                FilterChip(
+                                    selected = false,
+                                    onClick = { onRequestMlKitPairSuggestion(pair) },
+                                    label = { Text(stringResource(pair.labelRes)) },
+                                )
+                            }
+                        }
                         if (draft.isSuggesting) {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }

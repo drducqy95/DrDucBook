@@ -439,6 +439,61 @@ class QuickTranslationRepository(
         }
     }
 
+    override fun findMatchingTerms(
+        text: String,
+        projectTerms: List<DictPair>,
+        types: Set<QuickDictionaryType>?,
+        minLength: Int,
+    ): List<DictPair> {
+        if (text.isBlank() || text.codePoints().noneMatch(::isCjk)) return emptyList()
+        val pack = pack()
+        val safeProjectTerms = projectTerms.map(DictPair::normalizedForRuntime)
+        val projectRuntime = projectRuntimeFor(safeProjectTerms, pack)
+
+        val projectMatches = projectRuntime.trie.allMatchesByStart(text)
+        val baseMatches = pack.baseTrie.allMatchesByStart(text)
+
+        val matchedTerms = LinkedHashMap<String, DictPair>()
+
+        // 1. Project / user-defined matches: always accept length >= 2
+        for (list in projectMatches) {
+            if (list.isNullOrEmpty()) continue
+            for (match in list) {
+                val term = match.term
+                val raw = term.source.trim()
+                val target = term.target.trim()
+                if (raw.length >= 2 && target.isNotBlank()) {
+                    matchedTerms[raw] = DictPair(raw, target)
+                }
+            }
+        }
+
+        // 2. Base pack matches: NAME >= 2 chars, TERM >= 2 chars, VIETPHRASE >= 3 chars
+        for (list in baseMatches) {
+            if (list.isNullOrEmpty()) continue
+            for (match in list) {
+                val term = match.term
+                val raw = term.source.trim()
+                val target = term.target.trim()
+                if (target.isBlank()) continue
+
+                val isAccepted = when (term.type) {
+                    QuickDictionaryType.NAME -> raw.length >= minLength
+                    QuickDictionaryType.TERM -> raw.length >= minLength
+                    QuickDictionaryType.VIETPHRASE -> raw.length >= minLength
+                    else -> raw.length >= minLength
+                }
+                if (isAccepted && (types == null || term.type in types)) {
+                    if (!matchedTerms.containsKey(raw)) {
+                        matchedTerms[raw] = DictPair(raw, target)
+                    }
+                }
+            }
+        }
+
+        return matchedTerms.values.toList()
+    }
+
     private fun availableQt2020SourceCatalogs(): List<Qt2020SourceCatalog> {
         val available = runCatching {
             appCtx.assets.list(QT2020_ASSET_DIRECTORY).orEmpty().toSet()

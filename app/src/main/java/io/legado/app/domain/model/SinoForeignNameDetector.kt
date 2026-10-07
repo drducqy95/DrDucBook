@@ -96,12 +96,66 @@ object SinoForeignNameDetector {
         "彼得" to NameCandidate("彼得", "western", "Peter", 1.0f, "exact"),
         "斯科特" to NameCandidate("斯科特", "western", "Scott", 1.0f, "exact"),
         "诺亚" to NameCandidate("诺亚", "western", "Noah", 1.0f, "exact"),
+        "李昂" to NameCandidate("李昂", "western", "Lyon", 1.0f, "exact"),
+        "凯撒" to NameCandidate("凯撒", "western", "Caesar", 1.0f, "exact"),
+        // Anime & Popular Japanese / Ninja names
+        "宇智波" to NameCandidate("宇智波", "japanese", "Uchiha", 1.0f, "exact"),
+        "宇智波斑" to NameCandidate("宇智波斑", "japanese", "Uchiha Madara", 1.0f, "exact"),
+        "宇智波佐助" to NameCandidate("宇智波佐助", "japanese", "Uchiha Sasuke", 1.0f, "exact"),
+        "宇智波鼬" to NameCandidate("宇智波鼬", "japanese", "Uchiha Itachi", 1.0f, "exact"),
+        "宇智波带土" to NameCandidate("宇智波带土", "japanese", "Uchiha Obito", 1.0f, "exact"),
+        "宇智波止水" to NameCandidate("宇智波止水", "japanese", "Uchiha Shisui", 1.0f, "exact"),
+        "漩涡鸣人" to NameCandidate("漩涡鸣人", "japanese", "Uzumaki Naruto", 1.0f, "exact"),
+        "漩涡" to NameCandidate("漩涡", "japanese", "Uzumaki", 1.0f, "exact"),
+        "旗木卡卡西" to NameCandidate("旗木卡卡西", "japanese", "Hatake Kakashi", 1.0f, "exact"),
+        "春野樱" to NameCandidate("春野樱", "japanese", "Haruno Sakura", 1.0f, "exact"),
+        "日向雏田" to NameCandidate("日向雏田", "japanese", "Hyūga Hinata", 1.0f, "exact"),
+        "白眼" to NameCandidate("白眼", "japanese", "Byakugan", 1.0f, "exact"),
+        "写轮眼" to NameCandidate("写轮眼", "japanese", "Sharingan", 1.0f, "exact"),
+        "轮回眼" to NameCandidate("轮回眼", "japanese", "Rinnegan", 1.0f, "exact"),
+        "须佐能乎" to NameCandidate("须佐能乎", "japanese", "Susanoo", 1.0f, "exact"),
+        "查克拉" to NameCandidate("查克拉", "japanese", "Chakra", 1.0f, "exact"),
+        "木叶" to NameCandidate("木叶", "japanese", "Konoha", 1.0f, "exact"),
+        "晓组织" to NameCandidate("晓组织", "japanese", "Akatsuki", 1.0f, "exact"),
+        "佩恩" to NameCandidate("佩恩", "japanese", "Pain", 1.0f, "exact"),
+        "大蛇丸" to NameCandidate("大蛇丸", "japanese", "Orochimaru", 1.0f, "exact"),
+        "自来也" to NameCandidate("自来也", "japanese", "Jiraiya", 1.0f, "exact"),
+        "纲手" to NameCandidate("纲手", "japanese", "Tsunade", 1.0f, "exact"),
+        "波风水门" to NameCandidate("波风水门", "japanese", "Namikaze Minato", 1.0f, "exact"),
+        "千手柱间" to NameCandidate("千手柱间", "japanese", "Senju Hashirama", 1.0f, "exact"),
+        "千手扉间" to NameCandidate("千手扉间", "japanese", "Senju Tobirama", 1.0f, "exact"),
+        // One Piece / Pirate world
+        "哥亚王国" to NameCandidate("哥亚王国", "western", "Vương quốc Goa", 1.0f, "exact"),
+        "海贼王" to NameCandidate("海贼王", "japanese", "One Piece", 1.0f, "exact"),
+        "路飞" to NameCandidate("路飞", "japanese", "Luffy", 1.0f, "exact"),
+        "索隆" to NameCandidate("索隆", "japanese", "Zoro", 1.0f, "exact"),
+        "山治" to NameCandidate("山治", "japanese", "Sanji", 1.0f, "exact"),
+        "娜美" to NameCandidate("娜美", "japanese", "Nami", 1.0f, "exact"),
+        "香克斯" to NameCandidate("香克斯", "japanese", "Shanks", 1.0f, "exact"),
+        "白胡子" to NameCandidate("白胡子", "japanese", "Râu Trắng", 1.0f, "exact"),
+        "黑胡子" to NameCandidate("黑胡子", "japanese", "Râu Đen", 1.0f, "exact"),
+        "艾斯" to NameCandidate("艾斯", "japanese", "Ace", 1.0f, "exact"),
+        "萨博" to NameCandidate("萨博", "japanese", "Sabo", 1.0f, "exact"),
+        // Hunter x Hunter & Bleach
+        "幻影旅团" to NameCandidate("幻影旅团", "japanese", "Lữ đoàn Phantom", 1.0f, "exact"),
+        "库洛洛" to NameCandidate("库洛洛", "japanese", "Chrollo", 1.0f, "exact"),
+        "西索" to NameCandidate("西索", "japanese", "Hisoka", 1.0f, "exact"),
+        "奇犽" to NameCandidate("奇犽", "japanese", "Killua", 1.0f, "exact"),
+        "死神" to NameCandidate("死神", "japanese", "Bleach", 1.0f, "exact"),
+        "黑崎一护" to NameCandidate("黑崎一护", "japanese", "Kurosaki Ichigo", 1.0f, "exact"),
+        "蓝染" to NameCandidate("蓝染", "japanese", "Aizen", 1.0f, "exact"),
+        // Korean idol & popular names
+        "陈然竣" to NameCandidate("陈然竣", "korean", "Choi Yeon-jun", 1.0f, "exact"),
+        "崔然竣" to NameCandidate("崔然竣", "korean", "Choi Yeon-jun", 1.0f, "exact"),
+        "金泰亨" to NameCandidate("金泰亨", "korean", "Kim Tae-hyung", 1.0f, "exact"),
     )
 
     // === 1B. Canonical alias mappings to unify variant transliterations ===
     val CANONICAL_ALIAS_MAP = mapOf(
         "里奥" to "Lyon",
         "里昂" to "Lyon",
+        "李昂" to "Lyon",
+        "凯撒" to "Caesar",
         "洛克" to "Locke",
         "罗克" to "Locke",
         "亚瑟" to "Arthur",
@@ -122,6 +176,14 @@ object SinoForeignNameDetector {
         "格温" to "Gwen",
         "安格尔" to "Angel",
         "诺亚" to "Noah",
+        "哥亚王国" to "Vương quốc Goa",
+        "海贼王" to "One Piece",
+        "宇智波" to "Uchiha",
+        "宇智波斑" to "Uchiha Madara",
+        "宇智波佐助" to "Uchiha Sasuke",
+        "漩涡鸣人" to "Uzumaki Naruto",
+        "路飞" to "Luffy",
+        "索隆" to "Zoro",
     )
 
     // === 2. Sino-phonetic transliteration chars for Western names ===
@@ -167,6 +229,10 @@ object SinoForeignNameDetector {
         "上条" to "Kamijō", "御坂" to "Misaka", "竈門" to "Kamado",
         "煉獄" to "Rengoku", "我妻" to "Agatsuma", "五条" to "Gojō",
         "虎杖" to "Itadori", "伏黒" to "Fushiguro", "釘崎" to "Kugisaki",
+        "宇智波" to "Uchiha", "漩涡" to "Uzumaki", "日向" to "Hyūga",
+        "旗木" to "Hatake", "春野" to "Haruno", "千手" to "Senju",
+        "波风" to "Namikaze", "奈良" to "Nara", "秋道" to "Akimichi",
+        "山中" to "Yamanaka", "犬冢" to "Inuzuka", "油女" to "Aburame",
     )
 
     // Common JP Given-Name Kanji -> Romaji
@@ -182,6 +248,10 @@ object SinoForeignNameDetector {
         "愛" to "Ai", "美咲" to "Misaki", "陽菜" to "Hina",
         "結衣" to "Yui", "葵" to "Aoi", "花" to "Hana",
         "桜" to "Sakura", "遥" to "Haruka", "凛" to "Rin",
+        "斑" to "Madara", "鸣人" to "Naruto", "佐助" to "Sasuke",
+        "鼬" to "Itachi", "带土" to "Obito", "卡卡西" to "Kakashi",
+        "雏田" to "Hinata", "水门" to "Minato", "柱间" to "Hashirama",
+        "扉间" to "Tobirama", "止水" to "Shisui",
     )
 
     // === 5. Korean Hanja Surnames -> Revised Romanization ===
@@ -208,7 +278,7 @@ object SinoForeignNameDetector {
         "秀智" to "Su-Ji", "智恩" to "Ji-Eun", "允儿" to "Yoon-A",
         "秀贤" to "Soo-Hyun", "铉辰" to "Hyun-Jin", "彰彬" to "Chang-Bin",
         "知韩" to "Ji-Han", "在旭" to "Jae-Wook", "钟仁" to "Jong-In",
-        "永勋" to "Yong-Hoon", "达也" to "Tatsuya",
+        "永勋" to "Yong-Hoon", "达也" to "Tatsuya", "然竣" to "Yeon-Jun",
     )
 
     // === 6. Syllable map for Western name Latin reconstruction ===
@@ -446,13 +516,14 @@ object SinoForeignNameDetector {
     fun classifyName(name: String, bias: GenreOriginBias = GenreOriginBias.NEUTRAL): NameCandidate? {
         if (name.isBlank()) return null
 
-        // 0. Check canonical alias map
-        CANONICAL_ALIAS_MAP[name]?.let { canonical ->
-            return NameCandidate(name, "western", canonical, 0.95f, "canonical_alias")
-        }
-
-        // 1. Check exact dictionary
+        // 1. Check exact dictionary first
         EXACT_MATCHES[name]?.let { return it }
+
+        // 2. Check canonical alias map
+        CANONICAL_ALIAS_MAP[name]?.let { canonical ->
+            val inferredOrigin = EXACT_MATCHES.values.firstOrNull { it.suggested.equals(canonical, ignoreCase = true) }?.origin ?: "western"
+            return NameCandidate(name, inferredOrigin, canonical, 0.95f, "canonical_alias")
+        }
 
         // 1B. Check multi-part compound names separated by middle dot or mojibake separator
         val separatorChars = charArrayOf('·', '・', '?', '•', ' ')

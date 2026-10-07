@@ -12,6 +12,8 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.HttpTTS
+import io.legado.app.domain.model.ChapterContextCopyUiState
+import io.legado.app.domain.model.ChapterContextVersionUi
 import io.legado.app.domain.model.QuickDictionaryScope
 import io.legado.app.domain.model.QuickDictionaryType
 import io.legado.app.domain.model.ReaderContentMode
@@ -147,6 +149,10 @@ data class TranslationProgressUiState(
     val targetLanguageOptions: ImmutableList<TranslationOptionUi> = persistentListOf(),
     val quickTranslationPronounMode: String = "",
     val quickTranslationPronounModeOptions: ImmutableList<TranslationOptionUi> = persistentListOf(),
+    val mlKitSourceLanguage: String = "auto",
+    val mlKitSourceLanguageOptions: ImmutableList<TranslationOptionUi> = persistentListOf(),
+    val mlKitTargetLanguage: String = "vi",
+    val mlKitTargetLanguageOptions: ImmutableList<TranslationOptionUi> = persistentListOf(),
     val status: TranslationUiStatus = TranslationUiStatus.IDLE,
     val currentChunk: Int = 0,
     val totalChunks: Int = 0,
@@ -292,6 +298,7 @@ data class ReadBookUiState(
         ReaderContentMode.NMT,
     ),
     val translationProgress: TranslationProgressUiState = TranslationProgressUiState(),
+    val chapterContextCopy: ChapterContextCopyUiState = ChapterContextCopyUiState(),
     val quickDictionary: QuickDictionaryUiState = QuickDictionaryUiState(),
     // Chapter info
     val curTextChapter: TextChapter? = null,
@@ -509,6 +516,8 @@ sealed interface ReadBookIntent {
     data class SelectTranslationProvider(val provider: String) : ReadBookIntent
     data class SelectTranslationTargetLanguage(val language: String) : ReadBookIntent
     data class SelectQuickTranslationPronounMode(val mode: String) : ReadBookIntent
+    data class SelectMlKitSourceLanguage(val language: String) : ReadBookIntent
+    data class SelectMlKitTargetLanguage(val language: String) : ReadBookIntent
     data class SetAutoTranslateEnabled(val enabled: Boolean) : ReadBookIntent
     data class SetAutoTranslateWifiOnly(val enabled: Boolean) : ReadBookIntent
     data class SetAutoTranslateNextChapters(val count: Int) : ReadBookIntent
@@ -527,6 +536,8 @@ sealed interface ReadBookIntent {
     data object ClearPerBookRewritePrompt : ReadBookIntent
     data object CopyTranslationLog : ReadBookIntent
     data object OpenTranslationRevision : ReadBookIntent
+    data object OpenChapterContextCopy : ReadBookIntent
+    data class CopyChapterContext(val versionId: String) : ReadBookIntent
     data class OpenQuickDictionary(
         val selectedText: String,
         val chapterIndex: Int? = null,
@@ -536,6 +547,7 @@ sealed interface ReadBookIntent {
     data class SetQuickDictionaryHanViet(val value: String) : ReadBookIntent
     data class SetQuickDictionaryTarget(val value: String) : ReadBookIntent
     data class RequestQuickDictionarySuggestion(val provider: String) : ReadBookIntent
+    data class RequestQuickDictionaryMlKitPairSuggestion(val pair: io.legado.app.domain.model.MlKitLanguagePair) : ReadBookIntent
     data class ApplyQuickDictionarySuggestion(val value: String) : ReadBookIntent
     data class SetQuickDictionaryType(val value: QuickDictionaryType) : ReadBookIntent
     data class SetQuickDictionaryScope(val value: QuickDictionaryScope) : ReadBookIntent
@@ -1015,6 +1027,7 @@ sealed interface ReadBookSheet {
     data object AiRewritePresetConfig : ReadBookSheet
     data object AppLog : ReadBookSheet
     data object Translation : ReadBookSheet
+    data object ChapterContextCopy : ReadBookSheet
     data object QuickDictionary : ReadBookSheet
     data class ChangeChapterSource(val chapterIndex: Int, val chapterTitle: String) : ReadBookSheet
     data object ChangeBookSource : ReadBookSheet
