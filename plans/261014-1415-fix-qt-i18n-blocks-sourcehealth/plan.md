@@ -1,53 +1,117 @@
-# Plan: Tối ưu QT (Chất lượng 6 Chương, Tốc độ, Mapping), Sửa Lỗi Việt Hóa Mojibake, Thu Gọn Block Tải Gói & Đồng Nhất Sức Khỏe Nguồn
+# Plan: Khôi Phục QT Gốc (Từ Điển + Luật Nhân), Sửa Lỗi Tiếng Việt Mojibake/i18n, Thu Gọn Khối Tải Xuống, Chuẩn Hóa Source Health, Sửa Lỗi TTS, Khóa Chặt AI Model/Combo & Tối Ưu Hóa Gemini Web (4 Model Thực Tế + Cấp Độ Tư Duy + Lồng Kỹ Năng Gemini Web Vào Prompt) — Milestone P77
 
-Created: 2026-10-14T14:15:00+07:00
-Updated: 2026-10-14T15:00:00+07:00
-Milestone: P80
-Status: 🟡 In Progress
 
-## Overview
 
-Kế hoạch giải quyết toàn diện 4 vấn đề được người dùng phản ánh, hoàn thiện dựa trên phân tích thực tế 6 chương đầu (`数据修仙，我在五行观证长生` - Chương 1 đến 6 trên LDPlayer):
-1. **QuickTranslator Core**:
-   - Khắc phục dứt điểm 424 lỗi `đích` và 54 lỗi `liễu` xuất hiện trong 6 chương thực tế.
-   - Sửa lỗi cụm số `四周` $\to$ `4 tuần` và các lỗi từ vựng ngô nghê (`放空` $\to$ `chạy xe không`, `一块` $\to$ `1 tệ`).
-   - Khắc phục các lỗi gãy từ ngữ Tiên hiệp & tên riêng (`庶务殿` $\to$ `Sở Vụ Điện`, `木灵内观经` $\to$ `Mộc Linh Nội Quan Kinh`, `万叶飞花` $\to$ `Vạn Diệp Phi Hoa`, `小聚气丹` $\to$ `Tiểu Tụ Khí Đan`, `许有德` $\to$ `Hứa Hữu Đức`, `陈师兄` $\to$ `Trần sư huynh`, `月儿` $\to$ `vầng trăng`).
-   - Đảo ngữ chính xác các cấu trúc định ngữ, trạng ngữ vị trí (`ở phía sau`, `ở bên trong`, `ở bên dưới`) và cấu trúc so sánh nhất (`最...`).
-   - Tối ưu hóa thuật toán xuất output QT nhanh hơn 3-5 lần bằng cách chuyển đổi Trie match từ eager `allMatchesByStart` sang lazy on-demand FMM.
-   - Tăng tốc mapping "Thêm từ điển" trong Reader xuống dưới 50ms (giới hạn cửa sổ ngữ cảnh 500 ký tự, query Trie trực tiếp).
-2. **Sửa lỗi hiển thị Việt hóa (Mojibake)**:
-   - Khắc phục triệt để chuỗi `HachimiMT-60-QT zhât'vi (QT/HĂ¡n Viá»‡t)` do lỗi bảng mã ANSI trong manifest và artifact.
-   - Thêm bộ giải mã an toàn `sanitizeModelDisplayName()` tại `HachimiOnnxModelRegistry`.
-3. **Chuyển Cài đặt TTS ra ngoài UI chính & Thu gọn Card TTS (Piper, Valtec, ZeroTTS) / NMT**:
-   - Bổ sung thẻ mục **"Cài đặt TTS"** trực tiếp trên màn hình Cài đặt chính (`ConfigNavScreen`), kết nối thẳng tới `MainRouteSettingsTtsModels` và khu vực tải model TTS.
-   - Chuẩn hóa toàn bộ các gói tải model TTS (Piper, Valtec, ZeroTTS) và NMT thành Card hiện đại theo chuẩn mockup (`media_1791965348043_7a0e4df7.png`):
-     + Leading badge mã ngôn ngữ (`[ VI ]`, `[ ZH ]`).
-     + Title to rõ, tag pill engine thực tế (`[Piper]`, `[Valtec]`, `[ZeroTTS]`, `[ONNX]`). Không dùng tag ví dụ `VMODEL`.
-     + Subtitle ngắn gọn gạch chấm: `${Ngôn ngữ} • ${Thể loại/Đặc tính} • ${Dung lượng}`.
-     + Nút tải hình tròn (`FilledTonalIconButton`).
-   - Loại bỏ triệt để mã băm SHA-256 và tên file zip kỹ thuật trên toàn bộ các block Asset Delivery, TTS Model Manager và Cài đặt dịch.
-4. **Đồng nhất tính năng Sức khỏe nguồn**:
-   - Khắc phục hiện tượng báo cáo và thực tế không đồng nhất (nguồn vẫn đọc tốt nhưng báo lỗi `HTTP_ERROR: VbookPluginException: test`).
-   - Sửa từ khóa tìm kiếm hardcode `"test"` sang tên sách thực tế từ stage HOME hoặc theo ngôn ngữ nguồn.
-   - Phân loại chính xác lỗi tìm kiếm rỗng thành `CONTENT_EMPTY` / `DEGRADED`, không dán nhãn `HTTP_ERROR`.
-   - Sửa lỗi kế thừa nhầm `messageRedacted` khiến các stage PASSED vẫn bị gán lỗi FAILED.
+> **Mã kế hoạch:** `PLN-261014-1415`  
 
-## Tech Stack & Affected Modules
-- **UI & Presentation**: Jetpack Compose, Material 3 Expressive, `AssetDeliveryScreen.kt`, `TranslationConfigScreen.kt`, `TtsModelManagerScreen.kt`, `SourceHealthScreen.kt`, `ReadBookViewModel.kt`.
-- **Core Engine & Translation**: Kotlin Coroutines, Room DB, Trie FMM, `QuickTranslationRepository.kt`, `QuickDictionarySelectionResolver.kt`, `HachimiOnnxModelRegistry.kt`.
-- **Source Health Diagnostics**: WorkManager, `SourceCheckEngine.kt`, `SourceCheckRepository.kt`, `SourceCheckClassifier.kt`, `BookSourceHealthProbeRepository.kt`, `VbookSourceHealthProbeRepository.kt`.
+> **Đường dẫn:** `plans/261014-1415-fix-qt-i18n-blocks-sourcehealth/plan.md`  
 
-## Phases
+> **Milestone:** `P77`  
 
-| Phase | Name | Status | Description |
-|---|---|---|---|
-| 01 | QT Quality (6 Chapters), Output Speed & Fast Mapping | ⬜ Pending | Khử 424 'đích' & 54 'liễu', sửa '四周' & từ vựng tiên hiệp, on-demand Trie traversal, localized mapping window (<50ms) |
-| 02 | Fix Vietnamese Mojibake & Manifest Sanitizer | ⬜ Pending | Sửa `model_manifest.json`, `hf-artifacts-manifest.json`, bổ sung regex Mojibake sanitizer tại runtime |
-| 03 | Main Settings TTS Entry & Compact Cards (Piper/Valtec/ZeroTTS/NMT) | ⬜ Pending | Bổ sung thẻ Cài đặt TTS ra ngoài UI chính (ConfigNavScreen), chuẩn hóa card tải TTS (Piper/Valtec/ZeroTTS) & NMT theo mockup, xóa SHA/zip |
-| 04 | Source Health Diagnostic Accuracy & Consistency | ⬜ Pending | Sửa probe search keyword, fix classifier `CONTENT_EMPTY` vs `HTTP_ERROR`, fix stage message leak |
-| 05 | Verification, Benchmarks & LDPlayer Live Test | ⬜ Pending | Chạy Unit Tests 6 chương thực tế, benchmark tốc độ QT/Mapping, biên dịch Kotlin, build APK và test trực tiếp trên LDPlayer |
+> **Ngày tạo:** 2026-10-14T14:15:00+07:00  
 
-## Quick Commands
-- Bắt đầu Phase 1: `/code phase-01`
-- Kiểm tra tiến độ: `/next`
-- Lưu bộ nhớ: `/save-brain`
+> **Ngày cập nhật:** 2026-10-14T16:15:00+07:00  
+
+> **Trạng thái:** 🟡 Sẵn sàng triển khai (Ready for Execution)  
+
+> **Thiết bị mục tiêu:** HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer `emulator-5554`
+
+
+
+---
+
+
+
+## 1. Tổng Quan & Mục Tiêu Trọng Tâm (Unified Executive Summary)
+
+
+
+Kế hoạch Milestone P77 hợp nhất toàn bộ các yêu cầu sửa lỗi cốt lõi và nâng cấp kiến trúc của dự án `DrDucBook` vào một lộ trình 5 Phase đồng bộ:
+
+
+
+1. **Phase 01 — Khôi Phục Thuật Toán QT Về QT Gốc (Từ Điển + Luật Nhân) & Mapping 1:1 (`phase-01-qt-speed-and-mapping.md`):**
+
+   - Đưa thuật toán dịch nhanh về đúng bản chất **QuickTranslator (QT) gốc**: sử dụng thuật toán **Khớp từ dài nhất từ trái sang phải (Linear FMM — Forward Maximum Matching)** kết hợp **Bộ quy tắc `LuatNhan` (Luật Nhân)** và **Từ điển đa tầng** (`Book/StoryMemory Dict` > `User QuickDict` > `Names` > `VietPhrase` > `ChinesePhienAmWords`).
+
+   - Loại bỏ `beamTranslationPlan` (multi-hypothesis beam search) và các bộ đoán ngữ pháp/202 regex hậu xử lý tự chế gây biến dạng câu, làm chậm tốc độ và làm trượt vị trí ánh xạ từ.
+
+   - Đạt tốc độ trả output tức thì (**< 50ms/chương**), đảm bảo **80–90% chất lượng bản dịch quyết định bởi độ phủ của bộ từ điển & Luật Nhân**, và giữ ánh xạ `MappedDisplayText` chính xác tuyệt đối **1:1** cho tính năng bôi đen tra từ (`QuickDictionarySelectionResolver`).
+
+2. **Phase 02 — Sửa Lỗi Tiếng Việt Mojibake & Hoàn Thiện Quốc Tế Hóa i18n (`phase-02-fix-vietnamese-mojibake.md`):**
+
+   - Khử triệt để lỗi hiển thị tiếng Việt Mojibake, dấu `?` kẹt giữa tên riêng phiên âm (`Noah? Pat`), lỗi giải mã bảng mã `GB18030`/`UTF-8` và chuẩn hóa tổ hợp dấu Unicode `NFC`.
+
+   - Việt hóa 100% các nhãn trạng thái, bước kiểm tra (`stageKey`) và thông báo còn hiển thị mã Enum kỹ thuật thô trên `SourceHealthScreen`, `DownloadCenterScreen`, `ReadAloud`; đồng bộ tuyệt đối khóa tài nguyên giữa `values/strings.xml` và `values-vi/strings.xml`.
+
+3. **Phase 03 — Thu Gọn Các Khối Giao Diện Tải Xuống & Khối Nội Dung (`phase-03-compact-download-blocks.md`):**
+
+   - Tái thiết kế các khối/thẻ tải xuống trong `DownloadCenterScreen`, `BookCacheManageScreen`, `DownloadCacheConfigScreen`, `TranslationConfigScreen`, `MlKitModelsScreen` và `ReadAloudConfigSheet` theo chuẩn `CompactDownloadBlock` (`54.dp`–`72.dp`), đưa các nút hành động thành `IconButton(32.dp)` gọn trên cùng 1 hàng.
+
+   - Thu gọn các khối đoạn văn rỗng phát sinh sau khi lọc nội dung quảng cáo trong `BookContentProcessEngine`.
+
+4. **Phase 04 — Nâng Cao Độ Chính Xác Kiểm Tra Sức Khỏe Nguồn (`phase-04-source-health-accuracy.md`):**
+
+   - Chuẩn hóa `SourceCheckClassifier` và các Probe Adapters (`Book`, `RSS`, `VBook`) để không báo lỗi giả khi nguồn thiếu optional stage hoặc khi thiết bị ngoại tuyến.
+
+   - Sửa lỗi xóa nguồn đa loại (`book:`, `rss:`, `vbook:`), dọn dẹp sạch bản ghi mồ côi trong `BookSourceHealthDao` và `SourceCheckDao`, đồng bộ 100% bộ đếm `SourceHealthSummaryUi` với bộ lọc `SourceHealthFilter`.
+
+5. **Phase 05 — Tối Ưu Hóa Gemini Web (4 Model Thực Tế + Cấp Độ Tư Duy + Lồng Kỹ Năng Gemini Web Vào Prompt), Khóa Chặt AI Model/Combo, Sửa Lỗi TTS & Kiểm Thử (`phase-05-verification-testing.md`):**
+
+   - **Đồng bộ 4 Model thực tế & Cấp độ tư duy của Gemini Web:** Cập nhật đúng 4 model thực tế hiển thị trên giao diện Gemini Web hiện hành (`3.5 Flash-Lite` — *Câu trả lời nhanh nhất*, `3.8 Flash` — *Trợ giúp toàn diện*, `3.1 Pro` — *Suy luận nâng cao*, `4 Argon` — *Nhiệm vụ phức tạp*) kèm khả năng chọn **Cấp độ tư duy (`Cấp độ tư duy ▸`: Tự động / Thấp / Trung bình / Cao)** và bóc tách sạch khối suy luận nội bộ (`thought`).
+
+   - **Tận dụng tính năng “Kỹ năng” (Tuỳ chỉnh $\rightarrow$ Kỹ năng) của Gemini Web lồng vào Prompt:** Cho phép người dùng khai báo tên **Kỹ năng** đã tạo trước trên Gemini Web (ví dụ: Kỹ năng dịch Tiên Hiệp/Cổ Phong, Kỹ năng Biên tập/Rewrite); tự động lồng chỉ thị kích hoạt Kỹ năng vào đầu prompt trong `GeminiWebHandler` và rút gọn các quy tắc lặp lại trong System Prompt để giảm 70%–80% độ dài prompt hệ thống, tăng tốc độ phản hồi và tối ưu chất lượng đầu ra.
+
+   - **Khóa chặt lựa chọn Model/Combo AI — Chống tự nhảy về Free Fallback:** Vá triệt để 5 lỗ hổng trong `AiRouterViewModel`, `AiRouterRepository`, `RepairAiRouteBindingsUseCase` và `AiComboModelPickerSheet` khiến model đơn lẻ hoặc combo do người dùng chọn bị ghi đè về `"Free fallback"`.
+
+   - **Sửa lỗi chạy TTS (`ReadAloud` / `LocalTts` / `ZeroTTS`):** Khắc phục lỗi định tuyến service, race condition `onDestroy()` khi đổi engine, bắt buộc `Dispatchers.Main` cho `ExoPlayer`, bỏ qua đoạn văn chỉ có dấu câu `***`, và tự động fallback an toàn cho tệp model INT8 / `.npy` voice embeddings.
+
+
+
+---
+
+
+
+## 2. Cấu Trúc Chi Tiết Các Phase (Phase Directory Matrix)
+
+
+
+| Phase | Tệp Kế Hoạch Chi Tiết | Nội Dung Trọng Tâm | Các File Codebase Chính | Trạng Thái |
+
+|---|---|---|---|---|
+
+| **01** | [`phase-01-qt-speed-and-mapping.md`](./phase-01-qt-speed-and-mapping.md) | Khôi phục thuật toán QT Gốc (FMM + `LuatNhan` + Từ điển), bỏ Beam Search/Heuristic gây nhiễu, sửa Mapping 1:1 | `QuickTranslationRepository.kt`, `MappedDisplayText.kt`, `QuickDictionarySelectionResolver.kt`, `TranslateDynamicUiTextUseCase.kt` | ⬜ Pending |
+
+| **02** | [`phase-02-fix-vietnamese-mojibake.md`](./phase-02-fix-vietnamese-mojibake.md) | Khử lỗi tiếng Việt Mojibake, chuẩn hóa NFC, sửa lỗi charset và hoàn thiện i18n `strings.xml` / `strings-vi.xml` | `VietnameseTranslationPostProcessor.kt`, `SourceHealthScreen.kt`, `strings.xml`, `strings-vi.xml` | ⬜ Pending |
+
+| **03** | [`phase-03-compact-download-blocks.md`](./phase-03-compact-download-blocks.md) | Thu gọn giao diện các khối tải xuống (`CompactDownloadBlock` `54.dp`–`72.dp`) & thu gọn khối nội dung rỗng | `DownloadCenterScreen.kt`, `BookCacheManageScreen.kt`, `DownloadCacheConfigScreen.kt`, `TranslationConfigScreen.kt`, `MlKitModelsScreen.kt`, `ReadAloudConfigSheet.kt`, `BookContentProcessEngine.kt` | ⬜ Pending |
+
+| **04** | [`phase-04-source-health-accuracy.md`](./phase-04-source-health-accuracy.md) | Nâng cao độ chính xác Source Health, xóa nguồn đa loại (`Book`/`RSS`/`VBook`) & đồng bộ bộ lọc/bộ đếm | `SourceCheckClassifier.kt`, `SourceHealthProbeRepositories.kt`, `BookSourceHealthRepository.kt`, `SourceCheckRepository.kt`, `SourceHealthViewModel.kt`, `SourceHealthScreen.kt` | ⬜ Pending |
+
+| **05** | [`phase-05-verification-testing.md`](./phase-05-verification-testing.md) | (1) Gemini Web `3.5 Flash-Lite` / `3.8 Flash` / `3.1 Pro` / `4 Argon` + Cấp độ tư duy + Lồng Kỹ năng Gemini Web vào Prompt; (2) Khóa chặt AI Model/Combo; (3) Sửa lỗi TTS; (4) Kiểm thử toàn diện | `GeminiWebHandler.kt`, `AiProviderCatalog.kt`, `AiModels.kt`, `AiTranslationRefinePipeline.kt`, `TranslationConfigScreen.kt`, `TranslationPromptConfigScreen.kt`, `AiRouterViewModel.kt`, `AiRouterRepository.kt`, `RepairAiRouteBindingsUseCase.kt`, `ReadAloud.kt`, `BaseReadAloudService.kt`, `LocalTtsReadAloudService.kt`, `ZeroTtsOnnxEngine.kt` | ⬜ Pending |
+
+
+
+---
+
+
+
+## 3. Tiêu Chí Nghiệm Thu Tổng Thể (Master Acceptance Criteria)
+
+- [ ] **Phase 01 (QT Gốc & Mapping):** Tốc độ dịch chương < 50ms, chuẩn `VietPhrase` + `LuatNhan` (đạt 80–90% chất lượng qua từ điển), bôi đen từ bất kỳ trên màn hình đọc trích xuất đúng 100% chữ Hán gốc.
+
+- [ ] **Phase 02 (Mojibake & i18n):** Không còn dấu `?` lỗi giữa tên riêng hay ký tự lạ; 100% nhãn trên `SourceHealthScreen` và toàn app hiển thị tiếng Việt chuẩn.
+
+- [ ] **Phase 03 (Compact Download Blocks):** Các khối tải xuống trong `DownloadCenterScreen`, `BookCacheManageScreen`, `TranslationConfigScreen`, `ReadAloudConfigSheet` thu gọn chuẩn `54.dp`–`72.dp`.
+
+- [ ] **Phase 04 (Source Health):** Bộ đếm khớp 100% với bộ lọc; xóa nguồn lỗi xóa sạch cả `Book`/`RSS`/`VBook` và lịch sử kiểm tra.
+
+- [ ] **Phase 05.A (Gemini Web Models, Thinking Levels & Native Skills):**
+
+  - Chọn và chạy đúng 4 model thực tế (`3.5 Flash-Lite`, `3.8 Flash`, `3.1 Pro`, `4 Argon`) kèm các mức **Cấp độ tư duy** (`Tự động`, `Thấp`, `Trung bình`, `Cao`).
+
+  - Lồng thành công **Kỹ năng (Skill) đã tạo trên Gemini Web** vào prompt (kèm chế độ rút gọn System Prompt thừa), tách sạch khối `thought` khỏi văn bản đầu ra.
+
+- [ ] **Phase 05.B (AI Model/Combo Lock):** Sau khi chọn Model lẻ hoặc Combo ở bất kỳ tác vụ AI nào, tuyệt đối giữ nguyên lựa chọn đó, không bao giờ tự ý nhảy về `"Free fallback"`.
+
+- [ ] **Phase 05.C (TTS):** Đọc thành tiếng mượt mà trên cả System TTS và ZeroTTS, vượt qua dòng `***` và đổi giọng không bị dừng/crash.

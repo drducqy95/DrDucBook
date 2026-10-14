@@ -1,108 +1,339 @@
-# Phase 01: QT Quality, Output Speed & Fast Mapping Acceleration (Tổng hợp phân tích Chương 1 - 6 trên LDPlayer)
+# Phase 01: Đưa Thuật Toán QT Về QT Gốc (Từ Điển + Luật Nhân), Tăng Tốc Độ Output & Chuẩn Hóa Text Mapping 1:1
 
-Status: ⬜ Pending
-Dependencies: None
 
-## Objective
-Nâng cao toàn diện chất lượng dịch QuickTranslator thực tế dựa trên phân tích tổng hợp 6 chương thực tế (`数据修仙，我在五行观证长生`):
-- Xóa sạch 100% tàn dư chữ `đích` (424 lỗi) và `liễu` (54 lỗi).
-- Sửa lỗi cụm số `四周` $\to$ `4 tuần` (6 lỗi) và các lỗi từ vựng ngô nghê (`放空` $\to$ `chạy xe không`, `一块` $\to$ `1 tệ`).
-- Khắc phục các lỗi gãy tên riêng tiên hiệp (`庶务殿` $\to$ `Sở Vụ Điện`, `木灵内观经` $\to$ `Mộc Linh Nội Quan Kinh`, `万叶飞花` $\to$ `Vạn Diệp Phi Hoa`, `小聚气丹` $\to$ `Tiểu Tụ Khí Đan`, `许有德` $\to$ `Hứa Hữu Đức`, `陈师兄` $\to$ `Trần sư huynh`, `月儿` $\to$ `vầng trăng`).
-- Đảo ngữ chuẩn xác các cấu trúc định ngữ, trạng ngữ vị trí (`ở phía sau`, `ở bên trong`, `ở bên dưới`) và cấu trúc so sánh nhất (`最...`).
-- Tối ưu hóa tốc độ xuất output QT nhanh hơn 3-5 lần (Lazy on-demand Trie traversal).
-- Giảm độ trễ mapping "Thêm từ điển" trong Reader xuống dưới 50ms (Localize 500 ký tự & Fast-path Trie probe).
 
----
+> **Thuộc kế hoạch:** [`plan.md`](./plan.md)  
 
-## Dữ liệu phân tích thực tế từ 6 chương (Chương 1 đến 6 trên LDPlayer)
+> **Phase ID:** `phase-01`  
 
-| Chương | Tiêu đề chương | Số ký tự gốc | Số ký tự dịch | Lỗi `đích` | Lỗi `liễu` | Lỗi `4 tuần` | Lỗi tiêu biểu |
-|---|---|---|---|---|---|---|---|
-| **Chương 1** | 生物芯片 (Sinh vật Chip) | 4.870 | 17.968 | 87 | 12 | 0 | `chạy xe không tâm thần`, `tiến giai thổ nạp ở phía sau pháp` |
-| **Chương 2** | 入门和贡献点 (Nhập môn & Điểm cống hiến) | 4.790 | 17.745 | 82 | 11 | 2 | `chơi đến 1 tệ`, `nửa tháng ở trước cuối năm` |
-| **Chương 3** | 庶务殿 (Sở Vụ Điện) | 4.438 | 16.123 | 84 | 5 | 1 | `công việc vặt điện`, `mộc linh bên trong xem kinh`, `vạn Diệp Phi hoa` |
-| **Chương 4** | 藏经阁 (Tàng Kinh Các) | 2.576 | 9.596 | 51 | 14 | 1 | `vách tường 4 tuần`, `hứa có đức`, `1 tệ giảm cỡ nhỏ lương khô` |
-| **Chương 5** | 研究聚气丹 (Nghiên cứu Tụ Khí Đan) | 2.314 | 8.647 | 54 | 4 | 0 | `khí đan tiểu tụ` (7 lần), `tụ khí Đan Đan phương` |
-| **Chương 6** | 诡 (Quỷ) | 2.697 | 10.041 | 66 | 8 | 2 | `4 tuần đích sương mù`, `Nằm ở trần ở chính giữa sư huynh`, `Nguyệt Nhi` |
-| **TỔNG CỘNG** | **6 chương thực tế** | **21.685** | **80.120** | **424** | **54** | **6** | Hàng loạt lỗi gãy cấu trúc và ngô nghê |
+> **Trạng thái:** ⬜ Pending  
+
+> **Phụ thuộc:** Không
+
+
 
 ---
 
-## Root Causes Identified & Technical Architecture Fixes
 
-### 1. Tàn dư chữ `đích` (的) - 424 lần xuất hiện
-- **Căn nguyên:** Trong `QuickTranslationRepository.kt`, khi nạp pack thì `templates` (`LuatNhan.txt`) bị gán `null` khi `qt2025Runtime != null`. Do đó 287 luật đảo ngữ định ngữ bị bỏ qua hoàn toàn. Ngoài ra, `matchDynamicAttributiveDe` bị rụng slot candidate khiến cấu trúc đảo ngữ không khớp, rơi về `ChinesePhienAmWords.txt` dịch thành `đích`.
-- **Giải pháp:**
-  + Kích hoạt quy tắc `LuatNhan.txt` và đảo ngữ định ngữ `A 的 B` $\to$ `B của A` hoặc `B A` ngay cả khi đang dùng `qt2025Runtime`.
-  + Thêm bộ quy tắc bắt các mẫu định ngữ phổ biến: `[Tính từ/Cụm tính từ] + 的 + [Danh từ]` $\to$ `[Danh từ] + [Tính từ/Cụm tính từ]` (ví dụ `淡青色的气流` $\to$ `khí lưu màu xanh nhạt`, `极其复杂的结构` $\to$ `kết cấu cực kỳ phức tạp`).
-  + Các chữ `的` ngữ khí cuối câu $\to$ dịch thành `vậy / đấy` hoặc lược bỏ sạch chữ `đích`.
 
-### 2. Tàn dư chữ `liễu` (了) - 54 lần xuất hiện
-- **Căn nguyên:** Trợ từ hoàn thành/ngữ khí `了` rơi về từ điển gốc gán `liễu`.
-- **Giải pháp:**
-  + `Động từ + 了` $\to$ dịch thành `[Động từ] rồi` hoặc chỉ giữ `[Động từ]` nếu đã có từ chỉ thời gian/quá khứ (ví dụ `找了一整天了` $\to$ `đã tìm cả ngày rồi`).
-  + `Tính từ + 了` $\to$ `[Tính từ] rồi` (ví dụ `夜深了` $\to$ `đêm đã khuya rồi`, `越来越浓了` $\to$ `càng ngày càng đậm rồi`).
-  + Lược bỏ sạch các chữ `liễu` phản cảm cuối câu.
+## 1. Mục Tiêu (Objectives)
 
-### 3. Lỗi cụm số đếm `四周` (bốn phía) $\to$ `4 tuần`
-- **Căn nguyên:** `NUMBER_UNIT_TEMPLATES` gán `"周" to "{n} tuần"` và `NUMBER_RULE` nhận điểm thưởng `QT2025_RUNTIME_SCORE_BONUS`, đè bẹp từ ghép `四周 = bốn phía`.
-- **Giải pháp:**
-  + Loại trừ `四周` khỏi `NUMBER_UNIT_TEMPLATES`.
-  + Thiết lập cơ chế: Bất kỳ từ ghép nào có trong Trie từ điển (`四周 = bốn phía/xung quanh`) đều có độ ưu tiên cao hơn quy tắc phân rã số đếm rời `[四] + [周]`.
+1. **Đưa thuật toán dịch nhanh về đúng bản chất QuickTranslator (QT) gốc:**
 
-### 4. Từ vựng chuyên ngành Tiên hiệp & Sửa lỗi dịch ngô nghê
-- **Sửa lỗi từ ngô nghê:**
-  + `放空` $\to$ `thả lỏng / làm trống tâm thần` (không dịch `chạy xe không`).
-  + `一块` trong ngữ cảnh `玩到一块` $\to$ `chơi cùng nhau`, trong `一块压缩干粮` $\to$ `một khối lương khô nén` (không dịch `1 tệ`).
-- **Từ điển Tiên hiệp & Nhân danh/Địa danh:**
-  + `庶务殿` $\to$ `Sở Vụ Điện` (không dịch `công việc vặt điện`).
-  + `木灵内观经` $\to$ `Mộc Linh Nội Quan Kinh` (không dịch `mộc linh bên trong xem kinh`).
-  + `万叶飞花` $\to$ `Vạn Diệp Phi Hoa` (không dịch `vạn Diệp Phi hoa`).
-  + `小聚气丹` $\to$ `Tiểu Tụ Khí Đan` (không dịch `khí đan tiểu tụ`).
-  + `许有德` $\to$ `Hứa Hữu Đức` (không dịch `hứa có đức`).
-  + `陈师兄` $\to$ `Trần sư huynh` (không tách chữ `Trần` ra trước `sư huynh`).
-  + `月儿` trong ngữ cảnh `月儿已上树梢` $\to$ `vầng trăng / trăng` (không dịch `Nguyệt Nhi`).
-  + `零` $\to$ `Zero / Linh` (khi xưng hô AI chip).
+   - Sử dụng thuật toán **Khớp từ dài nhất từ trái sang phải (Linear FMM — Forward Maximum Matching)** kết hợp với **Bộ quy tắc `LuatNhan` (Luật Nhân)** và **Hệ thống Từ điển đa tầng** (`StoryMemory / BookDict` > `User QuickDict` > `Names` > `VietPhrase` > `ChinesePhienAmWords`).
 
-### 5. Đảo ngữ cấu trúc trạng ngữ vị trí & So sánh nhất
-- `[Địa điểm/Vật] + 里的 + [Sự vật]` $\to$ `[Sự vật] trong [Địa điểm/Vật]` (ví dụ `‘庶务殿’里的任务` $\to$ `nhiệm vụ trong Sở Vụ Điện`, không dịch `'Công việc vặt điện' nhiệm vụ ở bên trong`).
-- `[Hành động] + 之后/后` $\to$ `sau khi [Hành động]` (ví dụ `睡熟之后` $\to$ `sau khi ngủ say`, không dịch `ngủ say phía sau`).
-- `[Sự vật] + 之下/下` $\to$ `dưới [Sự vật]` (ví dụ `芯片的改良下` $\to$ `dưới sự cải tiến của chip`).
-- `最 + [Tính từ] + 的 + [Danh từ]` $\to$ `[Danh từ] + [Tính từ] + nhất` (ví dụ `最简单的控物术` $\to$ `thuật khống vật đơn giản nhất`, không dịch `khống đơn giản nhất vật thuật`).
+   - Loại bỏ cơ chế duyệt đa giả thuyết `beamTranslationPlan` (`QtHypothesis`, `QtHypNode`) và các bộ suy diễn ngữ pháp tự chế / 202 regex hậu xử lý nặng nề đang làm chậm tốc độ và làm biến dạng câu.
 
-### 6. Tốc độ xuất output QT (Lazy On-Demand Trie FMM)
-- Thay thế toàn bộ thuật toán pre-computation eager `allMatchesByStart` (tạo 5.000 bucket rác mỗi chương) bằng tra cứu Trie trực tiếp tại vị trí con trỏ `offset` khi FMM duyệt văn bản.
-- Giảm 80% cấp phát bộ nhớ, tăng tốc độ xuất output lên gấp 3-5 lần (<300ms/chương trên JVM, <500ms trên Android).
+2. **Đảm bảo chất lượng 80–90% qua bộ từ điển & Luật Nhân với tốc độ tức thì:**
 
-### 7. Tốc độ trả kết quả Mapping khi "Thêm từ điển" (< 50ms)
-- Trong `ReadBookViewModel`: Thay vì gọi `translateMapped` cho toàn bộ chương 5.000 ký tự, giới hạn phạm vi trong cửa sổ ngữ cảnh chứa từ bôi đen (~500 ký tự xung quanh).
-- Trong `QuickDictionarySelectionResolver`: Cung cấp fast-path tra cứu Trie trực tiếp cho các ứng viên từ điển ngắn (1-6 ký tự), loại bỏ 240 vòng lặp gọi lại toàn bộ pipeline dịch.
+   - Rút ngắn thời gian dịch một chương 3.000–5.000 chữ Hán xuống **< 50ms**.
+
+3. **Khôi phục ánh xạ văn bản (`MappedDisplayText`) chính xác tuyệt đối 1:1:**
+
+   - Mọi từ/cụm từ tiếng Việt hiển thị trên màn hình đọc đều trỏ chính xác về khoảng ký tự chữ Hán gốc (`rawStart..rawEnd`), giúp `QuickDictionarySelectionResolver` trích xuất đúng 100% chữ Hán gốc trong `< 1ms` khi người dùng bôi đen thêm từ điển.
+
+
 
 ---
 
-## Implementation Steps
-1. [ ] **Sửa lỗi '四周' & từ vựng ngô nghê (`放空`, `一块`) trong `QuickTranslationRepository`**.
-2. [ ] **Bổ sung từ điển Tiên hiệp chuẩn (`庶务殿`, `木灵内观经`, `万叶飞花`, `小聚气丹`, `许有德`, `陈师兄`, `月儿`)**.
-3. [ ] **Kích hoạt và hoàn thiện bộ lọc định ngữ `的` và trợ từ `了`, xóa sạch 424 chữ `đích` và 54 chữ `liễu`**.
-4. [ ] **Thêm quy tắc đảo ngữ trạng từ vị trí (`ở phía sau`, `ở bên trong`, `ở bên dưới`) và cấu trúc so sánh nhất (`最...`)**.
-5. [ ] **Chuyển đổi Trie Matching sang Lazy On-Demand FMM trong `QuickTranslationRepository`**.
-6. [ ] **Tối ưu hóa Mapping Window (~500 ký tự) và Fast-Path Trie Probe trong `ReadBookViewModel` & `QuickDictionarySelectionResolver`**.
-7. [ ] **Tạo Benchmark Unit Test kiểm thử trực tiếp trên cả 6 chương thực tế**.
+
+
+## 2. Phân Tích Nguyên Nhân Gốc Rễ (Root Cause Analysis)
+
+
+
+### 2.1. Tại sao thuật toán QT hiện tại bị chậm và biến dạng nghĩa?
+
+- Trong `QuickTranslationRepository.kt`, các phiên bản trước đã chồng thêm:
+
+  1. `beamTranslationPlan` (duyệt top-K giả thuyết `QtHypothesis` / `QtHypNode` với `beamWidth = 1..5`).
+
+  2. Các hàm tự đoán ngữ pháp ngoài phạm vi Luật Nhân (`renderAttributiveDe`, `bestGrammarMatch`, `Qt2025Runtime` với 287 quy tắc tự chế).
+
+  3. Vòng lặp 202 biểu thức chính quy hậu xử lý (`qt_clean_rules_v8.tsv`) trong `QuickTranslationTextPostProcessor`.
+
+- **Hậu quả:**
+
+  - Các quy tắc tự đoán định ngữ và regex hậu xử lý can thiệp thô bạo vào kết quả đã tra từ `VietPhrase`, gây ra hiện tượng đảo từ sai ranh giới mệnh đề, xóa nhầm từ hoặc ghép các từ không liên quan.
+
+  - Tiêu tốn hàng trăm mili-giây CPU và tạo áp lực cấp phát bộ nhớ (GC thrashing) không cần thiết.
+
+
+
+### 2.2. Tại sao bôi đen chữ để thêm từ điển (`QuickDictionarySelectionResolver`) bị lệch hoặc trống?
+
+- Khi `beamTranslationPlan` và 202 regex hậu xử lý thay đổi trật tự từ hoặc cắt/ghép chuỗi sau khi đã sinh văn bản, các tọa độ `displayStart..displayEnd` trong `MappedDisplayText.spans` bị trượt khỏi vị trí thực tế.
+
+- Khi người dùng bôi đen một cụm từ trên màn hình đọc, `QuickDictionarySelectionResolver` không tìm được `MappedSpan` khớp chính xác, phải rơi vào nhánh tìm kiếm xấp xỉ theo dòng/đoạn dẫn đến trả về cả đoạn văn dài hoặc để trống trường chữ Hán gốc (Raw).
+
+
 
 ---
 
-## Files to Create/Modify
-- `app/src/main/java/io/legado/app/data/repository/QuickTranslationRepository.kt`
-- `app/src/main/java/io/legado/app/ui/quickdict/QuickDictionarySelectionResolver.kt`
-- `app/src/main/java/io/legado/app/ui/book/read/ReadBookViewModel.kt`
-- `app/src/test/java/io/legado/app/data/repository/QuickTranslationSixChaptersBenchmarkTest.kt`
+
+
+## 3. Thiết Kế Kiến Trúc QT Gốc (Classic FMM + `LuatNhan` Engine)
+
+
+
+### 3.1. Sơ Đồ Luồng Xử Lý Tuyến Tính 3 Bước (3-Stage Linear Pipeline)
+
+```text
+
+[Văn bản CJK Gốc (Raw Text)]
+
+   │
+
+   ▼
+
+[Bước 1: Tiền Xử Lý & Bảo Vệ Token (Pre-Clean & Protected Spans)]
+
+   • Loại bỏ các từ nằm trong danh sách IgnoreWord (Pre-clean) nhưng vẫn giữ nguyên bản đồ chỉ số gốc (raw offset map).
+
+   • Nhận diện và khóa cứng các ProtectedToken: URL, thẻ HTML/XHTML, EPUB Block Markers (drop-cap, img, css alignment).
+
+   │
+
+   ▼
+
+[Bước 2: Duyệt Tuyến Tính Khớp Luật Nhân & Khớp Từ Điển Dài Nhất (Linear FMM + LuatNhan)]
+
+   • Cho con trỏ i chạy từ 0 đến rawText.length - 1:
+
+     1. Nếu vị trí i là ProtectedToken hoặc ký tự phi CJK (Latin/Số/Xuống dòng):
+
+        - Ghi nguyên vẹn vào MappedTextBuilder, tạo MappedSpan(i, i + len, dispStart, dispEnd), tăng i += len.
+
+     2. Kiểm tra khớp mẫu LuatNhan tại vị trí i (qua chỉ mục ký tự đầu O(1) LeadFilter / Prefix Trie):
+
+        - Mẫu LuatNhan có dạng: "A{0}B", "{0}的{1}", "不{0}了", "被{0}所{1}", "第{0}章"...
+
+        - Nếu khớp một mẫu LuatNhan hợp lệ (các biến {0}, {1} không vượt qua dấu câu hay từ giới hạn):
+
+          + Dịch đệ quy từng đoạn con trong biến {0}, {1} bằng chính hàm FMM Từ điển.
+
+          + Ráp theo mẫu đích tiếng Việt của LuatNhan (VD: "{1} của {0}" hoặc "không {0} nữa").
+
+          + Ghi nhận đầy đủ các MappedSpan con của từng từ bên trong {0}, {1} và phần khung LuatNhan vào MappedTextBuilder!
+
+          + Nhảy con trỏ: i = match.endIndex.
+
+     3. Nếu không khớp LuatNhan, thực hiện Khớp Từ Điển Dài Nhất (Longest Prefix Match - FMM) từ độ dài maxLen về 1:
+
+        - Sử dụng bitmask lengthsMaskByFirstChar[rawText[i]] để bỏ qua ngay các độ dài không tồn tại.
+
+        - Tra cứu theo thứ tự ưu tiên tuyệt đối:
+
+          (a) Book / StoryMemory Dictionary (Từ điển riêng của bộ truyện)
+
+          (b) User QuickDictionary (Từ điển người dùng lưu trong Room DB)
+
+          (c) Names (Từ điển Tên riêng nhân vật / địa danh)
+
+          (d) VietPhrase (Từ điển cụm từ cốt lõi — quyết định 80-90% chất lượng bản dịch)
+
+          (e) ChinesePhienAmWords (Từ điển âm Hán-Việt cho chữ đơn)
+
+        - Lấy nghĩa đầu tiên (first meaning trước dấu '/' hoặc '|').
+
+        - Tự động chèn 1 dấu cách phân tách từ nếu ký tự trước đó là chữ/số.
+
+        - Ghi trực tiếp MappedSpan(rawStart = i, rawEnd = i + L, displayStart, displayEnd).
+
+        - Nhảy con trỏ: i += L.
+
+   │
+
+   ▼
+
+[Bước 3: Chuẩn Hóa Dấu Câu & Viết Hoa Đầu Câu (Zero-Drift Formatting)]
+
+   • Chuyển dấu câu toàn giác CJK (，。！？：“”‘’【】（）) sang dấu câu chuẩn tiếng Việt (, . ! ? : " " ' ' [ ] ( )).
+
+   • Thực hiện ngay trong MappedTextBuilder để không làm dịch chuyển bất kỳ offset nào của MappedSpan!
+
+   • Viết hoa chữ cái đầu đoạn và chữ cái đầu tiên sau dấu kết thúc câu (. ! ? : ") hoặc sau dấu mở ngoặc kép (chỉ đổi char case 1-1 nên độ dài chuỗi và MappedSpan giữ nguyên 100%).
+
+
+
+```
+
+
 
 ---
 
-## Test Criteria
-- [ ] Số lượng chữ `đích` trong cả 6 chương giảm từ 424 xuống 0 (hoặc tối thiểu trong tên riêng ngoại lệ).
-- [ ] Số lượng chữ `liễu` giảm từ 54 xuống 0.
-- [ ] Số lượng chữ `4 tuần` giảm từ 6 xuống 0 (`四周` $\to$ `bốn phía / xung quanh`).
-- [ ] Không còn các lỗi dịch ngô nghê: `chạy xe không`, `1 tệ`, `công việc vặt điện`, `mộc linh bên trong xem kinh`, `hứa có đức`, `khí đan tiểu tụ`, `trần ở chính giữa sư huynh`.
-- [ ] Tốc độ dịch mỗi chương 5.000 ký tự đạt dưới 300ms.
-- [ ] Thời gian mapping khi bôi đen và bấm "Thêm từ điển" đạt dưới 50ms.
+
+
+## 4. Các Bước Triển Khai Chi Tiết (Implementation Steps)
+
+
+
+### Task 01.1: Refactor `QuickTranslationRepository.kt` về Thuật Toán QT Gốc (FMM + `LuatNhan`)
+
+
+
+* **File:** `app/src/main/java/io/legado/app/data/repository/QuickTranslationRepository.kt`
+
+* **Chi tiết thực hiện:**
+
+1. Trong `translate()` và `translateMapped()`:
+
+* Ngừng gọi `beamTranslationPlan()`. Chuyển cả hai hàm sang sử dụng chung một lõi thực thi tuyến tính `translateLinearQt(rawText, lookup, buildMapping = true/false)`.
+
+
+
+
+
+2. Tối ưu hóa bộ khớp `LuatNhan`:
+
+* Nạp đầy đủ các quy tắc `LuatNhan` từ tài nguyên đóng gói và từ bảng `QuickDictionary` của người dùng.
+
+* Kiểm soát chặt chẽ ranh giới của các biến `{0}`, `{1}` trong `LuatNhan`: một slot `{0}` không bao giờ được nuốt dấu câu (`，。！？；：“”`) hoặc ký tự xuống dòng `\n`.
+
+* Khi dịch bên trong slot `{0}`, truyền trực tiếp `MappedTextBuilder` vào hàm dịch đệ quy để từng từ đơn/từ ghép bên trong `{0}` đều sinh ra `MappedSpan` riêng biệt của chính nó.
+
+
+
+
+
+3. Trong `cleanQuickDictionaryTarget(rawTarget)`:
+
+* Khi một mục từ trong `VietPhrase.txt` hoặc `Names.txt` có nhiều nghĩa phân cách bởi `/` hoặc `|` (ví dụ: `修炼=tu luyện/tu hành`), luôn lấy **nghĩa đầu tiên** (`tu luyện`) theo đúng chuẩn QuickTranslator truyền thống, loại bỏ logic tự ý đảo chọn nghĩa gây lệch văn phong.
+
+
+
+
+
+
+
+
+
+
+
+### Task 01.2: Bảo Toàn 100% Tọa Độ `MappedDisplayText` & Tối Ưu `QuickDictionarySelectionResolver.kt`
+
+
+
+* **Files:**
+
+* `app/src/main/java/io/legado/app/domain/model/MappedDisplayText.kt`
+
+* `app/src/main/java/io/legado/app/ui/quickdict/QuickDictionarySelectionResolver.kt`
+
+
+
+
+
+* **Chi tiết thực hiện:**
+
+1. Xây dựng lớp hỗ trợ nội bộ `MappedTextBuilder` trong `QuickTranslationRepository.kt`:
+
+* Mọi thao tác `appendToken(rawStart, rawEnd, translatedText)` đều tự động xử lý khoảng trắng ngăn cách từ và ghi nhận chính xác `[displayStart, displayEnd)` sau khi đã tính khoảng trắng.
+
+* Việc viết hoa chữ cái đầu câu (`Character.toUpperCase`) được thực hiện tại chỗ trên mảng ký tự hoặc `StringBuilder.setCharAt(idx, upperChar)` để **không làm thay đổi bất kỳ chỉ số độ dài nào của `MappedSpan**`.
+
+
+
+
+
+2. Trong `QuickDictionarySelectionResolver.kt`:
+
+* Khi người dùng bôi đen vùng `[selStart, selEnd)` trên văn bản hiển thị:
+
+* Tìm tất cả `MappedSpan` trong `mappedDisplayText.spans` có phần giao dương (`maxOf(span.displayStart, selStart) < minOf(span.displayEnd, selEnd)`).
+
+* Nếu các span tìm được liên tiếp nhau trong văn bản gốc (hoặc nằm trong cùng một câu), lấy `rawStart = spans.minOf { it.rawStart }` và `rawEnd = spans.maxOf { it.rawEnd }` làm kết quả chính xác tuyệt đối (`rawText.substring(rawStart, rawEnd)`).
+
+* Tạo thêm danh sách `alternatives` từ các cụm từ lân cận (±1 đến ±2 token) để người dùng có thể mở rộng/thu hẹp nhanh chỉ với 1 chạm.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Task 01.3: Tinh Giản `QuickTranslationTextPostProcessor` & Cập Nhật `TranslateDynamicUiTextUseCase`
+
+
+
+* **Files:**
+
+* `app/src/main/java/io/legado/app/data/repository/QuickTranslationRepository.kt`
+
+* `app/src/main/java/io/legado/app/domain/usecase/TranslateDynamicUiTextUseCase.kt`
+
+
+
+
+
+* **Chi tiết thực hiện:**
+
+1. Trong `QuickTranslationTextPostProcessor`:
+
+* Gỡ bỏ việc quét 202 regex `qt_clean_rules_v8.tsv` trên văn bản chương truyện để bảo toàn 100% nghĩa từ điển và tọa độ `MappedSpan`.
+
+* Chỉ giữ lại hàm chuẩn hóa chương mục (`Đệ X Chương` $\rightarrow$ `Chương X`) cho tiêu đề chương và hàm dọn khoảng trắng dấu câu cơ bản khi gọi `translate()` không cần mapping.
+
+
+
+
+
+2. Trong `TranslateDynamicUiTextUseCase.kt`:
+
+* Đảm bảo `needsQuickTranslation()` kiểm tra nhanh sự tồn tại của ký tự CJK (`\u4E00`..`\u9FFF`, `\u3400`..`\u4DBF`), bỏ qua ngay lập tức các chuỗi tiếng Việt/Anh thuần túy.
+
+
+
+
+
+3. Tăng `QT_CACHE_REVISION` để làm mới toàn bộ cache chương QT cũ.
+
+
+
+
+
+
+
+---
+
+
+
+## 5. Danh Sách Tệp Sửa Đổi (Files to Modify)
+
+
+
+* `app/src/main/java/io/legado/app/data/repository/QuickTranslationRepository.kt`
+
+* `app/src/main/java/io/legado/app/domain/model/MappedDisplayText.kt`
+
+* `app/src/main/java/io/legado/app/ui/quickdict/QuickDictionarySelectionResolver.kt`
+
+* `app/src/main/java/io/legado/app/domain/usecase/TranslateDynamicUiTextUseCase.kt`
+
+* `app/src/test/java/io/legado/app/data/repository/QuickTranslationRepositoryTest.kt`
+
+* `app/src/test/java/io/legado/app/ui/quickdict/QuickDictionarySelectionResolverTest.kt`
+
+
+
+---
+
+
+
+## 6. Tiêu Chí Nghiệm Thu (Pass Criteria)
+
+
+
+* [ ] **PASS-01 (Tốc độ):** Dịch một chương 3.000–5.000 chữ Hán hoàn tất trong **< 50ms** trên thiết bị và JVM test.
+
+* [ ] **PASS-02 (Chất lượng QT Gốc):** Câu dịch giữ đúng nghĩa `VietPhrase`, `Names` và cấu trúc `LuatNhan` (đạt 80–90% độ mượt thuần từ điển), không bị mất chữ hay đảo lộn câu vô lý.
+
+* [ ] **PASS-03 (Mapping 1:1):** Bôi đen bất kỳ từ đơn, từ ghép hay cụm từ nằm trong cấu trúc `LuatNhan` trên màn hình đọc đều lấy ra đúng 100% chữ Hán gốc tương ứng, không bao giờ bị trống trường Raw hay lấy tràn cả đoạn văn.

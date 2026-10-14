@@ -1,139 +1,251 @@
-# Phase 03: Compact Download & Package Info Blocks (Đưa Cài Đặt TTS Ra UI Chính & Chuẩn Hóa Card TTS/NMT/Valtec/Zero)
+# Phase 03: Thu Gọn Giao Diện Các Khối Tải Xuống & Khối Nội Dung (Compact Download & Content Blocks)
 
-Status: ⬜ Pending
-Dependencies: None
 
-## Objective
-1. **Chuyển vị trí tải Model TTS và cài đặt TTS về ngoài UI chính của Cài đặt (`ConfigNavScreen`)**:
-   - Bổ sung thẻ mục **"Cài đặt TTS"** (hoặc "Quản lý & Cài đặt TTS") trực tiếp trên màn hình Cài đặt chính (`ConfigNavScreen.kt`), người dùng không phải vào sâu trong "Cài đặt đọc" (`ReadConfigScreen`) để tìm kiếm.
-   - Kết nối trực tiếp route `MainRouteSettingsTtsModels` từ màn hình chính để người dùng vừa cài đặt engine vừa duyệt/tải các gói model TTS tiện lợi ngay tại chỗ.
-2. **Chuẩn hóa hiển thị gọn gàng toàn bộ các họ Model TTS (Piper, Valtec, ZeroTTS) & Model NMT theo mockup**:
-   - Loại bỏ 100% các chuỗi kỹ thuật rườm rà: mã hash SHA-256 (`SHA 0826c36e241e`), tên file zip cồng kềnh, phân loại trùng lặp (`Dịch · translation`).
-   - Tái cấu trúc giao diện theo phong cách Card UI chuẩn mockup:
-     + Leading badge bo góc mềm (`[ VI ]`, `[ ZH ]`).
-     + Title to rõ, format sạch sẽ.
-     + Tag pill engine thực tế (`[Piper]`, `[Valtec]`, `[ZeroTTS]`, `[ONNX]`). Tuyệt đối loại bỏ tag ví dụ `VMODEL`.
-     + Subtitle gạch chấm ngắn gọn `${Ngôn ngữ} • ${Đặc tính/Thể loại} • ${Dung lượng}`.
-     + Trailing Action: Nút tải hình tròn (`FilledTonalIconButton`).
+
+> **Thuộc kế hoạch:** [`plan.md`](./plan.md)  
+
+> **Phase ID:** `phase-03`  
+
+> **Trạng thái:** ⬜ Pending  
+
+> **Phụ thuộc:** Phase 02
+
+
 
 ---
 
-## Chi tiết Quy chuẩn các Họ Model TTS & NMT trong Card Layout
 
-### 1. Họ Model Piper TTS (`ENGINE_PIPER_VITS`)
-- **Đặc điểm:** Từng voice đóng gói kèm ONNX + JSON riêng biệt (~31 - 58 MB).
-- **Quy cách Card:**
-  ```
-  +-------------------------------------------------------------+
-  | [ VI ]   Ban Mai  [Piper]                               (↓) |
-  |          Tiếng Việt • Nữ • 31.4 MB                          |
-  +-------------------------------------------------------------+
-  | [ VI ]   Miền Nam  [Piper]                              (↓) |
-  |          Tiếng Việt • Đa giọng • 38.2 MB                    |
-  +-------------------------------------------------------------+
-  | [ VI ]   Minh Quang  [Piper]                            (↓) |
-  |          Tiếng Việt • Nam • 31.4 MB                         |
-  +-------------------------------------------------------------+
-  ```
 
-### 2. Họ Model Valtec TTS (`ENGINE_VALTEC` - VITS ONNX)
-- **Đặc điểm:** Gói ZIP trọn bộ chứa text_encoder, flow, decoder, duration_predictor (~160 MB).
-- **Quy cách Card:**
-  ```
-  +-------------------------------------------------------------+
-  | [ VI ]   Valtec Vietnamese  [Valtec]                    (↓) |
-  |          Tiếng Việt • Đa giọng VITS • 160 MB                |
-  +-------------------------------------------------------------+
-  ```
+## 1. Mục Tiêu (Objectives)
 
-### 3. Họ Model ZeroTTS (`ENGINE_ZEROTTS` - Base Model & Voice Prompts)
-- **Đặc điểm:** 
-  + Gói Base nền tảng: `ZeroTTS Base (Mai Chi)` dung lượng ~443 MB.
-  + Các gói voice prompt siêu nhẹ (~31 KB): Mai Chi, Bảo Trang, Kim Oanh, Gia Huy, Hữu Đức, Quang Minh, Tiến Đạt, Hà My.
-- **Quy cách Card:**
-  ```
-  +-------------------------------------------------------------+
-  | [ VI ]   ZeroTTS Base (Mai Chi)  [ZeroTTS]              (↓) |
-  |          Tiếng Việt • Kể chuyện (Base) • 443 MB             |
-  +-------------------------------------------------------------+
-  | [ VI ]   Bảo Trang  [ZeroTTS]                           (↓) |
-  |          Tiếng Việt • Nữ, tin tức • 31 KB                   |
-  +-------------------------------------------------------------+
-  | [ VI ]   Hữu Đức  [ZeroTTS]                             (↓) |
-  |          Tiếng Việt • Nam, điềm đạm • 31 KB                 |
-  +-------------------------------------------------------------+
-  | [ VI ]   Tiến Đạt  [ZeroTTS]                            (↓) |
-  |          Tiếng Việt • Nam, sôi nổi • 31 KB                  |
-  +-------------------------------------------------------------+
-  ```
+1. **Tối ưu hóa mật độ hiển thị (Compact UI Density) cho toàn bộ các khối tải xuống (Download Blocks):**
 
-### 4. Họ Model NMT (Dịch máy Hachimi, ONNX, ML Kit)
-- **Đặc điểm:** Mô hình dịch máy thần kinh Hachimi zh-vi (~168 MB) hoặc Google ML Kit (~32 MB).
-- **Quy cách Card:**
-  ```
-  +-------------------------------------------------------------+
-  | [ ZH ]   HachimiMT-60-QT  [ONNX]                        (↓) |
-  |          zh-vi • Hán Việt • 168.3 MB                        |
-  +-------------------------------------------------------------+
-  | [ ZH ]   Hachimi zh-vi  [NMT]                           (↓) |
-  |          zh-vi • NMT chuẩn • 168.3 MB                       |
-  +-------------------------------------------------------------+
-  | [ ZH ]   Google ML Kit  [ML Kit]                        (↓) |
-  |          zh-vi • Offline engine • 32 MB                     |
-  +-------------------------------------------------------------+
-  ```
+   - Giảm 45%–55% chiều cao dọc của mỗi thẻ tải xuống (từ `140.dp`–`200.dp` xuống còn **`54.dp`–`72.dp`**) trên tất cả các màn hình:
+
+     - `DownloadCenterScreen.kt` (Trung tâm tải xuống hợp nhất: Sách, File, Media, Xuất EPUB/TXT).
+
+     - `BookCacheManageScreen.kt` & `DownloadCacheConfigScreen.kt` (Quản lý bộ nhớ đệm chương sách).
+
+     - `TranslationConfigScreen.kt` & `MlKitModelsScreen.kt` (Các khối tải mô hình NMT ONNX `HachimiMT`, `NLLB-200`, `LocalAI GGUF`, `ML Kit`).
+
+     - `ReadAloudConfigSheet.kt` (Các khối tải gói `ZeroTTS Base` và 8 gói `ZeroTTS Voice Addons`).
+
+2. **Thu gọn các khối nội dung rỗng trên trình đọc (`BookContentProcessEngine.kt`):**
+
+   - Không để lại các khoảng trống trắng lớn trên trang đọc sau khi quy tắc `BookContentProcess` xóa các đoạn văn quảng cáo/rác.
+
+
 
 ---
 
-## Implementation Steps
 
-### 1. Đưa Thẻ "Cài đặt TTS" ra màn hình Cài đặt chính (`ConfigNavScreen.kt`)
-- Trong `ConfigNavScreen.kt`:
-  + Thêm tham số callback điều hướng: `onNavigateToTts: () -> Unit = {}`.
-  + Thêm thẻ `ClickableSettingItem` trong nhóm cài đặt:
-    ```kotlin
-    ClickableSettingItem(
-        title = stringResource(R.string.local_tts_settings_title), // "Cài đặt TTS"
-        onClick = onNavigateToTts,
-    )
-    ```
-- Trong `MainNavGraph.kt`:
-  + Truyền `onNavigateToTts = { backStack.add(MainRouteSettingsTtsModels) }` khi đăng ký `entry<MainRouteSettings>`.
-- Trong `TtsModelManagerScreen.kt`:
-  + Tối ưu thanh công cụ đầu màn hình: Nút mở kho tải Catalog / AssetDelivery cho toàn bộ các model TTS (Piper, Valtec, ZeroTTS) hiển thị rõ nét trên cùng.
 
-### 2. Tái cấu trúc `AssetDeliveryItemRow` trong `AssetDeliveryScreen.kt`
-- Thay thế `ListItem` 3 tầng cũ thành Card UI chuẩn mockup:
-  + Container: `Surface` / `NormalCard` bo góc 16.dp.
-  + Leading badge: Khối bo góc 12.dp chứa mã ngôn ngữ `[ VI ]` hoặc `[ ZH ]`.
-  + Title & Tag Row: Tên hiển thị sạch sẽ + tag pill engine thực tế (`[Piper]`, `[Valtec]`, `[ZeroTTS]`, `[ONNX]`).
-  + Subtitle Row: Định dạng phân cách dấu chấm: `${Ngôn ngữ} • ${Thể loại/Đặc tính} • ${Dung lượng}`.
-  + Trailing Button: Nút tròn `FilledTonalIconButton` tải xuống.
-  + Ẩn hoàn toàn mã SHA-256 và tên file zip kỹ thuật.
+## 2. Quy Chuẩn Thiết Kế `CompactDownloadBlock` (Design Specifications)
 
-### 3. Tinh gọn & Phân loại trong `TtsModelManagerScreen.kt`
-- Loại bỏ dòng hiển thị SHA-256 checksum thô (`stringResource(R.string.local_tts_model_checksum)`).
-- Hiển thị danh sách model đã cài đặt dưới dạng card tinh gọn có tag phân loại: `Valtec`, `ZeroTTS`, `Piper`.
-- Thông số kỹ thuật (sample rate, số giọng, dung lượng) được gộp thành subtitle ngắn gọn có dấu chấm phân cách.
 
-### 4. Tinh gọn các Block trong `TranslationConfigScreen.kt`
-- Rút gọn subtitle các block tải mô hình NMT:
-  + "Tải gói QT clean": Rút gọn thành dòng trạng thái súc tích ("Từ điển chuẩn Hán Việt/VietPhrase").
-  + "Gói ngôn ngữ Google ML Kit": Rút gọn thành "Mô hình offline Google zh-vi (32 MB)".
-  + "Tải model NMT (Hachimi zh-vi)", "Tải model NMT (Hachimi QT)": Rút gọn chỉ giữ lại thông số cốt lõi.
+
+### 2.1. Cấu Trúc Hàng Ngang Đơn Nhất (Single-Row Compact Layout)
+
+```text
+
++-----------------------------------------------------------------------+
+
+| [Thumb] Tên Sách / Tên Gói Model (1 dòng, Ellipsis)     [Pause] [Del] |
+
+|  36x48  124/500 chương • 24.8% • Đang tải                             |
+
+|         [=================>------------------------] (Progress 3.dp)  |
+
++-----------------------------------------------------------------------+
+
+
+
+```
+
+
+
+### 2.2. Thông Số Kích Thước Chuẩn (Metrics)
+
+
+
+* **Khoảng cách giữa các thẻ (Item Vertical Spacing):** `4.dp` (thay vì `10.dp`–`12.dp`).
+
+* **Padding bên trong thẻ (Card Inner Padding):** `horizontal = 12.dp, vertical = 8.dp` (thay vì `16.dp`).
+
+* **Kích thước Thumbnail / Icon bên trái:**
+
+* Bìa sách: `36.dp x 48.dp`, bo góc `6.dp`.
+
+* Icon loại tệp / Model AI / Giọng đọc TTS: Box `36.dp x 36.dp`, bo góc `8.dp`, icon bên trong `20.dp`.
+
+
+
+
+
+* **Cột thông tin ở giữa (`Modifier.weight(1f)`):**
+
+* **Dòng 1 (Title):** `MaterialTheme.typography.bodyMedium`, `fontWeight = FontWeight.SemiBold`, `maxLines = 1`, `overflow = TextOverflow.Ellipsis`.
+
+* **Dòng 2 (Unified Subtitle):** `MaterialTheme.typography.labelSmall`, màu `onSurfaceVariant`, `maxLines = 1`, gộp gọn: `Đã tải X/Y chương (hoặc MB/MB) • Phần trăm (%) • Trạng thái`.
+
+* **Dòng 3 (Thin Progress Bar):** `LinearProgressIndicator` có `Modifier.fillMaxWidth().height(3.dp)`, chỉ hiển thị khi tác vụ đang `RUNNING` / `PAUSED` / `PENDING` / `ERROR`. Khi đã `COMPLETED`, tự động ẩn thanh progress để thẻ thu gọn còn `54.dp`.
+
+
+
+
+
+* **Cột nút hành động bên phải (Inline Compact IconButtons):**
+
+* Sử dụng `IconButton(modifier = Modifier.size(32.dp))` với `Icon(modifier = Modifier.size(18.dp))` đặt trên cùng hàng ngang với tiêu đề/phụ đề.
+
+* Xóa bỏ hoàn toàn hàng `Row` chứa các `Button` / `OutlinedButton` chiếm chỗ ở đáy thẻ.
+
+
+
+
+
+
 
 ---
 
-## Files to Create/Modify
-- `app/src/main/java/io/legado/app/ui/config/ConfigNavScreen.kt` - Bổ sung thẻ "Cài đặt TTS" ra màn hình Cài đặt chính.
-- `app/src/main/java/io/legado/app/ui/main/MainNavGraph.kt` - Nối đường dẫn `onNavigateToTts` tới `MainRouteSettingsTtsModels`.
-- `app/src/main/java/io/legado/app/ui/assetdelivery/AssetDeliveryScreen.kt` - Tái cấu trúc card tải gói cho Piper, Valtec, ZeroTTS, NMT.
-- `app/src/main/java/io/legado/app/ui/config/tts/TtsModelManagerScreen.kt` - Tinh gọn card model TTS, phân biệt Valtec, ZeroTTS, Piper, loại bỏ SHA-256.
-- `app/src/main/java/io/legado/app/ui/config/translation/TranslationConfigScreen.kt` - Rút gọn phụ đề các SettingItem tải model NMT.
+
+
+## 3. Các Bước Triển Khai Chi Tiết (Implementation Steps)
+
+
+
+### Task 03.1: Refactor `DownloadCenterScreen.kt` & `BookCacheManageScreen.kt`
+
+
+
+* **Files:**
+
+* `app/src/main/java/io/legado/app/ui/download/DownloadCenterScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/book/cache/BookCacheManageScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/config/download/DownloadCacheConfigScreen.kt`
+
+
+
+
+
+* **Chi tiết thực hiện:**
+
+1. Thu gọn phần Header thống kê ở đầu `DownloadCenterScreen` và `BookCacheManageScreen` thành một thanh `Surface` mỏng (`padding = 8.dp`), hiển thị các con số thống kê trên 1 dòng ngang cùng các chip lọc compact.
+
+2. Áp dụng bố cục `CompactDownloadBlock` cho tất cả các loại item trong danh sách tải xuống:
+
+* Tác vụ tải chương sách (`CacheBook`).
+
+* Tác vụ tải tệp/ebook (`DownloadService`).
+
+* Tác vụ tải Media Video/Audio/Manga (`MediaDownload`).
+
+* Tác vụ xuất sách (`ExportBook`).
+
+
+
+
+
+
+
+
+
+
+
+### Task 03.2: Thu Gọn Các Khối Tải Model AI / NMT / ML Kit / ZeroTTS
+
+
+
+* **Files:**
+
+* `app/src/main/java/io/legado/app/ui/config/translation/TranslationConfigScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/config/translation/mlkit/MlKitModelsScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/book/read/ReadAloudConfigSheet.kt`
+
+
+
+
+
+* **Chi tiết thực hiện:**
+
+1. Trong `TranslationConfigScreen.kt` và `MlKitModelsScreen.kt`:
+
+* Thu gọn các thẻ tải gói mô hình offline (`HachimiMT-60-QT`, `NLLB-200`, `HY-MT 1.8B GGUF`, và các gói ngôn ngữ ML Kit) về dạng dòng compact `56.dp`, đặt nút `Tải xuống / Đang dùng / Xóa` ngay bên phải cùng hàng.
+
+
+
+
+
+2. Trong `ReadAloudConfigSheet.kt`:
+
+* Thu gọn khối tải gói `ZeroTTS Base` và danh sách 8 gói giọng đọc `ZeroTTS Voice Addons` thành các dòng compact (`48.dp`–`56.dp`), hiển thị tên giọng + dung lượng + trạng thái đã cài + nút tải/chọn trên một dòng duy nhất.
+
+
+
+
+
+
+
+
+
+
+
+### Task 03.3: Thu Gọn Khối Rỗng Sau Khi Xóa Nội Dung Trong `BookContentProcessEngine.kt`
+
+
+
+* **File:** `app/src/main/java/io/legado/app/domain/model/BookContentProcessEngine.kt`
+
+* **Chi tiết thực hiện:**
+
+* Sau khi thực thi các quy tắc `BookContentProcess` (đặc biệt là quy tắc xóa đoạn văn rác hoặc thay thế bằng chuỗi rỗng), chuẩn hóa chuỗi kết quả bằng cách thu gọn các chuỗi xuống dòng liên tiếp (`\n(?:[ \t\u3000]*\n){2,}` $\rightarrow$ `\n\n`) và cắt khoảng trắng thừa ở đầu/cuối chương, tránh tạo ra các khối trống rỗng trên trang đọc.
+
+
+
+
+
+
 
 ---
 
-## Test Criteria
-- [ ] Màn hình Cài đặt chính (`ConfigNavScreen`) có thẻ "Cài đặt TTS" ngay ngoài danh sách, bấm vào chuyển ngay tới màn hình quản lý mô hình TTS và kho tải.
-- [ ] Tất cả các gói tải model TTS (Valtec, ZeroTTS, Piper) và model NMT hiển thị nhất quán theo chuẩn mockup card: có Leading badge ngôn ngữ (`VI`/`ZH`), tag engine thực tế (`Piper`/`Valtec`/`ZeroTTS`/`ONNX`), phụ đề ngắn gọn và nút tròn tải xuống.
-- [ ] Tuyệt đối không còn mã SHA-256 hay tên file zip kỹ thuật trên toàn bộ các màn hình người dùng.
+
+
+## 4. Danh Sách Tệp Sửa Đổi (Files to Modify)
+
+
+
+* `app/src/main/java/io/legado/app/ui/download/DownloadCenterScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/book/cache/BookCacheManageScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/config/download/DownloadCacheConfigScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/config/translation/TranslationConfigScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/config/translation/mlkit/MlKitModelsScreen.kt`
+
+* `app/src/main/java/io/legado/app/ui/book/read/ReadAloudConfigSheet.kt`
+
+* `app/src/main/java/io/legado/app/domain/model/BookContentProcessEngine.kt`
+
+* `app/src/test/java/io/legado/app/domain/model/BookContentProcessEngineTest.kt`
+
+
+
+---
+
+
+
+## 5. Tiêu Chí Nghiệm Thu (Pass Criteria)
+
+
+
+* [ ] **PASS-01:** Chiều cao mỗi thẻ tải xuống không vượt quá `72.dp` khi đang tải và `58.dp` khi hoàn tất; một màn hình hiển thị được tối thiểu 6–8 tác vụ tải xuống.
+
+* [ ] **PASS-02:** Các nút icon thao tác nhanh (`Pause`, `Resume`, `Retry`, `Delete`) phản hồi tức thì, không gây tràn hay cắt chữ tiêu đề.
+
+* [ ] **PASS-03:** `BookContentProcessEngineTest` pass 100%, không còn dòng trống thừa sau khi xóa khối văn bản.

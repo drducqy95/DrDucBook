@@ -6,8 +6,8 @@
     "resumed_at": "2026-10-14T05:30:00.000000"
   },
   "working_on": {
-    "feature": "QuickTranslator Speed & Mapping Acceleration (6 Chapters), Vietnamese Mojibake Fix, Compact Download Blocks & Source Health Accuracy",
-    "current_milestone": "P80",
+    "feature": "Khôi Phục QT Gốc, Sửa Lỗi Mojibake/i18n, Thu Gọn Download Blocks, Source Health Accuracy, Gemini Web 4 Models + TTS Fix",
+    "current_milestone": "P77",
     "current_plan_path": "plans/261014-1415-fix-qt-i18n-blocks-sourcehealth/plan.md",
     "current_phase": "phase-01-qt-speed-and-mapping",
     "total_phases": 5,
