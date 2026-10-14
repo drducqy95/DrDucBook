@@ -8,6 +8,7 @@ import io.legado.app.data.repository.BookSourceHealthRepository
 import io.legado.app.data.repository.sourcehealth.SourceCheckRepository
 import io.legado.app.domain.model.BookSourceHealthRow
 import io.legado.app.domain.model.BookSourceHealthStatus
+import io.legado.app.domain.model.isAttentionRequired
 import io.legado.app.domain.sourcehealth.SourceCheckRun
 import io.legado.app.domain.sourcehealth.SourceCheckStageResult
 import io.legado.app.help.source.SourceHelp
@@ -90,7 +91,10 @@ class SourceHealthViewModel(
                     } else {
                         selected.add(intent.sourceUrl)
                     }
-                    current.copy(selectedSourceUrls = selected.toImmutableList())
+                    current.copy(
+                        selectedSourceUrls = selected.toImmutableList(),
+                        isSelectionMode = selected.isNotEmpty(),
+                    )
                 }
             }
             is SourceHealthIntent.SelectAllSources -> {
@@ -108,7 +112,7 @@ class SourceHealthViewModel(
             }
             SourceHealthIntent.DeleteErrorSources -> {
                 val errorUrls = sourceRows
-                    .filter { row -> (row.health?.statusValue ?: BookSourceHealthStatus.UNKNOWN_OFFLINE).needsAttention() }
+                    .filter { row -> (row.health?.statusValue ?: BookSourceHealthStatus.UNKNOWN_OFFLINE).isAttentionRequired() }
                     .map { it.sourceUrl }
                 if (errorUrls.isEmpty()) {
                     _effects.tryEmit(
@@ -290,8 +294,12 @@ class SourceHealthViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isDeleting = true) }
             val count = urls.size
-            urls.forEach { url ->
-                SourceHelp.deleteBookSource(url)
+            repository.deleteSourcesCompletely(urls)
+            if (_uiState.value.selectedSourceUrl in urls) {
+                selectedSourceUrl.value = null
+                selectedRunId.value = null
+                selectedRuns = emptyList()
+                selectedStages = emptyList()
             }
             _uiState.update {
                 it.copy(
@@ -300,6 +308,9 @@ class SourceHealthViewModel(
                     selectedSourceUrls = kotlinx.collections.immutable.persistentListOf(),
                     selectedSourceUrl = if (it.selectedSourceUrl in urls) null else it.selectedSourceUrl,
                     selectedSource = if (it.selectedSourceUrl in urls) null else it.selectedSource,
+                    selectedRunId = if (it.selectedSourceUrl in urls) null else it.selectedRunId,
+                    selectedRuns = if (it.selectedSourceUrl in urls) kotlinx.collections.immutable.persistentListOf() else it.selectedRuns,
+                    selectedStages = if (it.selectedSourceUrl in urls) kotlinx.collections.immutable.persistentListOf() else it.selectedStages,
                 )
             }
             _effects.tryEmit(
@@ -421,7 +432,7 @@ private fun List<BookSourceHealthRow>.toSummaryUi(): SourceHealthSummaryUi {
         total = size,
         checked = count { row -> (row.health?.lastChecked ?: 0L) > 0L },
         healthy = statuses.count { it == BookSourceHealthStatus.HEALTHY },
-        needsAttention = statuses.count(BookSourceHealthStatus::needsAttention),
+        needsAttention = statuses.count { it.isAttentionRequired() },
         authRequired = statuses.count { it == BookSourceHealthStatus.AUTH_REQUIRED },
         captchaRequired = statuses.count { it == BookSourceHealthStatus.CAPTCHA_REQUIRED },
     )
@@ -441,15 +452,10 @@ private fun BookSourceHealthRow.matchesFilter(filter: SourceHealthFilter): Boole
     return when (filter) {
         SourceHealthFilter.ALL -> true
         SourceHealthFilter.HEALTHY -> status == BookSourceHealthStatus.HEALTHY
-        SourceHealthFilter.ERROR -> status.needsAttention()
+        SourceHealthFilter.ERROR -> status.isAttentionRequired()
         SourceHealthFilter.AUTH_REQUIRED -> status == BookSourceHealthStatus.AUTH_REQUIRED
         SourceHealthFilter.CAPTCHA_REQUIRED -> status == BookSourceHealthStatus.CAPTCHA_REQUIRED
     }
 }
 
-private fun BookSourceHealthStatus.needsAttention(): Boolean = this !in setOf(
-    BookSourceHealthStatus.HEALTHY,
-    BookSourceHealthStatus.DEGRADED,
-    BookSourceHealthStatus.UNKNOWN_OFFLINE,
-    BookSourceHealthStatus.STALE,
-)
+private fun BookSourceHealthStatus.needsAttention(): Boolean = isAttentionRequired()

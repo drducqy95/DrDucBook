@@ -28,6 +28,12 @@ interface BookSourceHealthDao {
     @Query("DELETE FROM book_source_health WHERE sourceUrl = :sourceUrl")
     fun deleteBySourceUrlBlocking(sourceUrl: String): Int
 
+    @Query("DELETE FROM book_source_health WHERE sourceUrl IN (:sourceUrls)")
+    suspend fun deleteBySourceUrls(sourceUrls: Collection<String>): Int
+
+    @Query("DELETE FROM book_source_health WHERE sourceUrl IN (:sourceUrls)")
+    fun deleteBySourceUrlsBlocking(sourceUrls: Collection<String>): Int
+
     @Query("SELECT COUNT(*) FROM book_source_health WHERE status NOT IN ('HEALTHY', 'DEGRADED', 'UNKNOWN_OFFLINE', 'STALE')")
     suspend fun getErrorCount(): Int
 

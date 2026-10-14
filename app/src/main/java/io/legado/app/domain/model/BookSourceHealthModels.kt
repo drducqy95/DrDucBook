@@ -51,6 +51,23 @@ internal fun redactBookSourceDiagnostic(message: String?): String? {
     return normalized?.takeIf(String::isNotBlank)
 }
 
+fun BookSourceHealthStatus.isAttentionRequired(): Boolean = when (this) {
+    BookSourceHealthStatus.DEGRADED,
+    BookSourceHealthStatus.AUTH_REQUIRED,
+    BookSourceHealthStatus.CAPTCHA_REQUIRED,
+    BookSourceHealthStatus.RATE_LIMITED,
+    BookSourceHealthStatus.BROKEN_RULE,
+    BookSourceHealthStatus.NETWORK_ERROR,
+    BookSourceHealthStatus.TLS_ERROR,
+    BookSourceHealthStatus.CONTENT_EMPTY,
+    BookSourceHealthStatus.MEDIA_ERROR,
+    BookSourceHealthStatus.HTTP_ERROR,
+    BookSourceHealthStatus.UNSUPPORTED -> true
+    BookSourceHealthStatus.HEALTHY,
+    BookSourceHealthStatus.UNKNOWN_OFFLINE,
+    BookSourceHealthStatus.STALE -> false
+}
+
 fun nextBookSourceFailureCount(
     previousFailures: Int,
     status: BookSourceHealthStatus,
@@ -78,8 +95,11 @@ internal fun classifyBookSourceProbeFailure(
         ?.getOrNull(1)
         ?.toIntOrNull()
     val status = when {
-        listOf("captcha", "cloudflare", "challenge", "verify code", "verification code")
-            .any(value::contains) -> BookSourceHealthStatus.CAPTCHA_REQUIRED
+        listOf(
+            "captcha", "cloudflare", "challenge", "verify code", "verification code",
+            "turnstile", "cf-chl-bypass", "just a moment...", "attention required! | cloudflare",
+            "人机验证", "安全验证"
+        ).any(value::contains) -> BookSourceHealthStatus.CAPTCHA_REQUIRED
         httpStatus in setOf(401, 403) ||
             listOf("unauthorized", "forbidden", "login", "dang nhap", "signin", "sign in")
                 .any(value::contains) -> BookSourceHealthStatus.AUTH_REQUIRED

@@ -64,4 +64,23 @@ class BookSourceHealthModelsTest {
         assertEquals(0, nextBookSourceFailureCount(8, BookSourceHealthStatus.UNKNOWN_OFFLINE))
         assertEquals(0, nextBookSourceFailureCount(8, BookSourceHealthStatus.STALE))
     }
+
+    @Test
+    fun isAttentionRequiredIdentifiesActionableProblemStatuses() {
+        assertEquals(false, BookSourceHealthStatus.HEALTHY.isAttentionRequired())
+        assertEquals(false, BookSourceHealthStatus.UNKNOWN_OFFLINE.isAttentionRequired())
+        assertEquals(false, BookSourceHealthStatus.STALE.isAttentionRequired())
+
+        assertEquals(true, BookSourceHealthStatus.DEGRADED.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.AUTH_REQUIRED.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.CAPTCHA_REQUIRED.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.RATE_LIMITED.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.BROKEN_RULE.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.NETWORK_ERROR.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.TLS_ERROR.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.CONTENT_EMPTY.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.MEDIA_ERROR.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.HTTP_ERROR.isAttentionRequired())
+        assertEquals(true, BookSourceHealthStatus.UNSUPPORTED.isAttentionRequired())
+    }
 }

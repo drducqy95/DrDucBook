@@ -120,6 +120,12 @@ interface SourceCheckDao {
     @Query("DELETE FROM source_check_runs WHERE sourceUrl = :sourceUrl")
     fun deleteRunsBySourceUrlBlocking(sourceUrl: String): Int
 
+    @Query("DELETE FROM source_check_runs WHERE sourceUrl IN (:sourceUrls)")
+    suspend fun deleteRunsBySourceUrls(sourceUrls: Collection<String>): Int
+
+    @Query("DELETE FROM source_check_runs WHERE sourceUrl IN (:sourceUrls)")
+    fun deleteRunsBySourceUrlsBlocking(sourceUrls: Collection<String>): Int
+
     @Query("SELECT COUNT(*) FROM source_check_runs")
     suspend fun getRunCount(): Int
 

@@ -46,7 +46,11 @@ object SourceCheckClassifier {
         val value = message.orEmpty().lowercase()
         val statusCode = httpStatus ?: value.extractHttpStatus()
         val status = when {
-            value.containsAny("captcha", "cloudflare", "challenge", "verify code", "verification code") ->
+            value.containsAny(
+                "captcha", "cloudflare", "challenge", "verify code", "verification code",
+                "turnstile", "cf-chl-bypass", "just a moment...", "attention required! | cloudflare",
+                "人机验证", "安全验证"
+            ) ->
                 BookSourceHealthStatus.CAPTCHA_REQUIRED
             statusCode in setOf(401, 403) ||
                 value.containsAny("unauthorized", "forbidden", "login", "dang nhap", "signin", "sign in") ->
