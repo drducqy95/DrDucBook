@@ -97,4 +97,19 @@ class VietnameseTranslationPostProcessorTest {
         val expected2 = "\"Anh trai thân yêu của em, Lyon...\""
         assertEquals(expected2, VietnameseTranslationPostProcessor.fixContradictoryDialoguePronouns(input2))
     }
+
+    @Test
+    fun stripsRogueReplacementAndZeroWidthCharacters() {
+        val input = "Noah\uFFFD Pat\u200B hùng\u200C mạnh\uFEFF."
+        val expected = "Noah Pat hùng mạnh."
+        assertEquals(expected, VietnameseTranslationPostProcessor.stripRogueCharacters(input))
+    }
+
+    @Test
+    fun cleansRogueReplacementCharMojibakeInNames() {
+        val input = "Gia tộc Noah\uFFFD Pat và Harry?Potter."
+        val expected = "Gia tộc Noah Pat và Harry Potter."
+        assertEquals(expected, VietnameseTranslationPostProcessor.cleanRogueNameQuestionMarks(input))
+    }
 }
+

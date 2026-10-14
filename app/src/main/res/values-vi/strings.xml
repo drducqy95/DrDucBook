@@ -3114,6 +3114,40 @@
     <string name="source_health_started">B&#7855;t &#273;&#7847;u %1$s</string>
     <string name="source_health_stage_counts">&#272;&#7841;t %1$d | L&#7895;i %2$d | B&#7887; qua %3$d | T&#7893;ng %4$d</string>
     <string name="source_health_http_status">HTTP %1$d</string>
+
+    <!-- Source Health Stages -->
+    <string name="source_health_stage_reachability">Kết nối cơ sở</string>
+    <string name="source_health_stage_search">Tìm kiếm</string>
+    <string name="source_health_stage_explore">Khám phá</string>
+    <string name="source_health_stage_detail">Thông tin truyện</string>
+    <string name="source_health_stage_toc">Mục lục</string>
+    <string name="source_health_stage_content">Nội dung chương</string>
+    <string name="source_health_stage_media">Đa phương tiện</string>
+    <string name="source_health_stage_feed">Nguồn cấp RSS</string>
+    <string name="source_health_stage_list">Danh sách bài viết</string>
+    <string name="source_health_stage_article">Chi tiết bài viết</string>
+    <string name="source_health_stage_manifest">Cấu hình Plugin</string>
+    <string name="source_health_stage_track">Luồng phát Media</string>
+
+    <!-- Source Health Profiles -->
+    <string name="source_health_profile_quick">Kiểm tra nhanh</string>
+    <string name="source_health_profile_standard">Tiêu chuẩn</string>
+    <string name="source_health_profile_full">Toàn diện</string>
+
+    <!-- Source Health Run Status -->
+    <string name="source_health_run_running">Đang kiểm tra</string>
+    <string name="source_health_run_completed">Hoàn tất</string>
+    <string name="source_health_run_failed">Thất bại</string>
+    <string name="source_health_run_canceled">Đã hủy</string>
+    <string name="source_health_run_interrupted">Bị gián đoạn</string>
+
+    <!-- Source Health Stage Status -->
+    <string name="source_health_stage_status_passed">Đạt</string>
+    <string name="source_health_stage_status_failed">Lỗi</string>
+    <string name="source_health_stage_status_skipped">Bỏ qua</string>
+    <string name="source_health_stage_status_running">Đang chạy</string>
+    <string name="source_health_stage_status_canceled">Đã hủy</string>
+
     <string name="browser_home">Trang ch&#7911; tr&#236;nh duy&#7879;t</string>
     <string name="browser_recent_tabs">Tab g&#7847;n &#273;&#226;y</string>
     <string name="browser_no_recent_tabs">Ch&#432;a c&#243; tab web.</string>

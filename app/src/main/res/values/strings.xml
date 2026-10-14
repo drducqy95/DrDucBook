@@ -3030,6 +3030,40 @@
     <string name="source_health_started">Started %1$s</string>
     <string name="source_health_stage_counts">Pass %1$d | Fail %2$d | Skip %3$d | Total %4$d</string>
     <string name="source_health_http_status">HTTP %1$d</string>
+
+    <!-- Source Health Stages -->
+    <string name="source_health_stage_reachability">Reachability</string>
+    <string name="source_health_stage_search">Search</string>
+    <string name="source_health_stage_explore">Explore</string>
+    <string name="source_health_stage_detail">Book detail</string>
+    <string name="source_health_stage_toc">Table of contents</string>
+    <string name="source_health_stage_content">Chapter content</string>
+    <string name="source_health_stage_media">Media</string>
+    <string name="source_health_stage_feed">RSS feed</string>
+    <string name="source_health_stage_list">Article list</string>
+    <string name="source_health_stage_article">Article detail</string>
+    <string name="source_health_stage_manifest">Plugin manifest</string>
+    <string name="source_health_stage_track">Media stream</string>
+
+    <!-- Source Health Profiles -->
+    <string name="source_health_profile_quick">Quick check</string>
+    <string name="source_health_profile_standard">Standard check</string>
+    <string name="source_health_profile_full">Full check</string>
+
+    <!-- Source Health Run Status -->
+    <string name="source_health_run_running">Running</string>
+    <string name="source_health_run_completed">Completed</string>
+    <string name="source_health_run_failed">Failed</string>
+    <string name="source_health_run_canceled">Canceled</string>
+    <string name="source_health_run_interrupted">Interrupted</string>
+
+    <!-- Source Health Stage Status -->
+    <string name="source_health_stage_status_passed">Passed</string>
+    <string name="source_health_stage_status_failed">Failed</string>
+    <string name="source_health_stage_status_skipped">Skipped</string>
+    <string name="source_health_stage_status_running">Running</string>
+    <string name="source_health_stage_status_canceled">Canceled</string>
+
     <string name="browser_address">Address or search</string>
     <string name="browser_home">Browser Home</string>
     <string name="browser_recent_tabs">Recent tabs</string>

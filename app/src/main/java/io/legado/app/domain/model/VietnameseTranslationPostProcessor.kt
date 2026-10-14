@@ -8,7 +8,7 @@ object VietnameseTranslationPostProcessor {
     private val sentenceEnd = setOf('.', '!', '?', '…', '。', '！', '？')
     private val paragraphEnd = setOf('\n', '\r', '\u2028', '\u2029')
 
-    private val ROGUE_SCRIPT_REGEX = Regex("[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF]")
+    private val ROGUE_SCRIPT_REGEX = Regex("[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF\\u200B-\\u200D\\uFFFD]")
     private val ABNORMAL_MIXED_CASE_REGEX = Regex("""\b(\p{Lu})(\p{Ll}+)(\p{Lu}+)(\p{Ll}*)\b""")
 
     fun normalizeUnicode(text: String): String {
@@ -47,11 +47,11 @@ object VietnameseTranslationPostProcessor {
      * Does not affect valid sentence-ending question marks.
      */
     fun cleanRogueNameQuestionMarks(text: String): String {
-        if (!text.contains("?")) return text
-        // 1. Unspaced mojibake: "Noah?Pat" -> "Noah Pat"
-        var result = text.replace(Regex("""(?<=\p{L})\?(?=\p{L})"""), " ")
-        // 2. Capitalized name + '?' + Capitalized surname: "Noah? Pat" -> "Noah Pat"
-        result = result.replace(Regex("""(?<!\p{L})(\p{Lu}\p{Ll}{1,20})\s*\?\s+(\p{Lu}\p{Ll}{1,20})(?!\p{L})""")) { match ->
+        if (!text.contains("?") && !text.contains('\uFFFD')) return text
+        // 1. Unspaced mojibake: "Noah?Pat" or "Noah\uFFFDPat" -> "Noah Pat"
+        var result = text.replace(Regex("""(?<=\p{L})[?\uFFFD]+(?=\p{L})"""), " ")
+        // 2. Capitalized name + '?' / '\uFFFD' + Capitalized surname: "Noah? Pat" -> "Noah Pat"
+        result = result.replace(Regex("""(?<!\p{L})(\p{Lu}\p{Ll}{1,20})\s*[?\uFFFD]+\s+(\p{Lu}\p{Ll}{1,20})(?!\p{L})""")) { match ->
             val first = match.groupValues[1]
             val second = match.groupValues[2]
             if (first.lowercase() in QUESTION_WORDS) {

@@ -1,7 +1,7 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-14T17:07:00",
+    "last_updated": "2026-10-14T17:25:00",
     "overall_progress_percent": 99,
     "current_phase": "P77",
     "status": "IN_PROGRESS",
@@ -3017,7 +3017,7 @@
       "id": "P77",
       "name": "Khôi Phục QT Gốc, Sửa Lỗi Mojibake/i18n, Thu Gọn Download Blocks, Source Health Accuracy, Gemini Web 4 Models + TTS Fix",
       "status": "IN_PROGRESS",
-      "progress": 20,
+      "progress": 40,
       "plan_path": "plans/261014-1415-fix-qt-i18n-blocks-sourcehealth/plan.md",
       "tasks": [
         {
@@ -3028,7 +3028,7 @@
         {
           "id": "T77.2",
           "desc": "Phase 02 — Sửa lỗi tiếng Việt Mojibake, chuẩn hóa NFC, sửa charset GB18030/UTF-8, hoàn thiện i18n strings.xml/strings-vi.xml cho SourceHealth/DownloadCenter/ReadAloud",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "T77.3",

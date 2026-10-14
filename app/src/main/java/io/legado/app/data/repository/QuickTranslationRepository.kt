@@ -23,6 +23,7 @@ import com.huaban.analysis.jieba.JiebaSegmenter
 import splitties.init.appCtx
 import java.io.FileInputStream
 import java.io.InputStreamReader
+import java.text.Normalizer
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
@@ -117,6 +118,17 @@ class QuickTranslationRepository(
         pronounMode: QuickTranslationPronounMode?,
     ): String = translate(text, projectTerms, customPhonetics, pronounMode, null)
 
+    private val HAN_MIDDLE_DOT_MOJIBAKE_REGEX = Regex("""(?<=[\p{IsHan}])[?\uFFFD](?=[\p{IsHan}])""")
+
+    internal fun normalizeRawChineseSource(text: String): String {
+        if (text.isEmpty()) return text
+        var result = if (Normalizer.isNormalized(text, Normalizer.Form.NFC)) text else Normalizer.normalize(text, Normalizer.Form.NFC)
+        if ('?' in result || '\uFFFD' in result) {
+            result = result.replace(HAN_MIDDLE_DOT_MOJIBAKE_REGEX, "·")
+        }
+        return result
+    }
+
     override fun translate(
         text: String,
         projectTerms: List<DictPair>,
@@ -125,11 +137,12 @@ class QuickTranslationRepository(
         beamWidth: Int?,
     ): String {
         if (text.isEmpty()) return text
-        if (text.codePoints().noneMatch(::isCjk)) return text
+        val safeText = normalizeRawChineseSource(text)
+        if (safeText.codePoints().noneMatch(::isCjk)) return safeText
         val effectiveBeamWidth = beamWidth ?: TranslationConfig.quickTranslationBeamWidth
         val tStart = System.currentTimeMillis()
         val externalEntries = externalPackStore?.matchEntries(
-            context = text,
+            context = safeText,
             projectKey = "",
             activeUniverseKey = "",
         ).orEmpty()
@@ -160,7 +173,7 @@ class QuickTranslationRepository(
                 .distinctBy { it.original }
                 .associate { it.original to it.translation.trim() }
         }
-        val protected = protectMarkup(text)
+        val protected = protectMarkup(safeText)
         val translatedTokenCache = HashMap<String, String>()
         val tSetup = System.currentTimeMillis()
         val lexicalTimer = LexicalTimer()
@@ -241,15 +254,16 @@ class QuickTranslationRepository(
         beamWidth: Int?,
     ): MappedTranslation {
         if (text.isEmpty()) return MappedTranslation(text, emptyList(), MAPPED_ENGINE)
-        if (text.codePoints().noneMatch(::isCjk)) {
+        val safeText = normalizeRawChineseSource(text)
+        if (safeText.codePoints().noneMatch(::isCjk)) {
             return MappedTranslation(
-                text = text,
+                text = safeText,
                 segments = listOf(
                     DisplaySourceSegment(
                         sourceStart = 0,
-                        sourceEnd = text.length,
+                        sourceEnd = safeText.length,
                         displayStart = 0,
-                        displayEnd = text.length,
+                        displayEnd = safeText.length,
                         confidence = 1f,
                         exactCharacterMapping = true,
                     )
@@ -259,7 +273,7 @@ class QuickTranslationRepository(
         }
         val effectiveBeamWidth = beamWidth ?: TranslationConfig.quickTranslationBeamWidth
         val externalEntries = externalPackStore?.matchEntries(
-            context = text,
+            context = safeText,
             projectKey = "",
             activeUniverseKey = "",
         ).orEmpty()
@@ -276,8 +290,8 @@ class QuickTranslationRepository(
             .filter { it.original.codePointCount(0, it.original.length) == 1 }
             .distinctBy { it.original }
             .associate { it.original to it.translation.trim() }
-        val layout = TranslationTextTokenizer.tokenize(text)
-        val output = StringBuilder(text.length * 2)
+        val layout = TranslationTextTokenizer.tokenize(safeText)
+        val output = StringBuilder(safeText.length * 2)
         val segments = mutableListOf<DisplaySourceSegment>()
         val capitalizer = StatefulSentenceCapitalizer()
         val translatedTokenCache = HashMap<String, LocalMappedText>()

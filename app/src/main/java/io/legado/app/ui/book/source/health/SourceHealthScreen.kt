@@ -65,6 +65,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drducbook.app.R
 import io.legado.app.domain.model.BookSourceHealthStatus
 import io.legado.app.domain.model.SourceKeyType
+import io.legado.app.domain.sourcehealth.SourceCheckProfile
+import io.legado.app.domain.sourcehealth.SourceCheckRunStatus
 import io.legado.app.domain.sourcehealth.SourceCheckStageStatus
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.adaptiveContentPadding
@@ -742,7 +744,7 @@ private fun SourceHealthRunRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AppText(
-                    text = run.profile.name,
+                    text = profileLabel(run.profile),
                     style = LegadoTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
@@ -791,7 +793,7 @@ private fun SourceHealthStageRow(stage: SourceHealthStageUi) {
         )
         Column(modifier = Modifier.weight(1f)) {
             AppText(
-                text = stage.stageKey,
+                text = localizeStageKey(stage.stageKey),
                 style = LegadoTheme.typography.titleSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -844,7 +846,7 @@ private fun SourceHealthItemUi.sourceMetaLine(): String = listOfNotNull(
 
 @Composable
 private fun SourceHealthRunUi.runMetaLine(): String = listOfNotNull(
-    runStatus.name.toReadableEnumName(),
+    runStatusLabel(runStatus),
     stringResource(R.string.source_health_started, lastCheckedLabel(startedAt)),
     latencyMs?.let { stringResource(R.string.source_health_latency_ms, it) },
     stringResource(
@@ -858,7 +860,7 @@ private fun SourceHealthRunUi.runMetaLine(): String = listOfNotNull(
 
 @Composable
 private fun SourceHealthStageUi.stageMetaLine(): String = listOfNotNull(
-    status.name.toReadableEnumName(),
+    stageStatusLabel(status),
     latencyMs?.let { stringResource(R.string.source_health_latency_ms, it) },
     httpStatus?.let { stringResource(R.string.source_health_http_status, it) },
     failureStep?.takeIf(String::isNotBlank),
@@ -932,6 +934,48 @@ private fun stageStatusColor(status: SourceCheckStageStatus): Color = when (stat
     SourceCheckStageStatus.SKIPPED -> LegadoTheme.colorScheme.tertiary
     SourceCheckStageStatus.FAILED,
     SourceCheckStageStatus.CANCELED -> LegadoTheme.colorScheme.error
+}
+
+@Composable
+private fun profileLabel(profile: SourceCheckProfile): String = when (profile) {
+    SourceCheckProfile.QUICK -> stringResource(R.string.source_health_profile_quick)
+    SourceCheckProfile.STANDARD -> stringResource(R.string.source_health_profile_standard)
+    SourceCheckProfile.FULL -> stringResource(R.string.source_health_profile_full)
+}
+
+@Composable
+private fun runStatusLabel(runStatus: SourceCheckRunStatus): String = when (runStatus) {
+    SourceCheckRunStatus.RUNNING -> stringResource(R.string.source_health_run_running)
+    SourceCheckRunStatus.COMPLETED -> stringResource(R.string.source_health_run_completed)
+    SourceCheckRunStatus.FAILED -> stringResource(R.string.source_health_run_failed)
+    SourceCheckRunStatus.CANCELED -> stringResource(R.string.source_health_run_canceled)
+    SourceCheckRunStatus.INTERRUPTED -> stringResource(R.string.source_health_run_interrupted)
+}
+
+@Composable
+private fun stageStatusLabel(status: SourceCheckStageStatus): String = when (status) {
+    SourceCheckStageStatus.PASSED -> stringResource(R.string.source_health_stage_status_passed)
+    SourceCheckStageStatus.FAILED -> stringResource(R.string.source_health_stage_status_failed)
+    SourceCheckStageStatus.SKIPPED -> stringResource(R.string.source_health_stage_status_skipped)
+    SourceCheckStageStatus.RUNNING -> stringResource(R.string.source_health_stage_status_running)
+    SourceCheckStageStatus.CANCELED -> stringResource(R.string.source_health_stage_status_canceled)
+}
+
+@Composable
+private fun localizeStageKey(stageKey: String): String = when (stageKey.lowercase()) {
+    "reachability" -> stringResource(R.string.source_health_stage_reachability)
+    "search" -> stringResource(R.string.source_health_stage_search)
+    "explore" -> stringResource(R.string.source_health_stage_explore)
+    "detail" -> stringResource(R.string.source_health_stage_detail)
+    "toc" -> stringResource(R.string.source_health_stage_toc)
+    "content" -> stringResource(R.string.source_health_stage_content)
+    "media" -> stringResource(R.string.source_health_stage_media)
+    "feed" -> stringResource(R.string.source_health_stage_feed)
+    "list" -> stringResource(R.string.source_health_stage_list)
+    "article" -> stringResource(R.string.source_health_stage_article)
+    "manifest" -> stringResource(R.string.source_health_stage_manifest)
+    "track" -> stringResource(R.string.source_health_stage_track)
+    else -> stageKey.toReadableEnumName()
 }
 
 private fun String.toReadableEnumName(): String = lowercase(Locale.ROOT)
