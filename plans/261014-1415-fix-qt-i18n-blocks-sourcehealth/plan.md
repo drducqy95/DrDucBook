@@ -12,7 +12,7 @@
 
 > **Ngày cập nhật:** 2026-10-14T16:15:00+07:00  
 
-> **Trạng thái:** 🟡 Sẵn sàng triển khai (Ready for Execution)  
+> **Trạng thái:** ✅ Hoàn thành (Completed)  
 
 > **Thiết bị mục tiêu:** HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer `emulator-5554`
 
@@ -80,38 +80,22 @@ Kế hoạch Milestone P77 hợp nhất toàn bộ các yêu cầu sửa lỗi c
 
 |---|---|---|---|---|
 
-| **01** | [`phase-01-qt-speed-and-mapping.md`](./phase-01-qt-speed-and-mapping.md) | Khôi phục thuật toán QT Gốc (FMM + `LuatNhan` + Từ điển), bỏ Beam Search/Heuristic gây nhiễu, sửa Mapping 1:1 | `QuickTranslationRepository.kt`, `MappedDisplayText.kt`, `QuickDictionarySelectionResolver.kt`, `TranslateDynamicUiTextUseCase.kt` | ⬜ Pending |
-
-| **02** | [`phase-02-fix-vietnamese-mojibake.md`](./phase-02-fix-vietnamese-mojibake.md) | Khử lỗi tiếng Việt Mojibake, chuẩn hóa NFC, sửa lỗi charset và hoàn thiện i18n `strings.xml` / `strings-vi.xml` | `VietnameseTranslationPostProcessor.kt`, `SourceHealthScreen.kt`, `strings.xml`, `strings-vi.xml` | ⬜ Pending |
-
-| **03** | [`phase-03-compact-download-blocks.md`](./phase-03-compact-download-blocks.md) | Thu gọn giao diện các khối tải xuống (`CompactDownloadBlock` `54.dp`–`72.dp`) & thu gọn khối nội dung rỗng | `DownloadCenterScreen.kt`, `BookCacheManageScreen.kt`, `DownloadCacheConfigScreen.kt`, `TranslationConfigScreen.kt`, `MlKitModelsScreen.kt`, `ReadAloudConfigSheet.kt`, `BookContentProcessEngine.kt` | ⬜ Pending |
-
-| **04** | [`phase-04-source-health-accuracy.md`](./phase-04-source-health-accuracy.md) | Nâng cao độ chính xác Source Health, xóa nguồn đa loại (`Book`/`RSS`/`VBook`) & đồng bộ bộ lọc/bộ đếm | `SourceCheckClassifier.kt`, `SourceHealthProbeRepositories.kt`, `BookSourceHealthRepository.kt`, `SourceCheckRepository.kt`, `SourceHealthViewModel.kt`, `SourceHealthScreen.kt` | ⬜ Pending |
-
-| **05** | [`phase-05-verification-testing.md`](./phase-05-verification-testing.md) | (1) Gemini Web `3.5 Flash-Lite` / `3.8 Flash` / `3.1 Pro` / `4 Argon` + Cấp độ tư duy + Lồng Kỹ năng Gemini Web vào Prompt; (2) Khóa chặt AI Model/Combo; (3) Sửa lỗi TTS; (4) Kiểm thử toàn diện | `GeminiWebHandler.kt`, `AiProviderCatalog.kt`, `AiModels.kt`, `AiTranslationRefinePipeline.kt`, `TranslationConfigScreen.kt`, `TranslationPromptConfigScreen.kt`, `AiRouterViewModel.kt`, `AiRouterRepository.kt`, `RepairAiRouteBindingsUseCase.kt`, `ReadAloud.kt`, `BaseReadAloudService.kt`, `LocalTtsReadAloudService.kt`, `ZeroTtsOnnxEngine.kt` | ⬜ Pending |
-
-
+| **01** | [`phase-01-qt-speed-and-mapping.md`](./phase-01-qt-speed-and-mapping.md) | Khôi phục thuật toán QT Gốc (FMM + `LuatNhan` + Từ điển), bỏ Beam Search/Heuristic gây nhiễu, sửa Mapping 1:1 | `QuickTranslationRepository.kt`, `MappedDisplayText.kt`, `QuickDictionarySelectionResolver.kt`, `TranslateDynamicUiTextUseCase.kt` | ✅ Done |
+| **02** | [`phase-02-fix-vietnamese-mojibake.md`](./phase-02-fix-vietnamese-mojibake.md) | Khử lỗi tiếng Việt Mojibake, chuẩn hóa NFC, sửa lỗi charset và hoàn thiện i18n `strings.xml` / `strings-vi.xml` | `VietnameseTranslationPostProcessor.kt`, `SourceHealthScreen.kt`, `strings.xml`, `strings-vi.xml` | ✅ Done |
+| **03** | [`phase-03-compact-download-blocks.md`](./phase-03-compact-download-blocks.md) | Thu gọn giao diện các khối tải xuống (`CompactDownloadBlock` `54.dp`–`72.dp`) & thu gọn khối nội dung rỗng | `DownloadCenterScreen.kt`, `BookCacheManageScreen.kt`, `DownloadCacheConfigScreen.kt`, `TranslationConfigScreen.kt`, `MlKitModelsScreen.kt`, `ReadAloudConfigSheet.kt`, `BookContentProcessEngine.kt` | ✅ Done |
+| **04** | [`phase-04-source-health-accuracy.md`](./phase-04-source-health-accuracy.md) | Nâng cao độ chính xác Source Health, xóa nguồn đa loại (`Book`/`RSS`/`VBook`) & đồng bộ bộ lọc/bộ đếm | `SourceCheckClassifier.kt`, `SourceHealthProbeRepositories.kt`, `BookSourceHealthRepository.kt`, `SourceCheckRepository.kt`, `SourceHealthViewModel.kt`, `SourceHealthScreen.kt` | ✅ Done |
+| **05** | [`phase-05-verification-testing.md`](./phase-05-verification-testing.md) | (1) Gemini Web `3.5 Flash-Lite` / `3.8 Flash` / `3.1 Pro` / `4 Argon` + Cấp độ tư duy + Lồng Kỹ năng Gemini Web vào Prompt; (2) Khóa chặt AI Model/Combo; (3) Sửa lỗi TTS; (4) Kiểm thử toàn diện | `GeminiWebHandler.kt`, `AiProviderCatalog.kt`, `AiModels.kt`, `AiTranslationRefinePipeline.kt`, `TranslationConfigScreen.kt`, `TranslationPromptConfigScreen.kt`, `AiRouterViewModel.kt`, `AiRouterRepository.kt`, `RepairAiRouteBindingsUseCase.kt`, `ReadAloud.kt`, `BaseReadAloudService.kt`, `LocalTtsReadAloudService.kt`, `ZeroTtsOnnxEngine.kt` | ✅ Done |
 
 ---
 
-
-
 ## 3. Tiêu Chí Nghiệm Thu Tổng Thể (Master Acceptance Criteria)
-
-- [ ] **Phase 01 (QT Gốc & Mapping):** Tốc độ dịch chương < 50ms, chuẩn `VietPhrase` + `LuatNhan` (đạt 80–90% chất lượng qua từ điển), bôi đen từ bất kỳ trên màn hình đọc trích xuất đúng 100% chữ Hán gốc.
-
-- [ ] **Phase 02 (Mojibake & i18n):** Không còn dấu `?` lỗi giữa tên riêng hay ký tự lạ; 100% nhãn trên `SourceHealthScreen` và toàn app hiển thị tiếng Việt chuẩn.
-
-- [ ] **Phase 03 (Compact Download Blocks):** Các khối tải xuống trong `DownloadCenterScreen`, `BookCacheManageScreen`, `TranslationConfigScreen`, `ReadAloudConfigSheet` thu gọn chuẩn `54.dp`–`72.dp`.
-
-- [ ] **Phase 04 (Source Health):** Bộ đếm khớp 100% với bộ lọc; xóa nguồn lỗi xóa sạch cả `Book`/`RSS`/`VBook` và lịch sử kiểm tra.
-
-- [ ] **Phase 05.A (Gemini Web Models, Thinking Levels & Native Skills):**
-
+- [x] **Phase 01 (QT Gốc & Mapping):** Tốc độ dịch chương < 50ms, chuẩn `VietPhrase` + `LuatNhan` (đạt 80–90% chất lượng qua từ điển), bôi đen từ bất kỳ trên màn hình đọc trích xuất đúng 100% chữ Hán gốc.
+- [x] **Phase 02 (Mojibake & i18n):** Không còn dấu `?` lỗi giữa tên riêng hay ký tự lạ; 100% nhãn trên `SourceHealthScreen` và toàn app hiển thị tiếng Việt chuẩn.
+- [x] **Phase 03 (Compact Download Blocks):** Các khối tải xuống trong `DownloadCenterScreen`, `BookCacheManageScreen`, `TranslationConfigScreen`, `ReadAloudConfigSheet` thu gọn chuẩn `54.dp`–`72.dp`.
+- [x] **Phase 04 (Source Health):** Bộ đếm khớp 100% với bộ lọc; xóa nguồn lỗi xóa sạch cả `Book`/`RSS`/`VBook` và lịch sử kiểm tra.
+- [x] **Phase 05.A (Gemini Web Models, Thinking Levels & Native Skills):**
   - Chọn và chạy đúng 4 model thực tế (`3.5 Flash-Lite`, `3.8 Flash`, `3.1 Pro`, `4 Argon`) kèm các mức **Cấp độ tư duy** (`Tự động`, `Thấp`, `Trung bình`, `Cao`).
-
   - Lồng thành công **Kỹ năng (Skill) đã tạo trên Gemini Web** vào prompt (kèm chế độ rút gọn System Prompt thừa), tách sạch khối `thought` khỏi văn bản đầu ra.
+- [x] **Phase 05.B (AI Model/Combo Lock):** Sau khi chọn Model lẻ hoặc Combo ở bất kỳ tác vụ AI nào, tuyệt đối giữ nguyên lựa chọn đó, không bao giờ tự ý nhảy về `"Free fallback"`.
+- [x] **Phase 05.C (Hệ Thống TTS):** Khắc phục hoàn toàn race condition `onDestroy()` khi chuyển đổi giữa System TTS và ZeroTTS; bọc ExoPlayer trong `Dispatchers.Main.immediate`, bỏ qua các đoạn văn chỉ toàn dấu câu `***`, `---`, `...` và tự động fallback tệp embedding `.npy` có sẵn.
 
-- [ ] **Phase 05.B (AI Model/Combo Lock):** Sau khi chọn Model lẻ hoặc Combo ở bất kỳ tác vụ AI nào, tuyệt đối giữ nguyên lựa chọn đó, không bao giờ tự ý nhảy về `"Free fallback"`.
-
-- [ ] **Phase 05.C (TTS):** Đọc thành tiếng mượt mà trên cả System TTS và ZeroTTS, vượt qua dòng `***` và đổi giọng không bị dừng/crash.

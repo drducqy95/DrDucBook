@@ -76,6 +76,11 @@ abstract class BaseReadAloudService : BaseService(),
 
     companion object {
         @JvmStatic
+        @Volatile
+        var activeServiceInstance: BaseReadAloudService? = null
+            private set
+
+        @JvmStatic
         var isRun = false
             private set
 
@@ -165,6 +170,7 @@ abstract class BaseReadAloudService : BaseService(),
     @SuppressLint("WakelockTimeout")
     override fun onCreate() {
         super.onCreate()
+        activeServiceInstance = this
         isRun = true
         pause = false
         observeLiveBus()
@@ -214,17 +220,8 @@ abstract class BaseReadAloudService : BaseService(),
             wakeLock.release()
             wifiLock?.release()
         }
-        isRun = false
-        pause = true
-        currentChapterIndex = -1
-        currentProgress = 0
         abandonFocus()
         unregisterReceiver(broadcastReceiver)
-        publishReadAloudState(Status.STOP)
-        notificationManager.cancel(NotificationId.ReadAloudService)
-        upMediaSessionPlaybackState(PlaybackStateCompat.STATE_STOPPED)
-        mediaSessionCompat.release()
-        ReadBook.uploadProgress()
         unregisterPhoneStateListener(phoneStateListener)
         if (!ReadBook.isUiActive) {
             ReadBook.stopAutoSaveSession()
@@ -232,6 +229,19 @@ abstract class BaseReadAloudService : BaseService(),
         }
         upNotificationJob?.invokeOnCompletion {
             notificationManager.cancel(NotificationId.ReadAloudService)
+        }
+
+        if (activeServiceInstance === this) {
+            activeServiceInstance = null
+            isRun = false
+            pause = true
+            currentChapterIndex = -1
+            currentProgress = 0
+            publishReadAloudState(Status.STOP)
+            notificationManager.cancel(NotificationId.ReadAloudService)
+            upMediaSessionPlaybackState(PlaybackStateCompat.STATE_STOPPED)
+            mediaSessionCompat.release()
+            ReadBook.uploadProgress()
         }
     }
 

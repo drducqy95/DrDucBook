@@ -237,16 +237,18 @@ class LocalTtsReadAloudService : BaseReadAloudService(), Player.Listener {
                     prefetchJob?.join()
                 }
                 val wav = synthesizeToWav(request)
-                player.clearMediaItems()
-                val mediaItem = MediaItem.Builder()
-                    .setUri(Uri.fromFile(wav))
-                    .setMediaId(request.paragraphIndex.toString())
-                    .build()
-                player.setMediaItem(mediaItem)
-                applySpeechRate()
-                pendingProgress = readAloudNumber + 1
-                player.prepare()
-                upMediaMetadata(showContent = true)
+                withContext(Dispatchers.Main.immediate) {
+                    player.clearMediaItems()
+                    val mediaItem = MediaItem.Builder()
+                        .setUri(Uri.fromFile(wav))
+                        .setMediaId(request.paragraphIndex.toString())
+                        .build()
+                    player.setMediaItem(mediaItem)
+                    applySpeechRate()
+                    pendingProgress = readAloudNumber + 1
+                    player.prepare()
+                    upMediaMetadata(showContent = true)
+                }
                 triggerPrefetchPipeline(request.paragraphIndex, engineReference)
             } catch (error: Throwable) {
                 if (error is CancellationException) return@launch
@@ -287,7 +289,9 @@ class LocalTtsReadAloudService : BaseReadAloudService(), Player.Listener {
 
     private fun isSpeakableText(value: String): Boolean {
         val normalized = normalizeTtsParagraph(value)
-        return normalized.isNotEmpty() && !normalized.matches(AppPattern.notReadAloudRegex)
+        return normalized.isNotEmpty() &&
+            normalized.any { it.isLetterOrDigit() } &&
+            !normalized.matches(AppPattern.notReadAloudRegex)
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {

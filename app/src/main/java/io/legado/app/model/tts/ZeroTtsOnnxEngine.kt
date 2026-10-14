@@ -743,6 +743,16 @@ class ZeroTtsOnnxEngine(private val model: LocalTtsModel) : LocalTtsSynthesisEng
                         readRawFloatArray(matched)
                     }
                 }
+                val fallbackVoice = voicesDir.listFiles()?.firstOrNull { file ->
+                    file.name.endsWith(".bin") || file.name.endsWith(".npy")
+                }
+                if (fallbackVoice != null) {
+                    return if (fallbackVoice.name.endsWith(".npy")) {
+                        NpyReader.readFloatArray(fallbackVoice)
+                    } else {
+                        readRawFloatArray(fallbackVoice)
+                    }
+                }
             }
             return nullVoiceEmb
         }

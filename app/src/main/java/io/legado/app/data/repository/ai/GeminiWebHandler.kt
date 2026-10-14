@@ -62,34 +62,46 @@ class GeminiWebHandler : AiProtocolHandler {
             runCatching {
                 listOf(
                     AiAvailableModel(
-                        id = "gemini-web-flash-lite",
-                        name = "Gemini Web (Flash-Lite)",
+                        id = "gemini-web-3.5-flash-lite",
+                        name = "3.5 Flash-Lite (Câu trả lời nhanh nhất · Free)",
                         contextWindow = 1_000_000,
-                        maxOutputTokens = 8_192,
+                        maxOutputTokens = 16_384,
                     ),
                     AiAvailableModel(
-                        id = "gemini-web-flash",
-                        name = "Gemini Web (Flash)",
+                        id = "gemini-web-3.8-flash",
+                        name = "3.8 Flash (Trợ giúp toàn diện)",
                         contextWindow = 1_000_000,
-                        maxOutputTokens = 8_192,
+                        maxOutputTokens = 32_768,
                     ),
                     AiAvailableModel(
-                        id = "gemini-web-default",
-                        name = "Gemini Web (Default)",
+                        id = "gemini-web-3.1-pro",
+                        name = "3.1 Pro (Suy luận nâng cao)",
                         contextWindow = 1_000_000,
-                        maxOutputTokens = 8_192,
+                        maxOutputTokens = 64_000,
                     ),
                     AiAvailableModel(
-                        id = "gemini-web-pro",
-                        name = "Gemini Web (Advanced)",
-                        contextWindow = 2_000_000,
-                        maxOutputTokens = 8_192,
+                        id = "gemini-web-4-argon",
+                        name = "4 Argon (Nhiệm vụ phức tạp · Tư duy: Tự động)",
+                        contextWindow = 1_000_000,
+                        maxOutputTokens = 64_000,
                     ),
                     AiAvailableModel(
-                        id = "gemini-web-thinking",
-                        name = "Gemini Web (Thinking)",
+                        id = "gemini-web-4-argon-low",
+                        name = "4 Argon (Cấp độ tư duy: Thấp)",
                         contextWindow = 1_000_000,
-                        maxOutputTokens = 8_192,
+                        maxOutputTokens = 64_000,
+                    ),
+                    AiAvailableModel(
+                        id = "gemini-web-4-argon-medium",
+                        name = "4 Argon (Cấp độ tư duy: Trung bình)",
+                        contextWindow = 1_000_000,
+                        maxOutputTokens = 64_000,
+                    ),
+                    AiAvailableModel(
+                        id = "gemini-web-4-argon-high",
+                        name = "4 Argon (Cấp độ tư duy: Cao)",
+                        contextWindow = 1_000_000,
+                        maxOutputTokens = 64_000,
                     ),
                 )
             }
@@ -201,14 +213,43 @@ class GeminiWebHandler : AiProtocolHandler {
         return "SAPISIDHASH ${ts}_$hex"
     }
 
+    internal fun resolveGeminiWebModelSpec(modelId: String): Pair<Int, Int> {
+        val raw = modelId.lowercase()
+        val normalized = when {
+            raw.contains("3.5") || raw.contains("flash-lite") || raw == "gemini-web-flash-lite" -> "3.5-flash-lite"
+            raw.contains("3.8") || raw.contains("flash") || raw == "gemini-web-default" -> "3.8-flash"
+            raw.contains("3.1") || raw.contains("pro") || raw == "gemini-web-pro" -> "3.1-pro"
+            raw.contains("4") || raw.contains("argon") || raw.contains("thinking") -> {
+                when {
+                    raw.contains("low") -> "4-argon-low"
+                    raw.contains("medium") || raw.contains("med") -> "4-argon-medium"
+                    raw.contains("high") -> "4-argon-high"
+                    else -> "4-argon"
+                }
+            }
+            else -> "3.8-flash"
+        }
+
+        return when (normalized) {
+            "3.5-flash-lite" -> Pair(6, 4)
+            "3.8-flash" -> Pair(1, 4)
+            "3.1-pro" -> Pair(3, 4)
+            "4-argon-low" -> Pair(2, 1)
+            "4-argon-medium" -> Pair(2, 2)
+            "4-argon-high" -> Pair(2, 3)
+            "4-argon" -> Pair(2, 0)
+            else -> Pair(1, 4)
+        }
+    }
+
     private fun buildFullPrompt(request: AiGenerateRequest): String {
-        val systemPrompt = request.messages
+        val rawSystemPrompt = request.messages
             .filter { it.role == AiMessageRole.SYSTEM }
             .joinToString("\n\n") { it.content }
             .takeIf { it.isNotBlank() }
 
         val nonSystem = request.messages.filter { it.role != AiMessageRole.SYSTEM }
-        val conversation = if (nonSystem.size == 1 && nonSystem.first().role == AiMessageRole.USER) {
+        val rawConversation = if (nonSystem.size == 1 && nonSystem.first().role == AiMessageRole.USER) {
             nonSystem.first().content
         } else {
             nonSystem.joinToString("\n\n") { msg ->
@@ -217,35 +258,49 @@ class GeminiWebHandler : AiProtocolHandler {
             }
         }
 
+        // Skill extraction: Check for [SKILL: ...] or @Skill("...") in system prompt or user conversation
+        val skillRegex = Regex("""(?:\[SKILL:\s*([^\]]+)\]|@Skill\(\s*["']([^"']+)["']\s*\))""", RegexOption.IGNORE_CASE)
+        val matchedSkill = skillRegex.find(rawSystemPrompt.orEmpty())?.groupValues?.let { it.getOrNull(1)?.ifBlank { null } ?: it.getOrNull(2) }
+            ?: skillRegex.find(rawConversation)?.groupValues?.let { it.getOrNull(1)?.ifBlank { null } ?: it.getOrNull(2) }
+
+        val skillActivationHeader = if (!matchedSkill.isNullOrBlank()) {
+            val skillName = matchedSkill.trim()
+            """<gemini_skill_activation>
+[Kích hoạt Kỹ năng: "$skillName"]
+Hãy sử dụng Kỹ năng "$skillName" đã được thiết lập của tôi và tuân thủ nghiêm ngặt toàn bộ quy tắc dịch thuật, văn phong, đại từ xưng hô cùng định dạng đầu ra trong Kỹ năng đó.
+</gemini_skill_activation>"""
+        } else {
+            null
+        }
+
+        val cleanedSystemPrompt = rawSystemPrompt?.replace(skillRegex, "")?.trim()
+        val cleanedConversation = rawConversation.replace(skillRegex, "").trim()
+
         // Model-aware instruction tuning for Gemini Web variants
         val modelId = request.model.modelId.lowercase()
         val modelDirective = when {
-            modelId.contains("thinking") -> "Hãy suy nghĩ cẩn thận từng bước và đặt phần phân tích suy nghĩ trong cặp thẻ <thought>...</thought> trước khi trả lời."
+            modelId.contains("argon") || modelId.contains("thinking") ->
+                "Hãy suy nghĩ cẩn thận từng bước và đặt toàn bộ phần phân tích suy nghĩ trong cặp thẻ <thought>...</thought> trước khi đưa ra câu trả lời chính thức."
             modelId.contains("lite") -> "Hãy phản hồi cực nhanh, ngắn gọn và tập trung chính xác vào yêu cầu."
             modelId.contains("flash") -> "Hãy phản hồi nhanh, cô đọng và đi thẳng vào nội dung chính."
             modelId.contains("pro") -> "Hãy đưa ra câu trả lời chuyên sâu, đầy đủ và chi tiết."
             else -> null
         }
 
-        val fullSystem = listOfNotNull(systemPrompt, modelDirective).joinToString("\n\n").takeIf { it.isNotBlank() }
+        val fullSystemParts = listOfNotNull(skillActivationHeader, cleanedSystemPrompt, modelDirective)
+        val fullSystem = fullSystemParts.joinToString("\n\n").takeIf { it.isNotBlank() }
 
         return if (fullSystem != null) {
-            "Instruction:\n$fullSystem\n\n$conversation"
+            "Instruction:\n$fullSystem\n\n$cleanedConversation"
         } else {
-            conversation
+            cleanedConversation
         }
     }
 
     internal fun buildFReqPayload(prompt: String, modelId: String = ""): String {
         // Map model IDs to Google's MODE_CATEGORY and think_mode
         // 1=FAST, 2=THINKING, 3=PRO, 4=AUTO, 5=FAST_DYNAMIC_THINKING, 6=FLASH_LITE
-        val idLower = modelId.lowercase()
-        val (geminiModelCode, thinkMode) = when {
-            idLower.contains("thinking") -> Pair(2, 0)
-            idLower.contains("pro") -> Pair(3, 4)
-            idLower.contains("lite") -> Pair(6, 4)
-            else -> Pair(1, 4)
-        }
+        val (geminiModelCode, thinkMode) = resolveGeminiWebModelSpec(modelId)
 
         val innerArray = JsonArray()
         for (i in 0 until 80) {
@@ -440,10 +495,18 @@ class GeminiWebHandler : AiProtocolHandler {
             if (cleaned.isEmpty()) return
             emittedAny = true
 
-            val thoughtStartIndex = cleaned.indexOf("<thought>")
-            if (thoughtStartIndex != -1) {
-                val thoughtContentStart = thoughtStartIndex + "<thought>".length
-                val thoughtEndIndex = cleaned.indexOf("</thought>", thoughtContentStart)
+            // Look for <thought> or ```thought
+            val thoughtTag = when {
+                cleaned.contains("<thought>") -> "<thought>" to "</thought>"
+                cleaned.contains("```thought") -> "```thought" to "```"
+                else -> null
+            }
+
+            if (thoughtTag != null) {
+                val (openTag, closeTag) = thoughtTag
+                val thoughtStartIndex = cleaned.indexOf(openTag)
+                val thoughtContentStart = thoughtStartIndex + openTag.length
+                val thoughtEndIndex = cleaned.indexOf(closeTag, thoughtContentStart)
 
                 if (thoughtEndIndex == -1) {
                     // Thought is still streaming
@@ -462,7 +525,7 @@ class GeminiWebHandler : AiProtocolHandler {
                         emitEvent(AiStreamEvent.Reasoning(delta))
                     }
 
-                    val contentAfterThought = cleaned.substring(thoughtEndIndex + "</thought>".length).trimStart('\r', '\n')
+                    val contentAfterThought = cleaned.substring(thoughtEndIndex + closeTag.length).trimStart('\r', '\n')
                     if (contentAfterThought.length > lastEmittedContentLength) {
                         val delta = contentAfterThought.substring(lastEmittedContentLength)
                         lastEmittedContentLength = contentAfterThought.length

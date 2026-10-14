@@ -1040,7 +1040,9 @@ class AiRouterViewModel(
         modelIds: List<String>,
     ) {
         val existing = profileGateway.getTaskPreset(taskType)
-        if (existing?.runtimeOptions?.routeProfileId?.isNotBlank() == true) return
+        if (existing != null && (existing.model.id.isNotBlank() || existing.runtimeOptions.routeProfileId.isNotBlank())) {
+            return
+        }
         val modelProfileId = existing?.model?.id
             ?.takeIf(modelIds::contains)
             ?: modelIds.first()
@@ -1379,6 +1381,13 @@ class AiRouterViewModel(
             "catalog_opencode_free",
         )
         val GEMINI_WEB_KNOWN_FREE_MODELS = setOf(
+            "gemini-web-3.5-flash-lite",
+            "gemini-web-3.8-flash",
+            "gemini-web-3.1-pro",
+            "gemini-web-4-argon",
+            "gemini-web-4-argon-low",
+            "gemini-web-4-argon-medium",
+            "gemini-web-4-argon-high",
             "gemini-web-flash-lite",
             "gemini-web-flash",
             "gemini-web-default",

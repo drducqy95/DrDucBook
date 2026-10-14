@@ -1,10 +1,10 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-14T17:25:00",
-    "overall_progress_percent": 99,
+    "last_updated": "2026-10-14T18:35:00",
+    "overall_progress_percent": 100,
     "current_phase": "P77",
-    "status": "IN_PROGRESS",
+    "status": "COMPLETED",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
@@ -3016,8 +3016,8 @@
     {
       "id": "P77",
       "name": "Khôi Phục QT Gốc, Sửa Lỗi Mojibake/i18n, Thu Gọn Download Blocks, Source Health Accuracy, Gemini Web 4 Models + TTS Fix",
-      "status": "IN_PROGRESS",
-      "progress": 40,
+      "status": "DONE",
+      "progress": 100,
       "plan_path": "plans/261014-1415-fix-qt-i18n-blocks-sourcehealth/plan.md",
       "tasks": [
         {
@@ -3033,17 +3033,17 @@
         {
           "id": "T77.3",
           "desc": "Phase 03 — Thu gọn khối tải xuống (CompactDownloadBlock 54dp-72dp) trong DownloadCenter, BookCache, TranslationConfig, MlKit, ReadAloud & thu gọn khối nội dung rỗng",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "T77.4",
           "desc": "Phase 04 — Nâng cao độ chính xác Source Health: sửa false-positive Classifier, xóa nguồn đa loại book:/rss:/vbook:, đồng bộ bộ đếm/bộ lọc SourceHealthSummaryUi",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "T77.5",
           "desc": "Phase 05 — Gemini Web 4 model (3.5 Flash-Lite/3.8 Flash/3.1 Pro/4 Argon) + Cấp độ tư duy + Lồng Kỹ năng Gemini Web, Khóa chặt AI Model/Combo, Sửa lỗi TTS & Kiểm thử",
-          "status": "PENDING"
+          "status": "DONE"
         }
       ]
     }

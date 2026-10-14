@@ -437,8 +437,10 @@ class AiRouterRepository(
 
     private suspend fun resolveRoute(request: AiGenerateRequest): RouteContext? {
         val taskType = request.taskType?.takeIf(String::isNotBlank) ?: return null
-        // Null uses the active default route; blank explicitly bypasses the router.
-        if (request.routeProfileId != null && request.routeProfileId.isBlank()) return null
+        // When a specific model is selected directly without an explicit route, bypass the router
+        if (request.routeProfileId.isNullOrBlank() && (request.model.id.isNotBlank() || request.model.modelId.isNotBlank())) {
+            return null
+        }
         val explicitRouteId = request.routeProfileId?.takeIf(String::isNotBlank)
         val profile = if (explicitRouteId != null) {
             val route = dao.getRoute(explicitRouteId)

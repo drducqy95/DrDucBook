@@ -14,6 +14,8 @@ import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.HttpReadAloudService
 import io.legado.app.service.LocalTtsReadAloudService
 import io.legado.app.service.TTSReadAloudService
+import io.legado.app.help.config.AppConfig
+import io.legado.app.model.tts.LocalTtsModelRegistry
 import io.legado.app.model.tts.parseLocalTtsEngine
 import io.legado.app.ui.config.readConfig.ReadConfig
 import io.legado.app.utils.LogUtils
@@ -53,10 +55,10 @@ object ReadAloud {
 
     private fun getReadAloudClass(): Class<*> {
         val ttsEngine = ttsEngine
-        if (ttsEngine.isNullOrBlank()) {
+        if (ttsEngine.isNullOrBlank() || ReadConfig.ttsFollowSys) {
             return TTSReadAloudService::class.java
         }
-        if (parseLocalTtsEngine(ttsEngine) != null) {
+        if (parseLocalTtsEngine(ttsEngine) != null || LocalTtsModelRegistry(appCtx).get(ttsEngine) != null) {
             return LocalTtsReadAloudService::class.java
         }
         if (StringUtils.isNumeric(ttsEngine)) {

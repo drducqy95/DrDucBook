@@ -477,6 +477,8 @@ data class AiTaskRuntimeOptions(
     val concurrentRequests: Int = DEFAULT_CONCURRENT_REQUESTS,
     val retryCount: Int = DEFAULT_RETRY_COUNT,
     val routeProfileId: String = "",
+    val geminiWebSkillName: String? = null,
+    val geminiWebSkillCompactMode: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_TARGET_LANGUAGE = "zh"

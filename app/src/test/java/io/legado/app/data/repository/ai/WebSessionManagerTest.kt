@@ -243,7 +243,7 @@ class WebSessionManagerTest {
     }
 
     @Test
-    fun geminiWebHandlerIncludesFlashLiteAnd1MContextWindow() = runBlocking {
+    fun geminiWebHandlerIncludes4ActualModelsAndThinkingLevels() = runBlocking {
         val handler = GeminiWebHandler()
         val dummyProvider = io.legado.app.domain.model.AiProviderConfig(
             id = "test_gemini_web",
@@ -253,15 +253,36 @@ class WebSessionManagerTest {
             apiKey = "",
         )
         val models = handler.fetchModels(dummyProvider).getOrThrow()
-        val defaultModel = models.first { it.id == "gemini-web-default" }
-        assertEquals(1_000_000, defaultModel.contextWindow)
+        val flashLite = models.first { it.id == "gemini-web-3.5-flash-lite" }
+        assertEquals(1_000_000, flashLite.contextWindow)
+        assertEquals(16_384, flashLite.maxOutputTokens)
 
-        val liteModel = models.firstOrNull { it.id == "gemini-web-flash-lite" }
-        assertNotNull(liteModel)
-        assertEquals("Gemini Web (Flash-Lite)", liteModel?.name)
-        assertEquals(1_000_000, liteModel?.contextWindow)
+        val flash38 = models.first { it.id == "gemini-web-3.8-flash" }
+        assertEquals(1_000_000, flash38.contextWindow)
 
-        val payload = handler.buildFReqPayload("test prompt", "gemini-web-flash-lite")
+        val pro31 = models.first { it.id == "gemini-web-3.1-pro" }
+        assertEquals(1_000_000, pro31.contextWindow)
+
+        val argon4 = models.first { it.id == "gemini-web-4-argon" }
+        assertEquals(1_000_000, argon4.contextWindow)
+
+        // Test model spec mapping
+        assertEquals(Pair(6, 4), handler.resolveGeminiWebModelSpec("gemini-web-3.5-flash-lite"))
+        assertEquals(Pair(1, 4), handler.resolveGeminiWebModelSpec("gemini-web-3.8-flash"))
+        assertEquals(Pair(3, 4), handler.resolveGeminiWebModelSpec("gemini-web-3.1-pro"))
+        assertEquals(Pair(2, 0), handler.resolveGeminiWebModelSpec("gemini-web-4-argon"))
+        assertEquals(Pair(2, 1), handler.resolveGeminiWebModelSpec("gemini-web-4-argon-low"))
+        assertEquals(Pair(2, 2), handler.resolveGeminiWebModelSpec("gemini-web-4-argon-medium"))
+        assertEquals(Pair(2, 3), handler.resolveGeminiWebModelSpec("gemini-web-4-argon-high"))
+
+        // Legacy aliases
+        assertEquals(Pair(6, 4), handler.resolveGeminiWebModelSpec("gemini-web-flash-lite"))
+        assertEquals(Pair(1, 4), handler.resolveGeminiWebModelSpec("gemini-web-default"))
+        assertEquals(Pair(3, 4), handler.resolveGeminiWebModelSpec("gemini-web-pro"))
+        assertEquals(Pair(2, 0), handler.resolveGeminiWebModelSpec("gemini-web-thinking"))
+
+        // Test payload structure
+        val payload = handler.buildFReqPayload("test prompt", "gemini-web-3.5-flash-lite")
         val parsedOuter = GSON.fromJson(payload, com.google.gson.JsonArray::class.java)
         val innerString = parsedOuter[1].asString
         val parsedInner = GSON.fromJson(innerString, com.google.gson.JsonArray::class.java)
@@ -269,6 +290,13 @@ class WebSessionManagerTest {
         assertEquals(6, parsedInner[79].asInt)
         // thinkMode is 4 at index 17
         assertEquals(4, parsedInner[17].asJsonArray[0].asJsonArray[0].asInt)
+
+        // Test Argon High payload
+        val payloadArgonHigh = handler.buildFReqPayload("test prompt", "gemini-web-4-argon-high")
+        val parsedOuterArgon = GSON.fromJson(payloadArgonHigh, com.google.gson.JsonArray::class.java)
+        val parsedInnerArgon = GSON.fromJson(parsedOuterArgon[1].asString, com.google.gson.JsonArray::class.java)
+        assertEquals(2, parsedInnerArgon[79].asInt)
+        assertEquals(3, parsedInnerArgon[17].asJsonArray[0].asJsonArray[0].asInt)
     }
 }
 
