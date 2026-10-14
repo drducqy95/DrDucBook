@@ -266,6 +266,26 @@ object TranslationConfig {
         HachimiOnnxModelRegistry.DEFAULT_MODEL_ID,
     )
 
+    private var storedNmtBeamWidth by prefDelegate(
+        PreferKey.nmtBeamWidth,
+        4,
+    )
+    var nmtBeamWidth: Int
+        get() = storedNmtBeamWidth.coerceIn(1, 8)
+        set(value) {
+            storedNmtBeamWidth = value.coerceIn(1, 8)
+        }
+
+    private var storedQuickTranslationBeamWidth by prefDelegate(
+        PreferKey.quickTranslationBeamWidth,
+        3,
+    )
+    var quickTranslationBeamWidth: Int
+        get() = storedQuickTranslationBeamWidth.coerceIn(1, 5)
+        set(value) {
+            storedQuickTranslationBeamWidth = value.coerceIn(1, 5)
+        }
+
     var localAiModelPath by prefDelegate(
         PreferKey.localAiModelPath,
         "",

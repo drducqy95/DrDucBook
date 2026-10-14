@@ -62,7 +62,7 @@ object AiProviderCatalog {
                 AiCatalogModel("nemotron-3-ultra-free", "Nemotron 3 Ultra Free", 128_000, 8_192),
                 AiCatalogModel("muse-spark-1.2-contributor-free", "Muse Spark 1.2 Free", 64_000, 4_096),
             ),
-            notice = "OpenCode Free Zen đã được tích hợp giả lập CLI headers (User-Agent, x-opencode-*). Miễn phí không cần API key.",
+            notice = "OpenCode Free Zen (Đã bị Cloudflare upstream chặn third-party, khuyến nghị sử dụng OpenCode Go hoặc API key cá nhân).",
         ),
         AiProviderCatalogEntry(
             id = "nvidia",
@@ -194,13 +194,21 @@ object AiProviderCatalog {
             baseUrl = "https://generativelanguage.googleapis.com/v1beta",
             modelsUrl = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
             models = listOf(
-                AiCatalogModel("gemini-3.6-flash", "Gemini 3.6 Flash", 1_000_000, 64_000),
-                AiCatalogModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite", 1_000_000, 64_000),
-                AiCatalogModel("gemini-3.5-flash", "Gemini 3.5 Flash", 1_000_000, 64_000),
-                AiCatalogModel("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite", 1_000_000, 64_000),
-                AiCatalogModel("gemini-3.1-flash", "Gemini 3.1 Flash", 1_000_000, 64_000),
-                AiCatalogModel("gemini-3.1-pro", "Gemini 3.1 Pro", 1_000_000, 64_000),
+                // Free Tier (Flash / Flash-Lite)
+                AiCatalogModel("gemini-3.8-flash", "Gemini 3.8 Flash (Free / Paid)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.5-flash", "Gemini 3.5 Flash (Free Khuyên dùng)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.6-flash", "Gemini 3.6 Flash (Free / Paid)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite (Free / Paid)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.8-flash-lite", "Gemini 3.8 Flash Lite (Free / Paid)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.7-flash", "Gemini 3.7 Flash (Free / Paid)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.7-flash-lite", "Gemini 3.7 Flash Lite (Free / Paid)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.5-flash-lite", "Gemini 3.5 Flash Lite (Free / Paid)", 1_000_000, 64_000),
+                // Paid Tier (Dòng Pro yêu cầu Billing)
+                AiCatalogModel("gemini-3.8-pro", "Gemini 3.8 Pro (Yêu cầu Billing)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.7-pro", "Gemini 3.7 Pro (Yêu cầu Billing)", 1_000_000, 64_000),
+                AiCatalogModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro (Yêu cầu Billing)", 1_000_000, 64_000),
             ),
+            notice = "Free Tier: Chỉ dùng được dòng Flash / Flash-Lite (khuyên dùng 3.5 Flash để ổn định nhất). Dòng Pro yêu cầu tài khoản đã kích hoạt Billing.",
         ),
         AiProviderCatalogEntry(
             id = "gemini_web",
@@ -210,12 +218,13 @@ object AiProviderCatalog {
             baseUrl = "https://gemini.google.com",
             authType = AiProviderAuthType.NONE,
             models = listOf(
-                AiCatalogModel("gemini-web-default", "Gemini Web (Default)", 32_000, 8_192),
+                AiCatalogModel("gemini-web-flash-lite", "Gemini Web (Flash-Lite)", 1_000_000, 8_192),
                 AiCatalogModel("gemini-web-flash", "Gemini Web (Flash)", 1_000_000, 8_192),
+                AiCatalogModel("gemini-web-default", "Gemini Web (Default)", 1_000_000, 8_192),
                 AiCatalogModel("gemini-web-pro", "Gemini Web (Advanced)", 2_000_000, 8_192),
                 AiCatalogModel("gemini-web-thinking", "Gemini Web (Thinking)", 1_000_000, 8_192),
             ),
-            notice = "Miễn phí 100% không cần đăng nhập Google! Có thể dán thêm Cookie nếu muốn đồng bộ tài khoản cá nhân.",
+            notice = "Yêu cầu Cookie từ tài khoản Google đã đăng nhập (Google không cấp token SNlM0e và từ chối prompt dịch thuật ở chế độ khách vãng lai). Dán Cookie dạng JSON {cookie, snlm0e, bl} hoặc chuỗi Cookie.",
         ),
         AiProviderCatalogEntry(
             id = "chatgpt_web",
@@ -287,7 +296,7 @@ object AiProviderCatalog {
 
     fun byId(id: String): AiProviderCatalogEntry? = entries.firstOrNull { it.id == id }
 
-    val autoInstallIds: Set<String> = setOf("gemini_web", "opencode_free")
+    val autoInstallIds: Set<String> = setOf("gemini_web")
 }
 
 private fun toTextCatalogEntry(registry: AiProviderRegistryEntry): AiProviderCatalogEntry? {

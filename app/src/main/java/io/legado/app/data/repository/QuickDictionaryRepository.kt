@@ -171,6 +171,7 @@ class QuickDictionaryRepository(
         type: QuickDictionaryType,
         scope: QuickDictionaryScope,
         scopeKey: String,
+        skipBuiltInDedup: Boolean,
         onProgress: (QuickDictionaryImportProgress) -> Unit,
     ): QuickDictionaryImportResult {
         val callerContext = currentCoroutineContext()
@@ -187,7 +188,7 @@ class QuickDictionaryRepository(
             scopeKey = normalizedScopeKey,
             isExistingEntry = { entryType, raw ->
                 duplicateKey(entryType, raw) in roomKeys ||
-                    translationGateway?.containsBuiltInEntry(entryType, raw) == true ||
+                    (!skipBuiltInDedup && translationGateway?.containsBuiltInEntry(entryType, raw) == true) ||
                     packStore.containsEntry(
                         type = entryType,
                         raw = raw,

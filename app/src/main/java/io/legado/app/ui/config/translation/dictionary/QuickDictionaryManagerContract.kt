@@ -116,10 +116,13 @@ sealed interface QuickDictionaryManagerIntent {
     data object CloseSelection : QuickDictionaryManagerIntent
     data object RetryOriginalPack : QuickDictionaryManagerIntent
     data object RestoreOriginalPack : QuickDictionaryManagerIntent
+    data object RequestReplaceOriginalFile : QuickDictionaryManagerIntent
+    data class ReplaceOriginalFile(val fileName: String?, val localPath: String) : QuickDictionaryManagerIntent
 }
 
 sealed interface QuickDictionaryManagerEffect {
     data object OpenImportFile : QuickDictionaryManagerEffect
+    data object OpenReplaceOriginalFile : QuickDictionaryManagerEffect
     data class OpenUrl(val url: String) : QuickDictionaryManagerEffect
     data class ShowMessage(
         @StringRes val messageRes: Int,

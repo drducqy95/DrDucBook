@@ -49,6 +49,30 @@ data class HachimiLexicalConstraint(
     }
 }
 
+internal data class EncodedConstraint(
+    val sourceKeys: List<String>,
+    val target: String,
+    val tokens: IntArray,
+    val tokenVariants: List<IntArray> = listOf(tokens),
+    val required: Boolean,
+    val startBias: Float,
+    val matchEverySourceOccurrence: Boolean,
+    val requiredOccurrences: Int = 1
+) {
+    fun appliesTo(source: String): Boolean =
+        sourceKeys.any { key -> source.contains(key, ignoreCase = true) }
+
+    fun forSource(source: String): EncodedConstraint = copy(
+        requiredOccurrences = when {
+            !matchEverySourceOccurrence -> 1
+            else -> sourceKeys.sumOf { key -> source.countNonOverlapping(key) }.coerceAtLeast(1)
+        }
+    )
+
+    fun isSatisfied(generated: List<Int>): Boolean =
+        tokenVariants.any { variant -> countSequence(generated, variant) >= requiredOccurrences }
+}
+
 data class HachimiDecodePolicy(
     /** Source-conditioned canonical terms. Constraints from unrelated segments are never applied. */
     val lexicalConstraints: List<HachimiLexicalConstraint> = emptyList(),
@@ -69,6 +93,7 @@ data class HachimiDecodePolicy(
     val sourcePrompt: String = "",
     val dictionaryRevision: String = "",
     val constraintFingerprint: String = "",
+    val beamWidth: Int = 1,
 ) {
     companion object {
         const val DEFAULT_SOURCE_TOKEN_BUDGET = 64
@@ -178,10 +203,11 @@ class HachimiOnnxTranslator(
             var firstSegmentMs = 0L
             var lastProgressAt = 0L
             segments.forEachIndexed { index, segment ->
-                val relevantConstraints = constraints.asSequence()
+                val rawConstraints = constraints.asSequence()
                     .filter { it.appliesTo(segment.source) }
                     .map { it.forSource(segment.source) }
                     .toList()
+                val relevantConstraints = pruneSubsumedConstraints(segment.source, rawConstraints)
                 val canonicalSource = canonicalizeHachimiNameSources(
                     source = segment.source,
                     constraints = policy.lexicalConstraints
@@ -311,25 +337,6 @@ class HachimiOnnxTranslator(
             val separatorAfter: String,
             val prefixBefore: String = "",
         )
-        data class EncodedConstraint(
-            val sourceKeys: List<String>,
-            val target: String,
-            val tokens: IntArray,
-            val required: Boolean,
-            val startBias: Float,
-            val matchEverySourceOccurrence: Boolean,
-            val requiredOccurrences: Int = 1
-        ) {
-            fun appliesTo(source: String): Boolean =
-                sourceKeys.any { key -> source.contains(key, ignoreCase = true) }
-
-            fun forSource(source: String): EncodedConstraint = copy(
-                requiredOccurrences = when {
-                    !matchEverySourceOccurrence -> 1
-                    else -> sourceKeys.sumOf { key -> source.countNonOverlapping(key) }.coerceAtLeast(1)
-                }
-            )
-        }
 
         data class SegmentResult(
             val text: String,
@@ -342,6 +349,25 @@ class HachimiOnnxTranslator(
             val strictRetryMs: Long = 0L,
             val detokenizerMs: Long = 0L,
         )
+
+        private fun isSpecialToken(token: Int): Boolean =
+            token in SPECIAL_TOKEN_IDS ||
+                token == descriptor.forcedBosTokenId ||
+                (descriptor.vocabSize > 100_000 && token >= 256_000)
+
+        private val sentenceEndingTokenIds: Set<Int> by lazy {
+            val punctChars = listOf(".", "?", "!", "。", "！", "？", ";", "…")
+            punctChars.mapNotNull { ch ->
+                runCatching {
+                    runTokenizer(targetTokenizer, ch).use { tokenized ->
+                        tokenized.ids.longValues()
+                            .map(Long::toInt)
+                            .filterNot(::isSpecialToken)
+                            .firstOrNull()
+                    }
+                }.getOrNull()
+            }.toSet()
+        }
 
         fun encodeConstraints(
             constraints: List<HachimiLexicalConstraint>,
@@ -359,25 +385,44 @@ class HachimiOnnxTranslator(
                 .take(MAX_CONSTRAINTS)
                 .mapNotNull { constraint ->
                     val target = constraint.target.trim()
-                    runTokenizer(targetTokenizer, target).use { tokenized ->
-                        val ids = tokenized.ids.longValues()
+                    val primaryTokens = runTokenizer(targetTokenizer, target).use { tokenized ->
+                        tokenized.ids.longValues()
                             .map(Long::toInt)
-                            .filterNot { it in SPECIAL_TOKEN_IDS }
+                            .filterNot(::isSpecialToken)
                             .toIntArray()
-                        ids.takeIf { it.isNotEmpty() && it.size <= MAX_CONSTRAINT_TOKENS }
-                            ?.let { tokens ->
-                                EncodedConstraint(
-                                    sourceKeys = constraint.sourceKeys.map(String::trim)
-                                        .filter(String::isNotBlank)
-                                        .distinct(),
-                                    target = target,
-                                    tokens = tokens,
-                                    required = constraint.required,
-                                    startBias = constraint.startBias.coerceIn(0f, MAX_START_BIAS),
-                                    matchEverySourceOccurrence = constraint.matchEverySourceOccurrence
-                                )
-                            }
                     }
+                    if (primaryTokens.isEmpty() || primaryTokens.size > MAX_CONSTRAINT_TOKENS) {
+                        return@mapNotNull null
+                    }
+                    val variants = mutableListOf(primaryTokens)
+                    val lower = target.lowercase()
+                    if (lower != target) {
+                        val lowerTokens = runCatching {
+                            runTokenizer(targetTokenizer, lower).use { tokenized ->
+                                tokenized.ids.longValues()
+                                    .map(Long::toInt)
+                                    .filterNot(::isSpecialToken)
+                                    .toIntArray()
+                            }
+                        }.getOrNull()
+                        if (lowerTokens != null && lowerTokens.isNotEmpty() &&
+                            lowerTokens.size <= MAX_CONSTRAINT_TOKENS &&
+                            !lowerTokens.contentEquals(primaryTokens)
+                        ) {
+                            variants.add(lowerTokens)
+                        }
+                    }
+                    EncodedConstraint(
+                        sourceKeys = constraint.sourceKeys.map(String::trim)
+                            .filter(String::isNotBlank)
+                            .distinct(),
+                        target = target,
+                        tokens = primaryTokens,
+                        tokenVariants = variants,
+                        required = constraint.required,
+                        startBias = constraint.startBias.coerceIn(0f, MAX_START_BIAS),
+                        matchEverySourceOccurrence = constraint.matchEverySourceOccurrence
+                    )
                 }
                 .toList()
             synchronized(encodedConstraintCache) {
@@ -493,8 +538,35 @@ class HachimiOnnxTranslator(
             constraints: List<EncodedConstraint>,
             strictConstraints: Boolean
         ): SegmentResult {
+            return if (policy.beamWidth <= 1) {
+                decodeGreedy(
+                    attentionMask = attentionMask,
+                    encoderHidden = encoderHidden,
+                    policy = policy,
+                    constraints = constraints,
+                    strictConstraints = strictConstraints
+                )
+            } else {
+                decodeBeamSearch(
+                    attentionMask = attentionMask,
+                    encoderHidden = encoderHidden,
+                    policy = policy,
+                    constraints = constraints,
+                    strictConstraints = strictConstraints,
+                    beamWidth = policy.beamWidth
+                )
+            }
+        }
+
+        private fun decodeGreedy(
+            attentionMask: OnnxTensor,
+            encoderHidden: OnnxTensor,
+            policy: HachimiDecodePolicy,
+            constraints: List<EncodedConstraint>,
+            strictConstraints: Boolean
+        ): SegmentResult {
             val decoderStarted = SystemClock.elapsedRealtime()
-            val generated = mutableListOf(DECODER_START_TOKEN_ID)
+            val generated = mutableListOf(descriptor.decoderStartTokenId)
             var currentResult: OrtSession.Result? = null
             var initialResult: OrtSession.Result? = null
             var crossCache: Map<String, OnnxTensor> = emptyMap()
@@ -532,16 +604,20 @@ class HachimiOnnxTranslator(
                                     vocabularySize = logits.remaining(),
                                     initialTokens = generated
                                 ).also { tokenSelector = it }
-                                val nextToken = chooseToken(
-                                    logits = logits,
-                                    generated = generated,
-                                    constraints = constraints,
-                                    policy = policy,
-                                    strictConstraints = strictConstraints,
-                                    selector = selector,
-                                    biasedTokens = biasedTokens,
-                                    biasedScores = biasedScores
-                                )
+                                val nextToken = if (step == 0 && descriptor.forcedBosTokenId != null) {
+                                    descriptor.forcedBosTokenId
+                                } else {
+                                    chooseToken(
+                                        logits = logits,
+                                        generated = generated,
+                                        constraints = constraints,
+                                        policy = policy,
+                                        strictConstraints = strictConstraints,
+                                        selector = selector,
+                                        biasedTokens = biasedTokens,
+                                        biasedScores = biasedScores
+                                    )
+                                }
                                 if (step == 0) {
                                     initialResult = nextResult
                                     crossCache = nextResult.cacheValues(".encoder.")
@@ -557,17 +633,20 @@ class HachimiOnnxTranslator(
                             }
                         }
                     }
-                    if (generated.last() == EOS_TOKEN_ID) break
+                    if (generated.last() == descriptor.eosTokenId) break
                 }
-                val visible = generated.drop(1).filterNot(SPECIAL_TOKEN_IDS::contains)
-                val missing = constraints.asSequence()
-                    .filter(EncodedConstraint::required)
-                    .filterNot { isSatisfied(generated, it.tokens, it.requiredOccurrences) }
-                    .map(EncodedConstraint::target)
-                    .toList()
+                val visible = generated.drop(1).filterNot(::isSpecialToken)
                 val detokenizerStarted = SystemClock.elapsedRealtime()
                 val output = detokenize(visible)
                 val detokenizerMs = SystemClock.elapsedRealtime() - detokenizerStarted
+                val missing = constraints.asSequence()
+                    .filter(EncodedConstraint::required)
+                    .filterNot { constraint ->
+                        constraint.isSatisfied(generated) ||
+                            output.countNonOverlapping(constraint.target) >= constraint.requiredOccurrences
+                    }
+                    .map(EncodedConstraint::target)
+                    .toList()
                 return SegmentResult(
                     text = output,
                     tokens = visible,
@@ -596,23 +675,33 @@ class HachimiOnnxTranslator(
             var forcedStartBias = Float.NEGATIVE_INFINITY
             var biasedCount = 0
             var hasMissingRequired = false
+            val atSentenceEnd = generated.lastOrNull() in sentenceEndingTokenIds
             constraints.forEach { constraint ->
-                if (isSatisfied(generated, constraint.tokens, constraint.requiredOccurrences)) return@forEach
-                val matchedPrefix = matchingSuffixLength(generated, constraint.tokens)
+                if (constraint.isSatisfied(generated)) return@forEach
+                var bestMatchedPrefix = 0
+                var bestMatchedVariant = constraint.tokens
+                for (variant in constraint.tokenVariants) {
+                    val matchedPrefix = matchingSuffixLength(generated, variant)
+                    if (matchedPrefix > bestMatchedPrefix) {
+                        bestMatchedPrefix = matchedPrefix
+                        bestMatchedVariant = variant
+                    }
+                }
                 if (strictConstraints && constraint.required) hasMissingRequired = true
-                if (matchedPrefix in 1 until constraint.tokens.size) {
+                if (bestMatchedPrefix in 1 until bestMatchedVariant.size) {
                     val shouldReplace = forcedToken < 0 ||
                         constraint.required && !forcedRequired ||
                         constraint.required == forcedRequired &&
                         constraint.startBias > forcedStartBias
                     if (shouldReplace) {
-                        forcedToken = constraint.tokens[matchedPrefix]
+                        forcedToken = bestMatchedVariant[bestMatchedPrefix]
                         forcedRequired = constraint.required
                         forcedStartBias = constraint.startBias
                     }
                     return@forEach
                 }
-                if (matchedPrefix != 0) return@forEach
+                if (bestMatchedPrefix != 0) return@forEach
+                if (atSentenceEnd) return@forEach
 
                 val token = constraint.tokens[0]
                 val score = constraint.startBias * if (
@@ -640,12 +729,335 @@ class HachimiOnnxTranslator(
                 generated = generated,
                 repetitionPenalty = policy.repetitionPenalty,
                 noRepeatNgramSize = policy.noRepeatNgramSize,
-                eosToken = EOS_TOKEN_ID,
-                eosPenalty = if (hasMissingRequired) STRICT_EOS_PENALTY else 0f,
+                eosToken = descriptor.eosTokenId,
+                eosPenalty = if (hasMissingRequired && !atSentenceEnd) STRICT_EOS_PENALTY else 0f,
                 biasedTokens = biasedTokens,
                 biasedScores = biasedScores,
                 biasedCount = biasedCount
             )
+        }
+
+        private fun chooseTopKTokens(
+            logits: FloatBuffer,
+            generated: List<Int>,
+            constraints: List<EncodedConstraint>,
+            policy: HachimiDecodePolicy,
+            strictConstraints: Boolean,
+            selector: HachimiGreedySelector,
+            biasedTokens: IntArray,
+            biasedScores: FloatArray,
+            k: Int,
+        ): List<HachimiGreedySelector.ScoredToken> {
+            var forcedToken = -1
+            var forcedRequired = false
+            var forcedStartBias = Float.NEGATIVE_INFINITY
+            var biasedCount = 0
+            var hasMissingRequired = false
+            val atSentenceEnd = generated.lastOrNull() in sentenceEndingTokenIds
+            constraints.forEach { constraint ->
+                if (constraint.isSatisfied(generated)) return@forEach
+                var bestMatchedPrefix = 0
+                var bestMatchedVariant = constraint.tokens
+                for (variant in constraint.tokenVariants) {
+                    val matchedPrefix = matchingSuffixLength(generated, variant)
+                    if (matchedPrefix > bestMatchedPrefix) {
+                        bestMatchedPrefix = matchedPrefix
+                        bestMatchedVariant = variant
+                    }
+                }
+                if (strictConstraints && constraint.required) hasMissingRequired = true
+                if (bestMatchedPrefix in 1 until bestMatchedVariant.size) {
+                    val shouldReplace = forcedToken < 0 ||
+                        constraint.required && !forcedRequired ||
+                        constraint.required == forcedRequired &&
+                        constraint.startBias > forcedStartBias
+                    if (shouldReplace) {
+                        forcedToken = bestMatchedVariant[bestMatchedPrefix]
+                        forcedRequired = constraint.required
+                        forcedStartBias = constraint.startBias
+                    }
+                    return@forEach
+                }
+                if (bestMatchedPrefix != 0) return@forEach
+                if (atSentenceEnd) return@forEach
+
+                val token = constraint.tokens[0]
+                val score = constraint.startBias * if (
+                    strictConstraints && constraint.required
+                ) STRICT_START_BIAS_MULTIPLIER else 1f
+                var existingIndex = -1
+                for (index in 0 until biasedCount) {
+                    if (biasedTokens[index] == token) {
+                        existingIndex = index
+                        break
+                    }
+                }
+                if (existingIndex >= 0) {
+                    biasedScores[existingIndex] = maxOf(biasedScores[existingIndex], score)
+                } else if (biasedCount < biasedTokens.size) {
+                    biasedTokens[biasedCount] = token
+                    biasedScores[biasedCount] = score
+                    biasedCount++
+                }
+            }
+            if (forcedToken >= 0) {
+                return listOf(HachimiGreedySelector.ScoredToken(forcedToken, 0f))
+            }
+
+            return selector.selectTopK(
+                logits = logits,
+                generated = generated,
+                repetitionPenalty = policy.repetitionPenalty,
+                noRepeatNgramSize = policy.noRepeatNgramSize,
+                eosToken = descriptor.eosTokenId,
+                eosPenalty = if (hasMissingRequired && !atSentenceEnd) STRICT_EOS_PENALTY else 0f,
+                biasedTokens = biasedTokens,
+                biasedScores = biasedScores,
+                biasedCount = biasedCount,
+                k = k,
+            )
+        }
+
+        private class BeamHypothesis(
+            val tokens: MutableList<Int>,
+            var cumulativeScore: Float,
+            val selector: HachimiGreedySelector,
+            var parentResultIndex: Int = -1,
+        ) {
+            fun normalizedScore(alpha: Float = 0.6f): Float {
+                val len = (tokens.size - 1).coerceAtLeast(1)
+                val penalty = Math.pow((5.0 + len) / 6.0, alpha.toDouble()).toFloat()
+                return cumulativeScore / penalty
+            }
+        }
+
+        private fun decodeBeamSearch(
+            attentionMask: OnnxTensor,
+            encoderHidden: OnnxTensor,
+            policy: HachimiDecodePolicy,
+            constraints: List<EncodedConstraint>,
+            strictConstraints: Boolean,
+            beamWidth: Int,
+        ): SegmentResult {
+            val decoderStarted = SystemClock.elapsedRealtime()
+            val actualBeamWidth = beamWidth.coerceIn(1, 8)
+            var initialResult: OrtSession.Result? = null
+            var crossCache: Map<String, OnnxTensor> = emptyMap()
+            var previousStepResults = mutableListOf<OrtSession.Result>()
+            val completedBeams = mutableListOf<BeamHypothesis>()
+
+            try {
+                val initialTokens = mutableListOf(descriptor.decoderStartTokenId)
+                val initialSelector = HachimiGreedySelector(
+                    vocabularySize = descriptor.vocabSize,
+                    initialTokens = initialTokens,
+                )
+                val step0Result: OrtSession.Result
+                val step0Logits: FloatBuffer
+                val ownedEmptyCache = createEmptyCache()
+                try {
+                    OnnxTensor.createTensor(
+                        environment,
+                        arrayOf(longArrayOf(initialTokens.last().toLong())),
+                    ).use { currentToken ->
+                        OnnxTensor.createTensor(
+                            environment,
+                            booleanArrayOf(false),
+                        ).use { cacheBranch ->
+                            val feeds = linkedMapOf<String, OnnxTensorLike>(
+                                "encoder_attention_mask" to attentionMask,
+                                "input_ids" to currentToken,
+                                "encoder_hidden_states" to encoderHidden,
+                                "use_cache_branch" to cacheBranch,
+                            )
+                            feeds.putAll(ownedEmptyCache)
+                            step0Result = decoder.run(feeds)
+                        }
+                    }
+                } finally {
+                    ownedEmptyCache.values.forEach(OnnxTensor::close)
+                }
+
+                initialResult = step0Result
+                crossCache = step0Result.cacheValues(".encoder.")
+                step0Logits = step0Result.tensor("logits").floatBuffer
+                previousStepResults.add(step0Result)
+
+                val biasedTokens = IntArray(MAX_CONSTRAINTS)
+                val biasedScores = FloatArray(MAX_CONSTRAINTS)
+
+                val initialCandidates = if (descriptor.forcedBosTokenId != null) {
+                    listOf(HachimiGreedySelector.ScoredToken(descriptor.forcedBosTokenId, 0f))
+                } else {
+                    chooseTopKTokens(
+                        logits = step0Logits,
+                        generated = initialTokens,
+                        constraints = constraints,
+                        policy = policy,
+                        strictConstraints = strictConstraints,
+                        selector = initialSelector,
+                        biasedTokens = biasedTokens,
+                        biasedScores = biasedScores,
+                        k = actualBeamWidth,
+                    )
+                }
+
+                var activeBeams = initialCandidates.take(actualBeamWidth).map { cand ->
+                    val beamTokens = mutableListOf(descriptor.decoderStartTokenId, cand.token)
+                    val sel = initialSelector.copy().also { it.record(cand.token) }
+                    BeamHypothesis(
+                        tokens = beamTokens,
+                        cumulativeScore = cand.score,
+                        selector = sel,
+                        parentResultIndex = 0,
+                    )
+                }.toMutableList()
+
+                val initialCompleted = activeBeams.filter { it.tokens.last() == descriptor.eosTokenId }
+                if (initialCompleted.isNotEmpty()) {
+                    completedBeams.addAll(initialCompleted)
+                    activeBeams.removeAll(initialCompleted)
+                }
+
+                val maxSteps = policy.maxNewTokens.coerceIn(1, MAX_NEW_TOKENS)
+                for (step in 1 until maxSteps) {
+                    if (activeBeams.isEmpty()) break
+
+                    val currentStepResults = mutableListOf<OrtSession.Result>()
+                    data class BeamExpansion(
+                        val parentBeam: BeamHypothesis,
+                        val resultIndex: Int,
+                        val candidateToken: Int,
+                        val candidateScore: Float,
+                        val totalScore: Float,
+                    )
+                    val allExpansions = mutableListOf<BeamExpansion>()
+
+                    for (beamIdx in activeBeams.indices) {
+                        val beam = activeBeams[beamIdx]
+                        val parentRes = previousStepResults[beam.parentResultIndex]
+                        val selfCache = parentRes.cacheValues(".decoder.")
+
+                        val nextRes: OrtSession.Result
+                        OnnxTensor.createTensor(
+                            environment,
+                            arrayOf(longArrayOf(beam.tokens.last().toLong())),
+                        ).use { currentToken ->
+                            OnnxTensor.createTensor(
+                                environment,
+                                booleanArrayOf(true),
+                            ).use { cacheBranch ->
+                                val feeds = linkedMapOf<String, OnnxTensorLike>(
+                                    "encoder_attention_mask" to attentionMask,
+                                    "input_ids" to currentToken,
+                                    "encoder_hidden_states" to encoderHidden,
+                                    "use_cache_branch" to cacheBranch,
+                                )
+                                feeds.putAll(selfCache)
+                                feeds.putAll(crossCache)
+                                nextRes = decoder.run(feeds)
+                            }
+                        }
+                        currentStepResults.add(nextRes)
+                        val resIndex = currentStepResults.lastIndex
+                        val logits = nextRes.tensor("logits").floatBuffer
+
+                        val candidates = chooseTopKTokens(
+                            logits = logits,
+                            generated = beam.tokens,
+                            constraints = constraints,
+                            policy = policy,
+                            strictConstraints = strictConstraints,
+                            selector = beam.selector,
+                            biasedTokens = biasedTokens,
+                            biasedScores = biasedScores,
+                            k = actualBeamWidth,
+                        )
+
+                        for (cand in candidates) {
+                            allExpansions.add(
+                                BeamExpansion(
+                                    parentBeam = beam,
+                                    resultIndex = resIndex,
+                                    candidateToken = cand.token,
+                                    candidateScore = cand.score,
+                                    totalScore = beam.cumulativeScore + cand.score,
+                                )
+                            )
+                        }
+                    }
+
+                    allExpansions.sortByDescending { it.totalScore }
+
+                    val nextActiveBeams = mutableListOf<BeamHypothesis>()
+                    for (exp in allExpansions) {
+                        if (exp.candidateToken == descriptor.eosTokenId) {
+                            val finishedBeam = BeamHypothesis(
+                                tokens = (exp.parentBeam.tokens + exp.candidateToken).toMutableList(),
+                                cumulativeScore = exp.totalScore,
+                                selector = exp.parentBeam.selector.copy().also { it.record(exp.candidateToken) },
+                                parentResultIndex = exp.resultIndex,
+                            )
+                            completedBeams.add(finishedBeam)
+                        } else {
+                            val newBeam = BeamHypothesis(
+                                tokens = (exp.parentBeam.tokens + exp.candidateToken).toMutableList(),
+                                cumulativeScore = exp.totalScore,
+                                selector = exp.parentBeam.selector.copy().also { it.record(exp.candidateToken) },
+                                parentResultIndex = exp.resultIndex,
+                            )
+                            nextActiveBeams.add(newBeam)
+                            if (nextActiveBeams.size >= actualBeamWidth) break
+                        }
+                    }
+
+                    for (res in previousStepResults) {
+                        if (res !== initialResult) {
+                            runCatching { res.close() }
+                        }
+                    }
+                    previousStepResults = currentStepResults
+                    activeBeams = nextActiveBeams
+
+                    if (completedBeams.size >= actualBeamWidth) break
+                }
+
+                val winner = (completedBeams.ifEmpty { activeBeams })
+                    .maxByOrNull { it.normalizedScore() }
+                    ?: BeamHypothesis(
+                        tokens = mutableListOf(descriptor.decoderStartTokenId),
+                        cumulativeScore = 0f,
+                        selector = initialSelector,
+                    )
+
+                val generated = winner.tokens
+                val visible = generated.drop(1).filterNot(::isSpecialToken)
+                val detokenizerStarted = SystemClock.elapsedRealtime()
+                val output = detokenize(visible)
+                val detokenizerMs = SystemClock.elapsedRealtime() - detokenizerStarted
+                val missing = constraints.asSequence()
+                    .filter(EncodedConstraint::required)
+                    .filterNot { constraint ->
+                        constraint.isSatisfied(generated) ||
+                            output.countNonOverlapping(constraint.target) >= constraint.requiredOccurrences
+                    }
+                    .map(EncodedConstraint::target)
+                    .toList()
+                return SegmentResult(
+                    text = output,
+                    tokens = visible,
+                    missingRequiredTargets = missing,
+                    decoderMs = SystemClock.elapsedRealtime() - decoderStarted,
+                    detokenizerMs = detokenizerMs,
+                )
+            } finally {
+                for (res in previousStepResults) {
+                    if (res !== initialResult) {
+                        runCatching { res.close() }
+                    }
+                }
+                initialResult?.close()
+            }
         }
 
         private fun appendParagraphSegments(
@@ -1054,6 +1466,16 @@ internal class HachimiGreedySelector(
         initialTokens.forEach(::record)
     }
 
+    data class ScoredToken(val token: Int, val score: Float)
+
+    fun copy(): HachimiGreedySelector {
+        val clone = HachimiGreedySelector(vocabularySize, emptyList())
+        System.arraycopy(seen, 0, clone.seen, 0, vocabularySize)
+        System.arraycopy(blockedAtStep, 0, clone.blockedAtStep, 0, vocabularySize)
+        clone.blockStep = blockStep
+        return clone
+    }
+
     fun record(token: Int) {
         if (token in seen.indices) seen[token] = true
     }
@@ -1107,6 +1529,106 @@ internal class HachimiGreedySelector(
             }
         }
         return winner
+    }
+
+    fun selectTopK(
+        logits: FloatBuffer,
+        generated: List<Int>,
+        repetitionPenalty: Float,
+        noRepeatNgramSize: Int,
+        eosToken: Int,
+        eosPenalty: Float,
+        biasedTokens: IntArray,
+        biasedScores: FloatArray,
+        biasedCount: Int,
+        k: Int,
+    ): List<ScoredToken> {
+        val actualK = k.coerceIn(1, 8)
+        require(logits.remaining() == vocabularySize) {
+            "Logit vocabulary changed from $vocabularySize to ${logits.remaining()}"
+        }
+        prepareBlockedBigrams(generated, noRepeatNgramSize)
+        val offset = logits.position()
+
+        val topTokens = IntArray(actualK) { -1 }
+        val topScores = FloatArray(actualK) { Float.NEGATIVE_INFINITY }
+
+        fun insertCandidate(token: Int, score: Float) {
+            if (score <= topScores[0]) return
+            for (i in 0 until actualK) {
+                if (topTokens[i] == token) {
+                    if (score > topScores[i]) {
+                        topScores[i] = score
+                        for (j in i downTo 1) {
+                            if (topScores[j] < topScores[j - 1]) {
+                                val sTemp = topScores[j]; topScores[j] = topScores[j - 1]; topScores[j - 1] = sTemp
+                                val tTemp = topTokens[j]; topTokens[j] = topTokens[j - 1]; topTokens[j - 1] = tTemp
+                            }
+                        }
+                    }
+                    return
+                }
+            }
+            topTokens[0] = token
+            topScores[0] = score
+            for (i in 0 until actualK - 1) {
+                if (topScores[i] > topScores[i + 1]) {
+                    val sTemp = topScores[i]; topScores[i] = topScores[i + 1]; topScores[i + 1] = sTemp
+                    val tTemp = topTokens[i]; topTokens[i] = topTokens[i + 1]; topTokens[i + 1] = tTemp
+                } else {
+                    break
+                }
+            }
+        }
+
+        var maxLogit = Float.NEGATIVE_INFINITY
+        for (token in 0 until vocabularySize) {
+            val score = adjustedScore(
+                token = token,
+                rawScore = logits.get(offset + token),
+                repetitionPenalty = repetitionPenalty,
+                eosToken = eosToken,
+                eosPenalty = eosPenalty,
+                extraBias = 0f,
+            )
+            if (score > maxLogit) maxLogit = score
+            insertCandidate(token, score)
+        }
+
+        for (index in 0 until biasedCount.coerceAtMost(biasedTokens.size)) {
+            val token = biasedTokens[index]
+            if (token !in 0 until vocabularySize) continue
+            val score = adjustedScore(
+                token = token,
+                rawScore = logits.get(offset + token),
+                repetitionPenalty = repetitionPenalty,
+                eosToken = eosToken,
+                eosPenalty = eosPenalty,
+                extraBias = biasedScores[index],
+            )
+            if (score > maxLogit) maxLogit = score
+            insertCandidate(token, score)
+        }
+
+        var sumExp = 0.0
+        for (token in 0 until vocabularySize) {
+            val raw = logits.get(offset + token)
+            val diff = raw - maxLogit
+            if (diff > -16f) {
+                sumExp += Math.exp(diff.toDouble())
+            }
+        }
+        val logSumExp = maxLogit + Math.log(sumExp.coerceAtLeast(1e-12)).toFloat()
+
+        val results = ArrayList<ScoredToken>(actualK)
+        for (i in actualK - 1 downTo 0) {
+            val token = topTokens[i]
+            if (token >= 0) {
+                val normalizedScore = (topScores[i] - logSumExp).coerceAtMost(0f)
+                results.add(ScoredToken(token, normalizedScore))
+            }
+        }
+        return results
     }
 
     private fun adjustedScore(
@@ -1221,44 +1743,100 @@ internal fun restoreHachimiQuoteSkeleton(source: String, translated: String): St
  * is bounded to copied forms such as `Nor Wen` or `Nowan`. Normalize those local variants and
  * collapse only an immediately duplicated canonical name produced by constraint completion.
  */
+internal fun pruneSubsumedConstraints(
+    source: String,
+    constraints: List<EncodedConstraint>
+): List<EncodedConstraint> {
+    if (constraints.size <= 1) return constraints
+    val sorted = constraints.sortedByDescending { it.sourceKeys.maxOfOrNull { k -> k.length } ?: 0 }
+    val kept = mutableListOf<EncodedConstraint>()
+    for (candidate in sorted) {
+        val candidateMaxKey = candidate.sourceKeys.maxByOrNull { it.length } ?: ""
+        if (candidateMaxKey.isEmpty()) {
+            kept.add(candidate)
+            continue
+        }
+        val candidateCount = source.countNonOverlapping(candidateMaxKey)
+        val covered = kept.any { longer ->
+            longer.sourceKeys.any { longerKey ->
+                longerKey.length > candidateMaxKey.length &&
+                    longerKey.contains(candidateMaxKey, ignoreCase = true) &&
+                    source.countNonOverlapping(longerKey) >= candidateCount
+            }
+        }
+        if (!covered) {
+            kept.add(candidate)
+        }
+    }
+    return kept
+}
+
+/**
+ * The canonical Latin name is already injected into the model source, so remaining spelling drift
+ * is bounded to copied forms such as `Nor Wen` or `Nowan`. Normalize those local variants and
+ * collapse only an immediately duplicated canonical name produced by constraint completion.
+ */
 internal fun canonicalizeHachimiNameOutputs(
     source: String,
     translated: String,
     constraints: List<HachimiLexicalConstraint>
 ): String = constraints.asSequence()
-    .filter { it.required && it.canonicalizeSourceName && it.appliesTo(source) }
+    .filter { it.appliesTo(source) }
+    .sortedByDescending { it.target.length }
     .fold(translated) { current, constraint ->
         val canonical = constraint.target.trim()
         val letters = canonical.filter(Char::isLetterOrDigit)
         if (letters.isEmpty()) return@fold current
-        val flexiblePattern = letters.map { Regex.escape(it.toString()) }
-            .joinToString("[\\s\\-·]*")
-        var value = Regex(
-            "(?<!\\p{L})$flexiblePattern(?!\\p{L})",
-            RegexOption.IGNORE_CASE
-        ).replace(current, canonical)
-        val normalizedCanonical = canonical.normalizedNameKey()
-        if (normalizedCanonical.length >= MIN_FUZZY_NAME_LENGTH) {
-            value = NAME_CANDIDATE.replace(value) { match ->
-                val candidate = match.value
-                val normalizedCandidate = candidate.normalizedNameKey()
-                val splitCandidateWithOneEdit = candidate.any { it == ' ' || it == '-' || it == '·' } &&
-                    levenshteinDistance(normalizedCandidate, normalizedCanonical) <= 1
-                if (
-                    (normalizedCandidate.firstOrNull() == normalizedCanonical.firstOrNull() ||
-                        splitCandidateWithOneEdit) &&
-                    kotlin.math.abs(normalizedCandidate.length - normalizedCanonical.length) <= 2 &&
-                    isLikelyNameVariant(normalizedCandidate, normalizedCanonical)
-                ) canonical else candidate
+        var value = current
+        if (constraint.canonicalizeSourceName) {
+            val flexiblePattern = letters.map { Regex.escape(it.toString()) }
+                .joinToString("[\\s\\-·]*")
+            value = Regex(
+                "(?<!\\p{L})$flexiblePattern(?!\\p{L})",
+                RegexOption.IGNORE_CASE
+            ).replace(value, canonical)
+            val normalizedCanonical = canonical.normalizedNameKey()
+            if (normalizedCanonical.length >= MIN_FUZZY_NAME_LENGTH) {
+                value = NAME_CANDIDATE.replace(value) { match ->
+                    val candidate = match.value
+                    val normalizedCandidate = candidate.normalizedNameKey()
+                    val splitCandidateWithOneEdit = candidate.any { it == ' ' || it == '-' || it == '·' } &&
+                        levenshteinDistance(normalizedCandidate, normalizedCanonical) <= 1
+                    if (
+                        (normalizedCandidate.firstOrNull() == normalizedCanonical.firstOrNull() ||
+                            splitCandidateWithOneEdit) &&
+                        kotlin.math.abs(normalizedCandidate.length - normalizedCanonical.length) <= 2 &&
+                        isLikelyNameVariant(normalizedCandidate, normalizedCanonical)
+                    ) canonical else candidate
+                }
             }
         }
         val duplicate = Regex(
-            "(?<!\\p{L})${Regex.escape(canonical)}\\s+${Regex.escape(canonical)}(?!\\p{L})",
+            "(?<!\\p{L})(${Regex.escape(canonical)})\\s+${Regex.escape(canonical)}(?!\\p{L})",
             RegexOption.IGNORE_CASE
         )
         while (true) {
             val repeated = duplicate.find(value) ?: break
-            value = value.replaceRange(repeated.range, canonical)
+            val firstOccur = repeated.groupValues[1]
+            value = value.replaceRange(repeated.range, firstOccur)
+        }
+        val punctDuplicate = Regex(
+            "(?<!\\p{L})(${Regex.escape(canonical)})([.,!?;:]*\\s*)${Regex.escape(canonical)}(?!\\p{L})",
+            RegexOption.IGNORE_CASE
+        )
+        while (true) {
+            val repeated = punctDuplicate.find(value) ?: break
+            val firstOccur = repeated.groupValues[1]
+            val punct = repeated.groupValues[2]
+            value = value.replaceRange(repeated.range, "$firstOccur$punct".trimEnd())
+        }
+        val trailingEcho = Regex(
+            "([.,!?;:]\\s*)${Regex.escape(canonical)}[.,!?;:]?\\s*$",
+            RegexOption.IGNORE_CASE
+        )
+        val firstIdx = value.indexOf(canonical, ignoreCase = true)
+        if (trailingEcho.containsMatchIn(value) && firstIdx >= 0 && firstIdx < value.length - canonical.length - 4) {
+            value = trailingEcho.replace(value) { match -> match.groupValues[1].trimEnd() }
         }
         value
     }

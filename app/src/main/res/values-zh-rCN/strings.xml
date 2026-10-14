@@ -2524,4 +2524,6 @@
     <string name="apply">应用</string>
     <string name="source_categories">书源分类</string>
     <string name="my_tags">我的标签</string>
+    <string name="edit_chapter_title">修改章节标题</string>
+    <string name="edit_chapter_title_hint">章节标题（永久保存）</string>
 </resources>

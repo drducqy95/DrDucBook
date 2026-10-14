@@ -119,6 +119,7 @@ class ManageTranslationRevisionUseCaseTest {
             type: QuickDictionaryType,
             scope: io.legado.app.domain.model.QuickDictionaryScope,
             scopeKey: String,
+            skipBuiltInDedup: Boolean,
             onProgress: (QuickDictionaryImportProgress) -> Unit,
         ): QuickDictionaryImportResult = error("Not used")
         override suspend fun deletePack(id: String) = Unit

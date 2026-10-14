@@ -143,11 +143,58 @@ fun QuickDictionaryManagerRouteScreen(
             dictImportJob = null
         }
     }
+    val replaceLauncher = rememberLauncherForActivityResult(
+        FilteredOpenDocumentContract(
+            primaryMimeType = "text/plain",
+            persistableAccess = false,
+        )
+    ) { uri ->
+        uri ?: return@rememberLauncherForActivityResult
+        dictImportJob?.cancel()
+        dictImportJob = routeScope.launch {
+            val copied = withContext(Dispatchers.IO) {
+                cleanOrphanedDictionaryStaging(context.cacheDir)
+                runCatching {
+                    val fileName = context.contentResolver.query(
+                        uri,
+                        arrayOf(OpenableColumns.DISPLAY_NAME),
+                        null,
+                        null,
+                        null,
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    } ?: uri.lastPathSegment
+                    val localFile = File.createTempFile(
+                        "quick-dictionary-base-",
+                        ".source",
+                        context.cacheDir,
+                    )
+                    try {
+                        context.contentResolver.openInputStream(uri).use { input ->
+                            requireNotNull(input) { "Không thể mở tệp từ điển đã chọn" }
+                            localFile.outputStream().buffered().use(input::copyTo)
+                        }
+                        fileName to localFile.absolutePath
+                    } catch (error: Throwable) {
+                        localFile.delete()
+                        throw error
+                    }
+                }
+            }
+            copied.onSuccess { (fileName, localPath) ->
+                viewModel.onIntent(QuickDictionaryManagerIntent.ReplaceOriginalFile(fileName, localPath))
+            }
+            dictImportJob = null
+        }
+    }
     LaunchedEffect(Unit) {
         viewModel.effects.collectLatest { effect ->
             when (effect) {
                 QuickDictionaryManagerEffect.OpenImportFile -> {
                     launcher.launch(quickDictionaryImportMimeTypes)
+                }
+                QuickDictionaryManagerEffect.OpenReplaceOriginalFile -> {
+                    replaceLauncher.launch(quickDictionaryImportMimeTypes)
                 }
                 is QuickDictionaryManagerEffect.OpenUrl -> {
                     context.openUrl(effect.url)
@@ -286,26 +333,23 @@ fun QuickDictionaryManagerScreen(
                         originalState.lastError?.takeIf(String::isNotBlank)?.let { error ->
                             AppText(text = error, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            if (originalState.status == QuickDictionaryPackStatus.NOT_INSTALLED ||
-                                originalState.status == QuickDictionaryPackStatus.FAILED ||
-                                originalState.status == QuickDictionaryPackStatus.OUTDATED
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 8.dp),
+                        ) {
+                            Button(
+                                onClick = { onIntent(QuickDictionaryManagerIntent.RequestReplaceOriginalFile) },
+                                enabled = originalState.status != QuickDictionaryPackStatus.DOWNLOADING &&
+                                    originalState.status != QuickDictionaryPackStatus.VERIFYING,
                             ) {
-                                Button(
-                                    onClick = { onIntent(QuickDictionaryManagerIntent.RetryOriginalPack) },
-                                    enabled = originalState.status != QuickDictionaryPackStatus.DOWNLOADING,
-                                ) {
-                                    AppText(stringResource(R.string.quick_dictionary_original_retry))
-                                }
+                                AppText(stringResource(R.string.quick_dictionary_original_replace))
                             }
-                            if (originalState.status == QuickDictionaryPackStatus.READY ||
-                                originalState.status == QuickDictionaryPackStatus.EDITED
+                            OutlinedButton(
+                                onClick = { onIntent(QuickDictionaryManagerIntent.RestoreOriginalPack) },
+                                enabled = originalState.status != QuickDictionaryPackStatus.DOWNLOADING &&
+                                    originalState.status != QuickDictionaryPackStatus.VERIFYING,
                             ) {
-                                OutlinedButton(
-                                    onClick = { onIntent(QuickDictionaryManagerIntent.RestoreOriginalPack) },
-                                ) {
-                                    AppText(stringResource(R.string.quick_dictionary_original_restore))
-                                }
+                                AppText(stringResource(R.string.quick_dictionary_original_restore))
                             }
                         }
                     }

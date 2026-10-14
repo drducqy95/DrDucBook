@@ -77,3 +77,12 @@ _Append-only operation history._
 - `2026-10-06T15:51:09` — UPDATE [entity] project-legado-with-md3-main
 - `2026-10-07T07:22:05` — CREATE [decision] ML Kit Dynamic Dictionary & Pure Grammar Architecture → .brain\wiki\decisions\ml-kit-dynamic-dictionary-pure-grammar-architecture.md
 - `2026-10-07T07:22:15` — CREATE [entity] ML Kit Dynamic Dictionary & Grammar Engine → .brain\wiki\entities\ml-kit-dynamic-dictionary-grammar-engine.md
+- `2026-10-10T15:39:08` — CREATE [pattern] DI / Koin / BrowserViewModel - KOIN_NO_DEFINITION_FOUND Pattern → .brain\wiki\patterns\di-koin-browserviewmodel-koin-no-definition-found-pattern.md
+- `2026-10-10T15:39:08` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-10T15:39:14` — CREATE [pattern] AI Router / Gemini 3.5 Flash Lite - AI_CAPABILITY_PROBE_EXCLUSION Pattern → .brain\wiki\patterns\ai-router-gemini-35-flash-lite-ai-capability-probe-exclusion-pattern.md
+- `2026-10-10T15:39:14` — UPDATE [entity] project-legado-with-md3-main
+- `2026-10-14T11:14:58` — CREATE [decision] QT Quality and Speed Optimization Across 10 Chapters → .brain\wiki\decisions\qt-quality-and-speed-optimization-across-10-chapters.md
+- `2026-10-14T11:15:04` — CREATE [entity] Milestone P79 - Quick Translator Quality and Speed Optimization for First 10 Chapters → .brain\wiki\entities\milestone-p79-quick-translator-quality-and-speed-optimization-for-first-10-chapters.md
+- `2026-10-14T11:27:38` — CREATE [decision] Restore Classic QuickTranslator Algorithm and Pure TXT Dictionaries → .brain\wiki\decisions\restore-classic-quicktranslator-algorithm-and-pure-txt-dictionaries.md
+- `2026-10-14T14:23:55` — CREATE [decision] Optimize QT Speed, Fix Mojibake, Compact Blocks & Source Health Accuracy → .brain\wiki\decisions\optimize-qt-speed-fix-mojibake-compact-blocks-source-health-accuracy.md
+- `2026-10-14T14:24:02` — CREATE [entity] Milestone P80 QuickTranslator Optimization, Mojibake Fix, Compact UI & Source Health Consistency → .brain\wiki\entities\milestone-p80-quicktranslator-optimization-mojibake-fix-compact-ui-source-health-consistency.md

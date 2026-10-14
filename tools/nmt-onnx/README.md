@@ -72,4 +72,33 @@ pip install transformers optimum[onnxruntime] onnx onnxruntime onnxruntime-exten
    .\package_hachimi_qt.ps1
    ```
 
-Outputs will be placed into `dist/hachimi-mt60-qt-zh-vi-onnx.zip` along with its SHA256 checksum file.
+Outputs will be placed into `dist/hachimi-mt60-qt-zh-vi-onnx.zip` along with its SHA256 checksum file. 
+---
+
+## 5. NLLB-200-Distilled-600M Pipeline Workflow
+
+### Overview
+- **Architecture**: Seq2Seq M2M100 (`facebook/nllb-200-distilled-600M`)
+- **Layers**: 12 Encoder, 12 Decoder, 16 Attention Heads, $d_{\text{model}} = 1024$ (head_dim = 64)
+- **Vocab Size**: 256,206 tokens (SentencePiece with +1 offset and language tokens)
+- **Language IDs**: `zho_Hans` = 256200, `vie_Latn` = 256193, `decoder_start_token_id` = 2, `forced_bos_token_id` = 256193
+
+### Execution
+1. **Export PyTorch NLLB to ONNX**:
+   ```powershell
+   python convert_nllb.py
+   ```
+2. **Dynamic INT8 Quantization**:
+   ```powershell
+   python quantize_nllb.py
+   ```
+3. **Validation & Parity**:
+   ```powershell
+   python validate_nllb.py
+   ```
+4. **Package Distribution ZIP**:
+   ```powershell
+   .\package_nllb.ps1
+   ```
+
+Package output is generated at `dist/nllb-200-distilled-600m-onnx.zip` (~840 MB, uncompressed 1.1 GB).

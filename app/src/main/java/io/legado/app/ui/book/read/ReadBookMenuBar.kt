@@ -1219,16 +1219,18 @@ private fun MenuTitleBar(
                     modifier = Modifier
                         .weight(1f)
                         .then(
-                            if (!state.isLocalBook) {
-                                Modifier.combinedClickable(
-                                    onClick = { onIntent(ReadBookIntent.OpenChapterUrl) },
-                                    onLongClick = {
-                                        onIntent(ReadBookIntent.ToggleReadUrlInBrowser)
-                                    },
-                                )
-                            } else {
-                                Modifier
-                            }
+                            Modifier.combinedClickable(
+                                onClick = {
+                                    if (!state.isLocalBook) {
+                                        onIntent(ReadBookIntent.OpenChapterUrl)
+                                    } else {
+                                        onIntent(ReadBookIntent.OpenEditChapterTitleDialog())
+                                    }
+                                },
+                                onLongClick = {
+                                    onIntent(ReadBookIntent.OpenEditChapterTitleDialog())
+                                },
+                            )
                         ),
                     style = labelStyle,
                     color = titleTextColor,
@@ -2044,6 +2046,14 @@ private fun OverflowDropdownMenu(
             onClick = {
                 dismiss()
                 onIntent(ReadBookIntent.OpenChapterContextCopy)
+            },
+        )
+        RoundDropdownMenuItem(
+            text = stringResource(R.string.edit_chapter_title),
+            leadingIcon = menuIcon(Icons.Default.Edit),
+            onClick = {
+                dismiss()
+                onIntent(ReadBookIntent.OpenEditChapterTitleDialog())
             },
         )
 

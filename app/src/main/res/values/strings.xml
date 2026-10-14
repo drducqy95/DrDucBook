@@ -2084,6 +2084,14 @@
     <string name="nmt_no_repeat_bigram">Block repeated NMT bigrams</string>
     <string name="nmt_retry_missing_terms">Retry missing required terms</string>
     <string name="nmt_retry_missing_terms_summary">Run a stricter NMT decode only for segments that lose scoped dictionary terms.</string>
+    <string name="quick_translation_beam_width">Quick Translation Beam Width</string>
+    <string name="quick_translation_beam_width_greedy">1 (Greedy Longest-Match - fastest)</string>
+    <string name="quick_translation_beam_width_desc">%1$d (Beam search - multi-path segmentation)</string>
+    <string name="nmt_beam_width">NMT Beam Width</string>
+    <string name="nmt_beam_width_greedy">1 (Greedy search - fastest)</string>
+    <string name="nmt_beam_width_desc">%1$d (Beam search - higher quality)</string>
+    <string name="mlkit_decoding_fixed_notice_title">Google ML Kit decoding algorithm</string>
+    <string name="mlkit_decoding_fixed_notice_summary">Google ML Kit runs on-device models via Google Play Services with fixed internal decoding; beam width cannot be configured via third-party SDK.</string>
     <string name="translation_app_ai_provider">Use App AI Interface</string>
     <string name="translation_app_ai_provider_summary">Model, API key, and protocol are configured in AI Settings.</string>
 
@@ -3427,6 +3435,9 @@
     <string name="quick_dictionary_original_outdated">QT pack needs an update.</string>
     <string name="quick_dictionary_original_retry">Retry download</string>
     <string name="quick_dictionary_original_restore">Restore original QT</string>
+    <string name="quick_dictionary_original_replace">Replace base dictionary</string>
+    <string name="quick_dictionary_original_replaced">Base dictionary replaced successfully.</string>
+    <string name="quick_dictionary_original_replace_failed">Could not replace base dictionary.</string>
     <string name="quick_dictionary_deleted">Dictionary entry deleted.</string>
     <string name="quick_dictionary_scope_required">Select a Project or Universe before importing.</string>
     <string name="quick_dictionary_select_scope">Select scope</string>
@@ -4267,4 +4278,6 @@
     <string name="chapter_context_status_user_edited">Edited</string>
     <string name="chapter_context_status_stale">Outdated</string>
     <string name="chapter_context_status_final">Final</string>
+    <string name="edit_chapter_title">Edit chapter title</string>
+    <string name="edit_chapter_title_hint">Chapter title (permanent)</string>
 </resources>

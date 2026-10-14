@@ -241,5 +241,34 @@ class WebSessionManagerTest {
         assertEquals("snlm0e_B", sessionBRetrieved.snlm0e)
         assertEquals(sessionB.fetchedAt, sessionBRetrieved.fetchedAt)
     }
+
+    @Test
+    fun geminiWebHandlerIncludesFlashLiteAnd1MContextWindow() = runBlocking {
+        val handler = GeminiWebHandler()
+        val dummyProvider = io.legado.app.domain.model.AiProviderConfig(
+            id = "test_gemini_web",
+            name = "Gemini Web",
+            protocol = io.legado.app.domain.model.AiProtocol.GEMINI_WEB,
+            baseUrl = "https://gemini.google.com",
+            apiKey = "",
+        )
+        val models = handler.fetchModels(dummyProvider).getOrThrow()
+        val defaultModel = models.first { it.id == "gemini-web-default" }
+        assertEquals(1_000_000, defaultModel.contextWindow)
+
+        val liteModel = models.firstOrNull { it.id == "gemini-web-flash-lite" }
+        assertNotNull(liteModel)
+        assertEquals("Gemini Web (Flash-Lite)", liteModel?.name)
+        assertEquals(1_000_000, liteModel?.contextWindow)
+
+        val payload = handler.buildFReqPayload("test prompt", "gemini-web-flash-lite")
+        val parsedOuter = GSON.fromJson(payload, com.google.gson.JsonArray::class.java)
+        val innerString = parsedOuter[1].asString
+        val parsedInner = GSON.fromJson(innerString, com.google.gson.JsonArray::class.java)
+        // Code 6 is FLASH_LITE at index 79
+        assertEquals(6, parsedInner[79].asInt)
+        // thinkMode is 4 at index 17
+        assertEquals(4, parsedInner[17].asJsonArray[0].asJsonArray[0].asInt)
+    }
 }
 

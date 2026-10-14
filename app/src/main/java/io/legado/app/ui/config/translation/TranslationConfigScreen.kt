@@ -361,28 +361,15 @@ fun TranslationConfigScreen(
                             entryValues = sourceLanguageValues,
                             onValueChange = { TranslationConfig.mlKitSourceLanguage = it }
                         )
+                        ClickableSettingItem(
+                            title = stringResource(R.string.mlkit_decoding_fixed_notice_title),
+                            description = stringResource(R.string.mlkit_decoding_fixed_notice_summary),
+                            onClick = {},
+                        )
                     }
 
-                    DropdownListSettingItem(
-                        title = stringResource(R.string.quick_translation_pronoun_mode),
-                        description = stringResource(R.string.quick_translation_pronoun_mode_summary),
-                        selectedValue = TranslationConfig.quickTranslationPronounMode,
-                        displayEntries = arrayOf(
-                            stringResource(R.string.quick_translation_pronoun_mode_auto),
-                            stringResource(R.string.quick_translation_pronoun_mode_ancient),
-                            stringResource(R.string.quick_translation_pronoun_mode_modern),
-                            stringResource(R.string.quick_translation_pronoun_mode_western),
-                            stringResource(R.string.quick_translation_pronoun_mode_off),
-                        ),
-                        entryValues = arrayOf(
-                            QuickTranslationPronounMode.AUTO.value,
-                            QuickTranslationPronounMode.ANCIENT.value,
-                            QuickTranslationPronounMode.MODERN.value,
-                            QuickTranslationPronounMode.WESTERN.value,
-                            QuickTranslationPronounMode.OFF.value,
-                        ),
-                        onValueChange = { TranslationConfig.quickTranslationPronounMode = it },
-                    )
+
+
 
                     SwitchSettingItem(
                         title = stringResource(R.string.dynamic_ui_translation),
@@ -552,6 +539,22 @@ fun TranslationConfigScreen(
                             steps = 9,
                             description = "%.1f".format(TranslationConfig.nmtRepetitionPenalty),
                             onValueChange = { TranslationConfig.nmtRepetitionPenalty = it },
+                        )
+                        SliderSettingItem(
+                            title = stringResource(R.string.nmt_beam_width),
+                            value = TranslationConfig.nmtBeamWidth.toFloat(),
+                            defaultValue = 4f,
+                            valueRange = 1f..8f,
+                            steps = 6,
+                            description = if (TranslationConfig.nmtBeamWidth == 1) {
+                                stringResource(R.string.nmt_beam_width_greedy)
+                            } else {
+                                stringResource(
+                                    R.string.nmt_beam_width_desc,
+                                    TranslationConfig.nmtBeamWidth,
+                                )
+                            },
+                            onValueChange = { TranslationConfig.nmtBeamWidth = it.toInt() },
                         )
                         val isQtModel = (activeNmtModelId == HachimiOnnxModelRegistry.HACHIMI_QT_MODEL_ID)
                         SwitchSettingItem(

@@ -1,10 +1,10 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-07T09:44:00",
-    "overall_progress_percent": 100,
-    "current_phase": "P66",
-    "status": "DONE",
+    "last_updated": "2026-10-14T14:15:00",
+    "overall_progress_percent": 99,
+    "current_phase": "P80",
+    "status": "IN_PROGRESS",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
@@ -2601,6 +2601,448 @@
           "id": "T66.4",
           "desc": "Phase 04 - Automated Testing, Build & Live On-Device Validation on LDPlayer emulator-5554 (100% unit tests passed, built APK installed, chapter 1 translated live with flawless novel terminology)",
           "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P67",
+      "name": "NLLB-200-600M ONNX Conversion & DrDucBook Integration",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T67.1",
+          "desc": "Phase 01 - Python Conversion Toolchain for NLLB-200-600M (tools/nmt-onnx/convert_nllb.py with Optimum Seq2Seq export and bit-exact SentencePiece offset+1 ONNX tokenizers)",
+          "status": "DONE"
+        },
+        {
+          "id": "T67.2",
+          "desc": "Phase 02 - Dynamic INT8 Quantization & Parity Validation Toolchain (tools/nmt-onnx/quantize_nllb.py and validate_nllb.py)",
+          "status": "DONE"
+        },
+        {
+          "id": "T67.3",
+          "desc": "Phase 03 - Packaging Script, model_manifest.json v2 Generation & Checksum Integrity (tools/nmt-onnx/package_nllb.ps1)",
+          "status": "DONE"
+        },
+        {
+          "id": "T67.4",
+          "desc": "Phase 04 - Android Kotlin NMT Engine Adaptation (NmtModelDescriptor, HachimiOnnxTranslator forcedBosTokenId, 256k vocab support, dynamic eosTokenId, special token filtration)",
+          "status": "DONE"
+        },
+        {
+          "id": "T67.5",
+          "desc": "Phase 05 - Unit Testing, Build Verification & Regression Testing (HachimiOnnxModelRegistryTest 100% passed, HachimiOnnxModelImporterTest 100% passed, compileAppDebugKotlin SUCCESS)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P68",
+      "name": "NLLB-200 Vocabulary Pruning & Domain Adaptation (ZH/VI Novel Translation with Calibrated Foreign Entities)",
+      "status": "IN_PROGRESS",
+      "progress": 75,
+      "tasks": [
+        {
+          "id": "T68.1",
+          "desc": "Phase 01 - Vocabulary Pruning Toolchain (tools/nmt-onnx/prune_nllb.py: pruned 256k to 65,395 tokens, reduced parameters from 615M to 419M, 100% remapped, verified forward pass & generation)",
+          "status": "DONE"
+        },
+        {
+          "id": "T68.2",
+          "desc": "Phase 02 - Full-Scale Novel Bilingual Corpus Curation & Foreign Proper Names Reinforcement (tools/nmt-onnx/build_full_zh_vi_dataset.py: 516,602 pure ZH->VI pairs; 600+ calibrated entities spanning Western Fantasy, Lord of Mysteries, Anime, Korean Hunter/Solo Leveling, Game stats HP/MP/BOSS; 19.67% domain ratio; train.jsonl 588.14MB, eval.jsonl 5.71MB; packaged dist/nllb_full_zh_vi_bundle.zip 986.44MB)",
+          "status": "DONE"
+        },
+        {
+          "id": "T68.3",
+          "desc": "Phase 03 - LoRA Fine-Tuning Pipeline with Auto-Resume Checkpoint to Google Drive & Empty-Adapter Prevention (Seq2SeqTrainer, LoRA rank=32 alpha=64, evaluation on literary & foreign entity benchmarks)",
+          "status": "IN_PROGRESS"
+        },
+        {
+          "id": "T68.4",
+          "desc": "Phase 04 - ONNX Export & INT8 Dynamic Quantization for Pruned/Fine-Tuned Model (~220MB target package)",
+          "status": "TODO"
+        }
+      ]
+    },
+    {
+      "id": "P69",
+      "name": "Translation Decoding Overhaul: Multi-Hypothesis Beam Search for Offline ONNX NMT and Quick Translation (QT)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T69.1",
+          "desc": "Phase 01 - Offline ONNX NMT Beam Search Engine (HachimiBeamSearchDecoder in HachimiOnnxTranslator.kt with hypothesis tracking, logProb + length penalty, KV-cache per beam, lexical constraints, beamWidth 1..8)",
+          "status": "DONE"
+        },
+        {
+          "id": "T69.2",
+          "desc": "Phase 02 - Quick Translation Multi-Hypothesis Beam Search (beamTranslationPlan in QuickTranslationRepository.kt with top-K candidate expansion, normalized path scoring, beamWidth 1..5)",
+          "status": "DONE"
+        },
+        {
+          "id": "T69.3",
+          "desc": "Phase 03 - NMT Gateway & Service IPC Integration (NmtDecodeConfig.beamWidth, NmtOnnxService IPC pass-through)",
+          "status": "DONE"
+        },
+        {
+          "id": "T69.4",
+          "desc": "Phase 04 - Settings UI & Preferences (PreferKey.quickTranslationBeamWidth, PreferKey.nmtBeamWidth, Compose controls in Settings)",
+          "status": "DONE"
+        },
+        {
+          "id": "T69.5",
+          "desc": "Phase 05 - Unit Testing & Parity Verification (Greedy parity when beam=1, superior hypothesis when beam>1, zero regression - 65/65 QT tests passed, 100% NMT memory policy tests passed)",
+          "status": "DONE"
+        },
+        {
+          "id": "T69.6",
+          "desc": "Phase 06 - LDPlayer Verification & Chapter 1 'Luân Hồi Nhạc Viện' Benchmark Test (Build APK x86_64, adb install, test Chapter 1 QT Beam 1/3/5 & report quality)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P70",
+      "name": "Pure Quick Translation Restoration (Eliminate Pronoun Modes), Grammar Enhancement Engine, QT Speed Optimization & Dictionary Mapping Verification",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T70.1",
+          "desc": "Phase 01 - Eliminate Pronoun Mode Subsystem & Restore Pure QT (Remove pronoun rules from QuickTranslationRepository, deprecate/clean UI pronoun controls for QT, restore pure VietPhrase dictionary translation)",
+          "status": "DONE"
+        },
+        {
+          "id": "T70.2",
+          "desc": "Phase 02 - Pure QT Grammar & Syntax Polish Engine (Heal excessive 'của' before verbs/adjectives, correct adverbial inversion e.g. 'phí sức ngồi dậy', heal passive/resultative structures, inverted attributive clauses e.g. 'thân phận liệp sát giả của ngươi')",
+          "status": "DONE"
+        },
+        {
+          "id": "T70.3",
+          "desc": "Phase 03 - QT Beam Search Speed Optimization (Allocation reduction, StringBuilder capacity pre-sizing, fast Trie scan path, memory-efficient candidate pruning for sub-20ms page rendering)",
+          "status": "DONE"
+        },
+        {
+          "id": "T70.4",
+          "desc": "Phase 04 - Text Selection Dictionary Mapping & Dynamic Update Verification (Unit test & UI verification for text selection resolveQuickDictionarySelection, CJK <-> VI alignment, adding new dictionary entry, dynamic cache invalidation, live update on LDPlayer)",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P71",
+      "name": "Quick Translation Comprehensive Quality & Latency Overhaul (Resolve Point vs Hour, Toxic Dictionary Entries, RPG System Terms & Inverted Attributives)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T71.1",
+          "desc": "Phase 01 - Data Remediation: Purge toxic dictionary entry '点大', fix '储物空间', '斩龙闪', '乐园币', '可想而知' in offline TSV assets",
+          "status": "DONE"
+        },
+        {
+          "id": "T71.2",
+          "desc": "Phase 02 - Grammar Engine: Refine TIME_HOUR_PATTERN to require time-of-day prefixes and translate standalone [Number]点 as points ('điểm')",
+          "status": "DONE"
+        },
+        {
+          "id": "T71.3",
+          "desc": "Phase 03 - Polish Engine: Heal location/time inverted clauses ('của trong tay', 'của bây giờ', 'niệm của chỉ', 'dũng tâm của dám')",
+          "status": "DONE"
+        },
+        {
+          "id": "T71.4",
+          "desc": "Phase 04 - System Terms & RPG Format: Standardize attributes (Pháp lực, Thể lực, Mị lực), System prompts (Nhắc nhở, Ghi chú, Có/Không)",
+          "status": "DONE"
+        },
+        {
+          "id": "T71.5",
+          "desc": "Phase 05 - Performance & Verification: Benchmark 10 chapters to confirm sub-100ms chapter throughput and zero quality regressions",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P72",
+      "name": "NMT Lexical Constraint Repetition Elimination, Subsumption Filtering & Beam Search Decode Enforcement",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T72.1",
+          "desc": "Phase 01 - Constraint Encoding & Satisfaction: Support case-insensitive token variants in EncodedConstraint and add detokenized text satisfaction fallback in missingRequiredTargets",
+          "status": "DONE"
+        },
+        {
+          "id": "T72.2",
+          "desc": "Phase 02 - Punctuation Boundary & Anti-Forcing Guard: Suppress STRICT_EOS_PENALTY and startBias when preceding token is sentence-ending punctuation (no orphaned '. Term' echoes)",
+          "status": "DONE"
+        },
+        {
+          "id": "T72.3",
+          "desc": "Phase 03 - Constraint Subsumption & Deduplication: Filter out substring constraints within the same segment (玉 subsumed by 玉简) and fix canonicalizeHachimiNameOutputs deduplication across punctuation",
+          "status": "DONE"
+        },
+        {
+          "id": "T72.4",
+          "desc": "Phase 04 - Beam Search Configuration & Verification: Enforce beamWidth = 4 in UI and repository defaults, write unit tests in HachimiNmtMemoryPolicyTest, verify compilation and test suite",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P73",
+      "name": "Quick Translator & AI Translation Diagnostic Fixes, Unicode/Arabic Sanitization, Highlighting Latency & 2-Tier Story Memory Retrofit",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T73.1",
+          "desc": "Issue 1 - Quick Translator Hán-Việt Fallback Fix: Fix clean pack dedup bypass (skipBuiltInDedup), fallback CompositeTermLookup to bundled terms, auto-detect/recover corrupted on-device packs",
+          "status": "DONE"
+        },
+        {
+          "id": "T73.2",
+          "desc": "Issue 2 - AI Translation Huawei Character Corruptions: Add normalizeUnicode (NFC), stripRogueCharacters (Arabic & abnormal combining scripts), and fixAbnormalMixedCase in post-processing pipeline",
+          "status": "DONE"
+        },
+        {
+          "id": "T73.3",
+          "desc": "Issue 3 - Residual Quality Defects: Strip promotional watermarks and Chinese author notes (CHINESE_PROMO_REGEX) before chapter translation pipeline",
+          "status": "DONE"
+        },
+        {
+          "id": "T73.4",
+          "desc": "Issue 4 - Quick Dictionary Selection Latency Optimization: Shared window cache across lookups, reduced window branching to 40, LRU mapped translation cache (4 entries) in ReadBookViewModel, and fast-path lookup",
+          "status": "DONE"
+        },
+        {
+          "id": "T73.5",
+          "desc": "Issue 5 - Translation Story Memory 2-Tier Retrofit: Automatic background algorithmic word-boundary cache retrofit upon editing story memory entries (Tier 1), mode selector for full AI retranslation (Tier 2), and draft preservation",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P74",
+      "name": "Google Antigravity, Gemini Web & Gemini API Provider Model Audit & Standards Sync",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T74.1",
+          "desc": "Task 1 - Google Antigravity: Retire Gemini < 3.8 & 3.1 Pro, add claude-opus-4-7-thinking, extract tierId (FREE/PRO/ULTRA) in OAuth flow",
+          "status": "DONE"
+        },
+        {
+          "id": "T74.2",
+          "desc": "Task 2 - Gemini Web: Add gemini-web-flash-lite, upgrade default contextWindow to 1M, update prompt directives and router catalog",
+          "status": "DONE"
+        },
+        {
+          "id": "T74.3",
+          "desc": "Task 3 - Google Gemini API: Introduce Gemini 3.8 and 3.7 families, set gemini-3.8-flash as default preset and update preference rankings",
+          "status": "DONE"
+        },
+        {
+          "id": "T74.4",
+          "desc": "Task 4 - Verification & Tests: Update unit tests for default model changes, verify Kotlin compilation and test suites",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P75",
+      "name": "Setup Gemini API Models By Tier & Dead Models Elimination",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T75.1",
+          "desc": "Task 1 - Catalog & Tier Grouping: Group models into Free vs Paid/Billing in AiProviderCatalog, eliminate dead 2.5/2.0/1.5 models, add notice",
+          "status": "DONE"
+        },
+        {
+          "id": "T75.2",
+          "desc": "Task 2 - Handler Fetch & Router Fallback: Filter dead models in fetchModels, auto-tag Pro billing requirement, re-rank PREFERRED_GEMINI_TRANSLATION_MODELS prioritizing 3.5 Flash for Free stability",
+          "status": "DONE"
+        },
+        {
+          "id": "T75.3",
+          "desc": "Task 3 - ViewModels Synchronization: Synchronize PREFERRED_GEMINI_MODELS in AiRouterViewModel and AiProviderEditViewModel, define Free vs Billing collections",
+          "status": "DONE"
+        },
+        {
+          "id": "T75.4",
+          "desc": "Task 4 - Verification & Compilation: Verify unit tests and check Kotlin compilation",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P76",
+      "name": "Eliminate OpenCode Free & Deploy Gemini Web Flash-Lite Free Translation Test",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T76.1",
+          "desc": "Task 1 - Eliminate OpenCode Free from Auto-Install, Retired Providers, Combo Templates & Catalog references",
+          "status": "DONE"
+        },
+        {
+          "id": "T76.2",
+          "desc": "Task 2 - Fix Router Target Deduplication & Fail-Fast Diagnostics (clean targets on rebuild, log sample text on parse_error, fail-fast switch provider on short rejected responses)",
+          "status": "DONE"
+        },
+        {
+          "id": "T76.3",
+          "desc": "Task 3 - Configure Gemini Web Flash-Lite as Top Free Fallback & Update Unit Tests",
+          "status": "DONE"
+        },
+        {
+          "id": "T76.4",
+          "desc": "Task 4 - Verification, Compilation, Deploy to LDPlayer & Run Live Translation Test",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P77",
+      "name": "Fix QT Pronunciation, AI Chapter Title Sync & Duplication, Reader Background Translation Desync, and Quick Dictionary vBook Parity",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T77.1",
+          "desc": "Task 1 - Fix QT Phonetic Dictionary & Chapter Heading Quality: Fix '第' in qt_clean_phonetics_unihan17.tsv, add entry to lexicon, update matchChapterHeading in QuickTranslationRepository to format 'Chương $number:'",
+          "status": "DONE"
+        },
+        {
+          "id": "T77.2",
+          "desc": "Task 2 - Optimize QT Speed (100x Faster Response for UI/Titles): Add short-text relevantProjectTerms filter in QuickTranslationRepository to eliminate 600ms Aho-Corasick trie rebuild bottleneck and adopt FastTermMapLookup",
+          "status": "DONE"
+        },
+        {
+          "id": "T77.3",
+          "desc": "Task 3 - AI Chapter Title Extraction & Save: Extract AI chapter title from Chunk 0 in TranslateChapterUseCase and persist to saveAiChapterTitle under canonicalChapterTitleScopeKey",
+          "status": "DONE"
+        },
+        {
+          "id": "T77.4",
+          "desc": "Task 4 - Synchronize Chapter Title ScopeKey across Reader, TOC & Ebook Export: Wire chapterIndex in ReadBookViewModel, TranslateChapterUseCase, TocViewModel, and ExportBookService so AI title cache replaces QT everywhere",
+          "status": "DONE"
+        },
+        {
+          "id": "T77.5",
+          "desc": "Task 5 - User Manual Edit Chapter Title & Permanent Storage: Allow user to manually edit and permanently save chapter title with provider=user, guaranteed never overwritten by AI or QT",
+          "status": "DONE"
+        },
+        {
+          "id": "T77.6",
+          "desc": "Task 6 - Strip Duplicate Chapter Title in ContentProcessor & Reader Sync: Invalidate nextTextChapter on background completion; strip duplicate title lines; ensure clean reading render",
+          "status": "DONE"
+        },
+        {
+          "id": "T77.7",
+          "desc": "Task 7 - Verification, Compilation, LDPlayer Deployment & Live Ebook/Reading Test: Verify unit tests, compile Kotlin, build APK, install to LDPlayer, and verify live reading, TOC & custom title persistence",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P78",
+      "name": "Optimize Quick Translator Quality, Convert Style Guard & Zero-Allocation Speed (Real Story: Dữ Liệu Tu Tiên - Ngũ Hành Quan)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T78.1",
+          "desc": "Task 1 - Cleanse & Guard BookDictionary: Purge 1,250 polluted VIETPHRASE entries from translation_dictionary.json on LDPlayer and add sanitizer to block single words / function words from polluting book dictionary",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.2",
+          "desc": "Task 2 - Core Xianxia Vocabulary & Grammar Enhancement: Update qt_clean_cvdict_base_v3.tsv and lexicon with core cultivation terms (盘坐=ngồi xếp bằng, 胸膛=lồng ngực, 境界=cảnh giới, 入门=nhập môn, 下院=hạ viện, 正常来说=bình thường mà nói)",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.3",
+          "desc": "Task 3 - Sentence Handling for 将/把 and Possessive Term Protection: Fix 将/把 before object nouns to translate as 'đem' instead of 'sẽ', and protect compound terms from being fractured by possessive pronouns (他的吐纳法 -> thổ nạp pháp của hắn)",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.4",
+          "desc": "Task 4 - Zero-Garbage FastTermMapLookup Speed Optimization: Implement firstChar bitmask and lengthsMaskByFirstChar in FastTermMapLookup to eliminate 128,000 substring allocations per chapter and achieve <20ms translation speed",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.5",
+          "desc": "Task 5 - LDPlayer Live Story Verification & Regression Tests: Deploy to LDPlayer, verify Chapter 1 of Dữ Liệu Tu Tiên on Reader and TOC, confirm clean convert style without over-vietnameseization",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P79",
+      "name": "Restore Classic QuickTranslator Algorithm (FMM), Pure TXT Dictionaries & 1-1 Text Mapping (First 10 Chapters)",
+      "status": "DONE",
+      "progress": 100,
+      "tasks": [
+        {
+          "id": "T79.1",
+          "desc": "Phase 01 - Eliminate Pronoun Infrastructure: Remove applyPronounProfile, applyModernPronounRules, applyAncientPronounRules, PronounContextTracker, and clean up pronoun settings in ReadBookViewModel, TranslateChapterUseCase, PreferKey to eliminate all 'bạn, tôi' mutations",
+          "status": "DONE"
+        },
+        {
+          "id": "T79.2",
+          "desc": "Phase 02 - Purge QT Clean Datasets & Wire Pure TXT Dictionaries: Delete qt_clean_*.tsv assets (including qt_clean_cvdict_base_v3.tsv and qt_clean_rules_v*.tsv) and wire pure classic QuickTranslator dictionaries (VietPhrase.txt, Names.txt, ChinesePhienAmWords.txt, Pronouns.txt, LuatNhan.txt / qtdict runtime index)",
+          "status": "DONE"
+        },
+        {
+          "id": "T79.3",
+          "desc": "Phase 03 - Classic QT Algorithm (FMM), Remove QT Beam Search & Guard NMT Beam Search (K): Reimplement original linear greedy longest match (FMM) algorithm for QT, remove Beam Search and its slider only from QT, guarantee 1-1 text mapping, while fully preserving NMT Beam Search and user-adjustable K (1..8) in TranslationConfigScreen",
+          "status": "DONE"
+        },
+        {
+          "id": "T79.4",
+          "desc": "Phase 04 - 10-Chapter Benchmark, Quality/Speed Audit & LDPlayer Deployment: Run 10-chapter JVM benchmark, measure latency and throughput (<30ms/chapter), verify zero modern corruptions and authentic Xianxia tone, build APK and deploy to LDPlayer",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P80",
+      "name": "QuickTranslator Speed & Mapping Acceleration, Vietnamese Mojibake Fix, Compact Download Blocks & Source Health Accuracy",
+      "status": "IN_PROGRESS",
+      "progress": 0,
+      "tasks": [
+        {
+          "id": "T80.1",
+          "desc": "Phase 01 - QT Quality (6 Chapters), Output Speed & Fast Mapping: Eliminate 424 'đích' & 54 'liễu', fix '四周' (4 tuần) & Xianxia names/structures across chapters 1-6, implement lazy on-demand Trie FMM traversal, localize selection mapping window in ReadBookViewModel, and fast-path direct Trie candidate probe in SelectionResolver (<50ms)",
+          "status": "PENDING"
+        },
+        {
+          "id": "T80.2",
+          "desc": "Phase 02 - Fix Vietnamese Mojibake & Manifest Sanitizer: Fix corrupted displayName in model_manifest.json and hf-artifacts-manifest.json, export clean UTF-8 in package script, and add runtime Mojibake sanitizer in HachimiOnnxModelRegistry",
+          "status": "PENDING"
+        },
+        {
+          "id": "T80.3",
+          "desc": "Phase 03 - Main Settings TTS Entry & Compact Cards (Piper/Valtec/ZeroTTS/NMT): Add 'Cài đặt TTS' directly to main ConfigNavScreen, standardize download cards for all TTS families (Piper, Valtec, ZeroTTS) & NMT per user mockup: Leading badge (VI/ZH), title, actual engine tags, dot-separated subtitle, circular download button, and completely purge SHA-256 and .zip filenames",
+          "status": "PENDING"
+        },
+        {
+          "id": "T80.4",
+          "desc": "Phase 04 - Source Health Diagnostic Accuracy & Consistency: Dynamic search keyword probe from home sample or locale, accurate CONTENT_EMPTY/DEGRADED classification, and eliminate messageRedacted leakage on passed stages",
+          "status": "PENDING"
+        },
+        {
+          "id": "T80.5",
+          "desc": "Phase 05 - Verification, Benchmarks & LDPlayer Live Test: Unit tests pass 100%, Kotlin compile clean, APK build, LDPlayer live verification of QT output, mapping speed, dialog font, compact blocks, and source health",
+          "status": "PENDING"
         }
       ]
     }

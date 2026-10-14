@@ -49,6 +49,7 @@ interface QuickDictionaryGateway {
         type: QuickDictionaryType,
         scope: QuickDictionaryScope,
         scopeKey: String,
+        skipBuiltInDedup: Boolean = false,
         onProgress: (QuickDictionaryImportProgress) -> Unit = {},
     ): QuickDictionaryImportResult
 

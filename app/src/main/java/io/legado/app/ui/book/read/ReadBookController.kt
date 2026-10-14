@@ -768,12 +768,12 @@ class ReadBookController(
 
             val items = mutableListOf<ActionMenuItem>()
             items.add(ActionMenuItem(R.id.menu_copy, activity.getString(android.R.string.copy)))
+            items.add(ActionMenuItem(R.id.menu_quick_dictionary, activity.getString(R.string.quick_dictionary_add)))
+            items.add(ActionMenuItem(R.id.menu_dict, activity.getString(R.string.dict)))
             items.add(ActionMenuItem(R.id.menu_share_str, activity.getString(R.string.share)))
             items.add(ActionMenuItem(R.id.menu_browser, activity.getString(R.string.browser)))
             items.add(ActionMenuItem(R.id.menu_aloud, activity.getString(R.string.read_aloud)))
             items.add(ActionMenuItem(R.id.menu_bookmark, activity.getString(R.string.bookmark)))
-            items.add(ActionMenuItem(R.id.menu_dict, activity.getString(R.string.dict)))
-            items.add(ActionMenuItem(R.id.menu_quick_dictionary, activity.getString(R.string.quick_dictionary_add)))
             items.add(ActionMenuItem(R.id.menu_replace, activity.getString(R.string.replace)))
             items.add(ActionMenuItem(R.id.menu_edit, activity.getString(R.string.edit)))
             items.add(ActionMenuItem(R.id.menu_ai_clean, activity.getString(R.string.ai_text_clean)))
@@ -832,10 +832,25 @@ class ReadBookController(
     }
 
     private fun filterModeSpecificItems(items: List<ActionMenuItem>): List<ActionMenuItem> {
-        if (viewModel.uiState.value.readerContentMode.supportsQuickDictionaryEditing()) {
-            return items
+        val supportsQuickDict = viewModel.uiState.value.readerContentMode.supportsQuickDictionaryEditing()
+        if (!supportsQuickDict) {
+            return items.filterNot { it.id == R.id.menu_quick_dictionary }
         }
-        return items.filterNot { it.id == R.id.menu_quick_dictionary }
+        val qdIndex = items.indexOfFirst { it.id == R.id.menu_quick_dictionary }
+        if (qdIndex > 1) {
+            val qdItem = items[qdIndex].copy(showState = 0)
+            val mutable = items.toMutableList()
+            mutable.removeAt(qdIndex)
+            val copyIndex = mutable.indexOfFirst { it.id == R.id.menu_copy }
+            val insertAt = if (copyIndex >= 0) copyIndex + 1 else 0
+            mutable.add(insertAt, qdItem)
+            return mutable
+        } else if (qdIndex >= 0 && items[qdIndex].showState != 0) {
+            val mutable = items.toMutableList()
+            mutable[qdIndex] = mutable[qdIndex].copy(showState = 0)
+            return mutable
+        }
+        return items
     }
 
     fun refreshActionMenuItems() {

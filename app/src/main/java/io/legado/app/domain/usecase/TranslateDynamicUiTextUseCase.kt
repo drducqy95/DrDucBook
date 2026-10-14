@@ -1,6 +1,7 @@
 package io.legado.app.domain.usecase
 
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.BookChapter
 import io.legado.app.domain.gateway.DictionaryGateway
 import io.legado.app.domain.gateway.QuickDictionaryGateway
 import io.legado.app.domain.gateway.QuickTranslationGateway
@@ -395,6 +396,49 @@ class TranslateDynamicUiTextUseCase(
             scopeKey
         }
         val titleScopeKey = "$effectiveScopeKey:title"
+        // 1. User manual edit always takes the highest precedence and is permanent
+        translationCacheGateway.readDynamicUiTranslation(
+            scopeKey = titleScopeKey,
+            originalText = originalText,
+            targetLanguage = targetLanguage,
+            provider = TranslationConstants.PROVIDER_USER,
+        )?.let { return@withContext Result.success(it) }
+
+        // 2. Check if this chapter already has an AI translated file in cache (Ground Truth)
+        if (book != null && chapterIndex != null) {
+            val dummyChapter = BookChapter(
+                url = "",
+                title = originalText,
+                bookUrl = book.bookUrl,
+                index = chapterIndex,
+            )
+            val aiProviders = listOf(
+                TranslationConstants.PROVIDER_APP_AI,
+                TranslationConstants.PROVIDER_LOCAL_AI,
+            )
+            for (aiProv in aiProviders) {
+                val cachedTranslation = translationCacheGateway.readTranslation(
+                    book = book,
+                    bookChapter = dummyChapter,
+                    targetLanguage = targetLanguage,
+                    provider = aiProv,
+                )
+                if (!cachedTranslation.isNullOrBlank()) {
+                    val extractedTitle = extractTranslatedChapterTitle(cachedTranslation, chapterIndex)
+                    if (!extractedTitle.isNullOrBlank()) {
+                        saveAiChapterTitle(
+                            scopeKey = titleScopeKey,
+                            originalText = originalText,
+                            aiTitle = extractedTitle,
+                            provider = aiProv,
+                        )
+                        return@withContext Result.success(extractedTitle)
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback to cached dynamic UI AI title if available
         if (!forceRetranslate) {
             translationCacheGateway.readDynamicUiTranslation(
                 scopeKey = titleScopeKey,
@@ -409,6 +453,8 @@ class TranslateDynamicUiTextUseCase(
                 provider = TranslationConstants.PROVIDER_LOCAL_AI,
             )?.let { return@withContext Result.success(it.restructureChapterNumbers().toTitleCase()) }
         }
+
+        // 4. Fall back to Quick Translator
         execute(
             scopeKey = titleScopeKey,
             originalText = originalText,
@@ -416,6 +462,26 @@ class TranslateDynamicUiTextUseCase(
             contextText = contextText,
             forceRetranslate = forceRetranslate,
         ).map { it.restructureChapterNumbers().toTitleCase() }
+    }
+
+    suspend fun saveUserChapterTitle(
+        bookUrl: String,
+        chapterIndex: Int,
+        originalText: String,
+        userTitle: String,
+    ) = withContext(Dispatchers.IO) {
+        if (originalText.isBlank() || userTitle.isBlank()) return@withContext
+        val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
+        val canonScope = canonicalChapterTitleScopeKey(bookUrl, chapterIndex)
+        val titleScopeKey = "$canonScope:title"
+        val formatted = userTitle.trim()
+        translationCacheGateway.writeDynamicUiTranslation(
+            scopeKey = titleScopeKey,
+            originalText = originalText,
+            targetLanguage = targetLanguage,
+            provider = TranslationConstants.PROVIDER_USER,
+            translatedText = formatted,
+        )
     }
 
     suspend fun saveAiChapterTitle(
@@ -427,6 +493,16 @@ class TranslateDynamicUiTextUseCase(
         if (originalText.isBlank() || aiTitle.isBlank() || aiTitle.containsCjk()) return@withContext
         val targetLanguage = TranslationConstants.TARGET_VIETNAMESE
         val titleScopeKey = if (scopeKey.endsWith(":title")) scopeKey else "$scopeKey:title"
+        val existingUserTitle = translationCacheGateway.readDynamicUiTranslation(
+            scopeKey = titleScopeKey,
+            originalText = originalText,
+            targetLanguage = targetLanguage,
+            provider = TranslationConstants.PROVIDER_USER,
+        )
+        if (existingUserTitle != null) {
+            // User edited title is permanent and cannot be overwritten by AI
+            return@withContext
+        }
         val formatted = aiTitle.restructureChapterNumbers().toTitleCase()
         translationCacheGateway.writeDynamicUiTranslation(
             scopeKey = titleScopeKey,
@@ -470,24 +546,72 @@ class TranslateDynamicUiTextUseCase(
                 results[i] = line
                 continue
             }
-            var aiHit: String? = null
-            if (!forceRetranslate && book != null && chapterIndices != null && i < chapterIndices.size) {
-                val canonScope = canonicalChapterTitleScopeKey(book.bookUrl, chapterIndices[i])
+            var titleHit: String? = null
+            if (book != null && chapterIndices != null && i < chapterIndices.size) {
+                val chIdx = chapterIndices[i]
+                val canonScope = canonicalChapterTitleScopeKey(book.bookUrl, chIdx)
                 val titleKey = "$canonScope:title"
-                aiHit = translationCacheGateway.readDynamicUiTranslation(
+
+                // 1. User manual edit
+                titleHit = translationCacheGateway.readDynamicUiTranslation(
                     scopeKey = titleKey,
                     originalText = line,
                     targetLanguage = targetLanguage,
-                    provider = TranslationConstants.PROVIDER_APP_AI,
-                ) ?: translationCacheGateway.readDynamicUiTranslation(
-                    scopeKey = titleKey,
-                    originalText = line,
-                    targetLanguage = targetLanguage,
-                    provider = TranslationConstants.PROVIDER_LOCAL_AI,
+                    provider = TranslationConstants.PROVIDER_USER,
                 )
+
+                // 2. Check if translated chapter file exists (Ground Truth)
+                if (titleHit == null) {
+                    val dummyChapter = BookChapter(
+                        url = "",
+                        title = line,
+                        bookUrl = book.bookUrl,
+                        index = chIdx,
+                    )
+                    val aiProviders = listOf(
+                        TranslationConstants.PROVIDER_APP_AI,
+                        TranslationConstants.PROVIDER_LOCAL_AI,
+                    )
+                    for (aiProv in aiProviders) {
+                        val cachedTranslation = translationCacheGateway.readTranslation(
+                            book = book,
+                            bookChapter = dummyChapter,
+                            targetLanguage = targetLanguage,
+                            provider = aiProv,
+                        )
+                        if (!cachedTranslation.isNullOrBlank()) {
+                            val extracted = extractTranslatedChapterTitle(cachedTranslation, chIdx)
+                            if (!extracted.isNullOrBlank()) {
+                                saveAiChapterTitle(
+                                    scopeKey = titleKey,
+                                    originalText = line,
+                                    aiTitle = extracted,
+                                    provider = aiProv,
+                                )
+                                titleHit = extracted
+                                break
+                            }
+                        }
+                    }
+                }
+
+                // 3. Check dynamic UI cache
+                if (titleHit == null && !forceRetranslate) {
+                    titleHit = translationCacheGateway.readDynamicUiTranslation(
+                        scopeKey = titleKey,
+                        originalText = line,
+                        targetLanguage = targetLanguage,
+                        provider = TranslationConstants.PROVIDER_APP_AI,
+                    ) ?: translationCacheGateway.readDynamicUiTranslation(
+                        scopeKey = titleKey,
+                        originalText = line,
+                        targetLanguage = targetLanguage,
+                        provider = TranslationConstants.PROVIDER_LOCAL_AI,
+                    )
+                }
             }
-            if (aiHit != null) {
-                results[i] = aiHit.restructureChapterNumbers().toTitleCase()
+            if (titleHit != null) {
+                results[i] = titleHit.restructureChapterNumbers().toTitleCase()
             } else {
                 missingIndices.add(i)
                 missingOriginals.add(line)
@@ -553,7 +677,7 @@ fun String.toTitleCase(): String =
     }
 
 private val chapterNumberPattern = Regex(
-    """(?i)(?:^|(?<=[\s\p{Punct}]))[Đđ]ệ\s*([0-9IVXLCDMivxlcdm]+(?:[.\-_][0-9IVXLCDMivxlcdm]+)?|[Nn]hất|[Nn]hị|[Tt]am|[Tt]ứ|[Nn]gũ|[Ll]ục|[Tt]hất|[Bb]át|[Cc]ửu|[Tt]hập(?:\s*(?:[Nn]hất|[Nn]hị|[Tt]am|[Tt]ứ|[Nn]gũ|[Ll]ục|[Tt]hất|[Bb]át|[Cc]ửu))?|[Bb]ách|[Tt]hiên|[Vv]ạn)\s*([Cc]hương|[Tt]iết|[Qq]uyển|[Hh]ồi|[Tt]hiên|[Tt]ập|[Pp]hần|[Mm]ục|[Tt]hoại|[Bb]ộ|[Kk]ỳ|[Bb]ản|[Tt]rang)"""
+    """(?i)(?:^|(?<=[\s\p{Punct}]))(?:[Đđ]ệ|[Đđ]ậy)\s*([0-9IVXLCDMivxlcdm]+(?:[.\-_][0-9IVXLCDMivxlcdm]+)?|[Nn]hất|[Nn]hị|[Tt]am|[Tt]ứ|[Nn]gũ|[Ll]ục|[Tt]hất|[Bb]át|[Cc]ửu|[Tt]hập(?:\s*(?:[Nn]hất|[Nn]hị|[Tt]am|[Tt]ứ|[Nn]gũ|[Ll]ục|[Tt]hất|[Bb]át|[Cc]ửu))?|[Bb]ách|[Tt]hiên|[Vv]ạn)\s*([Cc]hương|[Tt]iết|[Qq]uyển|[Hh]ồi|[Tt]hiên|[Tt]ập|[Pp]hần|[Mm]ục|[Tt]hoại|[Bb]ộ|[Kk]ỳ|[Bb]ản|[Tt]rang)"""
 )
 
 fun String.restructureChapterNumbers(): String =
@@ -572,3 +696,37 @@ internal fun String.containsCjk(): Boolean = codePoints().anyMatch { codePoint -
         codePoint in 0x4E00..0x9FFF ||
         codePoint in 0x20000..0x2A6DF
 }
+
+fun extractTranslatedChapterTitle(
+    chunkContent: String?,
+    chapterIndex: Int,
+    originalTitle: String? = null,
+): String? {
+    if (chunkContent.isNullOrBlank()) return null
+    val firstLine = chunkContent.lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.isNotBlank() } ?: return null
+    if (firstLine.length > 120 || firstLine.containsCjk()) return null
+
+    val origNumber = originalTitle?.let { title ->
+        Regex("""(?:第\s*)?([0-9０-９零〇一壹二贰貳两兩三叁參四肆五伍六陆陸七柒八捌九玖十拾百佰千仟万萬]+)\s*(?:章|回|节|節|卷|部|篇)""").find(title)?.groupValues?.get(1)
+            ?: Regex("""\b(\d+)\b""").find(title)?.groupValues?.get(1)
+    }
+    val chapterPattern = Regex("^(Chương|Hồi|Tiết|Quyển|Chapter)\\s*(\\d+|[IVXLCDM]+)?[\\s:：._-]*", RegexOption.IGNORE_CASE)
+    val match = chapterPattern.find(firstLine)
+
+    return if (match != null) {
+        val label = match.groupValues[1].replaceFirstChar { it.uppercase() }
+        val numFromText = match.groupValues[2].takeIf { it.isNotBlank() }
+        val chapterNum = origNumber ?: numFromText ?: (chapterIndex + 1).toString()
+        val rest = firstLine.substring(match.range.last + 1).trimStart(':', '：', ' ', '-', '.', '_').trim()
+        if (rest.isNotBlank()) {
+            "$label $chapterNum: ${rest.toTitleCase()}"
+        } else {
+            "$label $chapterNum"
+        }
+    } else {
+        null
+    }
+}
+

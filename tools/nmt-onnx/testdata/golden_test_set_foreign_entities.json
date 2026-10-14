@@ -1,0 +1,306 @@
+{
+  "version": 1,
+  "description": "50-pair Calibrated Benchmark for Foreign Names & Mixed Novel Translation (Chinese -> Vietnamese: Western, Anime, Korean Hunter, Game Stats)",
+  "test_cases": [
+    {
+      "id": "foreign-01",
+      "category": "western_lotm",
+      "zh": "克莱恩·莫雷蒂站在贝克兰德的雨夜街头，轻轻按住头顶的黑色礼帽。",
+      "expected_vi": "Klein Moretti đứng giữa con phố trong đêm mưa Backlund, khẽ đè tay lên chiếc mũ chóp màu đen trên đầu."
+    },
+    {
+      "id": "foreign-02",
+      "category": "western_lotm",
+      "zh": "“愚者先生，向您致敬。”奥黛丽·霍尔在塔罗会上微笑着行礼。",
+      "expected_vi": "“Kính chào Ngài Kẻ Khờ.” Audrey Hall mỉm cười hành lễ tại Hội Tarot."
+    },
+    {
+      "id": "foreign-03",
+      "category": "western_lotm",
+      "zh": "阿蒙扶了扶右眼眶上的水晶单片眼镜，嘴角勾起一抹充满恶意的微笑。",
+      "expected_vi": "Amon đẩy chiếc kính một tròng bằng pha lê bên hốc mắt phải, khóe miệng nhếch lên một nụ cười đầy ác ý."
+    },
+    {
+      "id": "foreign-04",
+      "category": "western_lotm",
+      "zh": "阿尔杰看着手中的罗塞尔大帝日记，心中暗自震惊于上面记载的古老隐秘。",
+      "expected_vi": "Alger nhìn cuốn nhật ký của Đại đế Roselle trong tay, trong lòng thầm chấn động trước những bí mật cổ xưa được ghi chép trên đó."
+    },
+    {
+      "id": "foreign-05",
+      "category": "western_lotm",
+      "zh": "戴里克在白银城深处默默祈祷，期待着愚者先生赐予新的神谕。",
+      "expected_vi": "Derrick thầm cầu nguyện sâu trong Thành Bạch Ngân, mong đợi Ngài Kẻ Khờ ban xuống thần dụ mới."
+    },
+    {
+      "id": "foreign-06",
+      "category": "western_lotm",
+      "zh": "这件0级封印物散发出极其恐怖的污染气息，连空气都开始剧烈扭曲。",
+      "expected_vi": "Vật phong ấn cấp 0 này tỏa ra hơi thở ô nhiễm cực kỳ khủng khiếp, ngay cả không khí cũng bắt đầu vặn vẹo dữ dội."
+    },
+    {
+      "id": "foreign-07",
+      "category": "western_hp",
+      "zh": "哈利·波特紧握手中的魔杖，毫不犹豫地念出咒语：“呼神护卫！”",
+      "expected_vi": "Harry Potter nắm chặt đũa phép trong tay, không chút do dự niệm ra thần chú: “Expecto Patronum!”"
+    },
+    {
+      "id": "foreign-08",
+      "category": "western_hp",
+      "zh": "邓布利多平静地看着眼前的伏地魔，银白色的胡须在微风中轻轻飘动。",
+      "expected_vi": "Dumbledore bình thản nhìn Voldemort trước mắt, chòm râu bạc trắng khẽ đung đưa trong gió nhẹ."
+    },
+    {
+      "id": "foreign-09",
+      "category": "western_hp",
+      "zh": "赫敏·格兰杰迅速翻开厚重的古籍，低声道：“斯内普教授绝不会这么做。”",
+      "expected_vi": "Hermione Granger nhanh chóng lật mở cuốn cổ tịch dày cộm, khẽ nói: “Giáo sư Snape tuyệt đối sẽ không làm như vậy.”"
+    },
+    {
+      "id": "foreign-10",
+      "category": "western_marvel",
+      "zh": "托尼·斯塔克穿上最新的战甲，呼叫贾维斯启动全功率能量护盾。",
+      "expected_vi": "Tony Stark mặc vào bộ chiến giáp mới nhất, gọi Jarvis khởi động khiên năng lượng toàn công suất."
+    },
+    {
+      "id": "foreign-11",
+      "category": "western_marvel",
+      "zh": "灭霸戴着镶嵌满无限宝石的无限手套，冷漠地俯视着这片废墟战场。",
+      "expected_vi": "Thanos đeo chiếc Găng tay Vô Cực khảm kín các viên Đá Vô Cực, lạnh lùng nhìn xuống chiến trường đổ nát này."
+    },
+    {
+      "id": "foreign-12",
+      "category": "western_marvel",
+      "zh": "彼得·帕克在纽约的高楼大厦之间飞荡，蜘蛛感应突然发出了尖锐的警报。",
+      "expected_vi": "Peter Parker đu lượn giữa các tòa nhà chọc trời ở New York, giác quan nhện đột nhiên phát ra cảnh báo dồn dập."
+    },
+    {
+      "id": "foreign-13",
+      "category": "western_dc",
+      "zh": "布鲁斯·韦恩站在哥谭市最高的滴水兽上，俯瞰着这座罪恶之都的霓虹灯火。",
+      "expected_vi": "Bruce Wayne đứng trên bức tượng thú đầu máng cao nhất của thành phố Gotham, nhìn bao quát ánh đèn neon của kinh đô tội ác này."
+    },
+    {
+      "id": "foreign-14",
+      "category": "western_cthulhu",
+      "zh": "古老的拉莱耶之城正在海底苏醒，伟大的克苏鲁陷入了不可名状的沉睡。",
+      "expected_vi": "Thành phố R'lyeh cổ xưa đang thức tỉnh dưới đáy biển, vĩ đại Cthulhu chìm trong giấc ngủ say không thể gọi tên."
+    },
+    {
+      "id": "foreign-15",
+      "category": "anime_op",
+      "zh": "蒙奇·D·路飞咧嘴大笑，振臂高呼：“我是要成为海贼王的男人！”",
+      "expected_vi": "Monkey D. Luffy ngoác miệng cười lớn, vung tay hô to: “Ta là người đàn ông sẽ trở thành Vua Hải Tặc!”"
+    },
+    {
+      "id": "foreign-16",
+      "category": "anime_op",
+      "zh": "罗罗诺亚·索隆拔出三代鬼彻与和道一文字，凌厉的剑气直冲云霄。",
+      "expected_vi": "Roronoa Zoro rút ra Sandai Kitetsu và Wado Ichimonji, kiếm khí sắc bén xông thẳng lên chín tầng mây."
+    },
+    {
+      "id": "foreign-17",
+      "category": "anime_op",
+      "zh": "红发香克斯拔出格里芬，霸王色霸气轰然爆发，瞬间震晕了半个甲板的船员。",
+      "expected_vi": "Shanks Tóc Đỏ rút thanh Gryphon, Bá Vương Sắc Bá Khí ầm ầm bộc phát, trong nháy mắt đánh ngất một nửa thuyền viên trên boong tàu."
+    },
+    {
+      "id": "foreign-18",
+      "category": "anime_op",
+      "zh": "马林梵多广场上，白胡子手握丛云切，引发了震动大地的海啸狂澜。",
+      "expected_vi": "Trên quảng trường Marineford, Râu Trắng nắm chặt Murakumogiri, tạo nên cơn sóng thần cuồng loạn làm chấn động mặt đất."
+    },
+    {
+      "id": "foreign-19",
+      "category": "anime_op",
+      "zh": "赤犬右臂化作滚滚岩浆，青雉周身则凝结出森森寒冰，两人在庞克哈萨德决战十日。",
+      "expected_vi": "Cánh tay phải của Akainu hóa thành dòng dung nham cuồn cuộn, quanh người Aokiji lại ngưng kết làn băng giá buốt xương, cả hai quyết chiến suốt mười ngày tại Punk Hazard."
+    },
+    {
+      "id": "foreign-20",
+      "category": "anime_naruto",
+      "zh": "旋涡鸣人凝聚出巨大的螺旋丸，眼神坚定地望向木叶村的方向。",
+      "expected_vi": "Uzumaki Naruto ngưng tụ ra một quả Rasengan khổng lồ, ánh mắt kiên định nhìn về hướng Làng Lá."
+    },
+    {
+      "id": "foreign-21",
+      "category": "anime_naruto",
+      "zh": "宇智波佐助开启永恒万花筒写轮眼，黑色的天照之火熊熊燃烧。",
+      "expected_vi": "Uchiha Sasuke mở ra Mangekyo Sharingan Vĩnh Cửu, ngọn lửa đen Amaterasu bùng cháy dữ dội."
+    },
+    {
+      "id": "foreign-22",
+      "category": "anime_naruto",
+      "zh": "旗木卡卡西拉起护额露出写轮眼，低声道：“千鸟，雷切！”",
+      "expected_vi": "Hatake Kakashi kéo băng đeo trán để lộ Sharingan, trầm giọng nói: “Chidori, Raikiri!”"
+    },
+    {
+      "id": "foreign-23",
+      "category": "anime_naruto",
+      "zh": "宇智波斑俯瞰着战场的忍者联军，冷笑道：“你们也想起舞吗？”",
+      "expected_vi": "Uchiha Madara nhìn xuống liên quân ninja trên chiến trường, cười khẩy: “Các ngươi cũng muốn khiêu vũ sao?”"
+    },
+    {
+      "id": "foreign-24",
+      "category": "anime_bleach",
+      "zh": "黑崎一护手中的斩月爆发出一股狂暴的黑红色灵压，大喝一声：“卍解，天锁斩月！”",
+      "expected_vi": "Trảm Nguyệt trong tay Kurosaki Ichigo bộc phát một luồng linh áp đen đỏ cuồng bạo, quát lớn một tiếng: “Bankai, Tensa Zangetsu!”"
+    },
+    {
+      "id": "foreign-25",
+      "category": "anime_bleach",
+      "zh": "蓝染惣右介轻轻拔出镜花水月，微笑道：“从一开始，就没有人伫立在天上。”",
+      "expected_vi": "Aizen Sosuke khẽ rút Kyouka Suigetsu, mỉm cười nói: “Ngay từ đầu, chẳng có một ai đứng trên đỉnh trời cả.”"
+    },
+    {
+      "id": "foreign-26",
+      "category": "anime_jujutsu",
+      "zh": "五条悟拉下黑色眼罩，苍蓝色的六眼闪耀生辉：“领域展开，无量空处。”",
+      "expected_vi": "Gojo Satoru kéo bịt mắt màu đen xuống, Lục Nhãn xanh biếc tỏa sáng rực rỡ: “Bành Trướng Lãnh Địa, Vô Lượng Không Xứ.”"
+    },
+    {
+      "id": "foreign-27",
+      "category": "anime_jujutsu",
+      "zh": "两面宿傩坐在白骨王座之上，嘴角勾起残忍的弧度：“伏魔御厨子，开！”",
+      "expected_vi": "Ryomen Sukuna ngồi trên ngai vàng xương trắng, khóe miệng nhếch lên nụ cười tàn nhẫn: “Phục Ma Ngự Trù Tử, khai!”"
+    },
+    {
+      "id": "foreign-28",
+      "category": "anime_demon",
+      "zh": "灶门炭治郎握紧日轮刀，深吸一口气，运转日之呼吸斩向恶鬼的脖颈。",
+      "expected_vi": "Kamado Tanjiro nắm chặt Nhật Luân Đao, hít sâu một hơi, vận chuyển Hơi Thở Mặt Trời chém vào cổ ác quỷ."
+    },
+    {
+      "id": "foreign-29",
+      "category": "anime_aot",
+      "zh": "艾伦·耶格尔仰天长啸，化身为进击的巨人，狂暴的力量掀翻了四周的围墙。",
+      "expected_vi": "Eren Yeager ngửa mặt lên trời gầm thét, hóa thân thành Titan Tiến Công, sức mạnh cuồng bạo hất văng những bức tường bao quanh."
+    },
+    {
+      "id": "foreign-30",
+      "category": "anime_aot",
+      "zh": "利威尔兵长启动立体机动装置，化作一道银色闪电在巨人群中穿梭收割。",
+      "expected_vi": "Binh trưởng Levi khởi động bộ cơ động 3D, hóa thành một đạo tia chớp bạc lao vun vút thu hoạch giữa bầy người khổng lồ."
+    },
+    {
+      "id": "foreign-31",
+      "category": "anime_fate",
+      "zh": "吉尔伽美什傲然伫立在虚空之中，王之财宝背后浮现出数以千计的金色光晕。",
+      "expected_vi": "Gilgamesh kiêu ngạo đứng sừng sững giữa hư không, phía sau Cánh Cổng Babylon hiện lên hàng ngàn vầng hào quang hoàng kim."
+    },
+    {
+      "id": "foreign-32",
+      "category": "korean_solo",
+      "zh": "成振宇站在暗黑的地下城废墟中，冷峻地下达指令：“起来。”",
+      "expected_vi": "Sung Jin-woo đứng giữa tàn tích hầm ngục tăm tối, lạnh lùng hạ mệnh lệnh: “Trỗi dậy.”"
+    },
+    {
+      "id": "foreign-33",
+      "category": "korean_solo",
+      "zh": "数以万计的暗影士兵从影子里拔地而起，将整个地下城化作暗影君王的领地。",
+      "expected_vi": "Hàng vạn binh sĩ bóng tối từ trong bóng đen trồi lên khỏi mặt đất, biến toàn bộ hầm ngục thành lãnh địa của Hoàng Đế Bóng Tối."
+    },
+    {
+      "id": "foreign-34",
+      "category": "korean_solo",
+      "zh": "S级猎人车海印敏锐地嗅到了那股纯净而又令人心悸的魔力气息。",
+      "expected_vi": "Thợ săn cấp S Cha Hae-in nhạy bén ngửi thấy mùi ma lực thuần khiết nhưng lại khiến người ta thót tim."
+    },
+    {
+      "id": "foreign-35",
+      "category": "korean_solo",
+      "zh": "首尔猎人协会的高层们死死盯着监视器，屏幕上的魔力读数已经飙升至不可估量的天位。",
+      "expected_vi": "Các quan chức cấp cao của Hiệp hội Thợ săn Seoul nhìn chằm chằm vào màn hình giám sát, chỉ số ma lực trên màn hình đã tăng vọt tới cấp độ không thể đo lường."
+    },
+    {
+      "id": "foreign-36",
+      "category": "korean_orv",
+      "zh": "金独子看着眼前跳出的系统提示框，心中暗想这正是《灭活法》记载的第三阶段剧本。",
+      "expected_vi": "Kim Dokja nhìn khung thông báo hệ thống nhảy ra trước mắt, trong lòng thầm nghĩ đây chính là kịch bản giai đoạn ba được ghi chép trong 《Tam Pháp Sinh Tồn》."
+    },
+    {
+      "id": "foreign-37",
+      "category": "korean_orv",
+      "zh": "刘众赫手中的黑剑嗡鸣作响，冷声道：“金独子，你以为这次还能靠诡计蒙混过关么？”",
+      "expected_vi": "Thanh hắc kiếm trong tay Yoo Joonghyuk kêu ong ong, lạnh giọng nói: “Kim Dokja, ngươi nghĩ lần này còn có thể nhờ quỷ kế mà trót lọt qua ải sao?”"
+    },
+    {
+      "id": "foreign-38",
+      "category": "korean_hunter",
+      "zh": "红门突然在江南区中心商业街完全展开，地下城暴走引发了全城范围的紧急避难警报。",
+      "expected_vi": "Cổng Đỏ đột ngột mở rộng hoàn toàn tại khu phố thương mại trung tâm quận Gangnam, hầm ngục bạo tẩu kích hoạt còi báo động sơ tán khẩn cấp trên toàn thành phố."
+    },
+    {
+      "id": "foreign-39",
+      "category": "korean_hunter",
+      "zh": "各大公会的会长亲自带队，数十名S级与A级觉醒者联手封锁了暴走的传送裂缝。",
+      "expected_vi": "Hội trưởng các bang hội lớn đích thân dẫn đội, hàng chục Người Thức Tỉnh cấp S và cấp A chung tay phong tỏa vết nứt dịch chuyển đang bạo tẩu."
+    },
+    {
+      "id": "foreign-40",
+      "category": "game_stats",
+      "zh": "【叮！系统提示：您的HP值已跌至5%濒危线，全属性下降50%！】",
+      "expected_vi": "【Đinh! Hệ thống nhắc nhở: Chỉ số HP của bạn đã rơi xuống ranh giới nguy kịch 5%, toàn bộ thuộc tính giảm 50%!】"
+    },
+    {
+      "id": "foreign-41",
+      "category": "game_stats",
+      "zh": "这一击精准命中弱点，触发了高达500%的暴击伤害，瞬间清空了世界BOSS的血条！",
+      "expected_vi": "Đòn đánh này chuẩn xác trúng vào điểm yếu, kích hoạt sát thương bạo kích lên tới 500%, ngay lập tức dọn sạch thanh máu của BOSS Thế Giới!"
+    },
+    {
+      "id": "foreign-42",
+      "category": "game_stats",
+      "zh": "法力值见底的法师无力地瘫倒在地，技能冷却时间却还有整整三十秒。",
+      "expected_vi": "Pháp sư cạn kiệt thanh MP bất lực ngã quỵ xuống đất, trong khi thời gian hồi chiêu của kỹ năng vẫn còn tròn ba mươi giây."
+    },
+    {
+      "id": "foreign-43",
+      "category": "game_infinite",
+      "zh": "苏晓拔出斩龙闪，淡蓝色的青钢影能量奔涌而起，直接切开了敌方契约者的护盾。",
+      "expected_vi": "Tô Hiểu rút ra Trảm Long Thiểm, năng lượng Thanh Cương Ảnh màu xanh nhạt cuộn trào, trực tiếp chém toạc tấm khiên hộ thể của Khế ước giả đối phương."
+    },
+    {
+      "id": "foreign-44",
+      "category": "game_infinite",
+      "zh": "【轮回乐园提示：猎杀者已成功击杀违规者，获得灵魂钱币x500，主线任务已完成。】",
+      "expected_vi": "【Luân Hồi Lạc Viên nhắc nhở: Liệp sát giả đã tiêu diệt thành công Kẻ vi phạm, nhận được Tiền Linh Hồn x500, nhiệm vụ chính tuyến hoàn thành.】"
+    },
+    {
+      "id": "foreign-45",
+      "category": "game_infinite",
+      "zh": "他在属性强化大厅将力量与敏捷属性全部加到了80点极值，全身肌肉隐隐散发出金属般的光泽。",
+      "expected_vi": "Tại Đại sảnh cường hóa thuộc tính, hắn cộng toàn bộ điểm thuộc tính Sức mạnh và Nhanh nhẹn lên mốc cực hạn 80 điểm, các thớ cơ bắp trên cơ thể thoang thoảng ánh lên ánh kim loại."
+    },
+    {
+      "id": "foreign-46",
+      "category": "mixed_crossover",
+      "zh": "“托尼·斯塔克，快看雷达！”彼得·帕克指着纽约上空巨大的传送门惊呼道，“灭霸的战舰正在释放大量精英怪！”",
+      "expected_vi": "“Tony Stark, mau nhìn radar!” Peter Parker chỉ vào cánh cổng dịch chuyển khổng lồ trên bầu trời New York kinh hãi thốt lên, “Chiến hạm của Thanos đang thả ra lượng lớn quái tinh anh!”"
+    },
+    {
+      "id": "foreign-47",
+      "category": "mixed_crossover",
+      "zh": "蒙奇·D·路飞开启四档形态，霸王色霸气席卷马林梵多，赤犬与青雉皆是面露震惊之色。",
+      "expected_vi": "Monkey D. Luffy mở trạng thái Gear 4, Bá Vương Sắc Bá Khí quét ngang Marineford, cả Akainu và Aokiji đều lộ vẻ chấn động."
+    },
+    {
+      "id": "foreign-48",
+      "category": "mixed_crossover",
+      "zh": "成振宇在首尔街头拔出匕首，眼神冰冷地看着眼前的S级地下城裂缝，随手召唤出暗影军团。",
+      "expected_vi": "Sung Jin-woo rút dao găm giữa đường phố Seoul, ánh mắt lạnh lùng nhìn vết nứt hầm ngục cấp S trước mắt, thuận tay triệu hồi Đội quân Bóng Tối."
+    },
+    {
+      "id": "foreign-49",
+      "category": "mixed_crossover",
+      "zh": "克莱恩在贝克兰德的黑夜中戴上礼帽，掌心浮现出塔罗牌，悄然调动非凡特性抵御邪神的污染。",
+      "expected_vi": "Klein đội chiếc mũ chóp giữa màn đêm Backlund, trong lòng bàn tay hiện lên lá bài Tarot, lặng lẽ điều động đặc tính phi thường chống lại sự ô nhiễm của tà thần."
+    },
+    {
+      "id": "foreign-50",
+      "category": "mixed_crossover",
+      "zh": "金独子看着身受重伤的刘众赫，苦笑道：“你现在的HP值只剩5%了，再动用大招就会直接暴毙。”",
+      "expected_vi": "Kim Dokja nhìn Yoo Joonghyuk đang bị thương nặng, cười gượng nói: “Chỉ số HP của anh hiện tại chỉ còn 5% thôi, dùng chiêu cuối nữa là chết bất đắc kỳ tử ngay đấy.”"
+    }
+  ]
+}

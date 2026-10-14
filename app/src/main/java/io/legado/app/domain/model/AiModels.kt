@@ -216,8 +216,8 @@ object AiProviderPresets {
             protocol = AiProtocol.GEMINI_GENERATE_CONTENT,
             baseUrl = "https://generativelanguage.googleapis.com/v1beta",
             modelsUrl = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000",
-            modelName = "Gemini 3.6 Flash",
-            modelId = "gemini-3.6-flash"
+            modelName = "Gemini 3.8 Flash",
+            modelId = "gemini-3.8-flash"
         )
     )
 }

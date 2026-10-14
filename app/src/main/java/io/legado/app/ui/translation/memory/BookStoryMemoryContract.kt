@@ -72,12 +72,18 @@ data class AiStoryMemoryBuilderDialogState(
     }
 }
 
+enum class RetrofitMode {
+    ALGORITHMIC,
+    AI_RETRANSLATE,
+}
+
 @Stable
 data class RetrofitCacheDialogState(
     val isOpen: Boolean = false,
     val startChapter: Int = 0,
     val endChapter: Int = 10,
     val maxChapters: Int = 0,
+    val mode: RetrofitMode = RetrofitMode.ALGORITHMIC,
     val isRunning: Boolean = false,
     val progressCurrent: Int = 0,
     val progressTotal: Int = 0,

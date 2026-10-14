@@ -982,6 +982,9 @@ class AiRouterViewModel(
                             makeDefault = shouldBeDefault,
                         )
                     ).also { savedRoute ->
+                    existingTargets.forEach { target ->
+                        routerGateway.deleteTarget(target.id)
+                    }
                     modelIds.forEachIndexed { index, modelId ->
                         routerGateway.saveTarget(
                             AiRouteTargetDraft(
@@ -1370,25 +1373,49 @@ class AiRouterViewModel(
         const val FREE_CHAT_ROUTE = "Chat AI · Free fallback"
         val AUTO_INSTALL_PROVIDER_PROFILE_IDS = listOf(
             "catalog_gemini_web",
-            "catalog_opencode_free",
         )
         val RETIRED_AUTO_PROVIDER_PROFILE_IDS = setOf(
             "catalog_mimo_free",
+            "catalog_opencode_free",
         )
         val GEMINI_WEB_KNOWN_FREE_MODELS = setOf(
+            "gemini-web-flash-lite",
             "gemini-web-flash",
             "gemini-web-default",
             "gemini-web-pro",
             "gemini-web-thinking",
         )
-        val PREFERRED_GEMINI_MODELS = listOf(
+        val GEMINI_FREE_TIER_MODELS = setOf(
+            "gemini-3.8-flash",
+            "gemini-3.8-flash-lite",
+            "gemini-3.7-flash",
+            "gemini-3.7-flash-lite",
             "gemini-3.6-flash",
-            "gemini-3.5-flash-lite",
             "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
             "gemini-3.1-flash-lite",
             "gemini-3.1-flash",
-            "gemini-2.5-flash-lite",
-            "gemini-2.5-flash",
+        )
+        val GEMINI_BILLING_REQUIRED_MODELS = setOf(
+            "gemini-3.8-pro",
+            "gemini-3.7-pro",
+            "gemini-3.1-pro-preview",
+            "gemini-3.1-pro",
+        )
+        val PREFERRED_GEMINI_MODELS = listOf(
+            "gemini-3.8-flash",
+            "gemini-3.5-flash",
+            "gemini-3.6-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-3.8-flash-lite",
+            "gemini-3.7-flash",
+            "gemini-3.7-flash-lite",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash",
+            "gemini-3.8-pro",
+            "gemini-3.7-pro",
+            "gemini-3.1-pro-preview",
+            "gemini-3.1-pro",
         )
         const val FREE_TRANSLATION_ROUTE = "Dịch AI · Free fallback"
         val OPENCODE_RETIRED_FREE_MODELS = setOf(
@@ -1424,12 +1451,11 @@ class AiRouterViewModel(
         val comboTemplates = listOf(
             ComboTemplate(
                 id = "free_web_pool",
-                name = "Free Web & OpenCode",
-                description = "Gemini Web → OpenCode Zen; hoàn toàn miễn phí không cần API key.",
+                name = "Gemini Web Free",
+                description = "Gemini Web; hoàn toàn miễn phí không cần API key.",
                 strategy = io.legado.app.domain.model.AiRouteStrategy.PRIORITY,
                 providerOrder = listOf(
                     "catalog_gemini_web",
-                    "catalog_opencode_free",
                 ),
             ),
             ComboTemplate(

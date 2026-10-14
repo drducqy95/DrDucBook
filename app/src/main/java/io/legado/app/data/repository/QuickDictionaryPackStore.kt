@@ -44,19 +44,41 @@ class QuickDictionaryPackStore(
     private val root: File = File(appCtx.filesDir, DIRECTORY_NAME),
 ) {
 
-    init {
-        root.mkdirs()
-        cleanupIncompletePacks()
-    }
     private val _packs = MutableStateFlow(loadMetadata())
     val packs = _packs.asStateFlow()
     private val _originalPackState = MutableStateFlow(loadOriginalPackState())
     val originalPackState = _originalPackState.asStateFlow()
     private val mappedIndexes = ConcurrentHashMap<String, MappedDictionaryIndex>()
 
+    init {
+        root.mkdirs()
+        cleanupIncompletePacks()
+        purgeLegacyCleanPacks()
+    }
+
+    private fun purgeLegacyCleanPacks() {
+        if (hasOriginalPack()) {
+            restoreDefaultBundledPack()
+        }
+        val legacyPacks = _packs.value.filter {
+            it.name.contains("clean", ignoreCase = true) ||
+                it.name == ORIGINAL_DISPLAY_NAME ||
+                it.name == "Từ điển gốc tùy chỉnh"
+        }
+        legacyPacks.forEach { deletePack(it.id) }
+    }
+
     fun versionToken(): String = _packs.value
         .joinToString("|") { "${it.id}:${it.updatedAt}:${it.entryCount}:${it.enabled}" }
+        .plus("|orig:${_originalPackState.value.activePackId}:${_originalPackState.value.activeRevision}")
         .ifBlank { "none" }
+
+    fun customBaseIndexFile(): File? {
+        val state = _originalPackState.value
+        val packId = state.activePackId ?: return null
+        val indexFile = File(root, "$packId.qtdict")
+        return indexFile.takeIf { it.isFile && it.length() > 0L }
+    }
 
     fun importPack(
         sourceFile: File,
@@ -149,6 +171,8 @@ class QuickDictionaryPackStore(
     }
 
     fun getPack(id: String): QuickDictionaryPack? = _packs.value.firstOrNull { it.id == id }
+
+    fun activeOriginalPackId(): String? = _originalPackState.value.activePackId
 
     /** True only when the downloaded original pack has a verified active copy. */
     fun hasOriginalPack(): Boolean {
@@ -252,6 +276,50 @@ class QuickDictionaryPackStore(
         return restored
     }
 
+    /**
+     * Replaces the base dictionary completely with a user-supplied file (.txt, .tsv).
+     * Builds a mapped .qtdict index and registers it as the active base pack.
+     */
+    fun replaceOriginalBasePack(
+        sourceFile: File,
+        displayName: String = "Từ điển gốc tùy chỉnh",
+        onProgress: (QuickDictionaryImportProgress) -> Unit = {},
+    ): QuickDictionaryPack {
+        val state = _originalPackState.value
+        state.activePackId?.let { deletePack(it) }
+        markOriginalVerifying()
+        val result = importPack(
+            sourceFile = sourceFile,
+            displayName = displayName,
+            type = QuickDictionaryType.VIETPHRASE,
+            scope = QuickDictionaryScope.GLOBAL,
+            scopeKey = "",
+            onProgress = onProgress,
+        )
+        val pack = result.pack ?: error("Không thể tạo chỉ mục từ điển gốc từ tệp được cung cấp")
+        registerOriginalPack(pack, sourceFile)
+        return pack
+    }
+
+    /**
+     * Restores to the default bundled dictionary by removing the custom base index.
+     */
+    fun restoreDefaultBundledPack() {
+        val state = _originalPackState.value
+        state.activePackId?.let { deletePack(it) }
+        val pristine = File(root, ORIGINAL_PRISTINE_SOURCE)
+        if (pristine.exists()) pristine.delete()
+        _originalPackState.value = QuickDictionaryPackState(
+            status = QuickDictionaryPackStatus.NOT_INSTALLED,
+            activePackId = null,
+            activeRevision = null,
+            pristineRevision = null,
+            entryCount = 0,
+            lastVerifiedAt = System.currentTimeMillis(),
+        )
+        persistOriginalPackState()
+    }
+
     fun containsEntry(
         type: QuickDictionaryType,
         raw: String,
@@ -275,8 +343,9 @@ class QuickDictionaryPackStore(
         activeUniverseKey: String,
     ): List<QuickDictionaryEntry> {
         if (context.isEmpty()) return emptyList()
+        val activeOriginalId = _originalPackState.value.activePackId
         val applicable = _packs.value.filter { pack ->
-            pack.enabled && when (pack.scope) {
+            pack.id != activeOriginalId && pack.enabled && when (pack.scope) {
                 QuickDictionaryScope.GLOBAL -> true
                 QuickDictionaryScope.UNIVERSE -> pack.scopeKey == activeUniverseKey
                 QuickDictionaryScope.PROJECT -> pack.scopeKey == projectKey

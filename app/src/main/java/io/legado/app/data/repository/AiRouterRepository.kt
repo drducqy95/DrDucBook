@@ -749,7 +749,7 @@ class AiRouterRepository(
                             "Rewrite this sentence naturally in Vietnamese and return plain text only: Hello world."
                         else -> "Reply with OK."
                     }
-                    val response = withTimeoutOrNull(10_000L) {
+                    val response = withTimeoutOrNull(25_000L) {
                         delegate.generate(
                             AiGenerateRequest(
                                 model = modelConfig,
@@ -787,7 +787,7 @@ class AiRouterRepository(
                     }
                     error != null && isModelCapabilityUnavailable(error) -> AiCapabilityStatus.MODEL_UNAVAILABLE
                     error != null && isCredentialQuotaFailure(error) -> AiCapabilityStatus.QUOTA_EXHAUSTED
-                    else -> AiCapabilityStatus.CONTRACT_UNSUPPORTED
+                    else -> AiCapabilityStatus.DEGRADED
                 }
                 dao.upsertCapability(
                     AiCredentialModelCapabilityEntity(
@@ -923,10 +923,11 @@ class AiRouterRepository(
                 capability.cooldownUntil,
             )
         }
+        val candidateCredentials = capabilityCredentials.ifEmpty { credentials }
         val orderedCredentials = orderProviderCredentials(
             providerId = provider.id,
             targetId = "direct:${request.model.id}",
-            credentials = capabilityCredentials,
+            credentials = candidateCredentials,
         )
         val bestCredential = orderedCredentials.firstOrNull() ?: return request.copy(
             model = request.model.copy(provider = provider.copy(baseUrl = effectiveBaseUrl))

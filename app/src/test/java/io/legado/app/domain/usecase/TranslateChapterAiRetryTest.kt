@@ -1396,6 +1396,7 @@ private class EmptyQuickDictionaryGateway : QuickDictionaryGateway {
         type: QuickDictionaryType,
         scope: QuickDictionaryScope,
         scopeKey: String,
+        skipBuiltInDedup: Boolean,
         onProgress: (QuickDictionaryImportProgress) -> Unit,
     ): QuickDictionaryImportResult = error("unused")
 

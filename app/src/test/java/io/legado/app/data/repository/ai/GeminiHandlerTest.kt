@@ -193,10 +193,10 @@ class GeminiHandlerTest {
     }
 
     @Test
-    fun usesGemini36FlashAsDefaultGeminiModel() {
+    fun usesGemini38FlashAsDefaultGeminiModel() {
         val preset = AiProviderPresets.items.single { it.id == "gemini" }
 
-        assertEquals("gemini-3.6-flash", preset.modelId)
-        assertEquals("Gemini 3.6 Flash", preset.modelName)
+        assertEquals("gemini-3.8-flash", preset.modelId)
+        assertEquals("Gemini 3.8 Flash", preset.modelName)
     }
 }

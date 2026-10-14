@@ -80,4 +80,16 @@ object TranslationContentSanitizer {
             .replace(Regex("\\n{3,}"), "\n\n")
             .trim()
     }
+
+    private val CHINESE_PROMO_REGEX = Regex(
+        """(?m)^\s*(?:(?:ps|p\.s)\s*[:：].*|.*(?:求月票|求收藏|求推荐|求打赏|求追读|求花花|新书启航|萌新作者|本书首发域名|请记住本书首发域名|手机版阅读网址|看小说就到|请收藏本站|免费阅读网址).*)\s*${'$'}""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    fun stripSourceWatermarks(value: String): String {
+        if (value.isBlank()) return value
+        return value.replace(CHINESE_PROMO_REGEX, "")
+            .replace(Regex("\\n{3,}"), "\n\n")
+            .trim()
+    }
 }

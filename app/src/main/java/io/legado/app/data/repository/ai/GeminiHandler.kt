@@ -210,9 +210,29 @@ class GeminiHandler : AiProtocolHandler {
                 val id = model.getString("baseModelId")
                     ?: model.getString("name")?.removePrefix("models/")
                     ?: return@mapNotNull null
+                val idLower = id.lowercase()
+                // Bỏ qua các model đã bị Google khai tử (404) hoặc không phải model đàm thoại/dịch
+                if (idLower in GEMINI_DEAD_OR_UNSUPPORTED_MODELS ||
+                    idLower.startsWith("gemini-2.5") ||
+                    idLower.startsWith("gemini-2.0") ||
+                    idLower.startsWith("gemini-1.5") ||
+                    idLower.contains("-tts") ||
+                    idLower.contains("-image") ||
+                    idLower.contains("-transcribe") ||
+                    idLower.contains("computer-use") ||
+                    idLower.contains("robotics")
+                ) {
+                    return@mapNotNull null
+                }
+                val rawDisplayName = model.getString("displayName") ?: id
+                val displayNameWithTier = when {
+                    idLower.contains("pro") -> "$rawDisplayName (Yêu cầu Billing)"
+                    idLower == "gemini-3.5-flash" -> "$rawDisplayName (Free Khuyên dùng)"
+                    else -> rawDisplayName
+                }
                 AiAvailableModel(
                     id = id,
-                    name = model.getString("displayName") ?: id,
+                    name = displayNameWithTier,
                     contextWindow = model.get("inputTokenLimit")?.asInt ?: 0,
                     maxOutputTokens = model.get("outputTokenLimit")?.asInt ?: 0,
                 )
@@ -236,14 +256,32 @@ class GeminiHandler : AiProtocolHandler {
     }
 }
 
-private val PREFERRED_GEMINI_TRANSLATION_MODELS = listOf(
-    "gemini-3.6-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3.1-flash",
-    "gemini-2.5-flash-lite",
+private val GEMINI_DEAD_OR_UNSUPPORTED_MODELS = setOf(
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-2.0-pro",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-1.0-pro",
+)
+
+private val PREFERRED_GEMINI_TRANSLATION_MODELS = listOf(
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3.8-flash-lite",
+    "gemini-3.7-flash",
+    "gemini-3.7-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash",
+    "gemini-3.8-pro",
+    "gemini-3.7-pro",
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-pro",
 )
 
 private fun preferredGeminiModelRank(modelId: String): Int {

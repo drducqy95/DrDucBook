@@ -303,7 +303,7 @@ class AiRouterAutoInstallPolicyTest {
     @Test
     fun geminiWebAutoInstallIdIsInCatalog() {
         assertTrue(io.legado.app.domain.model.AiProviderCatalog.autoInstallIds.contains("gemini_web"))
-        assertTrue(io.legado.app.domain.model.AiProviderCatalog.autoInstallIds.contains("opencode_free"))
+        assertFalse(io.legado.app.domain.model.AiProviderCatalog.autoInstallIds.contains("opencode_free"))
     }
 
     @Test

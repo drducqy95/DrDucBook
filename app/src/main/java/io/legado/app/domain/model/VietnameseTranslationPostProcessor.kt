@@ -1,10 +1,32 @@
 package io.legado.app.domain.model
 
+import java.text.Normalizer
+
 /** Display-safe Vietnamese typography fixes that never change whitespace or punctuation. */
 object VietnameseTranslationPostProcessor {
 
     private val sentenceEnd = setOf('.', '!', '?', '…', '。', '！', '？')
     private val paragraphEnd = setOf('\n', '\r', '\u2028', '\u2029')
+
+    private val ROGUE_SCRIPT_REGEX = Regex("[\\u0600-\\u06FF\\u0750-\\u077F\\u08A0-\\u08FF\\uFB50-\\uFDFF\\uFE70-\\uFEFF]")
+    private val ABNORMAL_MIXED_CASE_REGEX = Regex("""\b(\p{Lu})(\p{Ll}+)(\p{Lu}+)(\p{Ll}*)\b""")
+
+    fun normalizeUnicode(text: String): String {
+        if (text.isEmpty() || Normalizer.isNormalized(text, Normalizer.Form.NFC)) return text
+        return Normalizer.normalize(text, Normalizer.Form.NFC)
+    }
+
+    fun stripRogueCharacters(text: String): String {
+        if (text.isEmpty()) return text
+        return text.replace(ROGUE_SCRIPT_REGEX, "")
+    }
+
+    fun fixAbnormalMixedCase(text: String): String {
+        if (text.isEmpty()) return text
+        return ABNORMAL_MIXED_CASE_REGEX.replace(text) { match ->
+            match.value.lowercase().replaceFirstChar { it.titlecaseChar() }
+        }
+    }
 
     fun cleanRogueBooleanLiterals(text: String): String {
         if (text.isEmpty() || (!text.contains("true", ignoreCase = true) && !text.contains("false", ignoreCase = true))) {

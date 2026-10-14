@@ -873,47 +873,58 @@ class AiOAuthRepository(
         }
         // OAuth has already succeeded. Discovery/onboarding is auxiliary and must not prevent
         // storing the account when Code Assist is temporarily unavailable.
+        var detectedTierId: String? = null
         val finalProject = runCatching {
-        if (!projectResponse.isSuccessful()) {
-            val detail = projectResponse.body.orEmpty().trim().take(300)
-            error(
-                "Google Code Assist load project HTTP ${projectResponse.code()}" +
-                    detail.takeIf(String::isNotEmpty)?.let { ": $it" }.orEmpty()
-            )
-        }
-        val projectRoot = runCatching {
-            GSON.fromJson(projectResponse.body, JsonObject::class.java)
-        }.getOrNull() ?: error("Google Code Assist trả dữ liệu project không hợp lệ")
-        resolveAntigravityProject(
-            loadPayload = projectRoot,
-            maxOnboardingAttempts = 2,
-            onboard = { tierId ->
-                val onboardResponse = okHttpClient.newCallStrResponse {
-                    url("$ANTIGRAVITY_PRODUCTION_BASE_URL/v1internal:onboardUser")
-                    postJson(
-                        GSON.toJson(
-                            mapOf(
-                                "tierId" to tierId,
-                                "metadata" to GOOGLE_CLIENT_METADATA,
+            if (!projectResponse.isSuccessful()) {
+                val detail = projectResponse.body.orEmpty().trim().take(300)
+                error(
+                    "Google Code Assist load project HTTP ${projectResponse.code()}" +
+                        detail.takeIf(String::isNotEmpty)?.let { ": $it" }.orEmpty()
+                )
+            }
+            val projectRoot = runCatching {
+                GSON.fromJson(projectResponse.body, JsonObject::class.java)
+            }.getOrNull() ?: error("Google Code Assist trả dữ liệu project không hợp lệ")
+            detectedTierId = projectRoot.getAsJsonArray("allowedTiers")
+                ?.mapNotNull { tier -> tier.takeIf { it.isJsonObject }?.asJsonObject }
+                .orEmpty()
+                .let { tiers ->
+                    tiers.firstOrNull { it.get("isDefault")?.asBoolean == true }
+                        ?: tiers.firstOrNull()
+                }
+                ?.get("id")?.takeIf { it.isJsonPrimitive }?.asString?.trim()?.takeIf(String::isNotEmpty)
+                ?: projectRoot.get("tierId")?.takeIf { it.isJsonPrimitive }?.asString?.trim()?.takeIf(String::isNotEmpty)
+            resolveAntigravityProject(
+                loadPayload = projectRoot,
+                maxOnboardingAttempts = 2,
+                onboard = { tierId ->
+                    detectedTierId = tierId
+                    val onboardResponse = okHttpClient.newCallStrResponse {
+                        url("$ANTIGRAVITY_PRODUCTION_BASE_URL/v1internal:onboardUser")
+                        postJson(
+                            GSON.toJson(
+                                mapOf(
+                                    "tierId" to tierId,
+                                    "metadata" to GOOGLE_CLIENT_METADATA,
+                                )
                             )
                         )
-                    )
-                    addHeaders(codeAssistHeaders)
-                }
-                if (!onboardResponse.isSuccessful()) {
-                    val detail = onboardResponse.body.orEmpty().trim().take(300)
-                    error(
-                        "Google Code Assist onboarding HTTP ${onboardResponse.code()}" +
-                            detail.takeIf(String::isNotEmpty)?.let { ": $it" }.orEmpty()
-                    )
-                }
-                runCatching {
-                    GSON.fromJson(onboardResponse.body, JsonObject::class.java)
-                }.getOrNull()
-                    ?: error("Google Code Assist onboarding trả dữ liệu không hợp lệ")
-            },
-            waitBeforeRetry = { delay(1_000L) },
-        )
+                        addHeaders(codeAssistHeaders)
+                    }
+                    if (!onboardResponse.isSuccessful()) {
+                        val detail = onboardResponse.body.orEmpty().trim().take(300)
+                        error(
+                            "Google Code Assist onboarding HTTP ${onboardResponse.code()}" +
+                                detail.takeIf(String::isNotEmpty)?.let { ": $it" }.orEmpty()
+                        )
+                    }
+                    runCatching {
+                        GSON.fromJson(onboardResponse.body, JsonObject::class.java)
+                    }.getOrNull()
+                        ?: error("Google Code Assist onboarding trả dữ liệu không hợp lệ")
+                },
+                waitBeforeRetry = { delay(1_000L) },
+            )
         }.getOrNull()
         val email = user?.string("email")
         return OAuthAccount(
@@ -921,6 +932,7 @@ class AiOAuthRepository(
             label = email ?: "Google Antigravity",
             data = buildMap {
                 finalProject?.takeIf(String::isNotBlank)?.let { put("projectId", it) }
+                detectedTierId?.takeIf(String::isNotBlank)?.let { put("tierId", it) }
             },
         )
     }

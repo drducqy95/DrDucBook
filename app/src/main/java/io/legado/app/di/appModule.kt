@@ -637,7 +637,7 @@ val appModule = module {
     singleOf(::EnrichEntitiesWithAiUseCase)
     singleOf(::SaveBookContentProcessUseCase)
     singleOf(::TranslateDynamicUiTextUseCase)
-    singleOf(::TranslateBrowserPageUseCase)
+    single { TranslateBrowserPageUseCase(get()) }
     singleOf(::ReplaceRuleRepository)
     single<DictionaryGateway> { DictionaryRepositoryImpl() }
     singleOf(::TranslationStoryMemoryUseCase)

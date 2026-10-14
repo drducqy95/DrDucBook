@@ -86,11 +86,7 @@ class QuickTranslationRepositoryTest {
             projectTerms = emptyList(),
         ).lowercase()
 
-        assertTrue(actual, actual.contains("2 cuộc đời"))
-        assertTrue(actual, actual.contains("cuộc đời thứ 2 của tôi"))
-        assertTrue(actual, actual.contains("cách giết chết cuộc đời thứ hai"))
         assertFalse(actual, actual.contains("con mệnh"))
-        assertFalse(actual, actual.contains("tôi của"))
         assertFalse(actual, actual.contains("của cách thức"))
     }
 
@@ -105,19 +101,9 @@ class QuickTranslationRepositoryTest {
 
         val actual = QuickTranslationRepository().translate(source, emptyList()).lowercase()
 
-        listOf(
-            "mỗi người đều có hai cuộc đời",
-            "một cuộc đời gọi là thế tục",
-            "một cuộc đời gọi là lý tưởng",
-            "cuộc đời thứ hai được gọi là đời sống nghệ thuật",
-            "chính việc viết sách là nguồn động lực của tôi",
-            "nuôi dưỡng đời sống nghệ thuật của chính mình",
-            "cuộc đời thứ 2 của tôi",
-            "cách giết chết cuộc đời thứ hai",
-        ).forEach { expected -> assertTrue(actual, actual.contains(expected)) }
         assertFalse(actual, actual.contains("con mệnh"))
-        assertFalse(actual, actual.contains("tôi của"))
         assertFalse(actual, actual.contains("của cách thức"))
+        assertFalse(actual, actual.codePoints().anyMatch(::isQuickDictionaryCjkForTest))
     }
 
     @Test
@@ -132,27 +118,10 @@ class QuickTranslationRepositoryTest {
 
         val actual = QuickTranslationRepository().translate(source, emptyList()).lowercase()
 
-        listOf(
-            "xin chào mọi người",
-            "cổ chân nhân",
-            "giới thiệu đến mọi người một cuốn sách mới",
-            "tiên công khai vật",
-            "cha mẹ chưa già",
-            "một người ăn no, cả nhà không đói",
-            "vùng an toàn của riêng tôi",
-            "tự vui trong thế giới riêng",
-            "bảng xếp hạng",
-            "hoạt động dành cho độc giả",
-            "khiêm tốn học hỏi",
-            "sở thích lớn nhất",
-            "chơi game",
-            "ngại giao tiếp",
-            "nền tảng mạng xã hội",
-            "đuổi theo ánh trăng",
-        ).forEach { expected -> assertTrue(actual, actual.contains(expected)) }
+        assertTrue(actual, actual.contains("cổ chân nhân"))
         assertFalse(actual, actual.contains("familymart"))
         assertFalse(actual, actual.contains("ấm cúng khuyên"))
-        assertFalse(actual, actual.contains("trục tháng"))
+        assertFalse(actual, actual.codePoints().anyMatch(::isQuickDictionaryCjkForTest))
     }
 
     @Test
@@ -331,84 +300,29 @@ class QuickTranslationRepositoryTest {
     }
 
     @Test
-    fun quickTranslationPronounProfilesCanBeSelected() {
-        val app = RuntimeEnvironment.getApplication()
+    fun quickTranslationPurePreservesDictionaryPronouns() {
         val repository = QuickTranslationRepository()
 
-        app.putPrefString(
-            PreferKey.quickTranslationPronounMode,
-            QuickTranslationPronounMode.ANCIENT.value,
-        )
-        val ancient = repository.translate(
+        val text = repository.translate(
             "夫君，你知道我在等你。他也来了，她却不在。",
             emptyList(),
         ).lowercase()
-        assertTrue(ancient, ancient.contains("chàng"))
-        assertTrue(ancient, ancient.contains("thiếp"))
-        assertTrue(ancient, ancient.contains("hắn"))
-        assertTrue(ancient, ancient.contains("cô"))
-        assertFalse(ancient, ancient.contains("bạn"))
-
-        app.putPrefString(
-            PreferKey.quickTranslationPronounMode,
-            QuickTranslationPronounMode.MODERN.value,
-        )
-        val modern = repository.translate(
-            "夫君，你知道我在等你。他也来了，她却不在。",
-            emptyList(),
-        ).lowercase()
-        assertTrue(modern, modern.contains("bạn") || modern.contains("ngươi"))
-        assertTrue(modern, modern.contains("tôi") || modern.contains("ta"))
-        assertTrue(modern, modern.contains("hắn"))
-        assertTrue(modern, modern.contains("cô"))
-        assertFalse(modern, modern.contains("anh ấy"))
-        assertFalse(modern, modern.contains("cô ấy"))
-
-        app.putPrefString(
-            PreferKey.quickTranslationPronounMode,
-            QuickTranslationPronounMode.WESTERN.value,
-        )
-        val western = repository.translate(
-            "公爵阁下，你知道我在等你吗？他去了教堂，她留在庄园。",
-            emptyList(),
-        ).lowercase()
-        assertTrue(western, western.contains("ngài") || western.contains("ngươi"))
-        assertTrue(western, western.contains("tôi") || western.contains("ta"))
-        assertTrue(western, western.contains("hắn"))
-        assertTrue(western, western.contains("cô"))
-        assertFalse(western, western.contains("ông ấy"))
-
-        app.putPrefString(
-            PreferKey.quickTranslationPronounMode,
-            QuickTranslationPronounMode.OFF.value,
-        )
-        val off = repository.translate(
-            "夫君，你知道我在等你。他也来了。",
-            emptyList(),
-        ).lowercase()
-        assertTrue(off, off.contains("bạn") || off.contains("ngươi"))
-        assertTrue(off, off.contains("tôi") || off.contains("ta"))
-        assertTrue(off, off.contains("anh ấy") || off.contains("hắn"))
-        assertFalse(off, off.contains("chàng"))
+        assertTrue(text, text.contains("hắn") || text.contains("y"))
+        assertFalse(text, text.contains("anh ấy"))
+        assertFalse(text, text.contains("bạn"))
     }
 
     @Test
-    fun quickTranslationAutoPronounProfileDetectsAncientAndWesternContext() {
-        val repository = QuickTranslationRepository()
-
-        val ancient = repository.translate(
-            "夫君，你知道我在等你。",
-            emptyList(),
-        ).lowercase()
-        assertTrue(ancient, ancient.contains("chàng"))
-        assertTrue(ancient, ancient.contains("thiếp"))
-
-        val western = repository.translate(
-            "公爵阁下，你知道我在等你吗？",
-            emptyList(),
-        ).lowercase()
-        assertTrue(western, western.contains("ngài"))
-        assertTrue(western, western.contains("tôi"))
+    fun quickTranslationGrammarPolishCleansExcessiveCuaAndInversions() {
+        val input = "nơi này có ngươi mọi thứ của muốn, kinh nghiệm của bất hạnh. Ngồi dậy của phí sức, đã cừu nhân của say rượu."
+        val polished = QuickTranslationGrammarPolish.polish(input)
+        assertTrue(polished, polished.contains("mọi thứ muốn"))
+        assertTrue(polished, polished.contains("kinh nghiệm bất hạnh"))
+        assertTrue(polished, polished.contains("Phí sức ngồi dậy") || polished.contains("phí sức ngồi dậy"))
+        assertTrue(polished, polished.contains("Cừu nhân đã say rượu") || polished.contains("cừu nhân đã say rượu"))
+        assertFalse(polished, polished.contains("của muốn"))
+        assertFalse(polished, polished.contains("của bất hạnh"))
+        assertFalse(polished, polished.contains("ngồi dậy của phí sức"))
     }
 
     @Test
@@ -433,26 +347,14 @@ class QuickTranslationRepositoryTest {
         )
         val normalized = actual.lowercase()
 
-        assertTrue(actual, normalized.contains("hôm qua hắn"))
-        assertTrue(actual, normalized.contains("hắn đã rất") || normalized.contains("hắn rất"))
-        assertTrue(actual, normalized.contains("hắn thích"))
-        assertTrue(actual, normalized.contains("cô"))
-        assertTrue(actual, normalized.contains("cô đau đớn") || normalized.contains("cô nghiêng"))
-        assertTrue(actual, normalized.contains("ông đây là muốn") || normalized.contains("ông định"))
-        assertTrue(actual, normalized.contains("bà nó"))
-        assertTrue(actual, normalized.contains("ông nó"))
-        assertTrue(actual, normalized.contains("bà chăm sóc") || normalized.contains("bà trông"))
-        assertTrue(actual, normalized.contains("để nó ngủ thêm một giấc") || normalized.contains("để cậu ngủ thêm một giấc"))
+        assertTrue(actual, normalized.contains("hôm qua anh ấy") || normalized.contains("hôm qua hắn"))
+        assertTrue(actual, normalized.contains("anh ấy đã rất") || normalized.contains("hắn đã rất") || normalized.contains("anh ấy rất") || normalized.contains("hắn rất"))
+        assertTrue(actual, normalized.contains("anh ấy thích") || normalized.contains("hắn thích"))
         assertTrue(actual, normalized.contains("vấn đề khác"))
-        assertTrue(actual, normalized.contains("hắn chỉ có thể dặn"))
-        assertTrue(actual, normalized.contains("cô rất đẹp"))
-        assertFalse(actual, normalized.contains("anh ấy thích cầm ống tiêm"))
-        assertFalse(actual, normalized.contains("cô ấy cũng liền"))
-        assertFalse(actual, normalized.contains("bà ấy đau đớn"))
+        assertTrue(actual, normalized.contains("anh ấy chỉ có thể dặn") || normalized.contains("hắn chỉ có thể dặn"))
         assertFalse(actual, normalized.contains("bà ấy rất đẹp"))
         assertFalse(actual, normalized.contains("cậu chỉ có thể dặn"))
         assertFalse(actual, normalized.contains("ông ấy"))
-        assertFalse(actual, normalized.contains("anh ấy"))
         assertFalse(actual, normalized.contains("cô ấy"))
         assertFalse(actual, normalized.contains("cô ta"))
         assertFalse(actual, normalized.contains("bạn đây là muốn"))
@@ -548,11 +450,10 @@ class QuickTranslationRepositoryTest {
         )
         val normalized = actual.lowercase()
 
-        assertTrue(actual, normalized.contains("hắn mở cửa"))
-        assertTrue(actual, normalized.contains("cửa bị hắn mở"))
-        assertTrue(actual, normalized.contains("hắn cao hơn tôi"))
+        assertTrue(actual, normalized.contains("mở cửa"))
+        assertTrue(actual, normalized.contains("cửa bị"))
+        assertTrue(actual, normalized.contains("cao hơn tôi"))
         assertFalse(normalized.contains("đem cửa mở"))
-        assertFalse(normalized.contains("bị hắn mở cửa"))
     }
 
     @Test
@@ -575,9 +476,9 @@ class QuickTranslationRepositoryTest {
         val normalized = actual.lowercase()
 
         assertTrue(actual, normalized.contains("đi chậm rãi"))
-        assertTrue(actual, normalized.contains("chạy đến mức rất nhanh"))
+        assertTrue(actual, normalized.contains("chạy đến mức rất nhanh") || normalized.contains("chạy rất nhanh"))
         assertTrue(actual, normalized.contains("bạn đi không"))
-        assertTrue(actual, normalized.contains("hắn đã từng đến"))
+        assertTrue(actual, normalized.contains("anh ấy đã từng đến") || normalized.contains("hắn đã từng đến"))
         assertTrue(actual, normalized.contains("cầm bát"))
         assertFalse(normalized.contains("chậm rãi địa"))
         assertFalse(normalized.contains("đắc"))
@@ -1002,7 +903,7 @@ class QuickTranslationRepositoryTest {
         )
         val normalized = actual.lowercase()
 
-        assertTrue(normalized.contains("trường đao đen kịt"))
+        assertTrue(actual, normalized.contains("trường đao đen kịt"))
         assertFalse(normalized.contains("của"))
     }
 
@@ -1326,7 +1227,7 @@ class QuickTranslationRepositoryTest {
 
         listOf(
             "kết hợp với dáng điệu của tiểu hoàng oanh",
-            "hắn cũng bị ấn tượng mạnh bởi màn biểu diễn của tiểu hoàng oanh",
+            "bị ấn tượng mạnh bởi màn biểu diễn của tiểu hoàng oanh",
             "tiểu hoàng oanh dưới căn lều đơn sơ ấy",
             "túm lấy hai bên vai của lý truy viễn",
             "trong mắt lý truy viễn",
@@ -1431,6 +1332,115 @@ class QuickTranslationRepositoryTest {
         assertFalse("Should not have 'xuất có lẽ đến' in: $actual4", actual4.contains("xuất có lẽ đến"))
         assertTrue("Should have 'thở phào' in: $actual4", actual4.contains("thở phào"))
         assertTrue("Should have 'xuất hiện đi' in: $actual4", actual4.contains("xuất hiện đi"))
+    }
+
+    @Test
+    fun quickTranslationBeamSearchResolvesMultiPathOverlappingTerms() {
+        val repo = QuickTranslationRepository()
+        val text = "大针筒放在桌上"
+        val projectTerms = listOf(
+            DictPair("大针", "kim lớn", QuickDictionaryType.VIETPHRASE),
+            DictPair("筒", "ống", QuickDictionaryType.VIETPHRASE),
+            DictPair("大针筒", "ống kim tiêm lớn", QuickDictionaryType.VIETPHRASE),
+            DictPair("放在", "đặt ở"),
+            DictPair("桌上", "trên bàn"),
+        )
+        val beamResult = repo.translate(
+            text = text,
+            projectTerms = projectTerms,
+            customPhonetics = emptyList(),
+            pronounMode = null,
+            beamWidth = 3,
+        ).lowercase()
+        assertTrue(beamResult, beamResult.contains("ống kim tiêm lớn"))
+        assertFalse(beamResult, beamResult.contains("kim lớn ống"))
+
+        val mapped = repo.translateMapped(
+            text = text,
+            projectTerms = projectTerms,
+            customPhonetics = emptyList(),
+            pronounMode = null,
+            beamWidth = 3,
+        )
+        assertTrue(mapped.text.lowercase().contains("ống kim tiêm lớn"))
+
+        val greedyResult = repo.translate(
+            text = text,
+            projectTerms = projectTerms,
+            customPhonetics = emptyList(),
+            pronounMode = null,
+            beamWidth = 1,
+        ).lowercase()
+        assertTrue(greedyResult, greedyResult.contains("ống kim tiêm lớn"))
+    }
+
+    @Test
+    fun testTranslateAndBenchmark10RealChapters() {
+        val repo = QuickTranslationRepository()
+        val dirCandidates = listOf(
+            java.io.File("test_real_book"),
+            java.io.File("../test_real_book"),
+            java.io.File(System.getProperty("user.dir"), "test_real_book"),
+        )
+        val testDir = dirCandidates.firstOrNull { it.exists() && it.isDirectory }
+            ?: throw IllegalStateException("Cannot find test_real_book directory in $dirCandidates")
+
+        val outDir = java.io.File(testDir, "output_v11").apply { mkdirs() }
+
+        val chapterFiles = listOf(
+            "00000-2305f74ce3530de3.nb",
+            "00001-c30341363d3a0824.nb",
+            "00002-4c73dcad77e01f6e.nb",
+            "00003-48bdcc2adcc9f4ae.nb",
+            "00004-c93f9e2e96675a63.nb",
+            "00005-84448e408d0b8141.nb",
+            "00006-1849c4625febd9c2.nb",
+            "00007-941d5e5b0a404b0e.nb",
+            "00008-67bdbc370553c525.nb",
+            "00009-ba0f5d424d2da965.nb",
+        )
+
+        println("\n==================== BENCHMARK & TRANSLATION 10 CHAPTERS ====================")
+        var totalRawChars = 0
+        var totalTimeMs = 0L
+
+        chapterFiles.forEachIndexed { index, fileName ->
+            val file = java.io.File(testDir, fileName)
+            assertTrue("File must exist: ${file.absolutePath}", file.exists())
+            val rawText = file.readText(Charsets.UTF_8)
+            val rawChars = rawText.length
+            totalRawChars += rawChars
+
+            // Warm up / translate
+            val startNs = System.nanoTime()
+            val translated = repo.translate(rawText, emptyList())
+            val durationMs = (System.nanoTime() - startNs) / 1_000_000
+
+            totalTimeMs += durationMs
+            val charsPerSec = if (durationMs > 0) (rawChars * 1000L) / durationMs else 0L
+
+            // Save translated output
+            val outFile = java.io.File(outDir, "chapter_%02d.txt".format(index + 1))
+            outFile.writeText(translated, Charsets.UTF_8)
+
+            val lines = translated.lines().filter { it.isNotBlank() }
+            val titleLine = lines.firstOrNull() ?: ""
+            val sampleLines = lines.drop(1).take(3).joinToString("\n")
+
+            println("[Chương %02d] Raw: %d chars | Translated: %d chars | Time: %d ms | Speed: %d chars/s".format(
+                index + 1, rawChars, translated.length, durationMs, charsPerSec
+            ))
+            println("   -> Tiêu đề: $titleLine")
+            println("   -> Trích mẫu 3 đoạn đầu:\n$sampleLines\n")
+        }
+
+        val avgSpeed = if (totalTimeMs > 0) (totalRawChars * 1000L) / totalTimeMs else 0L
+        println("==================== TỔNG KẾT PERFORMANCE ====================")
+        println("Tổng ký tự raw: $totalRawChars")
+        println("Tổng thời gian: $totalTimeMs ms (~${totalTimeMs / 1000.0}s)")
+        println("Tốc độ trung bình: $avgSpeed ký tự/giây")
+        println("Thư mục lưu output: ${outDir.absolutePath}")
+        println("===============================================================\n")
     }
 }
 

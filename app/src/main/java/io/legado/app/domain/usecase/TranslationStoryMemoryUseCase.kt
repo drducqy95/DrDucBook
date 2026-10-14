@@ -599,6 +599,7 @@ class TranslationStoryMemoryUseCase(
         book: Book,
         chapterIndices: List<Int>,
         translateChapterUseCase: TranslateChapterUseCase,
+        retrofitWithExistingDraft: Boolean = true,
         provider: String = TranslationConfig.llmProvider,
         targetLanguage: String = TranslationConfig.llmTargetLanguage,
         onProgress: ((current: Int, total: Int) -> Unit)? = null,
@@ -615,7 +616,7 @@ class TranslationStoryMemoryUseCase(
                 book = book,
                 bookChapter = chapter,
                 forceRetranslate = true,
-                retrofitWithExistingDraft = true,
+                retrofitWithExistingDraft = retrofitWithExistingDraft,
                 provider = provider,
                 targetLanguage = targetLanguage,
                 onProgress = {},
@@ -1065,8 +1066,14 @@ class TranslationStoryMemoryUseCase(
                     ?: memory.decodeValue<AiTranslationWorldEntry>()?.target
             }.orEmpty()
         }
-        val entityToWrite = entity.copy(target = target)
         val existingEntity = matching.firstOrNull { it.key.startsWith(ENTITY_PREFIX) }
+        val previousTarget = existingEntity?.decodeValue<AiTranslationStoryEntity>()?.target.orEmpty().trim()
+        val updatedAliases = if (previousTarget.isNotBlank() && target.isNotBlank() && previousTarget != target) {
+            (entity.aliases + previousTarget).filter { it.isNotBlank() && it != target }.distinct()
+        } else {
+            entity.aliases
+        }
+        val entityToWrite = entity.copy(target = target, aliases = updatedAliases)
         upsertBookMemory(
             bookUrl,
             existingEntity?.key ?: entityKey(entity.raw, entity.senseKey),
@@ -1125,8 +1132,14 @@ class TranslationStoryMemoryUseCase(
                     ?: memory.decodeValue<AiTranslationStoryEntity>()?.target
             }.orEmpty()
         }
-        val worldToWrite = entry.copy(target = target)
         val existingWorld = matching.firstOrNull { it.key.startsWith(WORLD_PREFIX) }
+        val previousWorldTarget = existingWorld?.decodeValue<AiTranslationWorldEntry>()?.target.orEmpty().trim()
+        val updatedRefs = if (previousWorldTarget.isNotBlank() && target.isNotBlank() && previousWorldTarget != target) {
+            (entry.entityRefs + previousWorldTarget).filter { it.isNotBlank() && it != target }.distinct()
+        } else {
+            entry.entityRefs
+        }
+        val worldToWrite = entry.copy(target = target, entityRefs = updatedRefs)
         upsertBookMemory(
             bookUrl,
             existingWorld?.key ?: worldKey(entry),

@@ -398,14 +398,22 @@ class BookStoryMemoryViewModel(
 
     private fun saveEditor() = runMutation {
         val draft = _uiState.value.editor ?: return@runMutation
+        val isTargetModified = draft.kind in setOf(AiTranslationStoryMemoryKind.ENTITY, AiTranslationStoryMemoryKind.WORLD_BUILDING)
+        val oldEntity = if (draft.kind == AiTranslationStoryMemoryKind.ENTITY && draft.originalId != null) {
+            snapshot.entities.firstOrNull { TranslationStoryMemoryUseCase.entityKey(it.raw, it.senseKey) == draft.originalId }
+        } else null
+        val oldWorld = if (draft.kind == AiTranslationStoryMemoryKind.WORLD_BUILDING && draft.originalId != null) {
+            snapshot.worldBuilding.firstOrNull { TranslationStoryMemoryUseCase.worldKey(it) == draft.originalId }
+        } else null
+
         val newId = when (draft.kind) {
-            AiTranslationStoryMemoryKind.ENTITY -> draft.toEntity().also {
+            AiTranslationStoryMemoryKind.ENTITY -> draft.toEntity(oldEntity?.target).also {
                 storyMemoryUseCase.upsertEntity(bookUrl, it)
             }.let { TranslationStoryMemoryUseCase.entityKey(it.raw, it.senseKey) }
             AiTranslationStoryMemoryKind.RELATIONSHIP -> draft.toRelationship().also {
                 storyMemoryUseCase.upsertRelationship(bookUrl, it)
             }.let(TranslationStoryMemoryUseCase::relationshipKey)
-            AiTranslationStoryMemoryKind.WORLD_BUILDING -> draft.toWorldEntry().also {
+            AiTranslationStoryMemoryKind.WORLD_BUILDING -> draft.toWorldEntry(oldWorld?.target).also {
                 storyMemoryUseCase.upsertWorldEntry(bookUrl, it)
             }.let(TranslationStoryMemoryUseCase::worldKey)
             AiTranslationStoryMemoryKind.TIMELINE -> draft.toTimeline().also {
@@ -415,6 +423,9 @@ class BookStoryMemoryViewModel(
         draft.originalId?.takeIf { it != newId }?.let { deleteById(draft.kind, it) }
         _uiState.update { it.copy(editor = null) }
         _effects.tryEmit(BookStoryMemoryEffect.ShowMessage(R.string.story_memory_saved))
+        if (isTargetModified) {
+            triggerBackgroundAlgorithmicRetrofit()
+        }
     }
 
     private fun deleteEditor() = runMutation {
@@ -594,7 +605,7 @@ class BookStoryMemoryViewModel(
                     retrofitDialog = RetrofitCacheDialogState(
                         isOpen = true,
                         startChapter = 0,
-                        endChapter = minOf(10, count.coerceAtLeast(1)),
+                        endChapter = count.coerceAtLeast(1),
                         maxChapters = count,
                     )
                 )
@@ -618,7 +629,7 @@ class BookStoryMemoryViewModel(
                         isRunning = true,
                         progressCurrent = 0,
                         progressTotal = total,
-                        progressMessage = "Đang chuẩn bị làm mới bản dịch...",
+                        progressMessage = "Đang chuẩn bị thay thế thuật toán...",
                     )
                 )
             }
@@ -627,13 +638,14 @@ class BookStoryMemoryViewModel(
                     book = book,
                     chapterIndices = range,
                     translateChapterUseCase = translateChapterUseCase,
+                    retrofitWithExistingDraft = true,
                     onProgress = { current, max ->
                         _uiState.update {
                             it.copy(
                                 retrofitDialog = it.retrofitDialog.copy(
                                     progressCurrent = current,
                                     progressTotal = max,
-                                    progressMessage = "Đang làm mới chương $current / $max...",
+                                    progressMessage = "Đang thay thế thuật toán chương $current / $max...",
                                 )
                             )
                         }
@@ -646,9 +658,7 @@ class BookStoryMemoryViewModel(
                 }
                 _uiState.update { it.copy(retrofitDialog = it.retrofitDialog.copy(isOpen = false, isRunning = false)) }
                 _effects.tryEmit(
-                    BookStoryMemoryEffect.ShowMessageText(
-                        "Đã hoàn thành làm mới $retrofitted/$total chương theo bộ nhớ dịch mới nhất!"
-                    )
+                    BookStoryMemoryEffect.ShowMessageText("Đã hoàn thành làm mới $retrofitted/$total chương theo thuật toán (0 token AI)!")
                 )
             } catch (error: CancellationException) {
                 throw error
@@ -657,6 +667,33 @@ class BookStoryMemoryViewModel(
                     it.copy(retrofitDialog = it.retrofitDialog.copy(isRunning = false))
                 }
                 _effects.tryEmit(BookStoryMemoryEffect.ShowError(error.localizedMessage ?: "Lỗi làm mới bản dịch"))
+            }
+        }
+    }
+
+    private fun triggerBackgroundAlgorithmicRetrofit() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val book = cachedChapterGateway.getBook(bookUrl) ?: return@launch
+            val chapterCount = cachedChapterGateway.getChapterCount(bookUrl)
+            if (chapterCount <= 0) return@launch
+            val range = (0 until chapterCount).toList()
+            val result = storyMemoryUseCase.retrofitChapterTranslations(
+                book = book,
+                chapterIndices = range,
+                translateChapterUseCase = translateChapterUseCase,
+                retrofitWithExistingDraft = true,
+            )
+            val updated = result.getOrNull() ?: 0
+            if (updated > 0) {
+                if (ReadBook.book?.bookUrl == bookUrl) {
+                    ReadBook.clearTextChapter()
+                    postEvent(EventBus.REFRESH_BOOK_CONTENT, true)
+                }
+                _effects.tryEmit(
+                    BookStoryMemoryEffect.ShowMessageText(
+                        "Đã tự động cập nhật cache $updated chương theo thuật toán"
+                    )
+                )
             }
         }
     }
@@ -757,25 +794,33 @@ class BookStoryMemoryViewModel(
         },
     )
 
-    private fun StoryMemoryEditorDraft.toEntity() = AiTranslationStoryEntity(
-        raw = primary.trim().also { require(it.isNotEmpty()) },
-        target = secondary.trim().also { require(it.isNotEmpty()) },
-        senseKey = senseKey.trim(),
-        type = type.trim().ifBlank { "character" },
-        description = description.trim(),
-        aliases = aliasesOrRefsText.lines().map(String::trim).filter(String::isNotBlank).distinct(),
-        gender = gender.trim(),
-        rank = rank.trim(),
-        firstChapterIndex = chapterIndexText.toIntOrNull() ?: -1,
-        lastChapterIndex = lastChapterIndex,
-        imagePath = imagePath,
-        imagePrompt = imagePrompt,
-        imageUpdatedAt = imageUpdatedAt,
-        category = type.trim().ifBlank { "character" },
-        userEdited = true,
-        source = "USER",
-        metadata = metadata,
-    )
+    private fun StoryMemoryEditorDraft.toEntity(oldTarget: String? = null): AiTranslationStoryEntity {
+        val baseAliases = aliasesOrRefsText.lines().map(String::trim).filter(String::isNotBlank)
+        val combinedAliases = if (!oldTarget.isNullOrBlank() && oldTarget != secondary.trim() && !baseAliases.contains(oldTarget)) {
+            baseAliases + oldTarget
+        } else {
+            baseAliases
+        }.distinct()
+        return AiTranslationStoryEntity(
+            raw = primary.trim().also { require(it.isNotEmpty()) },
+            target = secondary.trim().also { require(it.isNotEmpty()) },
+            senseKey = senseKey.trim(),
+            type = type.trim().ifBlank { "character" },
+            description = description.trim(),
+            aliases = combinedAliases,
+            gender = gender.trim(),
+            rank = rank.trim(),
+            firstChapterIndex = chapterIndexText.toIntOrNull() ?: -1,
+            lastChapterIndex = lastChapterIndex,
+            imagePath = imagePath,
+            imagePrompt = imagePrompt,
+            imageUpdatedAt = imageUpdatedAt,
+            category = type.trim().ifBlank { "character" },
+            userEdited = true,
+            source = "USER",
+            metadata = metadata,
+        )
+    }
 
     private fun StoryMemoryEditorDraft.toRelationship() = AiTranslationStoryRelationship(
         source = primary.trim().also { require(it.isNotEmpty()) },
@@ -785,21 +830,29 @@ class BookStoryMemoryViewModel(
         chapterIndex = chapterIndexText.toIntOrNull() ?: -1,
     )
 
-    private fun StoryMemoryEditorDraft.toWorldEntry() = AiTranslationWorldEntry(
-        raw = primary.trim().also { require(it.isNotEmpty()) },
-        target = secondary.trim(),
-        senseKey = senseKey.trim(),
-        category = type.trim().ifBlank { "other" },
-        description = description.trim(),
-        entityRefs = aliasesOrRefsText.lines().map(String::trim).filter(String::isNotBlank).distinct(),
-        chapterIndex = chapterIndexText.toIntOrNull() ?: -1,
-        lastChapterIndex = lastChapterIndex,
-        imagePath = imagePath,
-        imagePrompt = imagePrompt,
-        imageUpdatedAt = imageUpdatedAt,
-        userEdited = true,
-        source = "USER",
-    )
+    private fun StoryMemoryEditorDraft.toWorldEntry(oldTarget: String? = null): AiTranslationWorldEntry {
+        val baseRefs = aliasesOrRefsText.lines().map(String::trim).filter(String::isNotBlank)
+        val combinedRefs = if (!oldTarget.isNullOrBlank() && oldTarget != secondary.trim() && !baseRefs.contains(oldTarget)) {
+            baseRefs + oldTarget
+        } else {
+            baseRefs
+        }.distinct()
+        return AiTranslationWorldEntry(
+            raw = primary.trim().also { require(it.isNotEmpty()) },
+            target = secondary.trim(),
+            senseKey = senseKey.trim(),
+            category = type.trim().ifBlank { "other" },
+            description = description.trim(),
+            entityRefs = combinedRefs,
+            chapterIndex = chapterIndexText.toIntOrNull() ?: -1,
+            lastChapterIndex = lastChapterIndex,
+            imagePath = imagePath,
+            imagePrompt = imagePrompt,
+            imageUpdatedAt = imageUpdatedAt,
+            userEdited = true,
+            source = "USER",
+        )
+    }
 
     private fun StoryMemoryEditorDraft.toTimeline(): AiTranslationStoryTimeline {
         val chapterIndex = chapterIndexText.toIntOrNull()

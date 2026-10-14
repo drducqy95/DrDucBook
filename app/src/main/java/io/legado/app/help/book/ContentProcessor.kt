@@ -130,6 +130,31 @@ class ContentProcessor private constructor(
                         sameTitleRemoved = true
                     }
                 }
+                val dynamicTitle = io.legado.app.model.ReadBook.getDynamicChapterTitle(book.bookUrl, chapter.index)
+                if (!sameTitleRemoved && !dynamicTitle.isNullOrBlank()) {
+                    val dynEscaped = Pattern.quote(dynamicTitle.trim())
+                    val dynMatcher = Pattern.compile("^(\\s|\\p{P}|${name})*${dynEscaped}(\\s)*")
+                        .matcher(mContent)
+                    if (dynMatcher.find()) {
+                        mContent = mContent.substring(dynMatcher.end())
+                        sameTitleRemoved = true
+                    } else {
+                        val firstLine = mContent.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+                        if (firstLine != null && (
+                            firstLine == dynamicTitle.trim() ||
+                            firstLine.startsWith("Chương ${chapter.index + 1}") ||
+                            firstLine.startsWith("Chapter ${chapter.index + 1}") ||
+                            dynamicTitle.trim().startsWith(firstLine) ||
+                            firstLine.startsWith(dynamicTitle.trim())
+                        )) {
+                            val firstLineEnd = mContent.indexOf('\n')
+                            if (firstLineEnd >= 0) {
+                                mContent = mContent.substring(firstLineEnd + 1).trimStart()
+                                sameTitleRemoved = true
+                            }
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 AppLog.put("去除重复标题出错\n${e.localizedMessage}", e)
             }
@@ -209,10 +234,16 @@ class ContentProcessor private constructor(
         }
         if (includeTitle) {
             //重新添加标题
-            mContent = chapter.getDisplayTitle(
-                getTitleReplaceRules(),
-                useReplace = useReplace && book.getUseReplaceRule()
-            ) + "\n" + mContent
+            val dynamicTitle = io.legado.app.model.ReadBook.getDynamicChapterTitle(book.bookUrl, chapter.index)
+            val finalTitle = if (!dynamicTitle.isNullOrBlank()) {
+                dynamicTitle
+            } else {
+                chapter.getDisplayTitle(
+                    getTitleReplaceRules(),
+                    useReplace = useReplace && book.getUseReplaceRule()
+                )
+            }
+            mContent = finalTitle + "\n" + mContent
         }
         if (isAndroid8) {
             mContent = mContent.replace('\u00A0', ' ')

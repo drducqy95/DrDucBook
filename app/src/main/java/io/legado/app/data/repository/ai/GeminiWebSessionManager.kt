@@ -16,7 +16,7 @@ data class GeminiWebSession(
     val cookies: Map<String, String>,
     val snlm0e: String,
     val cookieHeader: String,
-    val buildLabel: String = "boq_assistant-bard-web-server_20250220.08_p0",
+    val buildLabel: String = "boq_gemini-web-uiserver_20261012.15_p0",
     val fetchedAt: Long = System.currentTimeMillis(),
 )
 
@@ -24,7 +24,7 @@ object GeminiWebSessionManager {
 
     private const val GEMINI_BASE_URL = "https://gemini.google.com"
     private const val GEMINI_APP_URL = "https://gemini.google.com/app"
-    private const val DEFAULT_BUILD_LABEL = "boq_assistant-bard-web-server_20250220.08_p0"
+    private const val DEFAULT_BUILD_LABEL = "boq_gemini-web-uiserver_20261012.15_p0"
 
     private val SNLM0E_REGEXES = listOf(
         Regex(""""SNlM0e":"([^"]+)""""),
@@ -38,6 +38,7 @@ object GeminiWebSessionManager {
         Regex(""""cfb2h":"([^"]+)""""),
         Regex("""'cfb2h':\s*'([^']+)'"""),
         Regex("""["']?cfb2h["']?\s*[:=]\s*["']([^"']+)["']"""),
+        Regex("""boq_gemini-web-uiserver_[0-9.]+_p\d+"""),
         Regex("""boq_assistant-bard-web-server_[0-9.]+_p\d+"""),
     )
 

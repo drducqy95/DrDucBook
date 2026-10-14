@@ -199,7 +199,7 @@ class AiProfileRepository(
         if (providerId == AiOAuthProviderId.ANTIGRAVITY) {
             aiProfileDao.deprecateModels(
                 providerId = providerId,
-                modelIds = listOf(ANTIGRAVITY_RETIRED_MODEL_ID),
+                modelIds = ANTIGRAVITY_RETIRED_MODEL_IDS,
                 now = now,
             )
         }

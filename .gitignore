@@ -91,3 +91,27 @@ temp_test_ort/
 tools/**/dist/
 tools/**/exported_models/
 tools/**/_test_export/
+tools/nmt-onnx/.hf_cache/
+tools/nmt-onnx/data/
+tools/nmt-onnx/dataset*/
+tools/nmt-onnx/exported_models_nllb/
+tools/nmt-onnx/nllb_pruned*/
+tools/nmt-onnx/user_trained*
+tools/nmt-onnx/user_ckpt*/
+
+# Local scratch and test dumps
+*.nb
+*.nb.*
+*.db
+legado_debug.db
+check_db.py
+gemini_session.json
+logcat*.txt
+uidump*.xml
+scratch_*.js
+chapter1_*.txt
+app/chapter1_*.txt
+app/test_chapters_*
+test_data/
+test_real_book/
+

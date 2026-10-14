@@ -156,6 +156,7 @@ class NmtOnnxService : Service() {
                     sourcePrompt = config.sourcePrompt.trim(),
                     dictionaryRevision = config.dictionaryRevision,
                     constraintFingerprint = config.constraintFingerprint.ifBlank { dictionaryFingerprint },
+                    beamWidth = config.beamWidth.coerceIn(1, 8),
                 ),
                 onProgress = { completed, total, mixed ->
                     receiver.send(

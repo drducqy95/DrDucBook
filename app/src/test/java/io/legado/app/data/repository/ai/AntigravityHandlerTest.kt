@@ -25,7 +25,7 @@ class AntigravityHandlerTest {
         )
 
         assertEquals("cloud-project", body["project"])
-        assertEquals("gemini-pro-agent", body["model"])
+        assertEquals("gemini-3.8-flash-high", body["model"])
         assertEquals("agent", body["requestType"])
         assertEquals("antigravity", body["userAgent"])
         assertEquals(listOf("GOOGLE_ONE_AI"), body["enabledCreditTypes"])
@@ -36,7 +36,7 @@ class AntigravityHandlerTest {
         assertNotNull(nestedRequest["contents"])
         assertEquals(
             "agent/8eb7b8a2-38ff-5a67-bcb8-a7c513db5b78/1700000000000/" +
-                "b89029b7-f8fd-5ce0-9470-e47ea4edaeb7/1",
+                "0ab04c94-7403-5db2-bba5-4660af663ec1/1",
             body["requestId"],
         )
     }
@@ -124,8 +124,8 @@ class AntigravityHandlerTest {
                 baseUrl = "https://daily-cloudcode-pa.googleapis.com",
                 apiKey = "access-token",
             ),
-            displayName = "Gemini 3.1 Pro (High)",
-            modelId = "gemini-pro-agent",
+            displayName = "Gemini 3.8 (High)",
+            modelId = "gemini-3.8-flash-high",
         ),
         messages = listOf(AiMessage(AiMessageRole.USER, "Hello")),
         tools = tools,

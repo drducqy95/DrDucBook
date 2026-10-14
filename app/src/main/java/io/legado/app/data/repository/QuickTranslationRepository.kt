@@ -17,6 +17,7 @@ import io.legado.app.domain.model.TranslationTextTokenizer
 import io.legado.app.domain.model.normalizedForRuntime
 import io.legado.app.domain.model.toQuickPhoneticPair
 import io.legado.app.domain.model.toQuickTranslationPair
+import io.legado.app.ui.config.translation.TranslationConfig
 import io.legado.app.utils.getPrefString
 import com.huaban.analysis.jieba.JiebaSegmenter
 import splitties.init.appCtx
@@ -71,7 +72,7 @@ class QuickTranslationRepository(
     }
     private val packLoadLock = Any()
     private val catalogLoadLock = Any()
-    private val emptyProjectTrie = TermTrie(emptyList())
+    private val emptyProjectTrie = FastTermMapLookup(emptyList())
     private val detectedPackVersion by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         if (runCatching {
                 appCtx.assets.openFd(QT2025_TERM_INDEX_ASSET).use { }
@@ -92,11 +93,8 @@ class QuickTranslationRepository(
         get() = packVersionFor(null)
 
     override fun packVersionFor(pronounMode: QuickTranslationPronounMode?): String =
-        versionWithPronounMode(
-            version = (cachedPack.get()?.version ?: detectedPackVersion) +
-                "|external:${externalPackStore?.versionToken() ?: "none"}",
-            mode = resolvedPronounMode(pronounMode),
-        )
+        (cachedPack.get()?.version ?: detectedPackVersion) +
+            "|external:${externalPackStore?.versionToken() ?: "none"}"
 
     override fun warmUp() {
         pack()
@@ -117,9 +115,18 @@ class QuickTranslationRepository(
         projectTerms: List<DictPair>,
         customPhonetics: List<DictPair>,
         pronounMode: QuickTranslationPronounMode?,
+    ): String = translate(text, projectTerms, customPhonetics, pronounMode, null)
+
+    override fun translate(
+        text: String,
+        projectTerms: List<DictPair>,
+        customPhonetics: List<DictPair>,
+        pronounMode: QuickTranslationPronounMode?,
+        beamWidth: Int?,
     ): String {
         if (text.isEmpty()) return text
         if (text.codePoints().noneMatch(::isCjk)) return text
+        val effectiveBeamWidth = beamWidth ?: TranslationConfig.quickTranslationBeamWidth
         val tStart = System.currentTimeMillis()
         val externalEntries = externalPackStore?.matchEntries(
             context = text,
@@ -141,7 +148,6 @@ class QuickTranslationRepository(
         val tPrep = System.currentTimeMillis()
         val pack = pack()
         val tPack = System.currentTimeMillis()
-        val resolvedPronounMode = resolvedPronounMode(pronounMode)
         val projectRuntime = projectRuntimeFor(safeProjectTerms, pack)
         val projectTrie = projectRuntime.trie
         val tTrie = System.currentTimeMillis()
@@ -155,8 +161,7 @@ class QuickTranslationRepository(
                 .associate { it.original to it.translation.trim() }
         }
         val protected = protectMarkup(text)
-        val pronounContext = PronounContextTracker()
-        val translatedTokenCache = HashMap<TranslationTokenCacheKey, String>()
+        val translatedTokenCache = HashMap<String, String>()
         val tSetup = System.currentTimeMillis()
         val lexicalTimer = LexicalTimer()
         var totalLexicalTime = 0L
@@ -167,10 +172,7 @@ class QuickTranslationRepository(
                     if (token.raw.codePoints().noneMatch(::isCjk)) {
                         token.raw
                     } else {
-                        val pronounHints = pronounContext.hintsFor(token.raw)
-                        translatedTokenCache.getOrPut(
-                            TranslationTokenCacheKey(token.raw, pronounHints)
-                        ) {
+                        translatedTokenCache.getOrPut(token.raw) {
                             val t0 = System.currentTimeMillis()
                             val lexical = translateProtected(
                                 text = token.raw,
@@ -178,14 +180,14 @@ class QuickTranslationRepository(
                                 pack = pack,
                                 customPhonetics = customPhoneticMap,
                                 timer = lexicalTimer,
+                                beamWidth = effectiveBeamWidth,
                             )
                             val t1 = System.currentTimeMillis()
                             totalLexicalTime += (t1 - t0)
                             val tokenPost = postProcessToken(
                                 sourceText = token.raw,
                                 text = lexical,
-                                pronounMode = resolvedPronounMode,
-                                pronounHints = pronounHints,
+                                pronounMode = pronounMode,
                             )
                             val t2 = System.currentTimeMillis()
                             totalPostTime += (t2 - t1)
@@ -229,6 +231,14 @@ class QuickTranslationRepository(
         projectTerms: List<DictPair>,
         customPhonetics: List<DictPair>,
         pronounMode: QuickTranslationPronounMode?,
+    ): MappedTranslation = translateMapped(text, projectTerms, customPhonetics, pronounMode, null)
+
+    override fun translateMapped(
+        text: String,
+        projectTerms: List<DictPair>,
+        customPhonetics: List<DictPair>,
+        pronounMode: QuickTranslationPronounMode?,
+        beamWidth: Int?,
     ): MappedTranslation {
         if (text.isEmpty()) return MappedTranslation(text, emptyList(), MAPPED_ENGINE)
         if (text.codePoints().noneMatch(::isCjk)) {
@@ -247,7 +257,7 @@ class QuickTranslationRepository(
                 engine = MAPPED_ENGINE,
             )
         }
-
+        val effectiveBeamWidth = beamWidth ?: TranslationConfig.quickTranslationBeamWidth
         val externalEntries = externalPackStore?.matchEntries(
             context = text,
             projectKey = "",
@@ -260,7 +270,6 @@ class QuickTranslationRepository(
             customPhonetics + externalEntries.mapNotNull { it.toQuickPhoneticPair() }
             ).map(DictPair::normalizedForRuntime)
         val pack = pack()
-        val resolvedPronounMode = resolvedPronounMode(pronounMode)
         val projectRuntime = projectRuntimeFor(safeProjectTerms, pack)
         val customPhoneticMap = safeCustomPhonetics.asSequence()
             .filter { it.original.isNotBlank() && it.translation.isNotBlank() }
@@ -271,24 +280,20 @@ class QuickTranslationRepository(
         val output = StringBuilder(text.length * 2)
         val segments = mutableListOf<DisplaySourceSegment>()
         val capitalizer = StatefulSentenceCapitalizer()
-        val pronounContext = PronounContextTracker()
-        val translatedTokenCache = HashMap<TranslationTokenCacheKey, LocalMappedText>()
+        val translatedTokenCache = HashMap<String, LocalMappedText>()
         var sourceOffset = 0
         layout.tokens.forEach { token ->
             val displayOffset = output.length
             when (token) {
                 is TranslationTextToken.TextToken -> {
-                    val pronounHints = pronounContext.hintsFor(token.raw)
-                    val mapped = translatedTokenCache.getOrPut(
-                        TranslationTokenCacheKey(token.raw, pronounHints)
-                    ) {
+                    val mapped = translatedTokenCache.getOrPut(token.raw) {
                         translateTextTokenMapped(
                             text = token.raw,
                             projectRuntime = projectRuntime,
                             pack = pack,
                             customPhonetics = customPhoneticMap,
-                            pronounMode = resolvedPronounMode,
-                            pronounHints = pronounHints,
+                            pronounMode = pronounMode,
+                            beamWidth = effectiveBeamWidth,
                         )
                     }
                     capitalizer.append(mapped.text, output)
@@ -569,6 +574,7 @@ class QuickTranslationRepository(
         pack: QuickPack,
         customPhonetics: Map<String, String>,
         timer: LexicalTimer? = null,
+        beamWidth: Int = 1,
     ): String {
         val t0 = System.currentTimeMillis()
         val projectMatches = projectRuntime.trie.allMatchesByStart(text)
@@ -585,21 +591,10 @@ class QuickTranslationRepository(
             baseMatches = baseMatches,
             jiebaTokens = emptyList(),
         )
-        val tPlan0 = System.currentTimeMillis()
-        val plan = bestTranslationPlan(
-            text = text,
-            projectRuntime = projectRuntime,
-            pack = pack,
-            customPhonetics = customPhonetics,
-            matches = matches,
-            timer = timer,
-        )
-        val tPlan1 = System.currentTimeMillis()
-        timer?.let { it.plan += (tPlan1 - tPlan0) }
         val output = StringBuilder(text.length * 2)
         var offset = 0
         while (offset < text.length) {
-            val candidate = plan[offset]
+            val candidate = fmmCandidateAt(text, offset, projectRuntime, pack, customPhonetics, matches, timer)
             if (candidate == null || candidate.endExclusive <= offset) {
                 val fallback = fallbackCandidate(text, offset, customPhonetics, pack.phonetics)
                 if (fallback.kind == CandidateKind.LITERAL) {
@@ -611,25 +606,10 @@ class QuickTranslationRepository(
                 continue
             }
             if (candidate.kind == CandidateKind.LITERAL) {
-                val literal = StringBuilder()
-                var literalOffset = offset
-                while (literalOffset < text.length) {
-                    val literalCandidate = plan[literalOffset] ?: break
-                    if (literalCandidate.kind != CandidateKind.LITERAL ||
-                        literalCandidate.endExclusive <= literalOffset
-                    ) {
-                        break
-                    }
-                    literal.append(literalCandidate.translation)
-                    literalOffset = literalCandidate.endExclusive
-                }
-                if (literal.isNotEmpty()) {
-                    output.appendLiteralRun(literal.toString())
-                    offset = literalOffset
-                    continue
-                }
+                output.appendLiteralRun(candidate.translation)
+            } else if (candidate.translation != QUICK_DICTIONARY_IGNORE_TARGET) {
+                output.appendWord(candidate.translation)
             }
-            output.appendWord(candidate.translation)
             offset = candidate.endExclusive
         }
         return output.toString()
@@ -640,14 +620,15 @@ class QuickTranslationRepository(
         projectRuntime: ProjectTrieCache,
         pack: QuickPack,
         customPhonetics: Map<String, String>,
-        pronounMode: QuickTranslationPronounMode,
-        pronounHints: PronounHints,
+        pronounMode: QuickTranslationPronounMode? = null,
+        beamWidth: Int = 1,
     ): LocalMappedText {
         val lexical = translateProtectedMapped(
             text = text,
             projectRuntime = projectRuntime,
             pack = pack,
             customPhonetics = customPhonetics,
+            beamWidth = beamWidth,
         )
         val processed = postProcessTranslatedText(
             sourceText = text,
@@ -655,7 +636,6 @@ class QuickTranslationRepository(
             pack = pack,
             customPhonetics = customPhonetics,
             pronounMode = pronounMode,
-            pronounHints = pronounHints,
         )
         if (processed == lexical.text) return lexical
         val remapped = remapProcessedSegments(
@@ -665,7 +645,6 @@ class QuickTranslationRepository(
             pack = pack,
             customPhonetics = customPhonetics,
             pronounMode = pronounMode,
-            pronounHints = pronounHints,
         )
         return LocalMappedText(processed, remapped, text.length)
     }
@@ -675,6 +654,7 @@ class QuickTranslationRepository(
         projectRuntime: ProjectTrieCache,
         pack: QuickPack,
         customPhonetics: Map<String, String>,
+        beamWidth: Int = 1,
     ): LocalMappedText {
         val matches = RuntimeMatchIndex(
             text = text,
@@ -682,17 +662,10 @@ class QuickTranslationRepository(
             baseMatches = pack.baseTrie.allMatchesByStart(text),
             jiebaTokens = emptyList(),
         )
-        val plan = bestTranslationPlan(
-            text = text,
-            projectRuntime = projectRuntime,
-            pack = pack,
-            customPhonetics = customPhonetics,
-            matches = matches,
-        )
         val output = LocalMappedTextBuilder(text)
         var offset = 0
         while (offset < text.length) {
-            val candidate = plan[offset]
+            val candidate = fmmCandidateAt(text, offset, projectRuntime, pack, customPhonetics, matches)
             if (candidate == null || candidate.endExclusive <= offset) {
                 val fallback = fallbackCandidate(text, offset, customPhonetics, pack.phonetics)
                 output.append(
@@ -704,27 +677,14 @@ class QuickTranslationRepository(
                 offset = fallback.endExclusive
                 continue
             }
-            if (candidate.kind == CandidateKind.LITERAL) {
-                val literal = StringBuilder()
-                val literalStart = offset
-                var literalOffset = offset
-                while (literalOffset < text.length) {
-                    val literalCandidate = plan[literalOffset] ?: break
-                    if (literalCandidate.kind != CandidateKind.LITERAL ||
-                        literalCandidate.endExclusive <= literalOffset
-                    ) {
-                        break
-                    }
-                    literal.append(literalCandidate.translation)
-                    literalOffset = literalCandidate.endExclusive
-                }
-                if (literal.isNotEmpty()) {
-                    output.append(literalStart, literalOffset, literal.toString(), literal = true)
-                    offset = literalOffset
-                    continue
-                }
+            if (candidate.translation != QUICK_DICTIONARY_IGNORE_TARGET) {
+                output.append(
+                    sourceStart = offset,
+                    sourceEnd = candidate.endExclusive,
+                    value = candidate.translation,
+                    literal = candidate.kind == CandidateKind.LITERAL,
+                )
             }
-            output.append(offset, candidate.endExclusive, candidate.translation, literal = false)
             offset = candidate.endExclusive
         }
         return output.build()
@@ -733,23 +693,20 @@ class QuickTranslationRepository(
     private fun postProcessToken(
         sourceText: String,
         text: String,
-        pronounMode: QuickTranslationPronounMode,
-        pronounHints: PronounHints = PronounHints(),
-    ): String = normalizeNarratorThirdPerson(
-        sourceText = sourceText,
-        translatedText = applyPronounProfile(sourceText, text, pronounMode, pronounHints),
-        mode = pronounMode,
-    )
+        pronounMode: QuickTranslationPronounMode? = null,
+    ): String = text
 
     private fun postProcessFullText(
         text: String,
         pack: QuickPack,
         customPhonetics: Map<String, String>,
     ): String = QuickTranslationTextPostProcessor.normalizeNumericSpacing(
-        replaceRemainingCjkWithPhonetics(
-            text = applyPostRules(text, pack.postRules),
-            customPhonetics = customPhonetics,
-            bundledPhonetics = pack.phonetics,
+        QuickTranslationGrammarPolish.polish(
+            replaceRemainingCjkWithPhonetics(
+                text = applyPostRules(text, pack.postRules),
+                customPhonetics = customPhonetics,
+                bundledPhonetics = pack.phonetics,
+            )
         )
     )
 
@@ -758,10 +715,9 @@ class QuickTranslationRepository(
         text: String,
         pack: QuickPack,
         customPhonetics: Map<String, String>,
-        pronounMode: QuickTranslationPronounMode,
-        pronounHints: PronounHints = PronounHints(),
+        pronounMode: QuickTranslationPronounMode? = null,
     ): String {
-        val tokenPass = postProcessToken(sourceText, text, pronounMode, pronounHints)
+        val tokenPass = postProcessToken(sourceText, text, pronounMode)
         return postProcessFullText(tokenPass, pack, customPhonetics)
     }
 
@@ -771,8 +727,7 @@ class QuickTranslationRepository(
         processed: String,
         pack: QuickPack,
         customPhonetics: Map<String, String>,
-        pronounMode: QuickTranslationPronounMode,
-        pronounHints: PronounHints = PronounHints(),
+        pronounMode: QuickTranslationPronounMode? = null,
     ): List<DisplaySourceSegment> {
         val result = mutableListOf<DisplaySourceSegment>()
         var cursor = 0
@@ -791,7 +746,6 @@ class QuickTranslationRepository(
                     pack = pack,
                     customPhonetics = customPhonetics,
                     pronounMode = pronounMode,
-                    pronounHints = pronounHints,
                 ).takeIf(String::isNotEmpty) ?: return@forEach
                 matchStart = processed.indexOf(matchText, startIndex = cursor, ignoreCase = true)
             }
@@ -833,49 +787,30 @@ class QuickTranslationRepository(
         exactCharacterMapping = true,
     )
 
-    private fun bestTranslationPlan(
+    private fun fmmCandidateAt(
         text: String,
+        offset: Int,
         projectRuntime: ProjectTrieCache,
         pack: QuickPack,
         customPhonetics: Map<String, String>,
         matches: RuntimeMatchIndex,
         timer: LexicalTimer? = null,
-    ): Array<TranslationCandidate?> {
-        val bestScores = LongArray(text.length + 1) { Long.MIN_VALUE / 4 }
-        val plan = arrayOfNulls<TranslationCandidate>(text.length)
-        bestScores[text.length] = 0L
-        for (offset in text.length - 1 downTo 0) {
-            var bestCandidate: TranslationCandidate? = null
-            var bestScore = Long.MIN_VALUE / 4
-            translationCandidatesAt(
-                text = text,
-                offset = offset,
-                projectRuntime = projectRuntime,
-                pack = pack,
-                customPhonetics = customPhonetics,
-                matches = matches,
-                timer = timer,
-            ).forEach { candidate ->
-                val tailScore = bestScores.getOrElse(candidate.endExclusive) {
-                    Long.MIN_VALUE / 4
-                }
-                if (tailScore <= Long.MIN_VALUE / 8) return@forEach
-                val score = candidate.score + tailScore
-                val current = bestCandidate
-                if (current == null ||
-                    score > bestScore ||
-                    score == bestScore && isBetterCandidate(candidate, current)
-                ) {
-                    bestCandidate = candidate
-                    bestScore = score
-                }
-            }
-            bestCandidate?.let { candidate ->
-                plan[offset] = candidate
-                bestScores[offset] = bestScore
-            }
-        }
-        return plan
+    ): TranslationCandidate? {
+        val candidates = translationCandidatesAt(
+            text = text,
+            offset = offset,
+            projectRuntime = projectRuntime,
+            pack = pack,
+            customPhonetics = customPhonetics,
+            matches = matches,
+            timer = timer,
+        )
+        if (candidates.isEmpty()) return null
+        return candidates.maxWithOrNull(
+            compareBy<TranslationCandidate> { it.endExclusive - offset }
+                .thenBy { it.priority }
+                .thenBy { it.score }
+        )
     }
 
     private fun translationCandidatesAt(
@@ -962,9 +897,14 @@ class QuickTranslationRepository(
                         lexical.term.target.isNotBlank() &&
                         (lexical.endExclusive - offset) * 2 >= grammar.endExclusive - offset
                 }
-                if (!coveredByBaseLexicalTerm ||
+                val coveredByProjectTerm = matches.projectTermsAt(offset).any { projectTerm ->
+                    projectTerm.endExclusive >= grammar.endExclusive
+                }
+                val isPersonExemption = grammar.isPerson &&
+                    matches.projectTermsAt(offset).none { it.term.type == QuickDictionaryType.NAME }
+                if ((!coveredByProjectTerm || isPersonExemption) && (!coveredByBaseLexicalTerm ||
                     grammar.priority >= TRUSTED_GRAMMAR_PRIORITY &&
-                    !matches.hasCorrectionOverride(offset, grammar.endExclusive)
+                    !matches.hasCorrectionOverride(offset, grammar.endExclusive))
                 ) {
                     candidates += TranslationCandidate(
                         endExclusive = grammar.endExclusive,
@@ -977,11 +917,13 @@ class QuickTranslationRepository(
             timer?.let { it.grammar += (System.currentTimeMillis() - tG0) }
         }
         val tT0 = System.currentTimeMillis()
+        val firstChar = text.getOrNull(offset)
+        val isPunctuation = firstChar != null && firstChar in PUNCTUATION_OR_BREAK_CHARS
         val termsAtOffset = matches.termsAt(offset)
-        val hasLeadingSlotTemplates = !insideProjectTerm && termsAtOffset.isNotEmpty() &&
+        val hasLeadingSlotTemplates = !insideProjectTerm && !isPunctuation && termsAtOffset.isNotEmpty() &&
             (projectRuntime.leadingSlotTemplateIndex.isNotEmpty() || pack.leadingSlotTemplateIndex.isNotEmpty())
-        val indexedProject = projectRuntime.indexedTemplatesAt(text, offset)
-        val indexedPack = pack.indexedTemplatesAt(text, offset)
+        val indexedProject = if (isPunctuation) emptyList() else projectRuntime.indexedTemplatesAt(text, offset)
+        val indexedPack = if (isPunctuation) emptyList() else pack.indexedTemplatesAt(text, offset)
         val leadingTemplates = if (hasLeadingSlotTemplates) {
             leadingSlotTemplatesAt(
                 text = text,
@@ -1171,7 +1113,7 @@ class QuickTranslationRepository(
     }
 
     private fun lexicalFragmentationPenalty(match: TermMatch, length: Int): Long {
-        if (match.term.projectOwned || match.term.target.isEmpty()) return 0L
+        if (match.term.target.isEmpty()) return 0L
         var penalty = TRANSLATION_FRAGMENT_PENALTY
         if (length == 1) {
             penalty += if (match.term.source in SINGLE_CHAR_FUNCTION_PARTICLES) {
@@ -1192,8 +1134,53 @@ class QuickTranslationRepository(
         customPhonetics: Map<String, String>,
         bundledPhonetics: Map<String, String>,
     ): TranslationCandidate {
+        if (text.startsWith("……", offset)) {
+            return TranslationCandidate(
+                endExclusive = offset + 2,
+                translation = "...",
+                priority = 0,
+                score = FALLBACK_SCORE,
+                kind = CandidateKind.LITERAL,
+            )
+        }
+        if (text.startsWith("——", offset)) {
+            return TranslationCandidate(
+                endExclusive = offset + 2,
+                translation = "-",
+                priority = 0,
+                score = FALLBACK_SCORE,
+                kind = CandidateKind.LITERAL,
+            )
+        }
         val codePoint = text.codePointAt(offset)
         val source = String(Character.toChars(codePoint))
+        val punctuation = when (source) {
+            "。" -> "."
+            "，", "、" -> ","
+            "！" -> "!"
+            "？" -> "?"
+            "：" -> ":"
+            "；" -> ";"
+            "“", "”" -> "\""
+            "‘", "’" -> "'"
+            "（" -> "("
+            "）" -> ")"
+            "【" -> "["
+            "】" -> "]"
+            "《", "》" -> "\""
+            "…" -> "..."
+            "—" -> "-"
+            else -> null
+        }
+        if (punctuation != null) {
+            return TranslationCandidate(
+                endExclusive = offset + Character.charCount(codePoint),
+                translation = punctuation,
+                priority = 0,
+                score = FALLBACK_SCORE,
+                kind = CandidateKind.LITERAL,
+            )
+        }
         val reading = customPhonetics[source] ?: bundledPhonetics[source]
         val translation = if (reading != null && isCjk(codePoint)) reading else source
         return TranslationCandidate(
@@ -1472,6 +1459,7 @@ class QuickTranslationRepository(
         packIndex: LeadingSlotTemplateIndex,
     ): List<SourceTemplate> {
         if (projectIndex.isEmpty() && packIndex.isEmpty()) return emptyList()
+        if (text.getOrNull(offset) in PUNCTUATION_OR_BREAK_CHARS) return emptyList()
         val terms = matches.termsAt(offset)
         if (terms.isEmpty()) return emptyList()
         val termEnds = ArrayList<Int>(minOf(terms.size, MAX_SLOT_CANDIDATES) + 1)
@@ -1590,7 +1578,10 @@ class QuickTranslationRepository(
         return matches.cachedSlotMatches(cursor, part.acceptedPos) {
             val result = LinkedHashMap<RuntimeMatchIndex.TermSlotDedupKey, TermMatch>()
             fun add(match: TermMatch) {
-                if (match.term.target.isBlank() || !part.accepts(posOf(match, matches))) return
+                if (match.term.target.isBlank() ||
+                    match.term.source.any { it in PUNCTUATION_OR_BREAK_CHARS || it.isWhitespace() } ||
+                    !part.accepts(posOf(match, matches))
+                ) return
                 val key = RuntimeMatchIndex.TermSlotDedupKey(normalize(match.term.source), match.endExclusive)
                 val current = result[key]
                 if (current == null || isBetterTermMatch(match, current)) {
@@ -1686,8 +1677,8 @@ class QuickTranslationRepository(
         fun consider(candidate: StructuredMatch?) {
             if (candidate == null) return
             val cur = best
-            if (cur == null || candidate.priority > cur.priority ||
-                (candidate.priority == cur.priority && candidate.endExclusive > cur.endExclusive)
+            if (cur == null || candidate.endExclusive > cur.endExclusive ||
+                (candidate.endExclusive == cur.endExclusive && candidate.priority > cur.priority)
             ) {
                 best = candidate
             }
@@ -1738,6 +1729,7 @@ class QuickTranslationRepository(
             }
         }
         val firstChar = text.getOrNull(offset) ?: return null
+        if (firstChar in PUNCTUATION_OR_BREAK_CHARS) return null
         if (matches.termsAt(offset).isNotEmpty()) {
             consider(matchPlaceHierarchy(text, offset, matches))
             consider(matchDynamicAttributiveDe(text, offset, matches))
@@ -1747,6 +1739,9 @@ class QuickTranslationRepository(
         }
         if (firstChar == '为') {
             consider(matchLeadingHeadPhrase(text, offset, matches))
+        }
+        if (firstChar == '将' || firstChar == '將') {
+            consider(matchDisposalParticle(text, offset, matches))
         }
         if (firstChar in INTERROGATIVE_FIRST_CHARS) {
             consider(matchInterrogativePattern(text, offset, matches))
@@ -1858,6 +1853,38 @@ class QuickTranslationRepository(
             translation = "$phrase dẫn đầu",
             priority = TRUSTED_GRAMMAR_PRIORITY,
         )
+    }
+
+    private fun matchDisposalParticle(
+        text: String,
+        offset: Int,
+        matches: RuntimeMatchIndex,
+    ): StructuredMatch? {
+        val existingTerms = matches.termsAt(offset)
+        if (existingTerms.any { it.term.source.length > 1 }) {
+            return null
+        }
+        val nextOffset = offset + 1
+        if (nextOffset >= text.length) return null
+        val nextChar = text[nextOffset]
+        if (nextChar in DISPOSAL_EXCLUDED_NEXT_CHARS) return null
+        val nextTerms = matches.termsAt(nextOffset)
+        val hasObject = nextTerms.any { termMatch ->
+            val pos = posOf(termMatch, matches)
+            pos in NOUN_COMPATIBLE_POS ||
+                pos == TermPos.PRONOUN ||
+                termMatch.term.type == QuickDictionaryType.PRONOUN ||
+                termMatch.term.source in DISPOSAL_OBJECT_PRONOUNS ||
+                isNounSource(termMatch.term.source)
+        } || nextChar in DISPOSAL_OBJECT_FIRST_CHARS
+        if (hasObject) {
+            return StructuredMatch(
+                endExclusive = nextOffset,
+                translation = "đem",
+                priority = TRUSTED_GRAMMAR_PRIORITY + 5,
+            )
+        }
+        return null
     }
 
     private fun scanGrammarNounPhraseEnd(
@@ -2131,10 +2158,12 @@ class QuickTranslationRepository(
                             head.term.target,
                             modifier.second,
                         ).joinToStringByWord { it }
+                        val isPerson = renderPersonModifier(modifier.first) != null || posOf(head, matches) == TermPos.PERSON
                         val candidate = StructuredMatch(
                             endExclusive = head.endExclusive,
                             translation = rendered,
                             priority = 118,
+                            isPerson = isPerson,
                         )
                         val current = best
                         if (current == null || candidate.endExclusive > current.endExclusive) {
@@ -2189,7 +2218,12 @@ class QuickTranslationRepository(
         if (isPersonHead(right) && isActionAttributiveModifier(left, leftTarget, matches)) {
             return listOf(rightTarget, leftTarget).joinToStringByWord { it }
         }
-        if (isPossessiveOwner(left)) return null
+        if (isPossessiveOwner(left)) {
+            if (posOf(right, matches) in NOUN_COMPATIBLE_POS || isNounSource(right.term.source)) {
+                return listOf(rightTarget, "của", leftTarget).joinToStringByWord { it }
+            }
+            return null
+        }
         if (posOf(right, matches) in ATTRIBUTIVE_ACTION_HEAD_POS &&
             isActionAttributiveModifier(left, leftTarget, matches)
         ) {
@@ -2203,9 +2237,20 @@ class QuickTranslationRepository(
         ) {
             return listOf(rightTarget, leftTarget).joinToStringByWord { it }
         }
+        if (posOf(right, matches) in NOUN_COMPATIBLE_POS || isNounSource(right.term.source)) {
+            if (posOf(left, matches) in setOf(TermPos.VERB, TermPos.ADVERB, TermPos.ADJECTIVE) ||
+                isDescriptiveModifier(left) ||
+                isActionAttributiveModifier(left, leftTarget, matches)
+            ) {
+                return listOf(rightTarget, leftTarget).joinToStringByWord { it }
+            }
+        }
         return when (posOf(left, matches)) {
             TermPos.LOCATION -> listOf(rightTarget, "ở", leftTarget).joinToStringByWord { it }
             TermPos.ADJECTIVE -> listOf(rightTarget, leftTarget).joinToStringByWord { it }
+            TermPos.PERSON, TermPos.NAME -> if (posOf(right, matches) in NOUN_COMPATIBLE_POS || isNounSource(right.term.source)) {
+                listOf(rightTarget, "của", leftTarget).joinToStringByWord { it }
+            } else null
             else -> when {
                 isAgeModifier(left) ->
                     listOf(rightTarget, "lúc", leftTarget).joinToStringByWord { it }
@@ -2573,10 +2618,16 @@ class QuickTranslationRepository(
         }
         TIME_HOUR_PATTERN.matchAt(text, offset)?.let { match ->
             val hour = parseQuickNumber(match.groupValues[2]) ?: return null
-            val period = TIME_PREFIX_TRANSLATIONS[match.groupValues[1]].orEmpty()
+            val periodRaw = match.groupValues[1]
+            val period = TIME_PREFIX_TRANSLATIONS[periodRaw].orEmpty()
+            val unit = if (period.isNotBlank() || match.value.endsWith("时") || match.value.endsWith("時") || match.value.contains("整") || match.value.contains("左右")) {
+                "giờ"
+            } else {
+                "điểm"
+            }
             return StructuredMatch(
                 match.range.last + 1,
-                listOf("$hour giờ", period).filter(String::isNotBlank).joinToString(" "),
+                listOf("$hour $unit", period).filter(String::isNotBlank).joinToString(" "),
                 TRUSTED_GRAMMAR_PRIORITY + 260,
             )
         }
@@ -2620,626 +2671,6 @@ class QuickTranslationRepository(
         val number = parseQuickNumber(match.groupValues[1]) ?: return null
         if ('.' !in number) return null
         return StructuredMatch(match.range.last + 1, number, TRUSTED_GRAMMAR_PRIORITY + 320)
-    }
-
-    private fun currentPronounMode(): QuickTranslationPronounMode =
-        QuickTranslationPronounMode.from(
-            appCtx.getPrefString(
-                PreferKey.quickTranslationPronounMode,
-                QuickTranslationPronounMode.default.value,
-            )
-        )
-
-    private fun resolvedPronounMode(mode: QuickTranslationPronounMode?): QuickTranslationPronounMode =
-        mode ?: currentPronounMode()
-
-    private fun versionWithPronounMode(
-        version: String,
-        mode: QuickTranslationPronounMode,
-    ): String = "$version+pronoun:${mode.value}"
-
-    private fun applyPronounProfile(
-        sourceText: String,
-        translatedText: String,
-        mode: QuickTranslationPronounMode,
-        hints: PronounHints = PronounHints(),
-    ): String {
-        if (translatedText.isBlank()) return translatedText
-        return when (resolvePronounStyle(sourceText, mode)) {
-            PronounStyle.OFF -> translatedText
-            PronounStyle.MODERN -> applyModernPronounRules(sourceText, translatedText, hints)
-            PronounStyle.ANCIENT -> applyAncientPronounRules(
-                sourceText,
-                applyModernKinshipRules(sourceText, translatedText),
-            )
-            PronounStyle.WESTERN -> applyWesternPronounRules(
-                sourceText,
-                applyModernKinshipRules(sourceText, translatedText),
-            )
-        }
-    }
-
-    private fun resolvePronounStyle(
-        sourceText: String,
-        mode: QuickTranslationPronounMode,
-    ): PronounStyle = when (mode) {
-        QuickTranslationPronounMode.OFF -> PronounStyle.OFF
-        QuickTranslationPronounMode.ANCIENT -> PronounStyle.ANCIENT
-        QuickTranslationPronounMode.MODERN -> PronounStyle.MODERN
-        QuickTranslationPronounMode.WESTERN -> PronounStyle.WESTERN
-        QuickTranslationPronounMode.AUTO -> when {
-            hasWesternPronounContext(sourceText) -> PronounStyle.WESTERN
-            hasAncientPronounContext(sourceText) -> PronounStyle.ANCIENT
-            else -> PronounStyle.MODERN
-        }
-    }
-
-    private fun normalizeNarratorThirdPerson(
-        sourceText: String,
-        translatedText: String,
-        mode: QuickTranslationPronounMode,
-    ): String {
-        if (mode == QuickTranslationPronounMode.OFF) return translatedText
-        var output = translatedText
-        if (sourceText.hasThirdPersonMalePronoun()) {
-            NARRATOR_MALE_PRONOUNS.forEach { pronoun ->
-                output = replaceDetachedPhrase(output, pronoun, "hắn")
-            }
-        }
-        if (sourceText.hasThirdPersonFemalePronoun()) {
-            NARRATOR_FEMALE_PRONOUNS.forEach { pronoun ->
-                output = replaceDetachedPhrase(output, pronoun, "cô")
-            }
-        }
-        return output
-    }
-
-    private fun applyModernPronounRules(
-        sourceText: String,
-        translatedText: String,
-        hints: PronounHints,
-    ): String {
-        var output = translatedText
-        if (sourceText.hasSecondPersonPronoun()) {
-            val singular = hints.secondPersonSingular
-            val plural = hints.secondPersonPlural ?: singular?.let(::modernPluralAddressee)
-            output = replaceDetachedPhrase(output, "các ngươi", plural ?: "các bạn")
-            output = replaceDetachedPhrase(output, "ngươi", singular ?: "bạn")
-            singular?.let { output = replaceDetachedPhrase(output, "bạn", it) }
-        }
-        if (sourceText.hasThirdPersonMalePronoun()) {
-            val male = hints.maleThirdPerson ?: modernMaleThirdPerson(sourceText)
-            output = replaceThirdPersonPlural(output, sourceText)
-            output = replaceDetachedPhrase(output, "hắn", male)
-            output = replaceDetachedPhrase(output, "anh ấy", male)
-        }
-        if (sourceText.hasThirdPersonFemalePronoun()) {
-            val female = hints.femaleThirdPerson ?: modernFemaleThirdPerson(sourceText)
-            output = replaceThirdPersonPlural(output, sourceText)
-            output = replaceDetachedPhrase(output, "nàng", female)
-            output = replaceDetachedPhrase(output, "cô ấy", female)
-        }
-        output = applyModernPossessivePronounRules(sourceText, output, hints)
-        return applyModernKinshipRules(sourceText, output, hints)
-    }
-
-    private fun applyModernKinshipRules(
-        sourceText: String,
-        translatedText: String,
-        hints: PronounHints = PronounHints(),
-    ): String {
-        var output = translatedText
-        if (sourceText.contains("你们爹妈") || sourceText.contains("你們爹媽") ||
-            sourceText.contains("你们父母") || sourceText.contains("你們父母")
-        ) {
-            output = replaceDetachedPhrase(output, "cha mẹ các bạn", "cha mẹ các cháu")
-            output = replaceDetachedPhrase(output, "cha mẹ của các bạn", "cha mẹ các cháu")
-            output = replaceDetachedPhrase(output, "các bạn", "các cháu")
-        }
-        directKinshipAddress(sourceText)?.let { address ->
-            output = replaceVocative(output, address.outputLabels, address.vocative)
-            output = replaceDetachedPhrase(output, "các bạn", "các cháu")
-            output = replaceDetachedPhrase(output, "bạn", address.addressee)
-            output = replaceDetachedPhrase(output, "tôi", address.speaker)
-        }
-        hints.secondPersonSingular?.let { addressee ->
-            output = replaceDetachedPhrase(output, "bạn", addressee)
-        }
-        hints.secondPersonPlural?.let { addressees ->
-            output = replaceDetachedPhrase(output, "các bạn", addressees)
-            output = replaceDetachedPhrase(output, "các ngươi", addressees)
-        }
-        return output
-    }
-
-    private fun modernMaleThirdPerson(sourceText: String): String =
-        when (explicitMaleRoleBeforePronoun(sourceText)) {
-            ModernThirdPersonRole.CHILD -> "cậu"
-            ModernThirdPersonRole.ELDER,
-            ModernThirdPersonRole.ADULT,
-            ModernThirdPersonRole.SUPERNATURAL,
-            -> "ông ấy"
-            null,
-            ModernThirdPersonRole.NEUTRAL,
-            -> "anh ấy"
-        }
-
-    private fun modernFemaleThirdPerson(sourceText: String): String =
-        when (explicitFemaleRoleBeforePronoun(sourceText)) {
-            ModernThirdPersonRole.CHILD -> "cô bé"
-            ModernThirdPersonRole.ELDER -> "bà ấy"
-            ModernThirdPersonRole.SUPERNATURAL -> "cô ta"
-            ModernThirdPersonRole.ADULT,
-            null,
-            ModernThirdPersonRole.NEUTRAL,
-            -> "cô ấy"
-        }
-
-    private fun modernPluralAddressee(singular: String): String =
-        when (singular) {
-            "cháu", "con", "cậu" -> "các cháu"
-            "ông", "bà", "ngài" -> "các vị"
-            "anh" -> "các anh"
-            "chị" -> "các chị"
-            else -> "các bạn"
-        }
-
-    private fun replaceThirdPersonPlural(text: String, sourceText: String): String {
-        if (!sourceText.containsAny("他们", "他們", "她们", "她們")) return text
-        var output = text
-        output = replaceDetachedPhrase(output, "các hắn", "họ")
-        output = replaceDetachedPhrase(output, "bọn hắn", "họ")
-        output = replaceDetachedPhrase(output, "các nàng", "họ")
-        output = replaceDetachedPhrase(output, "các anh ấy", "họ")
-        output = replaceDetachedPhrase(output, "các cô ấy", "họ")
-        return output
-    }
-
-    private fun applyModernPossessivePronounRules(
-        sourceText: String,
-        translatedText: String,
-        hints: PronounHints,
-    ): String {
-        var output = translatedText
-        if (sourceText.containsAny("孩子他奶", "孩子他姥", "伢儿他奶", "伢儿他姥")) {
-            output = CHILD_KINSHIP_GRANDMOTHER_PATTERN.replace(output, "bà nó")
-        }
-        if (sourceText.containsAny("孩子他爷", "孩子他爺", "孩子他外公", "伢儿他爷", "伢儿他爺")) {
-            output = CHILD_KINSHIP_GRANDFATHER_PATTERN.replace(output, "ông nó")
-        }
-        if (sourceText.containsAny("他奶", "他姥") && sourceText.containsAny("伢儿", "孩子", "远子", "小远侯")) {
-            output = CHILD_KINSHIP_GRANDMOTHER_PATTERN.replace(output, "bà nó")
-            output = replaceDetachedPhrase(output, "cậu sữa", "bà nó")
-            output = replaceDetachedPhrase(output, "cậu bà", "bà nó")
-            output = replaceDetachedPhrase(output, "nó sữa", "bà nó")
-            output = replaceDetachedPhrase(output, "nó bà", "bà nó")
-        }
-        if (sourceText.containsAny("他爷", "他爺", "他外公") && sourceText.containsAny("伢儿", "孩子", "远子", "小远侯")) {
-            output = CHILD_KINSHIP_GRANDFATHER_PATTERN.replace(output, "ông nó")
-            output = replaceDetachedPhrase(output, "cậu gia", "ông nó")
-            output = replaceDetachedPhrase(output, "cậu ông", "ông nó")
-            output = replaceDetachedPhrase(output, "nó gia", "ông nó")
-            output = replaceDetachedPhrase(output, "nó ông", "ông nó")
-        }
-        if (sourceText.containsAny("孩子他妈", "孩子他媽", "伢儿他妈", "伢儿他媽")) {
-            output = CHILD_KINSHIP_MOTHER_PATTERN.replace(output, "mẹ nó")
-        }
-        if (sourceText.containsAny("孩子他爹", "孩子他爸", "伢儿他爹", "伢儿他爸")) {
-            output = CHILD_KINSHIP_FATHER_PATTERN.replace(output, "cha nó")
-        }
-        if (sourceText.contains("她男人")) {
-            val owner = if (hints.femaleThirdPerson == "bà ấy") "bà" else "cô ấy"
-            output = replaceDetachedPhrase(output, "người đàn ông của cô ấy", "chồng $owner")
-            output = replaceDetachedPhrase(output, "người đàn ông của nàng", "chồng $owner")
-            output = replaceDetachedPhrase(output, "cô ấy người đàn ông", "chồng $owner")
-            output = replaceDetachedPhrase(output, "bà ấy người đàn ông", "chồng $owner")
-            output = replaceDetachedPhrase(output, "nàng người đàn ông", "chồng $owner")
-        }
-        return output
-    }
-
-    private fun applyAncientPronounRules(sourceText: String, translatedText: String): String {
-        var output = translatedText
-        output = when {
-            sourceText.containsAny("陛下", "皇上", "圣上", "萬歲", "万岁") ->
-                replaceAncientSecondPerson(output, "bệ hạ")
-            sourceText.containsAny("殿下", "太子", "公主") ->
-                replaceAncientSecondPerson(output, "điện hạ")
-            sourceText.containsAny("王爷", "王爺") ->
-                replaceAncientSecondPerson(output, "vương gia")
-            sourceText.containsAny("娘娘", "皇后", "贵妃", "貴妃") ->
-                replaceAncientSecondPerson(output, "nương nương")
-            sourceText.containsAny("爱卿", "愛卿", "卿") ->
-                replaceAncientSecondPerson(output, "khanh")
-            sourceText.containsAny("师父", "師父", "师尊", "師尊") ->
-                replaceAncientSecondPerson(output, "sư phụ")
-            sourceText.containsAny("道友") ->
-                replaceAncientSecondPerson(output, "đạo hữu")
-            sourceText.containsAny("夫君", "相公", "郎君") ->
-                replaceAncientSecondPerson(output, "chàng")
-            sourceText.containsAny("娘子", "爱妃", "愛妃") ->
-                replaceAncientSecondPerson(output, "nàng")
-            else -> output
-        }
-        output = when {
-            sourceText.containsAny("夫君", "相公", "郎君") ->
-                replaceAncientFirstPerson(output, "thiếp")
-            sourceText.containsAny("臣妾") ->
-                replaceAncientFirstPerson(output, "thần thiếp")
-            sourceText.containsAny("妾", "奴婢") ->
-                replaceAncientFirstPerson(output, "thiếp")
-            sourceText.containsAny("臣", "微臣", "下官") ->
-                replaceAncientFirstPerson(output, "thần")
-            sourceText.containsAny("弟子") ->
-                replaceAncientFirstPerson(output, "đệ tử")
-            sourceText.containsAny("朕") ->
-                replaceAncientFirstPerson(output, "trẫm")
-            sourceText.containsAny("寡人") ->
-                replaceAncientFirstPerson(output, "quả nhân")
-            else -> output
-        }
-        output = replaceDetachedPhrase(output, "chúng tôi", "chúng ta")
-        output = replaceDetachedPhrase(output, "các bạn", "các ngươi")
-        output = replaceDetachedPhrase(output, "bạn", "ngươi")
-        output = replaceDetachedPhrase(output, "tôi", "ta")
-        output = replaceDetachedPhrase(output, "anh ấy", "hắn")
-        output = replaceDetachedPhrase(output, "cô ấy", "nàng")
-        return output
-    }
-
-    private fun replaceAncientSecondPerson(text: String, replacement: String): String {
-        var output = replaceDetachedPhrase(text, "các bạn", "các vị")
-        output = replaceDetachedPhrase(output, "các ngươi", "các vị")
-        output = replaceDetachedPhrase(output, "bạn", replacement)
-        output = replaceDetachedPhrase(output, "ngươi", replacement)
-        return output
-    }
-
-    private fun replaceAncientFirstPerson(text: String, replacement: String): String {
-        var output = replaceDetachedPhrase(text, "chúng tôi", "chúng ta")
-        output = replaceDetachedPhrase(output, "tôi", replacement)
-        output = replaceDetachedPhrase(output, "ta", replacement)
-        return output
-    }
-
-    private fun applyWesternPronounRules(sourceText: String, translatedText: String): String {
-        val addressee = westernSecondPerson(sourceText)
-        val pluralAddressee = if (addressee == "ngài" || sourceText.hasFormalWesternTitle()) {
-            "các vị"
-        } else {
-            "các anh"
-        }
-        var output = translatedText
-        output = replaceDetachedPhrase(output, "các bạn", pluralAddressee)
-        output = replaceDetachedPhrase(output, "bạn", addressee)
-        if (sourceText.containsAny("公爵", "伯爵", "子爵", "男爵", "先生", "爵士", "神父", "牧师")) {
-            output = replaceDetachedPhrase(output, "anh ấy", "ông ấy")
-        }
-        if (sourceText.containsAny("夫人", "女士")) {
-            output = replaceDetachedPhrase(output, "cô ấy", "bà ấy")
-        }
-        if (sourceText.contains("小姐")) {
-            output = replaceDetachedPhrase(output, "tiểu thư", "quý cô")
-        }
-        if (sourceText.contains("阁下") || sourceText.contains("閣下")) {
-            output = replaceDetachedPhrase(output, "các hạ", "ngài")
-        }
-        return output
-    }
-
-    private fun westernSecondPerson(sourceText: String): String = when {
-        sourceText.containsAny("阁下", "閣下", "公爵", "伯爵", "子爵", "男爵", "爵士") -> "ngài"
-        sourceText.containsAny("神父", "牧师", "牧師") -> "cha"
-        sourceText.containsAny("夫人") -> "bà"
-        sourceText.containsAny("女士", "小姐") -> "cô"
-        sourceText.containsAny("先生") -> "ông"
-        else -> "anh"
-    }
-
-    private inner class PronounContextTracker {
-        private var lastMaleRole: ModernThirdPersonRole? = null
-        private var lastFemaleRole: ModernThirdPersonRole? = null
-
-        fun hintsFor(sourceText: String): PronounHints {
-            val malePronounIndex = sourceText.indexOfMalePronoun()
-            val femalePronounIndex = sourceText.indexOfFemalePronoun()
-            val currentMaleRole = if (sourceText.hasObjectPronounAt(malePronounIndex)) {
-                null
-            } else {
-                explicitMaleRoleBeforePronoun(sourceText)
-            }
-            val currentFemaleRole = if (sourceText.hasObjectPronounAt(femalePronounIndex)) {
-                null
-            } else {
-                explicitFemaleRoleBeforePronoun(sourceText)
-            }
-            val maleRole = currentMaleRole ?: lastMaleRole
-            val femaleRole = currentFemaleRole ?: lastFemaleRole
-            val nextMaleRole = explicitMaleRole(sourceText)
-            val nextFemaleRole = explicitFemaleRole(sourceText)
-            val hints = PronounHints(
-                secondPersonSingular = modernSecondPerson(sourceText),
-                secondPersonPlural = modernSecondPersonPlural(sourceText),
-                maleThirdPerson = if (sourceText.hasThirdPersonMalePronoun()) {
-                    maleRole?.maleThirdPerson()
-                } else {
-                    null
-                },
-                femaleThirdPerson = if (sourceText.hasThirdPersonFemalePronoun()) {
-                    femaleRole?.femaleThirdPerson()
-                } else {
-                    null
-                },
-            )
-            nextMaleRole?.let { lastMaleRole = it }
-            nextFemaleRole?.let { lastFemaleRole = it }
-            return hints
-        }
-    }
-
-    private fun modernSecondPerson(sourceText: String): String? = when {
-        sourceText.hasDirectAddress("奶", "奶奶", "外婆", "祖母", "阿婆") -> "bà"
-        sourceText.hasDirectAddress("爷", "爷爷", "爺", "爺爺", "外公", "祖父", "阿公") -> "ông"
-        sourceText.hasDirectAddress("爸", "爸爸", "爹", "父亲", "父親") -> "bố"
-        sourceText.hasDirectAddress("妈", "妈妈", "媽", "媽媽", "娘", "母亲", "母親") -> "mẹ"
-        sourceText.hasDirectAddress("叔", "叔叔", "叔父", "伯", "伯伯", "大夫", "医生", "先生") -> "ông"
-        sourceText.hasDirectAddress("婶", "婶子", "嬸", "嬸子") -> "thím"
-        sourceText.hasDirectAddress("姨", "阿姨", "姨妈", "姨媽") -> "dì"
-        sourceText.hasDirectAddress("哥", "哥哥", "兄弟") -> "anh"
-        sourceText.hasDirectAddress("姐", "姐姐") -> "chị"
-        sourceText.hasDirectAddress("妹子") -> "em"
-        sourceText.containsAny("孩子他奶", "孩子他姥", "伢儿他奶", "伢儿他姥") -> "bà"
-        sourceText.containsAny("孩子他爷", "孩子他爺", "孩子他外公", "伢儿他爷", "伢儿他爺") -> "ông"
-        sourceText.containsAny("他奶", "他姥") && sourceText.containsAny("伢儿", "孩子", "远子", "小远侯") -> "bà"
-        sourceText.containsAny("他爷", "他爺", "他外公") && sourceText.containsAny("伢儿", "孩子", "远子", "小远侯") -> "ông"
-        sourceText.containsAny("你们爹妈", "你們爹媽", "你们父母", "你們父母") -> "cháu"
-        sourceText.contains("你这是要出去") && sourceText.contains("崔桂英") -> "ông"
-        sourceText.containsAny("你照顾伢儿", "你照顾孩子", "你照顧伢兒", "你照顧孩子") -> "bà"
-        sourceText.containsAny("你快救救他", "你快救他", "你赶紧救他", "你趕緊救他") -> "chị"
-        sourceText.containsAny("姐姐，你", "姐，你", "我说姐姐", "我說姐姐") -> "chị"
-        sourceText.containsAny("妈，你不该", "媽，你不該", "妈你不该", "媽你不該") -> "mẹ"
-        sourceText.containsAny("桂英侯", "你家汉侯", "你家漢侯") -> "bà"
-        sourceText.containsAny("小远侯你", "小遠侯你", "远子你", "遠子你") -> "cậu"
-        sourceText.containsAny("你醒醒", "你快醒醒", "你醒了", "你终于醒了", "你終於醒了") &&
-            sourceText.containsAny("小远侯", "小遠侯", "远子", "遠子", "伢儿", "伢兒") -> "cậu"
-        sourceText.containsAny("香侯", "菊香", "闺女", "閨女") &&
-            sourceText.containsAny("你妈我", "你媽我", "娘俩", "娘倆", "我说香侯") -> "con"
-        sourceText.containsAny("你汉叔", "你漢叔", "你妈我", "你媽我") -> "con"
-        sourceText.contains("您") -> "ông"
-        else -> null
-    }
-
-    private fun modernSecondPersonPlural(sourceText: String): String? = when {
-        sourceText.containsAny("你们爹妈", "你們爹媽", "你们父母", "你們父母") -> "các cháu"
-        sourceText.containsAny("你们这是", "你們這是") -> "mọi người"
-        sourceText.containsAny("你们去看看", "你們去看看", "你们去看", "你們去看") -> "các cháu"
-        sourceText.contains("你们") || sourceText.contains("你們") ->
-            modernSecondPerson(sourceText)?.let(::modernPluralAddressee)
-        else -> null
-    }
-
-    private fun explicitMaleRoleBeforePronoun(sourceText: String): ModernThirdPersonRole? {
-        val pronounIndex = sourceText.indexOfMalePronoun()
-        val before = if (pronounIndex >= 0) pronounIndex else sourceText.length
-        return dominantRoleBefore(sourceText, MODERN_MALE_ROLE_MARKERS, before)
-            ?: latestRoleBefore(sourceText, MODERN_MALE_ROLE_MARKERS, before)
-    }
-
-    private fun explicitFemaleRoleBeforePronoun(sourceText: String): ModernThirdPersonRole? {
-        val pronounIndex = sourceText.indexOfFemalePronoun()
-        val before = if (pronounIndex >= 0) pronounIndex else sourceText.length
-        return dominantRoleBefore(sourceText, MODERN_FEMALE_ROLE_MARKERS, before)
-            ?: latestRoleBefore(sourceText, MODERN_FEMALE_ROLE_MARKERS, before)
-    }
-
-    private fun explicitMaleRole(sourceText: String): ModernThirdPersonRole? =
-        dominantRoleBefore(sourceText, MODERN_MALE_ROLE_MARKERS, sourceText.length)
-            ?: latestRoleBefore(sourceText, MODERN_MALE_ROLE_MARKERS, sourceText.length)
-
-    private fun explicitFemaleRole(sourceText: String): ModernThirdPersonRole? =
-        dominantRoleBefore(sourceText, MODERN_FEMALE_ROLE_MARKERS, sourceText.length)
-            ?: latestRoleBefore(sourceText, MODERN_FEMALE_ROLE_MARKERS, sourceText.length)
-
-    private fun String.hasObjectPronounAt(index: Int): Boolean {
-        if (index <= 0) return false
-        var cursor = index - 1
-        while (cursor >= 0 && this[cursor].isWhitespace()) cursor--
-        return cursor >= 0 && this[cursor] in setOf('和', '跟', '同', '对', '對', '向', '给', '給')
-    }
-
-    private fun dominantRoleBefore(
-        sourceText: String,
-        markers: List<RoleMarker>,
-        beforeExclusive: Int,
-    ): ModernThirdPersonRole? {
-        var bestIndex = Int.MAX_VALUE
-        var bestRole: ModernThirdPersonRole? = null
-        markers.forEach { marker ->
-            val index = sourceText.indexOf(marker.term)
-            if (index in 0 until beforeExclusive && index < bestIndex) {
-                bestIndex = index
-                bestRole = marker.role
-            }
-        }
-        return bestRole
-    }
-
-    private fun latestRoleBefore(
-        sourceText: String,
-        markers: List<RoleMarker>,
-        beforeExclusive: Int,
-    ): ModernThirdPersonRole? {
-        var bestIndex = -1
-        var bestRole: ModernThirdPersonRole? = null
-        markers.forEach { marker ->
-            var index = sourceText.indexOf(marker.term)
-            while (index >= 0) {
-                if (index < beforeExclusive && index >= bestIndex) {
-                    bestIndex = index
-                    bestRole = marker.role
-                }
-                index = sourceText.indexOf(marker.term, index + marker.term.length)
-            }
-        }
-        return bestRole
-    }
-
-    private fun ModernThirdPersonRole.maleThirdPerson(): String = when (this) {
-        ModernThirdPersonRole.CHILD -> "cậu"
-        ModernThirdPersonRole.ADULT,
-        ModernThirdPersonRole.ELDER,
-        ModernThirdPersonRole.SUPERNATURAL,
-        -> "ông ấy"
-        ModernThirdPersonRole.NEUTRAL -> "anh ấy"
-    }
-
-    private fun ModernThirdPersonRole.femaleThirdPerson(): String = when (this) {
-        ModernThirdPersonRole.CHILD -> "cô bé"
-        ModernThirdPersonRole.ELDER -> "bà ấy"
-        ModernThirdPersonRole.SUPERNATURAL -> "cô ta"
-        ModernThirdPersonRole.ADULT,
-        ModernThirdPersonRole.NEUTRAL,
-        -> "cô ấy"
-    }
-
-    private fun directKinshipAddress(sourceText: String): KinshipAddress? {
-        return when {
-            sourceText.hasDirectAddress("奶", "奶奶", "外婆", "祖母", "阿婆") ->
-                KinshipAddress(
-                    outputLabels = listOf("sữa", "bà"),
-                    vocative = "Bà ơi,",
-                    addressee = "bà",
-                    speaker = "cháu",
-                )
-            sourceText.hasDirectAddress("爷", "爷爷", "爺", "爺爺", "外公", "祖父", "阿公") ->
-                KinshipAddress(
-                    outputLabels = listOf("gia", "ông"),
-                    vocative = "Ông ơi,",
-                    addressee = "ông",
-                    speaker = "cháu",
-                )
-            sourceText.hasDirectAddress("爸", "爸爸", "爹", "父亲", "父親") ->
-                KinshipAddress(
-                    outputLabels = listOf("ba", "bố", "cha"),
-                    vocative = "Bố ơi,",
-                    addressee = "bố",
-                    speaker = "con",
-                )
-            sourceText.hasDirectAddress("妈", "妈妈", "媽", "媽媽", "娘", "母亲", "母親") ->
-                KinshipAddress(
-                    outputLabels = listOf("mẹ", "má", "nương"),
-                    vocative = "Mẹ ơi,",
-                    addressee = "mẹ",
-                    speaker = "con",
-                )
-            sourceText.hasDirectAddress("叔", "叔叔", "叔父", "伯", "伯伯", "大夫", "医生", "先生") ->
-                KinshipAddress(
-                    outputLabels = listOf("chú", "bác", "ông", "bác sĩ"),
-                    vocative = "Bác ơi,",
-                    addressee = "bác",
-                    speaker = "cháu",
-                )
-            sourceText.hasDirectAddress("婶", "婶子", "嬸", "嬸子") ->
-                KinshipAddress(
-                    outputLabels = listOf("thím", "cô"),
-                    vocative = "Thím ơi,",
-                    addressee = "thím",
-                    speaker = "cháu",
-                )
-            sourceText.hasDirectAddress("姨", "阿姨", "姨妈", "姨媽") ->
-                KinshipAddress(
-                    outputLabels = listOf("dì", "cô"),
-                    vocative = "Dì ơi,",
-                    addressee = "dì",
-                    speaker = "cháu",
-                )
-            else -> null
-        }
-    }
-
-    private fun hasAncientPronounContext(sourceText: String): Boolean =
-        sourceText.containsAny(
-            "朕", "寡人", "本宫", "本宮", "哀家", "臣妾", "微臣", "下官", "奴婢",
-            "奴才", "陛下", "皇上", "圣上", "聖上", "殿下", "王爷", "王爺", "娘娘",
-            "公主", "太子", "皇后", "贵妃", "貴妃", "爱卿", "愛卿", "师父", "師父",
-            "师尊", "師尊", "徒儿", "徒兒", "弟子", "师兄", "師兄", "师姐", "師姐",
-            "师弟", "師弟", "掌门", "掌門", "宗主", "道友", "公子", "姑娘", "夫君",
-            "相公", "郎君", "娘子", "仙子", "贫道", "貧道", "贫僧", "貧僧",
-        )
-
-    private fun hasWesternPronounContext(sourceText: String): Boolean =
-        sourceText.containsAny(
-            "公爵", "伯爵", "子爵", "男爵", "骑士", "騎士", "爵士", "神父", "牧师",
-            "牧師", "教堂", "城堡", "庄园", "莊園", "王国", "王國", "魔法", "巫师",
-            "巫師", "女巫", "吸血鬼", "狼人", "英镑", "英鎊", "美元", "欧元", "歐元",
-        )
-
-    private fun String.hasFormalWesternTitle(): Boolean =
-        containsAny("阁下", "閣下", "公爵", "伯爵", "子爵", "男爵", "爵士", "神父", "牧师", "牧師")
-
-    private fun String.hasDirectAddress(vararg terms: String): Boolean =
-        terms.any { term ->
-            if (!contains(term)) return@any false
-            val escaped = Regex.escape(term)
-            Regex("(^|[\\s\"'“”‘’（(])$escaped(?=\\s*(?:[啊呀吶呐呢哟喲])?\\s*[，,、。！？!?])")
-                .containsMatchIn(this)
-        }
-
-    private fun String.containsAny(vararg needles: String): Boolean =
-        needles.any(::contains)
-
-    private fun String.hasSecondPersonPronoun(): Boolean =
-        contains("你") || contains("您")
-
-    private fun String.hasThirdPersonMalePronoun(): Boolean =
-        indexOfMalePronoun() >= 0
-
-    private fun String.hasThirdPersonFemalePronoun(): Boolean =
-        indexOfFemalePronoun() >= 0
-
-    private fun String.indexOfMalePronoun(): Int {
-        var index = indexOf('他')
-        while (index >= 0) {
-            if (getOrNull(index - 1) != '其' && getOrNull(index + 1) != '人') return index
-            index = indexOf('他', index + 1)
-        }
-        return -1
-    }
-
-    private fun String.indexOfFemalePronoun(): Int =
-        indexOf('她')
-
-    private val vocativeRegexCache = ConcurrentHashMap<String, Regex>()
-    private fun getVocativeRegex(label: String): Regex =
-        vocativeRegexCache.computeIfAbsent(label) {
-            Regex("(^|[\\n.!?]\\s*)${Regex.escape(it)}\\s*[,，]", setOf(RegexOption.IGNORE_CASE))
-        }
-
-    private fun replaceVocative(text: String, labels: List<String>, vocative: String): String {
-        var output = text
-        labels.forEach { label ->
-            if (output.contains(label, ignoreCase = true)) {
-                output = getVocativeRegex(label).replace(output) { match ->
-                    "${match.groupValues[1]}$vocative"
-                }
-            }
-        }
-        return output
-    }
-
-    private val detachedRegexCache = ConcurrentHashMap<String, Regex>()
-    private fun getDetachedRegex(phrase: String): Regex =
-        detachedRegexCache.computeIfAbsent(phrase) {
-            Regex("(?<![\\p{L}\\p{N}])${Regex.escape(it)}(?![\\p{L}\\p{N}])", setOf(RegexOption.IGNORE_CASE))
-        }
-
-    private fun replaceDetachedPhrase(
-        text: String,
-        phrase: String,
-        replacement: String,
-    ): String {
-        if (!text.contains(phrase, ignoreCase = true)) return text
-        return getDetachedRegex(phrase).replace(text, replacement)
     }
 
     private fun compilePostRule(
@@ -3316,9 +2747,15 @@ class QuickTranslationRepository(
     }
 
     private fun pack(): QuickPack {
-        cachedPack.get()?.let { return it }
+        val currentToken = externalPackStore?.versionToken() ?: "none"
+        cachedPack.get()?.let { if (it.versionToken == currentToken) return it }
         return synchronized(packLoadLock) {
-            cachedPack.get() ?: loadPack().also(cachedPack::set)
+            val cached = cachedPack.get()
+            if (cached != null && cached.versionToken == currentToken) {
+                cached
+            } else {
+                loadPack(currentToken).also(cachedPack::set)
+            }
         }
     }
 
@@ -3348,6 +2785,16 @@ class QuickTranslationRepository(
             val terms = projectTerms.asSequence()
                 .filter { it.type != QuickDictionaryType.LUAT_NHAN }
                 .filter { it.original.isNotBlank() }
+                .filter { pair ->
+                    val orig = pair.original.trim()
+                    if (orig in PROTECTED_CLEAN_TERMS) {
+                        pair.type == QuickDictionaryType.NAME && orig.length >= 2
+                    } else if (orig.length == 1 && pair.type == QuickDictionaryType.VIETPHRASE) {
+                        false
+                    } else {
+                        true
+                    }
+                }
                 .distinctBy { normalize(it.original) }
                 .mapIndexed { priority, pair ->
                     val reviewedName = if (pair.type == QuickDictionaryType.VIETPHRASE) {
@@ -3391,7 +2838,7 @@ class QuickTranslationRepository(
             val cache = ProjectTrieCache(
                 fingerprint = fingerprint,
                 terms = terms,
-                trie = TermTrie(terms),
+                trie = FastTermMapLookup(terms),
                 templates = templates,
                 templatesByFirstChar = templates.indexByFirstLiteralChar(),
                 leadingSlotTemplateIndex = templates.filter {
@@ -3436,70 +2883,9 @@ class QuickTranslationRepository(
     private fun Long.mix(value: Char): Long =
         (this xor value.code.toLong()) * 1099511628211L
 
-    private fun loadCatalogPack(): CatalogPack {
-        val entriesByType = linkedMapOf<QuickDictionaryType, MutableList<QuickDictionaryCatalogEntry>>()
-        CATALOG_ASSETS.forEach { catalogAsset ->
-            val minimumColumns = if (catalogAsset.type == QuickDictionaryType.LUAT_NHAN) 4 else 2
-            readTsv(catalogAsset.asset, minimumColumns).forEach { columns ->
-                val source: String
-                val target: String
-                val entryType: QuickDictionaryType
-                if (catalogAsset.type == QuickDictionaryType.LUAT_NHAN) {
-                    if (columns[0].trim() !in setOf("QT_TEMPLATE", "REPLACE")) return@forEach
-                    source = columns[2].trim()
-                    target = columns[3].trim()
-                    entryType = catalogAsset.type
-                } else {
-                    source = columns[0].trim()
-                    target = cleanQuickDictionaryTarget(columns[1])
-                    entryType = parseAssetTermType(
-                        value = columns.getOrNull(2).orEmpty(),
-                        fallback = catalogAsset.type,
-                    )
-                }
-                if (source.isEmpty() || target.isEmpty()) return@forEach
-                entriesByType.getOrPut(entryType, ::mutableListOf).add(
-                    QuickDictionaryCatalogEntry(
-                        catalogId = "bundled:${entryType.name.lowercase()}",
-                        raw = source,
-                        hanViet = if (entryType == QuickDictionaryType.PHONETIC) target else "",
-                        target = if (entryType == QuickDictionaryType.PHONETIC) "" else target,
-                        type = entryType,
-                    )
-                )
-            }
-        }
-        return CatalogPack(
-            entriesByType.mapValues { (_, entries) ->
-                entries.distinctBy { normalize(it.raw) }
-            }
-        )
-    }
+    private fun loadCatalogPack(): CatalogPack = CatalogPack(emptyMap())
 
-    private fun loadPack(): QuickPack {
-        val terms = LinkedHashMap<String, Term>()
-        var sourcePriority = 0
-        TERM_ASSETS.forEach { asset ->
-            readTsv(asset.asset, 2).forEach { columns ->
-                val source = columns[0].trim()
-                val target = cleanQuickDictionaryTarget(columns[1])
-                val type = parseAssetTermType(
-                    value = columns.getOrNull(2).orEmpty(),
-                    fallback = asset.type,
-                )
-                val key = normalize(source)
-                if (source.isNotEmpty() && target.isNotEmpty() && key !in terms) {
-                    terms[key] = Term(
-                        source = source,
-                        target = target,
-                        type = type,
-                        sourcePriority = sourcePriority,
-                        sourceQuality = asset.sourceQuality,
-                    )
-                }
-                sourcePriority++
-            }
-        }
+    private fun loadPack(currentToken: String = ""): QuickPack {
         val phonetics = LinkedHashMap<String, String>()
         readEqualsAsset(QT2025_PHONETIC_ASSET).forEach { (source, target) ->
             if (source.codePointCount(0, source.length) == 1 && target.isNotEmpty()) {
@@ -3511,17 +2897,8 @@ class QuickTranslationRepository(
                 phonetics.putIfAbsent(source, target.substringBefore(' ').trim())
             }
         }
-        PHONETIC_ASSETS.forEach { asset ->
-            readTsv(asset, 2).forEach { columns ->
-                val source = columns[0]
-                val target = columns[1].trim().substringBefore(' ')
-                if (source.codePointCount(0, source.length) == 1 && target.isNotEmpty()) {
-                    phonetics.putIfAbsent(source, target)
-                }
-            }
-        }
         val templates = mutableListOf<SourceTemplate>()
-        val postRules = mutableListOf<PostRule>()
+        val postRules = emptyList<PostRule>()
         val qt2025Runtime = Qt2025Runtime.create(
             rules = readEqualsAsset(QT2025_RULE_ASSET),
             surnames = readEqualsAsset(QT2025_SURNAME_ASSET),
@@ -3537,51 +2914,25 @@ class QuickTranslationRepository(
                 )?.let(templates::add)
             }
         }
-        RULE_ASSETS.forEach { asset ->
-            readTsv(asset, 4).forEach { columns ->
-                val action = columns[0].trim()
-                val priority = columns[1].trim().toIntOrNull() ?: return@forEach
-                val pattern = columns[2]
-                val replacement = columns[3]
-                val category = columns.getOrNull(4)?.trim().orEmpty()
-                when (action) {
-                    "QT_TEMPLATE" -> compileTemplate(
-                        source = pattern,
-                        replacement = replacement,
-                        priority = priority,
-                        category = category,
-                        contiguousScore = asset == LATEST_RULE_ASSET,
-                    )?.let(templates::add)
-                    "REPLACE" -> compilePostRule(pattern, replacement, priority)?.let(postRules::add)
-                }
-            }
-        }
-        val cleanLookup = TermTrie(terms.values.toList())
         val qt2025Lookup = MappedTermLookup.openOrNull(QT2025_TERM_INDEX_ASSET)
         val compatibilityLookup = qt2025Lookup
             ?: MappedTermLookup.openOrNull(QT2020_TERM_INDEX_ASSET)
+            ?: FastTermMapLookup(emptyList())
         val limitedTemplates = templates.take(MAX_TEMPLATE_RULES)
         val templatesByFirstChar = limitedTemplates.indexByFirstLiteralChar()
         val leadingSlotTemplateIndex = limitedTemplates.filter {
             (it.parts.firstOrNull() as? TemplatePart.Literal)?.value.isNullOrEmpty()
         }.indexLeadingSlotTemplates()
         return QuickPack(
-            version = when {
-                qt2025Lookup != null -> QT2025_PACK_VERSION
-                compatibilityLookup != null -> QT2020_PACK_VERSION
-                else -> PACK_VERSION
-            },
-            baseTrie = if (compatibilityLookup == null) {
-                cleanLookup
-            } else {
-                CompositeTermLookup(listOf(cleanLookup, compatibilityLookup))
-            },
+            version = if (qt2025Lookup != null) QT2025_PACK_VERSION else QT2020_PACK_VERSION,
+            baseTrie = compatibilityLookup,
             phonetics = phonetics,
             templates = limitedTemplates,
             templatesByFirstChar = templatesByFirstChar,
             leadingSlotTemplateIndex = leadingSlotTemplateIndex,
-            postRules = postRules.take(MAX_POST_RULES).sortedByDescending { it.priority },
+            postRules = postRules,
             qt2025Runtime = qt2025Runtime,
+            versionToken = currentToken,
         )
     }
 
@@ -3771,6 +3122,7 @@ class QuickTranslationRepository(
         val leadingSlotTemplateIndex: LeadingSlotTemplateIndex,
         val postRules: List<PostRule>,
         val qt2025Runtime: Qt2025Runtime?,
+        val versionToken: String = "",
     ) {
         fun indexedTemplatesAt(text: String, offset: Int): List<SourceTemplate> {
             if (offset >= text.length) return emptyList()
@@ -3824,7 +3176,7 @@ class QuickTranslationRepository(
     private data class ProjectTrieCache(
         val fingerprint: Long,
         val terms: List<Term>,
-        val trie: TermTrie,
+        val trie: TermLookup,
         val templates: List<SourceTemplate> = emptyList(),
         val templatesByFirstChar: Map<Char, List<SourceTemplate>> = emptyMap(),
         val leadingSlotTemplateIndex: LeadingSlotTemplateIndex = LeadingSlotTemplateIndex(),
@@ -3951,6 +3303,7 @@ class QuickTranslationRepository(
         val endExclusive: Int,
         val translation: String,
         val priority: Int,
+        val isPerson: Boolean = false,
     )
     private data class PlaceHierarchySegment(
         val endExclusive: Int,
@@ -4010,33 +3363,6 @@ class QuickTranslationRepository(
         val addressee: String,
         val speaker: String,
     )
-    private data class PronounHints(
-        val secondPersonSingular: String? = null,
-        val secondPersonPlural: String? = null,
-        val maleThirdPerson: String? = null,
-        val femaleThirdPerson: String? = null,
-    )
-    private data class TranslationTokenCacheKey(
-        val sourceText: String,
-        val pronounHints: PronounHints,
-    )
-    private data class RoleMarker(
-        val term: String,
-        val role: ModernThirdPersonRole,
-    )
-    private enum class PronounStyle {
-        MODERN,
-        ANCIENT,
-        WESTERN,
-        OFF,
-    }
-    private enum class ModernThirdPersonRole {
-        CHILD,
-        ADULT,
-        ELDER,
-        SUPERNATURAL,
-        NEUTRAL,
-    }
     private enum class TermPos {
         NAME,
         PRONOUN,
@@ -4377,97 +3703,130 @@ class QuickTranslationRepository(
         }
     }
 
-    /** Aho-Corasick automaton over project/clean-pack terms, returning every match by start. */
-    private class TermTrie(terms: List<Term>) : TermLookup {
-        private class Node {
-            val children = HashMap<Char, Int>()
-            val outputs = mutableListOf<Term>()
-            var failure: Int = 0
-        }
-
-        private val nodes = mutableListOf(Node())
+    /**
+     * Fast map-based term lookup implementing the original Quick Translator algorithm:
+     * O(N) hash table build without Trie or Aho-Corasick graph construction.
+     * Greedy Longest Prefix Match from maxSourceChars down to 1.
+     */
+    private class FastTermMapLookup(terms: List<Term>) : TermLookup {
+        private val termsBySource: HashMap<String, Term> = HashMap(terms.size)
+        private val maxSourceChars: Int
+        private val lengthsMaskByFirstChar = LongArray(65536)
+        private val fallbackMasks = HashMap<Int, Long>()
 
         init {
-            terms.forEach(::insert)
-            buildFailureLinks()
+            var maxLen = 0
+            terms.forEach { term ->
+                val key = normalize(term.source)
+                if (key.isEmpty()) return@forEach
+                val existing = termsBySource[key]
+                if (existing == null || isBetterTerm(term, existing)) {
+                    termsBySource[key] = term
+                }
+                val len = term.source.length
+                if (len > maxLen) {
+                    maxLen = len
+                }
+                val firstCode = key[0].code
+                val shift = len.coerceAtMost(62)
+                if (firstCode < 65536) {
+                    lengthsMaskByFirstChar[firstCode] = lengthsMaskByFirstChar[firstCode] or (1L shl shift)
+                } else {
+                    fallbackMasks[firstCode] = (fallbackMasks[firstCode] ?: 0L) or (1L shl shift)
+                }
+            }
+            maxSourceChars = maxLen.coerceAtMost(32)
+        }
+
+        private fun getMaskFor(firstCode: Int): Long {
+            return if (firstCode < 65536) lengthsMaskByFirstChar[firstCode] else (fallbackMasks[firstCode] ?: 0L)
         }
 
         override fun longestAt(text: String, offset: Int): TermMatch? {
-            return allAt(text, offset).firstOrNull()
+            val available = (text.length - offset).coerceAtMost(maxSourceChars)
+            if (available <= 0) return null
+            val firstCode = text[offset].code
+            val mask = getMaskFor(firstCode)
+            if (mask == 0L) return null
+            var currentMask = mask and if (available >= 62) -1L else ((1L shl (available + 1)) - 1L)
+            while (currentMask > 1L) {
+                val len = 63 - java.lang.Long.numberOfLeadingZeros(currentMask)
+                if (len <= 0) break
+                currentMask = currentMask and (1L shl len).inv()
+                val key = normalize(text.substring(offset, offset + len))
+                val term = termsBySource[key]
+                if (term != null) {
+                    return TermMatch(term, offset, offset + len)
+                }
+            }
+            return null
         }
 
         override fun allAt(text: String, offset: Int): List<TermMatch> {
-            var state = 0
-            var cursor = offset
-            val matches = mutableListOf<TermMatch>()
-            while (cursor < text.length) {
-                state = nodes[state].children[text[cursor].lowercaseChar()] ?: break
-                cursor++
-                nodes[state].outputs.forEach { term ->
-                    if (offset + term.source.length == cursor) {
-                        matches += TermMatch(term, offset, cursor)
-                    }
+            val available = (text.length - offset).coerceAtMost(maxSourceChars)
+            if (available <= 0) return emptyList()
+            val firstCode = text[offset].code
+            val mask = getMaskFor(firstCode)
+            if (mask == 0L) return emptyList()
+            var matches: MutableList<TermMatch>? = null
+            var currentMask = mask and if (available >= 62) -1L else ((1L shl (available + 1)) - 1L)
+            while (currentMask > 1L) {
+                val len = 63 - java.lang.Long.numberOfLeadingZeros(currentMask)
+                if (len <= 0) break
+                currentMask = currentMask and (1L shl len).inv()
+                val key = normalize(text.substring(offset, offset + len))
+                val term = termsBySource[key]
+                if (term != null) {
+                    if (matches == null) matches = ArrayList(4)
+                    matches.add(TermMatch(term, offset, offset + len))
                 }
             }
-            return matches.sortedWith(TERM_MATCH_COMPARATOR)
+            return matches ?: emptyList()
         }
 
         override fun allMatchesByStart(text: String): Array<MutableList<TermMatch>?> {
-            val matches = arrayOfNulls<MutableList<TermMatch>>(text.length)
-            var state = 0
-            text.forEachIndexed { index, rawCharacter ->
-                val character = rawCharacter.lowercaseChar()
-                while (state != 0 && character !in nodes[state].children) {
-                    state = nodes[state].failure
-                }
-                state = nodes[state].children[character] ?: 0
-                nodes[state].outputs.forEach { term ->
-                    val start = index + 1 - term.source.length
-                    if (start >= 0) {
-                        val bucket = matches[start] ?: mutableListOf<TermMatch>().also {
-                            matches[start] = it
-                        }
-                        bucket += TermMatch(term, start, index + 1)
+            val textLen = text.length
+            val matches = arrayOfNulls<MutableList<TermMatch>>(textLen)
+            for (offset in 0 until textLen) {
+                val available = (textLen - offset).coerceAtMost(maxSourceChars)
+                if (available <= 0) continue
+                val firstCode = text[offset].code
+                val mask = getMaskFor(firstCode)
+                if (mask == 0L) continue
+                var list: MutableList<TermMatch>? = null
+                var currentMask = mask and if (available >= 62) -1L else ((1L shl (available + 1)) - 1L)
+                while (currentMask > 1L) {
+                    val len = 63 - java.lang.Long.numberOfLeadingZeros(currentMask)
+                    if (len <= 0) break
+                    currentMask = currentMask and (1L shl len).inv()
+                    val key = normalize(text.substring(offset, offset + len))
+                    val term = termsBySource[key]
+                    if (term != null) {
+                        if (list == null) list = ArrayList(4)
+                        list.add(TermMatch(term, offset, offset + len))
                     }
                 }
+                if (list != null) {
+                    matches[offset] = list
+                }
             }
-            matches.forEach { bucket -> bucket?.sortWith(TERM_MATCH_COMPARATOR) }
             return matches
         }
 
-        private fun insert(term: Term) {
-            var state = 0
-            term.source.forEach { rawCharacter ->
-                val character = rawCharacter.lowercaseChar()
-                state = nodes[state].children.getOrPut(character) {
-                    nodes.add(Node())
-                    nodes.lastIndex
-                }
-            }
-            if (nodes[state].outputs.none { normalize(it.source) == normalize(term.source) }) {
-                nodes[state].outputs += term
-            }
+        override fun containsExact(text: String): Boolean {
+            return termsBySource.containsKey(normalize(text))
         }
 
-        private fun buildFailureLinks() {
-            val queue = ArrayDeque<Int>()
-            nodes[0].children.values.forEach { child ->
-                nodes[child].failure = 0
-                queue.addLast(child)
-            }
-            while (queue.isNotEmpty()) {
-                val parent = queue.removeFirst()
-                nodes[parent].children.forEach { (character, child) ->
-                    queue.addLast(child)
-                    var fallback = nodes[parent].failure
-                    while (fallback != 0 && character !in nodes[fallback].children) {
-                        fallback = nodes[fallback].failure
-                    }
-                    nodes[child].failure = nodes[fallback].children[character]
-                        ?.takeIf { it != child }
-                        ?: 0
-                    nodes[child].outputs += nodes[nodes[child].failure].outputs
-                }
+        private fun isBetterTerm(candidate: Term, current: Term): Boolean {
+            return when {
+                candidate.target.isEmpty() != current.target.isEmpty() -> candidate.target.isEmpty()
+                candidate.projectOwned != current.projectOwned -> candidate.projectOwned
+                candidate.sourceQuality != current.sourceQuality ->
+                    termSourceQualityRank(candidate.sourceQuality) > termSourceQualityRank(current.sourceQuality)
+                candidate.type != current.type -> termTypeRank(candidate.type) > termTypeRank(current.type)
+                quickDictionaryTargetScore(candidate.target) != quickDictionaryTargetScore(current.target) ->
+                    quickDictionaryTargetScore(candidate.target) > quickDictionaryTargetScore(current.target)
+                else -> candidate.sourcePriority < current.sourcePriority
             }
         }
     }
@@ -4646,6 +4005,28 @@ class QuickTranslationRepository(
                 }.getOrNull()
             }
 
+            fun openFileOrNull(file: java.io.File): MappedTermLookup? {
+                if (!file.isFile || file.length() == 0L) return null
+                return runCatching {
+                    val mapped = FileInputStream(file).channel.use { channel ->
+                        channel.map(
+                            FileChannel.MapMode.READ_ONLY,
+                            0L,
+                            file.length(),
+                        )
+                    }.order(ByteOrder.LITTLE_ENDIAN)
+                    validate(mapped)
+                    val charIndex = scanSourceCharIndex(mapped)
+                    MappedTermLookup(
+                        buffer = mapped,
+                        bucketCount = mapped.getInt(BUCKET_COUNT_OFFSET),
+                        maxSourceChars = mapped.getInt(MAX_SOURCE_CHARS_OFFSET),
+                        firstSourceChars = charIndex.firstSourceChars,
+                        lengthsMaskByFirstChar = charIndex.lengthsMask,
+                    )
+                }.getOrNull()
+            }
+
             private class SourceCharIndex(
                 val firstSourceChars: BooleanArray,
                 val lengthsMask: LongArray,
@@ -4697,10 +4078,19 @@ class QuickTranslationRepository(
 
     companion object {
         private const val MAPPED_ENGINE = "quick_translator_exact"
-        private const val PACK_VERSION = "qt-clean-4.2.26"
+        private const val PACK_VERSION = "qt-clean-4.2.27-v11"
         private const val QT2025_PACK_VERSION =
-            "qt2025-302f9f8d+qt-clean-4.2.26+runtime-3-entity-lock"
-        private const val QT2020_PACK_VERSION = "qt2020-2025.09.01+qt-clean-4.2.26"
+            "qt2025-302f9f8d+qt-clean-4.2.27-v11+runtime-3-entity-lock"
+        private const val QT2020_PACK_VERSION = "qt2020-2025.09.01+qt-clean-4.2.27-v11"
+        private val PROTECTED_CLEAN_TERMS = setOf(
+            "第", "章", "节", "回", "卷", "篇", "零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
+            "的", "了", "着", "在", "被", "把", "将", "和", "或", "个", "几", "从", "到",
+            "间", "边", "旁", "前", "后", "上", "下", "里", "外", "中", "内",
+            "这", "那", "我", "你", "他", "她", "它", "们", "谁", "甚", "么",
+            "是", "不", "有", "无", "没", "非", "微", "很", "太", "极",
+            "说", "道", "看", "见", "听", "闻", "走", "去", "来", "出", "入",
+            "床", "门", "窗"
+        )
         private const val QT2025_TERM_INDEX_ASSET = "offline/qt2025/qt2025-terms.qtdict"
         private const val QT2025_PHONETIC_ASSET = "offline/qt2025/ChinesePhienAmWords.txt"
         private const val QT2025_RULE_ASSET = "offline/qt2025/LuatNhan.txt"
@@ -4715,7 +4105,6 @@ class QuickTranslationRepository(
         private const val QT2025_RUNTIME_SCORE_BONUS = 250_000L
         private const val MAX_QT2025_STRUCTURED_LOOKBACK = 32
         private const val MAX_QT2025_CORRECTION_LOOKBACK = 192
-        private const val LATEST_RULE_ASSET = "qt_clean_rules_v8.tsv"
         private const val PROJECT_TEMPLATE_PRIORITY = 900
         private const val MAX_TEMPLATE_RULES = 4_000
         private const val MAX_PROJECT_TEMPLATE_RULES = 512
@@ -4724,6 +4113,11 @@ class QuickTranslationRepository(
         private const val PROJECT_TRIE_CACHE_SIZE = 8
         private const val POST_RULE_META_CHARS = "[]()|+*?{}^$."
         private val CHINESE_PUNCTUATION_CHARS = charArrayOf('。', '，', '、', '：', '；', '！', '？')
+        private val PUNCTUATION_OR_BREAK_CHARS = setOf(
+            '。', '，', '、', '：', '；', '！', '？', '\n', '\r',
+            '.', ',', '!', '?', ';', ':', '“', '”', '‘', '’', '"', '\'', '(', ')', '（', '）',
+            '《', '》', '〈', '〉', '【', '】', '—', '…',
+        )
         private val DUPLICATE_SPACE_PATTERN = Regex("""^\\b([^\\]+?)\\s\+\1\\b$""")
         private val KNOWN_TRIGGER_WORDS = listOf(
             "thụ mệt mỏi", "không lớn", "Bạn sống", "Có chuyện", "bạn đang", "Phật Đà",
@@ -4745,142 +4139,6 @@ class QuickTranslationRepository(
         private val QT2025_NAME_SLOT_TYPES = setOf(
             QuickDictionaryType.NAME,
             QuickDictionaryType.PRONOUN,
-        )
-        private val NARRATOR_MALE_PRONOUNS = listOf(
-            "anh ấy", "ông ấy", "cậu ấy", "ông ta", "anh ta", "cậu",
-        )
-        private val NARRATOR_FEMALE_PRONOUNS = listOf(
-            "cô ấy", "bà ấy", "cô ta", "bà ta", "cô bé", "nàng",
-        )
-        private val CHILD_KINSHIP_GRANDMOTHER_PATTERN = Regex(
-            "(?<![\\p{L}\\p{N}])(?:đứa nhỏ|đứa trẻ|trẻ con|hài tử|hài có lẽ tử|con nít|nó)\\s+" +
-                "(?:anh ấy|hắn|cậu|nó)\\s+(?:sữa|nãi|bà)(?![\\p{L}\\p{N}])",
-            setOf(RegexOption.IGNORE_CASE),
-        )
-        private val CHILD_KINSHIP_GRANDFATHER_PATTERN = Regex(
-            "(?<![\\p{L}\\p{N}])(?:đứa nhỏ|đứa trẻ|trẻ con|hài tử|hài có lẽ tử|con nít|nó)\\s+" +
-                "(?:anh ấy|hắn|cậu|nó)\\s+(?:gia|ông)(?![\\p{L}\\p{N}])",
-            setOf(RegexOption.IGNORE_CASE),
-        )
-        private val CHILD_KINSHIP_MOTHER_PATTERN = Regex(
-            "(?<![\\p{L}\\p{N}])(?:đứa nhỏ|đứa trẻ|trẻ con|hài tử|hài có lẽ tử|con nít|nó)\\s+" +
-                "(?:anh ấy|hắn|cậu|nó)\\s+(?:mẹ|má)(?![\\p{L}\\p{N}])",
-            setOf(RegexOption.IGNORE_CASE),
-        )
-        private val CHILD_KINSHIP_FATHER_PATTERN = Regex(
-            "(?<![\\p{L}\\p{N}])(?:đứa nhỏ|đứa trẻ|trẻ con|hài tử|hài có lẽ tử|con nít|nó)\\s+" +
-                "(?:anh ấy|hắn|cậu|nó)\\s+(?:cha|bố|ba)(?![\\p{L}\\p{N}])",
-            setOf(RegexOption.IGNORE_CASE),
-        )
-        private val MODERN_MALE_ROLE_MARKERS = listOf(
-            RoleMarker("李追远", ModernThirdPersonRole.CHILD),
-            RoleMarker("李追遠", ModernThirdPersonRole.CHILD),
-            RoleMarker("小远侯", ModernThirdPersonRole.CHILD),
-            RoleMarker("小遠侯", ModernThirdPersonRole.CHILD),
-            RoleMarker("远子", ModernThirdPersonRole.CHILD),
-            RoleMarker("遠子", ModernThirdPersonRole.CHILD),
-            RoleMarker("伢儿", ModernThirdPersonRole.CHILD),
-            RoleMarker("孩子", ModernThirdPersonRole.CHILD),
-            RoleMarker("外孙", ModernThirdPersonRole.CHILD),
-            RoleMarker("外孫", ModernThirdPersonRole.CHILD),
-            RoleMarker("孙子", ModernThirdPersonRole.CHILD),
-            RoleMarker("孫子", ModernThirdPersonRole.CHILD),
-            RoleMarker("男娃", ModernThirdPersonRole.CHILD),
-            RoleMarker("潘子", ModernThirdPersonRole.CHILD),
-            RoleMarker("雷子", ModernThirdPersonRole.CHILD),
-            RoleMarker("虎子", ModernThirdPersonRole.CHILD),
-            RoleMarker("石头", ModernThirdPersonRole.CHILD),
-            RoleMarker("石頭", ModernThirdPersonRole.CHILD),
-            RoleMarker("远子哥", ModernThirdPersonRole.CHILD),
-            RoleMarker("遠子哥", ModernThirdPersonRole.CHILD),
-            RoleMarker("哥哥", ModernThirdPersonRole.CHILD),
-            RoleMarker("弟弟", ModernThirdPersonRole.CHILD),
-            RoleMarker("同桌", ModernThirdPersonRole.CHILD),
-            RoleMarker("男孩", ModernThirdPersonRole.CHILD),
-            RoleMarker("少年", ModernThirdPersonRole.CHILD),
-            RoleMarker("李维汉", ModernThirdPersonRole.ELDER),
-            RoleMarker("李維漢", ModernThirdPersonRole.ELDER),
-            RoleMarker("汉侯", ModernThirdPersonRole.ELDER),
-            RoleMarker("漢侯", ModernThirdPersonRole.ELDER),
-            RoleMarker("汉叔", ModernThirdPersonRole.ELDER),
-            RoleMarker("漢叔", ModernThirdPersonRole.ELDER),
-            RoleMarker("爷爷", ModernThirdPersonRole.ELDER),
-            RoleMarker("爺爺", ModernThirdPersonRole.ELDER),
-            RoleMarker("外公", ModernThirdPersonRole.ELDER),
-            RoleMarker("祖父", ModernThirdPersonRole.ELDER),
-            RoleMarker("老头", ModernThirdPersonRole.ELDER),
-            RoleMarker("老頭", ModernThirdPersonRole.ELDER),
-            RoleMarker("老爷子", ModernThirdPersonRole.ELDER),
-            RoleMarker("老爺子", ModernThirdPersonRole.ELDER),
-            RoleMarker("老教授", ModernThirdPersonRole.ELDER),
-            RoleMarker("李三江", ModernThirdPersonRole.ELDER),
-            RoleMarker("三江叔", ModernThirdPersonRole.ELDER),
-            RoleMarker("郑大筒", ModernThirdPersonRole.ADULT),
-            RoleMarker("鄭大筒", ModernThirdPersonRole.ADULT),
-            RoleMarker("郑华民", ModernThirdPersonRole.ADULT),
-            RoleMarker("鄭華民", ModernThirdPersonRole.ADULT),
-            RoleMarker("大夫", ModernThirdPersonRole.ADULT),
-            RoleMarker("医生", ModernThirdPersonRole.ADULT),
-            RoleMarker("醫生", ModernThirdPersonRole.ADULT),
-            RoleMarker("赤脚医生", ModernThirdPersonRole.ADULT),
-            RoleMarker("赤腳醫生", ModernThirdPersonRole.ADULT),
-            RoleMarker("先生", ModernThirdPersonRole.ADULT),
-            RoleMarker("叔", ModernThirdPersonRole.ADULT),
-            RoleMarker("男人", ModernThirdPersonRole.ADULT),
-            RoleMarker("女婿", ModernThirdPersonRole.ADULT),
-        )
-        private val MODERN_FEMALE_ROLE_MARKERS = listOf(
-            RoleMarker("小翠侯", ModernThirdPersonRole.CHILD),
-            RoleMarker("翠翠", ModernThirdPersonRole.CHILD),
-            RoleMarker("李翠翠", ModernThirdPersonRole.CHILD),
-            RoleMarker("小女孩", ModernThirdPersonRole.CHILD),
-            RoleMarker("女孩", ModernThirdPersonRole.CHILD),
-            RoleMarker("孙女", ModernThirdPersonRole.CHILD),
-            RoleMarker("孫女", ModernThirdPersonRole.CHILD),
-            RoleMarker("女娃", ModernThirdPersonRole.CHILD),
-            RoleMarker("刘金霞", ModernThirdPersonRole.ELDER),
-            RoleMarker("劉金霞", ModernThirdPersonRole.ELDER),
-            RoleMarker("刘瞎子", ModernThirdPersonRole.ELDER),
-            RoleMarker("劉瞎子", ModernThirdPersonRole.ELDER),
-            RoleMarker("崔桂英", ModernThirdPersonRole.ELDER),
-            RoleMarker("老太婆", ModernThirdPersonRole.ELDER),
-            RoleMarker("老太太", ModernThirdPersonRole.ELDER),
-            RoleMarker("老奶奶", ModernThirdPersonRole.ELDER),
-            RoleMarker("奶奶", ModernThirdPersonRole.ELDER),
-            RoleMarker("阿婆", ModernThirdPersonRole.ELDER),
-            RoleMarker("外婆", ModernThirdPersonRole.ELDER),
-            RoleMarker("祖母", ModernThirdPersonRole.ELDER),
-            RoleMarker("李菊香", ModernThirdPersonRole.ADULT),
-            RoleMarker("小黄莺", ModernThirdPersonRole.ADULT),
-            RoleMarker("小黃鶯", ModernThirdPersonRole.ADULT),
-            RoleMarker("女人", ModernThirdPersonRole.ADULT),
-            RoleMarker("女鬼", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("水鬼", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("死尸", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("死屍", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("尸体", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("屍體", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("尸身", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("屍身", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("水下", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("水面", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("水里", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("水裡", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("头发", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("頭髮", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("旗袍", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("高跟鞋", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("红色高跟鞋", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("紅色高跟鞋", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("脚踝", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("腳踝", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("发梢", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("髮梢", ModernThirdPersonRole.SUPERNATURAL),
-            RoleMarker("媳妇", ModernThirdPersonRole.ADULT),
-            RoleMarker("媳婦", ModernThirdPersonRole.ADULT),
-            RoleMarker("夫人", ModernThirdPersonRole.ADULT),
-            RoleMarker("母亲", ModernThirdPersonRole.ADULT),
-            RoleMarker("母親", ModernThirdPersonRole.ADULT),
         )
         private const val DEFAULT_DICTIONARY_BUFFER_BYTES = 64 * 1024
         private const val LENGTH_SCORE_FACTOR = 100L
@@ -4976,6 +4234,19 @@ class QuickTranslationRepository(
             Triple("可不可以", 4, "có thể"),
         )
         private val INTERROGATIVE_FIRST_CHARS = setOf('有', '会', '是', '能', '可')
+        private val DISPOSAL_EXCLUDED_NEXT_CHARS = setOf(
+            '军', '領', '领', '官', '士', '帥', '帅', '相', '星', '才', '門', '门',
+            '要', '來', '来', '近', '至', '必', '后', '後'
+        )
+        private val DISPOSAL_OBJECT_FIRST_CHARS = setOf(
+            '自', '他', '她', '你', '我', '它', '其', '这', '這', '那', '此',
+            '一', '两', '兩', '三', '四', '五', '六', '七', '八', '九', '十',
+            '全', '整', '所', '诸', '諸', '众', '眾', '各', '本'
+        )
+        private val DISPOSAL_OBJECT_PRONOUNS = setOf(
+            "自身", "自己", "我", "我们", "你", "你们", "他", "他们", "她", "她们",
+            "它", "它们", "其", "这", "这个", "这些", "那", "那个", "那些", "此"
+        )
         private const val MAX_PLACE_HIERARCHY_SEGMENTS = 8
         private const val MIN_SINGLE_PLACE_HIERARCHY_CHARS = 3
         private val PLACE_COUNTRY_SOURCES = setOf(
@@ -5212,106 +4483,12 @@ class QuickTranslationRepository(
             "心", "魂", "力", "气", "血", "骨", "肉", "房间", "笑容", "声音",
             "气息", "目光", "身体", "衣服", "长刀",
         )
-        private val TERM_ASSETS = listOf(
-            CatalogAsset("qt_clean_names_core_v2.tsv", QuickDictionaryType.NAME),
-            CatalogAsset(
-                "qt_clean_names_wikidata_v2.tsv",
-                QuickDictionaryType.NAME,
-                TermSourceQuality.CATALOG_NAME,
-            ),
-            CatalogAsset(
-                "qt_clean_corrections_v10.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.LATEST_CORRECTION,
-            ),
-            CatalogAsset(
-                "qt_clean_corrections_v9.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.LATEST_CORRECTION,
-            ),
-            CatalogAsset(
-                "qt_clean_corrections_v8.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.LATEST_CORRECTION,
-            ),
-            CatalogAsset(
-                "qt_clean_corrections_v7.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.LATEST_CORRECTION,
-            ),
-            CatalogAsset(
-                "qt_clean_corrections_v6.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.CORRECTION,
-            ),
-            CatalogAsset(
-                "qt_clean_corrections_v5.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.CORRECTION,
-            ),
-            CatalogAsset(
-                "qt_clean_corrections_v4.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.CORRECTION,
-            ),
-            CatalogAsset("qt_clean_webnovel_v4.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_function_words_v3.tsv", QuickDictionaryType.PRONOUN),
-            CatalogAsset("qt_clean_vietphrase_v2.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_lexicon_v1.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset(
-                "qt_clean_cvdict_base_v3.tsv",
-                QuickDictionaryType.VIETPHRASE,
-                TermSourceQuality.BASE,
-            ),
-        )
-        private val PHONETIC_ASSETS = listOf(
-            "qt_clean_phonetics_unihan17.tsv",
-            "qt_clean_phonetics_supplement_v4.tsv",
-            "qt_drduc_phonetics_v1.tsv",
-        )
-        private val RULE_ASSETS = listOf(
-            "qt_clean_rules_v8.tsv",
-            "qt_clean_rules_v7.tsv",
-            "qt_clean_rules_v6.tsv",
-            "qt_clean_rules_v5.tsv",
-            "qt_clean_rules_v4.tsv",
-            "qt_clean_rules_v3.tsv",
-            "qt_clean_rules_v2.tsv",
-            "qt_clean_rules_v1.tsv",
-        )
         private val CATALOG_ORDER = listOf(
             QuickDictionaryType.VIETPHRASE,
             QuickDictionaryType.NAME,
             QuickDictionaryType.PHONETIC,
             QuickDictionaryType.PRONOUN,
             QuickDictionaryType.LUAT_NHAN,
-        )
-        private val CATALOG_ASSETS = listOf(
-            CatalogAsset("qt_clean_names_core_v2.tsv", QuickDictionaryType.NAME),
-            CatalogAsset("qt_clean_names_wikidata_v2.tsv", QuickDictionaryType.NAME),
-            CatalogAsset("qt_clean_corrections_v10.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_corrections_v9.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_corrections_v8.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_corrections_v7.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_corrections_v6.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_corrections_v5.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_corrections_v4.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_webnovel_v4.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_vietphrase_v2.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_lexicon_v1.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_cvdict_base_v3.tsv", QuickDictionaryType.VIETPHRASE),
-            CatalogAsset("qt_clean_function_words_v3.tsv", QuickDictionaryType.PRONOUN),
-            CatalogAsset("qt_clean_phonetics_unihan17.tsv", QuickDictionaryType.PHONETIC),
-            CatalogAsset("qt_clean_phonetics_supplement_v4.tsv", QuickDictionaryType.PHONETIC),
-            CatalogAsset("qt_drduc_phonetics_v1.tsv", QuickDictionaryType.PHONETIC),
-            CatalogAsset("qt_clean_rules_v8.tsv", QuickDictionaryType.LUAT_NHAN),
-            CatalogAsset("qt_clean_rules_v7.tsv", QuickDictionaryType.LUAT_NHAN),
-            CatalogAsset("qt_clean_rules_v6.tsv", QuickDictionaryType.LUAT_NHAN),
-            CatalogAsset("qt_clean_rules_v5.tsv", QuickDictionaryType.LUAT_NHAN),
-            CatalogAsset("qt_clean_rules_v4.tsv", QuickDictionaryType.LUAT_NHAN),
-            CatalogAsset("qt_clean_rules_v3.tsv", QuickDictionaryType.LUAT_NHAN),
-            CatalogAsset("qt_clean_rules_v2.tsv", QuickDictionaryType.LUAT_NHAN),
-            CatalogAsset("qt_clean_rules_v1.tsv", QuickDictionaryType.LUAT_NHAN),
         )
         private val QT2020_SOURCE_CATALOGS = listOf(
             Qt2020SourceCatalog(
@@ -5894,6 +5071,60 @@ private fun String.parseProtectedTokenIndex(offset: Int): Int {
         value = value * 10 + digit
     }
     return value
+}
+
+internal object QuickTranslationGrammarPolish {
+    private val CUA_EXCESSIVE_REGEX = Regex(
+        """(?iu)(?<![\p{L}\p{N}])của\s+(muốn|say rượu|phát hành|sống sót|bất hạnh|bất công|ngột ngạt|đáng ngờ|sụp đổ|phí sức|nổi bật|táo bạo|yêu thích|hi vọng|kỳ vọng)(?![\p{L}\p{N}])"""
+    )
+    private val INVERTED_CONVERT_PATTERNS = listOf(
+        Regex("""(?iu)(?<![\p{L}\p{N}])ngồi dậy của phí sức(?![\p{L}\p{N}])""") to "phí sức ngồi dậy",
+        Regex("""(?iu)(?<![\p{L}\p{N}])đã cừu nhân của say rượu(?![\p{L}\p{N}])""") to "cừu nhân đã say rượu",
+        Regex("""(?iu)(?<![\p{L}\p{N}])vì ngươi mở(?![\p{L}\p{N}])""") to "mở ra cho ngươi",
+        Regex("""(?iu)(?<![\p{L}\p{N}])vì bạn mở(?![\p{L}\p{N}])""") to "mở ra cho ngươi",
+        Regex("""(?iu)(?<![\p{L}\p{N}])vận chuyển ống giảm thanh giới(?![\p{L}\p{N}])""") to "gắn ống giảm thanh",
+        Regex("""(?iu)(?<![\p{L}\p{N}])vận chuyển cách âm dụng cụ(?![\p{L}\p{N}])""") to "gắn thiết bị giảm thanh",
+        Regex("""(?iu)(?<![\p{L}\p{N}])thương cầm bảo vệ\s*ngực\s*an(?![\p{L}\p{N}])""") to "ngực bảo an cầm súng",
+        Regex("""(?iu)(?<![\p{L}\p{N}])thương cầm bảo vệ an(?![\p{L}\p{N}])""") to "bảo an cầm súng",
+        Regex("""(?iu)(?<![\p{L}\p{N}])bị thương đánh(?![\p{L}\p{N}])""") to "bị trúng đạn",
+        Regex("""(?iu)(?<![\p{L}\p{N}])chiếc thương(?![\p{L}\p{N}])""") to "khẩu súng",
+        Regex("""(?iu)(?<![\p{L}\p{N}])đó kinh nghiệm của bất hạnh(?![\p{L}\p{N}])""") to "kinh nghiệm bất hạnh đó",
+        Regex("""(?iu)(?<![\p{L}\p{N}])tuổi của bây giờ(?![\p{L}\p{N}])""") to "tuổi bây giờ",
+        Regex("""(?iu)(?<![\p{L}\p{N}])bắt đầu của sống về đêm(?![\p{L}\p{N}])""") to "bắt đầu cuộc sống về đêm",
+        Regex("""(?iu)(?<![\p{L}\p{N}])người trung niên của men say(?![\p{L}\p{N}])""") to "người trung niên say rượu",
+        Regex("""(?iu)(?<![\p{L}\p{N}])bảo đảm an ninh công cộng(?![\p{L}\p{N}])""") to "nhân viên bảo an",
+        Regex("""(?iu)(?<![\p{L}\p{N}])thân phận của (?:ngươi|bạn) (liệp sát giả|kẻ săn đuổi)(?![\p{L}\p{N}])""") to "thân phận $1 của ngươi",
+        Regex("""(?iu)(?<![\p{L}\p{N}])thân phận (?:ngươi|bạn) (liệp sát giả|kẻ săn đuổi)(?![\p{L}\p{N}])""") to "thân phận $1 của ngươi",
+        Regex("""(?iu)(?<![\p{L}\p{N}])(đao|trường đao|thương|súng|đoản đao|vũ khí|vật|đồ vật) của trong tay(?![\p{L}\p{N}])""") to "$1 trong tay",
+        Regex("""(?iu)(?<![\p{L}\p{N}])của trong tay(?![\p{L}\p{N}])""") to "trong tay",
+        Regex("""(?iu)(?<![\p{L}\p{N}])trong mắt của(?![\p{L}\p{N}])""") to "trong mắt",
+        Regex("""(?iu)(?<![\p{L}\p{N}])(cấp bậc|thời gian|Ouka|Hank|Mia|thủ đô|tình huống|trạng thái) của bây giờ(?![\p{L}\p{N}])""") to "$1 hiện tại",
+        Regex("""(?iu)(?<![\p{L}\p{N}])của bây giờ(?![\p{L}\p{N}])""") to "hiện tại",
+        Regex("""(?iu)(?<![\p{L}\p{N}])niệm của chỉ(?![\p{L}\p{N}])""") to "kỷ vật duy nhất",
+        Regex("""(?iu)(?<![\p{L}\p{N}])dũng tâm của dám(?![\p{L}\p{N}])""") to "trái tim dũng cảm",
+        Regex("""(?iu)(?<![\p{L}\p{N}])đã đồ đạc của tới tay(?![\p{L}\p{N}])""") to "đồ vật đã tới tay",
+        Regex("""(?iu)(?<![\p{L}\p{N}])thứ (?:1|nhất) (?:giờ giữa|thì gian)(?![\p{L}\p{N}])""") to "ngay lập tức",
+        Regex("""(?iu)(?<![\p{L}\p{N}])này 1 giờ(?![\p{L}\p{N}])""") to "điểm này",
+        Regex("""(?iu)(?<![\p{L}\p{N}])Rót:(?![\p{L}\p{N}])""") to "Ghi chú:",
+        Regex("""(?iu)(?<![\p{L}\p{N}])Chỉ ra:(?![\p{L}\p{N}])""") to "Nhắc nhở:",
+        Regex("""(?iu)(?<![\p{L}\p{N}])pháp lực giá trị(?![\p{L}\p{N}])""") to "điểm pháp lực",
+        Regex("""(?iu)(?<![\p{L}\p{N}])ở ở(?![\p{L}\p{N}])""") to "ở",
+        Regex("""(?iu)(?<![\p{L}\p{N}])nguy nguy hiểm(?![\p{L}\p{N}])""") to "nguy hiểm",
+        Regex("""(?iu)(?<![\p{L}\p{N}])lý do mà N P làm như vậy(?![\p{L}\p{N}])""") to "sở dĩ làm như vậy",
+        Regex("""(?iu)(?<![\p{L}\p{N}])nhỏ bé như hạt bụi(?![\p{L}\p{N}])""") to "hơi lớn",
+    )
+
+    fun polish(text: String): String {
+        if (text.isBlank()) return text
+        var output = text
+        for ((pattern, replacement) in INVERTED_CONVERT_PATTERNS) {
+            output = pattern.replace(output, replacement)
+        }
+        output = CUA_EXCESSIVE_REGEX.replace(output) { match ->
+            match.groupValues[1]
+        }
+        return output
+    }
 }
 
 internal object QuickTranslationTextPostProcessor {

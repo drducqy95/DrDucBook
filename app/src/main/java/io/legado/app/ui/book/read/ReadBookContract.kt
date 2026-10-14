@@ -633,6 +633,8 @@ sealed interface ReadBookIntent {
     data object LoadContentEdit : ReadBookIntent
     data class SaveContentEdit(val content: String, val saveToSource: Boolean) : ReadBookIntent
     data object ResetContentEdit : ReadBookIntent
+    data class OpenEditChapterTitleDialog(val chapterIndex: Int? = null) : ReadBookIntent
+    data class SaveUserChapterTitle(val chapterIndex: Int, val newTitle: String) : ReadBookIntent
     data class SetContentEditText(val text: String) : ReadBookIntent
     data class SetContentEditSaveToSource(val value: Boolean) : ReadBookIntent
 
@@ -1067,6 +1069,7 @@ sealed interface ReadBookDialog {
     data object ConfirmSkipToChapter : ReadBookDialog
     data class ConfirmChapterPay(val chapterTitle: String) : ReadBookDialog
     data class ConfirmAddToBookshelf(val bookName: String) : ReadBookDialog
+    data class EditChapterTitle(val chapterIndex: Int, val currentTitle: String) : ReadBookDialog
 }
 
 /**

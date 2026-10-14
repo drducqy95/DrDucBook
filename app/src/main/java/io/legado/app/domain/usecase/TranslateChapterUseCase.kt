@@ -130,6 +130,37 @@ class TranslateChapterUseCase(
         private const val LOCAL_AI_ADJACENT_CONTEXT_CHARS = 128
         private const val DEFAULT_AI_ADJACENT_CONTEXT_CHARS = 400
         private val STRUCTURAL_PARAGRAPH_BREAK = Regex("[\\t ]*(?:\\r?\\n[\\t ]*)+")
+
+        fun buildWordBoundaryPattern(term: String): Regex {
+            val escaped = Regex.escape(term)
+            return if (term.hasCjkSourceCodePoints()) {
+                Regex(escaped, setOf(RegexOption.MULTILINE, RegexOption.IGNORE_CASE))
+            } else {
+                Regex(
+                    "(?<=^|[\\s\\p{Punct}\"'«»“”‘’…–—])${escaped}(?=$|[\\s\\p{Punct}\"'«»“”‘’…–—])",
+                    setOf(RegexOption.MULTILINE, RegexOption.IGNORE_CASE),
+                )
+            }
+        }
+
+        fun matchCase(source: String, target: String): String {
+            if (source.isEmpty() || target.isEmpty()) return target
+            return when {
+                source.all { it.isUpperCase() || !it.isLetter() } -> target.uppercase()
+                source.all { it.isLowerCase() || !it.isLetter() } -> target.lowercase()
+                source.first().isUpperCase() -> {
+                    val words = source.trim().split(Regex("\\s+"))
+                    if (words.size > 1 && words.all { it.isEmpty() || it.first().isUpperCase() }) {
+                        target.split(" ").joinToString(" ") { w ->
+                            w.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                        }
+                    } else {
+                        target.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                    }
+                }
+                else -> target
+            }
+        }
     }
 
     private val dictionaryLock = Any()
@@ -174,14 +205,28 @@ class TranslateChapterUseCase(
         scopeKey: String,
         originalText: String,
         book: Book? = null,
+        chapterIndex: Int? = null,
         contextText: String = originalText,
         forceRetranslate: Boolean = false,
     ): Result<String> = translateDynamicUiTextUseCase.executeChapterTitle(
         scopeKey = scopeKey,
         originalText = originalText,
         book = book,
+        chapterIndex = chapterIndex,
         contextText = contextText,
         forceRetranslate = forceRetranslate,
+    )
+
+    suspend fun saveUserChapterTitle(
+        bookUrl: String,
+        chapterIndex: Int,
+        originalText: String,
+        userTitle: String,
+    ) = translateDynamicUiTextUseCase.saveUserChapterTitle(
+        bookUrl = bookUrl,
+        chapterIndex = chapterIndex,
+        originalText = originalText,
+        userTitle = userTitle,
     )
 
     suspend fun executeDynamicBookName(
@@ -457,6 +502,7 @@ class TranslateChapterUseCase(
 
             val originalContent = BookHelp.getContent(book, bookChapter)
                 ?.let(TranslationContentSanitizer::sanitize)
+                ?.let(TranslationContentSanitizer::stripSourceWatermarks)
                 ?.takeIf(String::isNotBlank)
                 ?: return@withContext Result.failure(Exception("Failed to read original content"))
             onProgress(TranslationProgress(0, 1, stage = "SOURCE_READ chars=${originalContent.length}"))
@@ -544,6 +590,7 @@ class TranslateChapterUseCase(
             }
 
             if (retrofitWithExistingDraft && isAiTranslation) {
+                var resolvedProvider = provider
                 val existingRevision = translationCacheGateway.getCurrentRevision(
                     book = book,
                     bookChapter = bookChapter,
@@ -558,15 +605,54 @@ class TranslateChapterUseCase(
                         targetLanguage = targetLanguage,
                         originalContentHash = rawContentHash,
                         provider = provider,
-                    )
+                    ) ?: translationCacheGateway.listProviderCaches(
+                        book = book,
+                        bookChapter = bookChapter,
+                        targetLanguage = targetLanguage,
+                    ).firstOrNull { it.content.isNotBlank() }?.also {
+                        resolvedProvider = it.provider.ifBlank { provider }
+                    }?.content
+
                 if (existingAiTranslation != null) {
                     var updatedText: String = existingAiTranslation
+                    val replacementPairs = mutableListOf<Pair<String, String>>()
                     for (mem in storyContext.canonicalMemory) {
                         if (mem.target.isNotBlank()) {
-                            for (alias in mem.aliases) {
-                                if (alias.isNotBlank() && alias != mem.target && updatedText.contains(alias)) {
-                                    updatedText = updatedText.replace(alias, mem.target)
+                            (mem.aliases + mem.raw).distinct().forEach { alias ->
+                                if (alias.isNotBlank() && alias != mem.target && (alias.length >= 2 || alias.hasCjkSourceCodePoints())) {
+                                    replacementPairs.add(alias to mem.target)
                                 }
+                            }
+                        }
+                    }
+                    for (world in storyContext.currentWorldBuilding) {
+                        if (world.target.isNotBlank()) {
+                            (world.entityRefs + world.raw).distinct().forEach { alias ->
+                                if (alias.isNotBlank() && alias != world.target && (alias.length >= 2 || alias.hasCjkSourceCodePoints())) {
+                                    replacementPairs.add(alias to world.target)
+                                }
+                            }
+                        }
+                    }
+                    for (entity in storyContext.currentEntities) {
+                        if (entity.target.isNotBlank()) {
+                            (entity.aliases + entity.raw).distinct().forEach { alias ->
+                                if (alias.isNotBlank() && alias != entity.target && (alias.length >= 2 || alias.hasCjkSourceCodePoints())) {
+                                    replacementPairs.add(alias to entity.target)
+                                }
+                            }
+                        }
+                    }
+
+                    val distinctPairs = replacementPairs
+                        .distinctBy { it.first.lowercase() }
+                        .sortedByDescending { it.first.length }
+
+                    for ((alias, target) in distinctPairs) {
+                        if (updatedText.contains(alias, ignoreCase = true)) {
+                            val pattern = buildWordBoundaryPattern(alias)
+                            updatedText = pattern.replace(updatedText) { matchResult ->
+                                matchCase(matchResult.value, target)
                             }
                         }
                     }
@@ -581,7 +667,7 @@ class TranslateChapterUseCase(
                         targetLanguage = targetLanguage,
                         content = displayTranslation,
                         originalContentHash = contentHash,
-                        provider = provider,
+                        provider = resolvedProvider,
                         rawContentHash = rawContentHash,
                         dictionaryRevision = dictionaryRevision.cacheToken,
                     )
@@ -591,10 +677,14 @@ class TranslateChapterUseCase(
                             totalChunks = 1,
                             mixedContent = displayTranslation,
                             translatedChunkIndices = emptySet(),
-                            stage = "AI_CACHE_PRESERVED provider=$provider",
+                            stage = "AI_CACHE_PRESERVED provider=$resolvedProvider",
                         )
                     )
                     return@withContext Result.success(displayTranslation)
+                } else {
+                    return@withContext Result.failure(
+                        IllegalStateException("Không tìm thấy bản dịch AI có sẵn để làm mới cho chương ${bookChapter.index}")
+                    )
                 }
             }
 
@@ -713,15 +803,6 @@ class TranslateChapterUseCase(
                         "MEMORY_PENDING warning=${error.message ?: error::class.java.simpleName}"
                     },
                 ) ?: "MEMORY_DISABLED"
-                result.story_memory?.timeline?.chapterTitle?.takeIf { it.isNotBlank() && !it.containsCjk() }?.let { aiTitle ->
-                    translateDynamicUiTextUseCase.saveAiChapterTitle(
-                        bookUrl = book.bookUrl,
-                        chapterIndex = bookChapter.index,
-                        originalText = bookChapter.title,
-                        aiTitle = aiTitle,
-                        provider = provider,
-                    )
-                }
                 onProgress(
                     TranslationProgress(
                         currentChunk = completedChunkCount,
@@ -1067,8 +1148,20 @@ class TranslateChapterUseCase(
                                 completedInGroup += 1
                                 streamingChunks.remove(event.chunk.index)
                                 if (event.result.isSuccess) {
-                                    translatedChunks[event.chunk.index] = event.result.getOrThrow()
+                                    val chunkContent = event.result.getOrThrow()
+                                    translatedChunks[event.chunk.index] = chunkContent
                                     completedChunkCount = translatedChunks.size
+                                    if (event.chunk.index == 0) {
+                                        extractTranslatedChapterTitle(chunkContent, bookChapter.index, bookChapter.title)?.let { aiTitle ->
+                                            translateDynamicUiTextUseCase.saveAiChapterTitle(
+                                                bookUrl = book.bookUrl,
+                                                chapterIndex = bookChapter.index,
+                                                originalText = bookChapter.title,
+                                                aiTitle = aiTitle,
+                                                provider = provider,
+                                            )
+                                        }
+                                    }
                                     val displayChunks = stableDisplayChunks()
                                     val mixedContent = postProcessTranslation(
                                         PartialTranslationAssembler.assemble(
@@ -1134,6 +1227,15 @@ class TranslateChapterUseCase(
                 targetLanguage,
                 isRewrite = isRewrite,
             )
+            extractTranslatedChapterTitle(mergedContent, bookChapter.index, bookChapter.title)?.let { aiTitle ->
+                translateDynamicUiTextUseCase.saveAiChapterTitle(
+                    bookUrl = book.bookUrl,
+                    chapterIndex = bookChapter.index,
+                    originalText = bookChapter.title,
+                    aiTitle = aiTitle,
+                    provider = provider,
+                )
+            }
             translationCacheGateway.writeTranslation(
                 book = book,
                 bookChapter = bookChapter,
@@ -1556,9 +1658,11 @@ class TranslateChapterUseCase(
             }
         }
         val terminalError = lastError ?: Exception("Translation pipeline ended without a result")
+        val isProviderRejectedPrompt = lastError?.message?.contains("provider rejected prompt", ignoreCase = true) == true
         val splitMaxChars = if (
             (provider == TranslationConstants.PROVIDER_APP_AI || provider == TranslationConstants.PROVIDER_REWRITE) &&
-            lastRetryReason == RetryReason.PARSE_ERROR
+            lastRetryReason == RetryReason.PARSE_ERROR &&
+            !isProviderRejectedPrompt
         ) {
             aiTranslationFallbackSplitMaxChars(chunk.content.length, splitDepth)
         } else {
@@ -1856,6 +1960,7 @@ class TranslateChapterUseCase(
             },
             retryMissingRequiredTerms = TranslationConfig.nmtRetryMissingTerms,
             modelId = activeModel,
+            beamWidth = TranslationConfig.nmtBeamWidth,
         )
     }
 
@@ -2486,15 +2591,36 @@ class TranslateChapterUseCase(
             )
         }.getOrElse { error ->
             val outputDescription = AiTranslationRefinePipeline.describeJsonOutput(completedContent)
+            val sample = completedContent.replace("\n", " ").trim().take(120)
             onStage(
                 "AI_STAGE=parse_error $outputDescription " +
-                    (error.message ?: error::class.java.simpleName)
+                    (error.message ?: error::class.java.simpleName) +
+                    if (sample.isNotBlank()) " sample='$sample'" else ""
             )
+            val lowerSample = sample.lowercase()
+            val isExplicitRefusal = lowerSample.contains("i cannot") ||
+                lowerSample.contains("i can't") ||
+                lowerSample.contains("i am unable") ||
+                lowerSample.contains("i'm unable") ||
+                lowerSample.contains("as an ai") ||
+                lowerSample.contains("policy") ||
+                lowerSample.contains("encountered an error") ||
+                lowerSample.contains("tôi không thể") ||
+                lowerSample.contains("không thể hỗ trợ") ||
+                lowerSample.contains("rất tiếc") ||
+                lowerSample.contains("can only be used from within") ||
+                lowerSample.contains("unable to assist")
+            val isShortNonJsonReject = completedContent.length < 300 &&
+                outputDescription.contains("missing_object") &&
+                isExplicitRefusal
+            val layoutMessage = if (isShortNonJsonReject) {
+                "Translation parse error: provider rejected prompt: $sample"
+            } else {
+                "Translation parse error: $outputDescription; " +
+                    (error.message ?: error::class.java.simpleName)
+            }
             return Result.failure(
-                TranslationLayoutException(
-                    "Translation parse error: $outputDescription; " +
-                        (error.message ?: error::class.java.simpleName)
-                )
+                TranslationLayoutException(layoutMessage)
             )
         }
         onStage(
@@ -2874,8 +3000,11 @@ class TranslateChapterUseCase(
     ): String {
         val sanitizedText = TranslationContentSanitizer.sanitize(text)
         return if (targetLanguage == TranslationConstants.TARGET_VIETNAMESE) {
+            val normalizedUnicode = VietnameseTranslationPostProcessor.normalizeUnicode(sanitizedText)
+            val strippedRogue = VietnameseTranslationPostProcessor.stripRogueCharacters(normalizedUnicode)
+            val fixedMixedCase = VietnameseTranslationPostProcessor.fixAbnormalMixedCase(strippedRogue)
             val cleanedNames = VietnameseTranslationPostProcessor.cleanRogueNameQuestionMarks(
-                normalizeCjkPunctuation(sanitizedText)
+                normalizeCjkPunctuation(fixedMixedCase)
             )
             val fixedDialogue = VietnameseTranslationPostProcessor.fixContradictoryDialoguePronouns(cleanedNames)
             val fixedForeign = VietnameseTranslationPostProcessor.fixRogueForeignHanVietNames(fixedDialogue)
@@ -2994,6 +3123,7 @@ class TranslateChapterUseCase(
             .sortedByDescending { it.length }
             .fold(text) { output, term -> output.replace(term, "") }
     }
+
 
     private class TranslationLayoutException(message: String) : Exception(message)
 

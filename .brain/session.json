@@ -1,29 +1,25 @@
 {
   "session_info": {
     "started_at": "2026-07-19T20:52:14.907682",
-    "last_active": "2026-10-07T09:44:00.000000",
-    "saved_at": "2026-10-07T09:44:00.000000",
-    "resumed_at": "2026-10-07T07:06:05.000000"
+    "last_active": "2026-10-14T05:36:00.000000",
+    "saved_at": "2026-10-14T05:36:00.000000",
+    "resumed_at": "2026-10-14T05:30:00.000000"
   },
   "working_on": {
-    "feature": "ML Kit Pivot Polysemy Disambiguation Engine & Advanced Novel Grammar Healing",
-    "current_milestone": "P66",
-    "current_plan_path": "plans/261007-0835-mlkit-pivot-disambiguation-engine/",
-    "current_phase": "phase-04",
-    "total_phases": 4,
+    "feature": "QuickTranslator Speed & Mapping Acceleration (6 Chapters), Vietnamese Mojibake Fix, Compact Download Blocks & Source Health Accuracy",
+    "current_milestone": "P80",
+    "current_plan_path": "plans/261014-1415-fix-qt-i18n-blocks-sourcehealth/plan.md",
+    "current_phase": "phase-01-qt-speed-and-mapping",
+    "total_phases": 5,
     "phases": [
       "01",
       "02",
       "03",
-      "04"
+      "04",
+      "05"
     ],
-    "completed_phases": [
-      "01",
-      "02",
-      "03",
-      "04"
-    ],
-    "status": "completed"
+    "completed_phases": [],
+    "status": "planning_complete"
   },
   "pending_tasks": [],
   "recent_changes": [
@@ -289,6 +285,23 @@
         "app/src/main/java/io/legado/app/ui/translation/memory/BookStoryMemoryViewModel.kt"
       ],
       "error_id": "ERR_0047"
+    },
+    {
+      "type": "debug",
+      "description": "DI / Koin / BrowserViewModel: NoDefinitionFoundException for Function0 in TranslateBrowserPageUseCase",
+      "files": [
+        "app/src/main/java/io/legado/app/di/appModule.kt",
+        "app/src/main/java/io/legado/app/domain/usecase/TranslateBrowserPageUseCase.kt"
+      ],
+      "error_id": "ERR_0048"
+    },
+    {
+      "type": "debug",
+      "description": "AI Router / Gemini 3.5 Flash Lite: Cấu hình AI chưa hợp lệ on gemini-3.5-flash-lite due to capability probe exclusion",
+      "files": [
+        "app/src/main/java/io/legado/app/data/repository/AiRouterRepository.kt"
+      ],
+      "error_id": "ERR_0049"
     }
   ],
   "context_notes": [

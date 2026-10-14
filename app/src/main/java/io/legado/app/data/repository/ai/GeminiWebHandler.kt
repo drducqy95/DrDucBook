@@ -16,7 +16,6 @@ import io.legado.app.domain.model.AiProtocol
 import io.legado.app.domain.model.AiProviderConfig
 import io.legado.app.help.http.addHeaders
 import io.legado.app.help.http.newCallResponse
-import io.legado.app.help.http.okHttpClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -63,14 +62,20 @@ class GeminiWebHandler : AiProtocolHandler {
             runCatching {
                 listOf(
                     AiAvailableModel(
-                        id = "gemini-web-default",
-                        name = "Gemini Web (Default)",
-                        contextWindow = 32_000,
+                        id = "gemini-web-flash-lite",
+                        name = "Gemini Web (Flash-Lite)",
+                        contextWindow = 1_000_000,
                         maxOutputTokens = 8_192,
                     ),
                     AiAvailableModel(
                         id = "gemini-web-flash",
                         name = "Gemini Web (Flash)",
+                        contextWindow = 1_000_000,
+                        maxOutputTokens = 8_192,
+                    ),
+                    AiAvailableModel(
+                        id = "gemini-web-default",
+                        name = "Gemini Web (Default)",
                         contextWindow = 1_000_000,
                         maxOutputTokens = 8_192,
                     ),
@@ -103,7 +108,7 @@ class GeminiWebHandler : AiProtocolHandler {
             if (session.snlm0e.isNotBlank()) "&at=" + URLEncoder.encode(session.snlm0e, StandardCharsets.UTF_8.name()) else ""
 
         val requestBody = formBodyString.toRequestBody("application/x-www-form-urlencoded;charset=utf-8".toMediaType())
-        val bl = session.buildLabel.ifBlank { "boq_assistant-bard-web-server_20250220.08_p0" }
+        val bl = session.buildLabel.ifBlank { "boq_gemini-web-uiserver_20261012.15_p0" }
         val encodedBl = URLEncoder.encode(bl, StandardCharsets.UTF_8.name())
         val url = "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate" +
             "?bl=$encodedBl&hl=vi&_reqid=$reqId&rt=c"
@@ -124,7 +129,7 @@ class GeminiWebHandler : AiProtocolHandler {
             headers["Authorization"] = generateSapisidHash(sapisid)
         }
 
-        val response = okHttpClient.newCallResponse {
+        val response = aiOkHttpClient.newCallResponse {
             url(url)
             post(requestBody)
             addHeaders(headers)
@@ -216,6 +221,7 @@ class GeminiWebHandler : AiProtocolHandler {
         val modelId = request.model.modelId.lowercase()
         val modelDirective = when {
             modelId.contains("thinking") -> "Hãy suy nghĩ cẩn thận từng bước và đặt phần phân tích suy nghĩ trong cặp thẻ <thought>...</thought> trước khi trả lời."
+            modelId.contains("lite") -> "Hãy phản hồi cực nhanh, ngắn gọn và tập trung chính xác vào yêu cầu."
             modelId.contains("flash") -> "Hãy phản hồi nhanh, cô đọng và đi thẳng vào nội dung chính."
             modelId.contains("pro") -> "Hãy đưa ra câu trả lời chuyên sâu, đầy đủ và chi tiết."
             else -> null

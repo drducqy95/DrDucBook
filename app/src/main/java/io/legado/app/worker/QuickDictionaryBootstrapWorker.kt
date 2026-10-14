@@ -30,37 +30,7 @@ class QuickDictionaryBootstrapWorker(
     private val quickDictionaryPackStore: QuickDictionaryPackStore by inject()
 
     override suspend fun doWork(): Result {
-        if (quickDictionaryPackStore.hasOriginalPack()) {
-            applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(COMPLETED_KEY, true)
-                .apply()
-            return Result.success()
-        }
-        if (!assetDeliveryUseCase.configured || accountAuthUseCase.currentAccessToken().isNullOrBlank()) {
-            return Result.success()
-        }
-        val artifact = when (
-            val resolution = AssetDeliveryCatalogResolver.resolve(
-                ExternalAssetCatalog.quickTranslationCleanZipUrl,
-            )
-        ) {
-            is AssetDeliveryResolution.Single -> resolution.artifact
-            else -> return Result.failure()
-        }
-        quickDictionaryPackStore.markOriginalDownloading()
-        return runCatching {
-            val downloaded = assetDeliveryUseCase.downloadArtifact(artifact) { _ -> }
-            assetDeliveryUseCase.importArtifact(artifact, downloaded)
-            applicationContext.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-                .edit()
-                .putBoolean(COMPLETED_KEY, true)
-                .apply()
-            Result.success()
-        }.getOrElse { error ->
-            quickDictionaryPackStore.markOriginalFailure(error.message ?: "Không thể tải QT gốc")
-            if (runAttemptCount < MAX_RETRIES) Result.retry() else Result.failure()
-        }
+        return Result.success()
     }
 
     companion object {

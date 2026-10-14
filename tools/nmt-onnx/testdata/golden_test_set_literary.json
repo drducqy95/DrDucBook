@@ -1,0 +1,186 @@
+{
+  "version": 2,
+  "description": "30-pair Calibrated Literary Test Set for NLLB Novel Translation (Chinese -> Vietnamese, Natural Literary Xianxia / Wuxia register)",
+  "test_cases": [
+    {
+      "id": "short-01",
+      "category": "title",
+      "zh": "第一章 呼吸就能变强",
+      "expected_vi": "Chương 1: Hít thở cũng có thể mạnh lên"
+    },
+    {
+      "id": "short-02",
+      "category": "dialogue",
+      "zh": "“道友请留步！”身后的灰袍老者忽然高声喊道。",
+      "expected_vi": "“Đạo hữu xin dừng bước!” Lão giả áo xám phía sau bỗng nhiên cao giọng gọi lớn."
+    },
+    {
+      "id": "short-03",
+      "category": "dialogue",
+      "zh": "竖子尔敢！今日便是你的死期！",
+      "expected_vi": "“Tên nhãi ranh to gan! Hôm nay chính là ngày chết của ngươi!”"
+    },
+    {
+      "id": "short-04",
+      "category": "phrase",
+      "zh": "螳螂捕蝉，黄雀在后。",
+      "expected_vi": "Bọ ngựa bắt ve, chim sẻ chực sẵn phía sau."
+    },
+    {
+      "id": "short-05",
+      "category": "cultivation",
+      "zh": "筑基初期与金丹大圆满，犹如云泥之别。",
+      "expected_vi": "Trúc Cơ sơ kỳ và Kim Đan đại viên mãn, khác nhau một trời một vực."
+    },
+    {
+      "id": "short-06",
+      "category": "action",
+      "zh": "他反手一剑，剑光如匹练般斩向虚空。",
+      "expected_vi": "Hắn trở tay một kiếm, kiếm quang như dải lụa chém thẳng vào hư không."
+    },
+    {
+      "id": "short-07",
+      "category": "item",
+      "zh": "这是一枚千年火灵芝，通体泛着赤红霞光。",
+      "expected_vi": "Đây là một cây hỏa linh chi ngàn năm, toàn thân tỏa ra ráng đỏ rực rỡ."
+    },
+    {
+      "id": "short-08",
+      "category": "emotion",
+      "zh": "叶晨心中冷笑，面上却不动声色。",
+      "expected_vi": "Diệp Thần trong lòng cười lạnh, nhưng ngoài mặt lại không hề biến sắc."
+    },
+    {
+      "id": "short-09",
+      "category": "dialogue",
+      "zh": "“师兄，难道我们就这么算了？”少女咬牙问道。",
+      "expected_vi": "“Sư huynh, lẽ nào chúng ta cứ như vậy bỏ qua sao?” Thiếu nữ nghiến răng hỏi."
+    },
+    {
+      "id": "short-10",
+      "category": "scenery",
+      "zh": "夜幕降临，黑风山脉深处传来阵阵凄厉兽吼。",
+      "expected_vi": "Màn đêm buông xuống, sâu trong dãy núi Hắc Phong truyền đến từng hồi tiếng thú gầm thê lương."
+    },
+    {
+      "id": "med-01",
+      "category": "cultivation_breakthrough",
+      "zh": "随着体内灵力轰然运转三十六个周天，丹田深处的金色气旋猛然一震，终于冲破了那层无形的桎梏。",
+      "expected_vi": "Theo linh lực trong cơ thể ầm ầm vận chuyển ba mươi sáu chu thiên, khí xoáy hoàng kim sâu trong đan điền bỗng rung chuyển dữ dội, cuối cùng đã phá vỡ tầng gông cùm vô hình kia."
+    },
+    {
+      "id": "med-02",
+      "category": "battle",
+      "zh": "九条火龙咆哮而出，带着焚山煮海的恐怖炽热，狠狠轰向那座遮天蔽日的黑色魔殿。",
+      "expected_vi": "Chín con hỏa long gầm thét lao ra, mang theo sức nóng khủng khiếp thiêu núi nấu biển, hung hãn oanh kích về phía tòa ma điện đen kịt che trời rợp bóng."
+    },
+    {
+      "id": "med-03",
+      "category": "alchemy",
+      "zh": "掌中丹火不断变换温度，待炉中药香四溢、结成九颗圆滚滚的凝气丹时，他才长舒了一口气。",
+      "expected_vi": "Đan hỏa trong lòng bàn tay không ngừng biến đổi nhiệt độ, đợi đến khi dược hương trong lò tỏa ra ngào ngạt, kết thành chín viên Ngưng Khí Đan tròn vo, hắn mới thở phào nhẹ nhõm một hơi."
+    },
+    {
+      "id": "med-04",
+      "category": "plot",
+      "zh": "若是让人知道青云宗的镇派至宝落入一个外门弟子之手，整个修真界恐怕都会掀起腥风血雨。",
+      "expected_vi": "Nếu để người khác biết được trấn phái chí bảo của Thanh Vân Tông rơi vào tay một đệ tử ngoại môn, e rằng toàn bộ giới tu chân sẽ dấy lên một trận mưa máu gió tanh."
+    },
+    {
+      "id": "med-05",
+      "category": "spell",
+      "zh": "只见他并指如刀，凌空虚画出一道繁复玄奥的金色符箓，瞬间将那头扑上来的嗜血妖狼定在半空。",
+      "expected_vi": "Chỉ thấy hắn khép ngón tay như lưỡi đao, giữa không trung hư vẽ ra một đạo kim sắc phù lục huyền ảo phức tạp, trong nháy mắt đã phong tỏa con yêu lang khát máu đang lao tới giữa chừng không gian."
+    },
+    {
+      "id": "med-06",
+      "category": "dialogue_long",
+      "zh": "“区区一个连筑基都未完成的蝼蚁，也配在此大放厥词？识相的便把储物袋留下，老夫尚可饶你一命。”",
+      "expected_vi": "“Chỉ là một con kiến hôi ngay cả Trúc Cơ còn chưa hoàn thành, cũng xứng ở nơi này ăn to nói lớn? Biết điều thì hãy để túi trữ vật lại, lão phu còn có thể tha cho ngươi một mạng.”"
+    },
+    {
+      "id": "med-07",
+      "category": "formation",
+      "zh": "护山大阵剧烈晃动，无数道阵纹在凌厉的飞剑轰击下寸寸崩裂，发出刺耳欲聋的咔嚓声响。",
+      "expected_vi": "Hộ sơn đại trận rung chuyển dữ dội, vô số đường trận văn dưới sự oanh kích của phi kiếm sắc bén vỡ vụn từng tấc, phát ra tiếng răng rắc chói tai."
+    },
+    {
+      "id": "med-08",
+      "category": "character_intro",
+      "zh": "白衣女子神色淡漠，宛若广寒仙子临尘，足尖轻点飞剑，飘然落在一处陡峭绝壁之上。",
+      "expected_vi": "Nữ tử áo trắng thần sắc lạnh nhạt, tựa như Quảng Hàn tiên tử hạ phàm, mũi chân khẽ điểm trên phi kiếm, nhẹ nhàng đáp xuống một vách núi cheo leo."
+    },
+    {
+      "id": "med-09",
+      "category": "treasure",
+      "zh": "残破古卷上记载的赫然是一门失传已久的上古大荒经残篇，字里行间流淌着古老沧桑的岁月气息。",
+      "expected_vi": "Trên cổ quyển tàn phá ghi lại rõ ràng là tàn thiên của Đại Hoang Kinh thượng cổ đã thất truyền từ lâu, giữa các hàng chữ chảy xuôi khí tức thời gian cổ xưa tang thương."
+    },
+    {
+      "id": "med-10",
+      "category": "mental_state",
+      "zh": "道心若是动摇，哪怕吞服再多灵丹妙药，终其一生也休想触碰到元婴大道的一丝门槛。",
+      "expected_vi": "Đạo tâm nếu như dao động, dù có nuốt thêm bao nhiêu linh đan diệu dược, cả đời cũng đừng hòng chạm tới một tia ngưỡng cửa của đại đạo Nguyên Anh."
+    },
+    {
+      "id": "long-01",
+      "category": "complex_narrative",
+      "zh": "此时此刻，站在苍穹之巅的林轩俯瞰着下方连绵万里的无尽山河，想起三年前自己被逐出宗门时的狼狈与屈辱，胸中那一股压抑已久的郁气终于化作一声响彻云霄的长啸。",
+      "expected_vi": "Lúc này, đứng trên đỉnh thương khung, Lâm Hiên phóng tầm mắt nhìn xuống vạn dặm non sông vô tận phía dưới, nhớ lại sự chật vật và sỉ nhục khi ba năm trước bị trục xuất khỏi tông môn, nỗi uất nghẹn kìm nén bấy lâu trong lồng ngực cuối cùng cũng hóa thành một tiếng gầm vang vọng chín tầng mây."
+    },
+    {
+      "id": "long-02",
+      "category": "grand_battle",
+      "zh": "漫天魔气与纯阳剑气交织碰撞，方圆百里的虚空寸寸塌陷，无数高耸入云的山峰在狂暴的冲击波下瞬间化为齑粉，大地之上裂开一道道深不见底的狰狞鸿沟。",
+      "expected_vi": "Ma khí ngập trời và Thuần Dương kiếm khí đan xen va chạm, hư không trăm dặm xung quanh từng tấc sụp đổ, vô số ngọn núi cao vút tận mây trong nháy mắt hóa thành bột mịn dưới làn sóng xung kích cuồng bạo, trên mặt đất nứt toác ra từng rãnh sâu không thấy đáy."
+    },
+    {
+      "id": "long-03",
+      "category": "auction_intrigue",
+      "zh": "天宝阁拍卖大厅内座无虚席，当红布揭开露出那截散发着幽幽寒芒的九天玄铁时，坐在天字一号包厢里的黑煞老怪率先开口，直接喊出了一个让在场所有人倒吸一口凉气的惊人天价。",
+      "expected_vi": "Bên trong đại sảnh đấu giá Thiên Bảo Các không còn một chỗ trống, khi tấm vải đỏ được vén lên để lộ ra thanh Cửu Thiên Huyền Thiết đang tỏa ra ánh hàn quang u tối, Hắc Sát Lão Quái ngồi trong nhã gian Thiên Tự Nhất Hào liền dẫn đầu lên tiếng, trực tiếp hét lên một mức giá kinh người khiến toàn bộ người có mặt tại hiện trường đều phải hít sâu một hơi khí lạnh."
+    },
+    {
+      "id": "long-04",
+      "category": "ancient_relic",
+      "zh": "根据宗门古籍中残存的模糊记载，这座深埋于无底深渊底部的太古神庙乃是上古神魔大战时遗留下来的封魔重地，其内不仅布满了稍有不慎便会神魂俱灭的诛仙杀阵，更镇压着一尊沉睡了数万载的不死凶魔。",
+      "expected_vi": "Theo những ghi chép mơ hồ còn sót lại trong cổ tịch tông môn, tòa Thái Cổ Thần Miếu chôn sâu dưới đáy vực thẳm này chính là trọng địa phong ma lưu lại từ trận đại chiến thần ma thời thượng cổ, bên trong không chỉ bố trí đầy Chu Tiên Sát Trận chỉ cần sơ suất một chút là thần hồn câu diệt, mà còn trấn áp một tôn hung ma bất tử đã ngủ say suốt mấy vạn năm."
+    },
+    {
+      "id": "long-05",
+      "category": "suspense_conversation",
+      "zh": "“楚师弟，你当真以为凭借你手中的那柄残缺灵剑，就能活着从这片万毒沼泽中走出去么？”黑衣人缓步逼近，嘴角勾起一抹残忍而诡异的弧度，手中的墨色骨杖悄然泛起阵阵令人作呕的绿芒。",
+      "expected_vi": "“Sở sư đệ, ngươi thật sự cho rằng dựa vào thanh linh kiếm tàn khuyết trong tay là có thể sống sót đi ra khỏi đầm lầy Vạn Độc này sao?” Hắc y nhân chậm rãi áp sát, khóe miệng nhếch lên một nụ cười tàn nhẫn và quỷ dị, chiếc gậy xương màu mực trong tay lặng lẽ tỏa ra từng đợt ánh sáng xanh lục khiến người ta buồn nôn."
+    },
+    {
+      "id": "long-06",
+      "category": "inner_monologue",
+      "zh": "他非常清楚，自己资质平庸，既没有世家大族倾注无尽资源作为后盾，也没有惊世骇俗的天灵根，能够走到今天这一步，全凭着胸膛中那一颗百折不挠、誓要逆天改命的坚毅道心。",
+      "expected_vi": "Hắn hiểu rất rõ bản thân tư chất bình thường, vừa không có thế gia đại tộc dốc vô tận tài nguyên làm hậu thuẫn, lại chẳng có thiên linh căn kinh thế hãi tục, có thể đi tới bước đường hôm nay hoàn toàn dựa vào một trái tim kiên nghị bất khuất, thề phải nghịch thiên cải mệnh trong lồng ngực."
+    },
+    {
+      "id": "long-07",
+      "category": "tribulation",
+      "zh": "劫云翻滚如墨，黑压压地笼罩在头顶方圆千里之内，第九道九九紫霄神雷在云层中狂暴酝酿，散发出的毁灭气息让整座千刃峰上的所有生灵都瑟瑟发抖、匍匐在地。",
+      "expected_vi": "Kiếp vân cuồn cuộn như mực, đen kịt bao phủ trên đỉnh đầu trong phạm vi ngàn dặm, đạo Cửu Cửu Tử Tiêu Thần Lôi thứ chín đang ầm ầm thai nghén trong tầng mây, khí tức hủy diệt tỏa ra khiến toàn bộ sinh linh trên đỉnh Thiên Nhận đều run rẩy phủ phục xuống đất."
+    },
+    {
+      "id": "long-08",
+      "category": "family_feud",
+      "zh": "赵家家主脸色铁青地拍案而起，怒视着堂下神色自若的少年，咬牙切齿地喝道：“好你个不知天高地厚的逆子，竟敢在家族大比之上公然废掉你堂兄的丹田气海，今日老夫若不清理门户，赵家颜面何存！”",
+      "expected_vi": "Gia chủ Triệu gia sắc mặt xanh mét đập bàn đứng phắt dậy, giận dữ trừng mắt nhìn thiếu niên đang điềm nhiên như không dưới đại đường, nghiến răng nghiến lợi quát lớn: “Hay cho một tên nghịch tử không biết trời cao đất rộng nhà ngươi, dám cả gan công khai phế bỏ đan điền khí hải của đường huynh ngươi ngay tại đại hội gia tộc, hôm nay lão phu nếu không thanh lý môn hộ thì thể diện Triệu gia còn biết giấu vào đâu!”"
+    },
+    {
+      "id": "long-09",
+      "category": "beast_encounter",
+      "zh": "幽暗密林深处，那头生有三目、体型庞大如小山丘般的紫睛魔猿猛然人立而起，硕大无朋的双拳重重锤击在自己坚硬如铁的胸膛上，爆发出一阵阵震耳欲聋的闷雷之声。",
+      "expected_vi": "Sâu trong rừng rậm u tối, con Tử Tình Ma Viên ba mắt với thân hình đồ sộ tựa gò đất nhỏ bỗng nhiên đứng thẳng dậy bằng hai chân, đôi nắm đấm khổng lồ nện mạnh vào lồng ngực rắn như sắt thép của mình, bộc phát ra từng tràng tiếng sấm rền đinh tai nhức óc."
+    },
+    {
+      "id": "long-10",
+      "category": "ending_reflection",
+      "zh": "回望来时那一路尸山血海、白骨累累的修仙长途，昔日同门挚友早已化作一杯黄土，唯有这浩瀚无垠的星空与亘古不变的长生大道，依旧孤寂而冰冷地横亘在眼前。",
+      "expected_vi": "Nhìn lại con đường tu tiên dài đằng đẵng đầy rẫy núi thây biển máu và xương trắng chất chồng đã qua, hảo hữu đồng môn ngày xưa sớm đã hóa thành một nắm đất vàng, chỉ còn lại bầu trời sao mênh mông vô tận này cùng đại đạo trường sinh vĩnh hằng bất biến, vẫn cô tịch và lạnh lẽo sừng sững trước mắt."
+    }
+  ]
+}

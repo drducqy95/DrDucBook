@@ -1,45 +1,51 @@
 # 📚 Trinity Wiki Index
 
-_Auto-generated at 2026-10-07T07:22:15. Do not edit manually._
+_Auto-generated at 2026-10-14T14:24:02. Do not edit manually._
 
-**Total Pages:** 40
+**Total Pages:** 47
 
 ## Categories
 
 | Category | Pages | Description |
 |---|---|---|
-| entities | 4 | Modules, services, components |
-| decisions | 6 | Architecture decision records |
-| patterns | 24 | Reusable code/design patterns |
+| entities | 6 | Modules, services, components |
+| decisions | 9 | Architecture decision records |
+| patterns | 26 | Reusable code/design patterns |
 | insights | 6 | Lessons learned, tips, gotchas |
 
-## Entities (4)
+## Entities (6)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
 | [Go Local WebDAV and NMT HachimiMT-60-QT](.brain\wiki\entities\go-local-webdav-and-nmt-hachimimt-60-qt.md) | active | 2026-09-12 | webdav, nmt, gomobile, onnx, explore, p34, auto |
+| [Milestone P79 - Quick Translator Quality and Speed Optimization for First 10 Chapters](.brain\wiki\entities\milestone-p79-quick-translator-quality-and-speed-optimization-for-first-10-chapters.md) | active | 2026-10-14 | p79, quick-translator, optimization, xianxia |
+| [Milestone P80 QuickTranslator Optimization, Mojibake Fix, Compact UI & Source Health Consistency](.brain\wiki\entities\milestone-p80-quicktranslator-optimization-mojibake-fix-compact-ui-source-health-consistency.md) | active | 2026-10-14 | milestone, p80, auto |
 | [ML Kit Dynamic Dictionary & Grammar Engine](.brain\wiki\entities\ml-kit-dynamic-dictionary-grammar-engine.md) | active | 2026-10-07 | mlkit, quickdict, grammar, auto |
 | [P59 UX Auth Tools and Link Routing](.brain\wiki\entities\p59-ux-auth-tools-and-link-routing.md) | active | 2026-10-04 | p59, ux, auth, tools, link, translation, auto |
-| [Project legado-with-MD3-main](.brain\wiki\entities\project-legado-with-md3-main.md) | active | 2026-10-06 | overview, project, legado-with-MD3-main |
+| [Project legado-with-MD3-main](.brain\wiki\entities\project-legado-with-md3-main.md) | active | 2026-10-10 | overview, project, legado-with-MD3-main |
 
-## Decisions (6)
+## Decisions (9)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
 | [Convert HachimiMT-60-QT to ONNX INT8 with No-Repeat Disabled](.brain\wiki\decisions\convert-hachimimt-60-qt-to-onnx-int8-with-no-repeat-disabled.md) | active | 2026-09-12 | nmt, onnx, hachimi, translation, p34, auto |
 | [Integrate Drive Library Section directly in Explore Tab](.brain\wiki\decisions\integrate-drive-library-section-directly-in-explore-tab.md) | active | 2026-09-12 | explore, webdav, ui, p34, auto |
 | [ML Kit Dynamic Dictionary & Pure Grammar Architecture](.brain\wiki\decisions\ml-kit-dynamic-dictionary-pure-grammar-architecture.md) | active | 2026-10-07 | mlkit, quickdict, grammar, architecture, auto |
+| [Optimize QT Speed, Fix Mojibake, Compact Blocks & Source Health Accuracy](.brain\wiki\decisions\optimize-qt-speed-fix-mojibake-compact-blocks-source-health-accuracy.md) | active | 2026-10-14 | qt, i18n, ui, sourcehealth, architecture |
+| [QT Quality and Speed Optimization Across 10 Chapters](.brain\wiki\decisions\qt-quality-and-speed-optimization-across-10-chapters.md) | active | 2026-10-14 | quick-translator, quality, benchmark, xianxia |
+| [Restore Classic QuickTranslator Algorithm and Pure TXT Dictionaries](.brain\wiki\decisions\restore-classic-quicktranslator-algorithm-and-pure-txt-dictionaries.md) | active | 2026-10-14 | quick-translator, classic-qt, fmm, pure-txt-dictionaries, architecture |
 | [Session Secret HTTP Basic Auth for Localhost WebDAV](.brain\wiki\decisions\session-secret-http-basic-auth-for-localhost-webdav.md) | active | 2026-09-12 | webdav, security, auth, p34, auto |
 | [Use Gomobile AAR for Local WebDAV Proxy](.brain\wiki\decisions\use-gomobile-aar-for-local-webdav-proxy.md) | active | 2026-09-12 | webdav, gomobile, architecture, p34, auto |
 | [Use Post Upsert and Pre-Approved Tool Policy](.brain\wiki\decisions\use-post-upsert-and-pre-approved-tool-policy.md) | active | 2026-10-04 | p59, architecture, decision, auto |
 
-## Patterns (24)
+## Patterns (26)
 
 | Page | Status | Updated | Tags |
 |---|---|---|---|
 | [AI Router / Antigravity - CONFIGURATION Pattern](.brain\wiki\patterns\ai-router-antigravity-configuration-pattern.md) | active | 2026-09-04 | AI Router / Antigravity, CONFIGURATION, auto-generated |
 | [AI Router / Antigravity - PROTOCOL_PAYLOAD Pattern](.brain\wiki\patterns\ai-router-antigravity-protocol-payload-pattern.md) | active | 2026-09-04 | AI Router / Antigravity, PROTOCOL_PAYLOAD, auto-generated |
 | [AI Router / Antigravity - RATE_LIMIT Pattern](.brain\wiki\patterns\ai-router-antigravity-rate-limit-pattern.md) | active | 2026-09-04 | AI Router / Antigravity, RATE_LIMIT, auto-generated |
+| [AI Router / Gemini 3.5 Flash Lite - AI_CAPABILITY_PROBE_EXCLUSION Pattern](.brain\wiki\patterns\ai-router-gemini-35-flash-lite-ai-capability-probe-exclusion-pattern.md) | active | 2026-10-10 | AI Router / Gemini 3.5 Flash Lite, AI_CAPABILITY_PROBE_EXCLUSION, auto-generated |
 | [AI Router / Web Providers - AUTHENTICATION_AND_WEB_AUTH Pattern](.brain\wiki\patterns\ai-router-web-providers-authentication-and-web-auth-pattern.md) | active | 2026-09-05 | AI Router / Web Providers, AUTHENTICATION_AND_WEB_AUTH, auto-generated |
 | [AI Router / WebLoginSheet - UI_AND_AUTHENTICATION Pattern](.brain\wiki\patterns\ai-router-webloginsheet-ui-and-authentication-pattern.md) | active | 2026-09-04 | AI Router / WebLoginSheet, UI_AND_AUTHENTICATION, auto-generated |
 | [AI Router / WebLoginSheet - UI_RENDERING Pattern](.brain\wiki\patterns\ai-router-webloginsheet-ui-rendering-pattern.md) | active | 2026-09-04 | AI Router / WebLoginSheet, UI_RENDERING, auto-generated |
@@ -47,6 +53,7 @@ _Auto-generated at 2026-10-07T07:22:15. Do not edit manually._
 | [AssetDelivery/ZeroTTS - ArtifactNotAllowListed Pattern](.brain\wiki\patterns\assetdeliveryzerotts-artifactnotallowlisted-pattern.md) | active | 2026-09-14 | AssetDelivery/ZeroTTS, ArtifactNotAllowListed, auto-generated |
 | [AssetDelivery/ZeroTTS - INTEGRITY_AND_CHECKSUM_DESYNC Pattern](.brain\wiki\patterns\assetdeliveryzerotts-integrity-and-checksum-desync-pattern.md) | active | 2026-09-14 | AssetDelivery/ZeroTTS, INTEGRITY_AND_CHECKSUM_DESYNC, auto-generated |
 | [Cloudflare Tunnel - TunnelDisconnectedException Pattern](.brain\wiki\patterns\cloudflare-tunnel-tunneldisconnectedexception-pattern.md) | active | 2026-08-26 | Cloudflare Tunnel, TunnelDisconnectedException, auto-generated |
+| [DI / Koin / BrowserViewModel - KOIN_NO_DEFINITION_FOUND Pattern](.brain\wiki\patterns\di-koin-browserviewmodel-koin-no-definition-found-pattern.md) | active | 2026-10-10 | DI / Koin / BrowserViewModel, KOIN_NO_DEFINITION_FOUND, auto-generated |
 | [DriveWebDav/PublicClient - CatalogTruncationAndDownloadCorruption Pattern](.brain\wiki\patterns\drivewebdavpublicclient-catalogtruncationanddownloadcorruption-pattern.md) | active | 2026-09-12 | DriveWebDav/PublicClient, CatalogTruncationAndDownloadCorruption, auto-generated |
 | [EpubRemoteExtractor - SelectorParseException Pattern](.brain\wiki\patterns\epubremoteextractor-selectorparseexception-pattern.md) | active | 2026-09-13 | EpubRemoteExtractor, SelectorParseException, auto-generated |
 | [Local AI GGUF Import - ActivityNotFoundException Pattern](.brain\wiki\patterns\local-ai-gguf-import-activitynotfoundexception-pattern.md) | active | 2026-08-26 | Local AI GGUF Import, ActivityNotFoundException, auto-generated |

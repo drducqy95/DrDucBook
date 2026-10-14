@@ -16,14 +16,19 @@ import kotlinx.coroutines.withTimeout
 
 class TranslateBrowserPageUseCase(
     private val mlKitTranslationGateway: MlKitTranslationGateway,
-    private val sourceLanguageProvider: () -> String? = {
-        runCatching {
-            io.legado.app.ui.config.translation.TranslationConfig.mlKitSourceLanguage
-                .trim()
-                .takeUnless { it.equals("auto", ignoreCase = true) }
-        }.getOrNull()
-    },
+    private val sourceLanguageProvider: () -> String?,
 ) {
+
+    constructor(mlKitTranslationGateway: MlKitTranslationGateway) : this(
+        mlKitTranslationGateway = mlKitTranslationGateway,
+        sourceLanguageProvider = {
+            runCatching {
+                io.legado.app.ui.config.translation.TranslationConfig.mlKitSourceLanguage
+                    .trim()
+                    .takeUnless { it.equals("auto", ignoreCase = true) }
+            }.getOrNull()
+        },
+    )
 
     suspend fun execute(
         nodes: List<BrowserPageTextNode>,

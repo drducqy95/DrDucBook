@@ -996,6 +996,11 @@ private fun RetrofitCacheDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                Text(
+                    text = "Làm mới các từ ngữ đã cập nhật trên toàn bộ bản dịch có sẵn bằng thuật toán tìm kiếm và thay thế (0 token AI). Nếu muốn dịch lại toàn bộ bằng AI, vui lòng dùng chức năng 'Dịch lại chương' tại thanh công cụ đọc sách.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

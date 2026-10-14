@@ -200,6 +200,7 @@ private class FakeQuickDictionaryGateway(
         type: QuickDictionaryType,
         scope: QuickDictionaryScope,
         scopeKey: String,
+        skipBuiltInDedup: Boolean,
         onProgress: (QuickDictionaryImportProgress) -> Unit,
     ): QuickDictionaryImportResult = error("Not used")
 

@@ -16,6 +16,16 @@ class DictionaryRepositoryImpl : DictionaryGateway {
 
     private companion object {
         const val DICT_FILE_NAME = "translation_dictionary.json"
+
+        private val POLLUTED_WORDS = setOf(
+            "的", "了", "着", "在", "被", "把", "将", "和", "或", "个", "几", "从", "到",
+            "间", "边", "旁", "前", "后", "上", "下", "里", "外", "中", "内",
+            "这", "那", "我", "你", "他", "她", "它", "们", "谁", "甚", "么",
+            "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "百", "千", "万",
+            "是", "不", "有", "无", "没", "非", "微", "很", "太", "极",
+            "说", "道", "看", "见", "听", "闻", "走", "去", "来", "出", "入",
+            "第", "章", "节", "回", "卷", "篇"
+        )
     }
 
     private data class CacheEntry(
@@ -55,6 +65,10 @@ class DictionaryRepositoryImpl : DictionaryGateway {
                     val trans = pair.translation.trim()
                     if (orig.isBlank() || trans.isBlank()) return@mapNotNull null
                     if (AiTranslationRefinePipeline.hasCjkTextCodePoints(trans) || trans.equals(orig, ignoreCase = true)) {
+                        hasChanges = true
+                        return@mapNotNull null
+                    }
+                    if (isPollutedBookDictionaryTerm(orig, trans)) {
                         hasChanges = true
                         return@mapNotNull null
                     }
@@ -101,6 +115,11 @@ class DictionaryRepositoryImpl : DictionaryGateway {
         val updatedPairs = existingDict.pairs.toMutableList()
 
         for (newPair in newPairs.map(DictPair::normalizedForRuntime)) {
+            val orig = newPair.original.trim()
+            val trans = newPair.translation.trim()
+            if (orig.isBlank() || trans.isBlank() || isPollutedBookDictionaryTerm(orig, trans)) {
+                continue
+            }
             val existingIndex = updatedPairs.indexOfFirst {
                 it.original == newPair.original
             }
@@ -120,15 +139,39 @@ class DictionaryRepositoryImpl : DictionaryGateway {
     }
 
     override fun replaceBookDictionary(book: Book, pairs: List<DictPair>) {
+        val cleanPairs = pairs.map(DictPair::normalizedForRuntime).filterNot {
+            isPollutedBookDictionaryTerm(it.original, it.translation)
+        }
         saveDictionary(
             book,
             BookDictionary(
                 bookUrl = book.bookUrl,
-                pairs = pairs.map(DictPair::normalizedForRuntime),
+                pairs = cleanPairs,
                 updatedAt = System.currentTimeMillis()
             )
         )
     }
+
+    private fun isPollutedBookDictionaryTerm(original: String, translation: String): Boolean {
+        val orig = original.trim()
+        val trans = translation.trim().lowercase()
+        // Single characters must NEVER enter BookDictionary
+        if (orig.codePointCount(0, orig.length) < 2) return true
+
+        // Function words and basic particles
+        if (POLLUTED_WORDS.contains(orig)) return true
+
+        // Known corrupted translations of common words
+        if (orig == "入门" && trans.contains("cửa vào")) return true
+        if (orig == "贡献" && trans.contains("đóng góp")) return true
+        if (orig == "随手" && trans.contains("tiện lợi")) return true
+        if (orig == "上门" && trans.contains("ghé thăm")) return true
+        if (orig == "一眼" && trans.contains("một cái nhìn")) return true
+        if (orig == "正常来说" && trans.contains("đang thường")) return true
+        if (orig in setOf("第", "章", "间", "洛", "门", "手", "边", "眼", "房", "紧", "闭", "的", "被")) return true
+        return false
+    }
+
 
     private fun saveDictionary(book: Book, dictionary: BookDictionary) {
         val dictFile = getDictFile(book)

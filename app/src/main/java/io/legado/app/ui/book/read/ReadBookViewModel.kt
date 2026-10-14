@@ -57,6 +57,8 @@ import io.legado.app.domain.model.ExternalAssetCatalog
 import io.legado.app.domain.model.PlaybackTimer
 import io.legado.app.domain.model.ReaderContentMode
 import io.legado.app.domain.model.ReaderContentSnapshot
+import io.legado.app.domain.model.MappedDisplayText
+import io.legado.app.domain.model.MappedTranslation
 import io.legado.app.domain.model.rebaseDisplayText
 import io.legado.app.domain.model.supportsQuickDictionaryEditing
 import io.legado.app.domain.model.ChapterContextCopyUiState
@@ -245,6 +247,22 @@ class ReadBookViewModel(
     private val translationCacheGateway: TranslationCacheGateway,
     private val translationStoryMemoryUseCase: TranslationStoryMemoryUseCase,
 ) : BaseViewModel(application), ReadBook.CallBack {
+
+    private data class MappedTranslationCacheKey(
+        val chapterUrl: String,
+        val rawContentHash: Int,
+        val revision: Long,
+    )
+
+    private val mappedTranslationCache = object : LinkedHashMap<MappedTranslationCacheKey, MappedTranslation>(
+        4,
+        0.75f,
+        true,
+    ) {
+        override fun removeEldestEntry(
+            eldest: MutableMap.MutableEntry<MappedTranslationCacheKey, MappedTranslation>?,
+        ): Boolean = size > 4
+    }
 
     // --- MVI State ---
 
@@ -895,6 +913,8 @@ class ReadBookViewModel(
             }
             is ReadBookIntent.ShowDialog -> _uiState.update { it.copy(activeDialog = intent.dialog) }
             is ReadBookIntent.DismissDialog -> _uiState.update { it.copy(activeDialog = null) }
+            is ReadBookIntent.OpenEditChapterTitleDialog -> openEditChapterTitleDialog(intent.chapterIndex)
+            is ReadBookIntent.SaveUserChapterTitle -> saveUserChapterTitle(intent.chapterIndex, intent.newTitle)
             is ReadBookIntent.ShowLogin -> {
                 ReadBook.bookSource?.bookSourceUrl?.let { sourceUrl ->
                     _effects.tryEmit(ReadBookEffect.ShowLogin(sourceUrl))
@@ -2628,6 +2648,7 @@ class ReadBookViewModel(
                 scopeKey = "chapter-title:${book.bookUrl}",
                 originalText = rawTitle,
                 book = book,
+                chapterIndex = textChapter.chapter.index,
                 contextText = rawTitle,
             ).getOrElse { rawTitle }
             val currentChapter = ReadBook.curTextChapter
@@ -6558,7 +6579,9 @@ class ReadBookViewModel(
                 book?.name.orEmpty()
             }
             val initialSuggestion = raw.takeIf(String::isNotBlank)?.let { source ->
-                translateChapterUseCase.executeSuggestion(
+                runCatching {
+                    quickTranslationGateway.translate(source)
+                }.getOrNull()?.takeIf(String::isNotBlank) ?: translateChapterUseCase.executeSuggestion(
                     text = source,
                     provider = TranslationConstants.PROVIDER_QUICK_TRANSLATOR,
                     book = book,
@@ -6656,14 +6679,48 @@ class ReadBookViewModel(
             .distinctBy { it.original.trim() }
         val selectionStart = resolvedChapterPosition.coerceAtLeast(0)
         val resolvedDisplayText = displayText.ifBlank { rawContent }
-        val snapshot = ReaderContentSnapshot(
-            rawText = rawContent,
-            displayText = resolvedDisplayText,
-            mappedDisplayText = alignedParagraphMapping(
+        val currentContentMode = _uiState.value.readerContentMode
+        val mappedDisplayText = if (currentContentMode == ReaderContentMode.QUICK_TRANSLATOR) {
+            val cacheKey = MappedTranslationCacheKey(
+                chapterUrl = chapter.url,
+                rawContentHash = rawContent.hashCode(),
+                revision = quickDictionaryGateway.currentRevision,
+            )
+            val mappedTranslation = synchronized(mappedTranslationCache) {
+                mappedTranslationCache.getOrPut(cacheKey) {
+                    quickTranslationGateway.translateMapped(
+                        text = rawContent,
+                        projectTerms = translationTerms,
+                        customPhonetics = scopedPhonetics,
+                        pronounMode = book.getQuickTranslationPronounModeOverride(),
+                    )
+                }
+            }
+            if (mappedTranslation.segments.isNotEmpty()) {
+                MappedDisplayText(
+                    sourceText = rawContent,
+                    displayText = mappedTranslation.text,
+                    engine = "quick_translator",
+                    segments = mappedTranslation.segments,
+                ).rebaseDisplayText(resolvedDisplayText)
+            } else {
+                alignedParagraphMapping(
+                    sourceText = rawContent,
+                    displayText = resolvedDisplayText,
+                    engine = "reader",
+                )
+            }
+        } else {
+            alignedParagraphMapping(
                 sourceText = rawContent,
                 displayText = resolvedDisplayText,
                 engine = "reader",
-            ),
+            )
+        }
+        val snapshot = ReaderContentSnapshot(
+            rawText = rawContent,
+            displayText = resolvedDisplayText,
+            mappedDisplayText = mappedDisplayText,
         )
         val request = QuickDictionaryRequest(
             bookUrl = book.bookUrl,
@@ -8458,6 +8515,40 @@ class ReadBookViewModel(
             return
         }
         _uiState.update { it.copy(activeDialog = ReadBookDialog.ConfirmChapterPay(chapter.title)) }
+    }
+
+    private fun openEditChapterTitleDialog(requestedChapterIndex: Int? = null) {
+        val curChapter = ReadBook.curTextChapter
+        val index = requestedChapterIndex ?: curChapter?.chapter?.index ?: ReadBook.durChapterIndex
+        val currentTitle = _uiState.value.chapterName.ifBlank { curChapter?.title.orEmpty() }
+        _uiState.update { it.copy(activeDialog = ReadBookDialog.EditChapterTitle(index, currentTitle)) }
+    }
+
+    private fun saveUserChapterTitle(chapterIndex: Int, newTitle: String) {
+        val trimmedTitle = newTitle.trim()
+        if (trimmedTitle.isBlank()) return
+        viewModelScope.launch(IO) {
+            val book = ReadBook.book ?: return@launch
+            val curChapter = ReadBook.curTextChapter
+            val rawTitle = if (curChapter?.chapter?.index == chapterIndex) {
+                curChapter.chapter.title
+            } else {
+                appDb.bookChapterDao.getChapter(book.bookUrl, chapterIndex)?.title ?: trimmedTitle
+            }
+            translateChapterUseCase.saveUserChapterTitle(
+                bookUrl = book.bookUrl,
+                chapterIndex = chapterIndex,
+                originalText = rawTitle,
+                userTitle = trimmedTitle,
+            )
+            dynamicChapterTitle = trimmedTitle
+            ReadBook.setDynamicChapterTitle(book.bookUrl, chapterIndex, trimmedTitle)
+            _uiState.update { it.copy(chapterName = trimmedTitle) }
+            withContext(Main.immediate) {
+                ReadBook.clearTextChapter()
+                ReadBook.loadContent(resetPageOffset = false)
+            }
+        }
     }
 
     private fun confirmPayAction() {

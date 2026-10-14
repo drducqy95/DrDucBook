@@ -8,6 +8,18 @@ internal const val ANTIGRAVITY_PRODUCTION_BASE_URL = "https://cloudcode-pa.googl
 internal const val ANTIGRAVITY_IDE_BASE_URL = "https://daily-cloudcode-pa.googleapis.com"
 internal const val ANTIGRAVITY_IDE_USER_AGENT = "antigravity/ide/2.9.1 darwin/arm64"
 internal const val ANTIGRAVITY_OAUTH_USES_PKCE = false
+internal val ANTIGRAVITY_RETIRED_MODEL_IDS: List<String> = listOf(
+    "gemini-3.1-flash-lite",
+    "gemini-pro-agent",
+    "gemini-3.1-pro-low",
+    "gemini-3.7-flash-high",
+    "gemini-3.7-flash-medium",
+    "gemini-3.7-flash-low",
+    "gemini-3.7-flash-tiered",
+    "gemini-3.6-flash-high",
+    "gemini-3.6-flash-medium",
+    "gemini-3.6-flash-low",
+)
 internal const val ANTIGRAVITY_RETIRED_MODEL_ID = "gemini-3.1-flash-lite"
 
 internal const val ANTIGRAVITY_DEFAULT_SYSTEM =
@@ -91,23 +103,8 @@ val ANTIGRAVITY_SUPPORTED_MODELS: List<io.legado.app.domain.model.AiAvailableMod
     io.legado.app.domain.model.AiAvailableModel("gemini-3.8-flash-medium", "Gemini 3.8 (Medium)", 1_000_000, 64_000),
     io.legado.app.domain.model.AiAvailableModel("gemini-3.8-flash-low", "Gemini 3.8 (Low)", 1_000_000, 64_000),
 
-    // Gemini 3.7 Flash
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-high", "Gemini 3.7 Flash (High)", 1_000_000, 64_000),
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-medium", "Gemini 3.7 Flash (Medium)", 1_000_000, 64_000),
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-low", "Gemini 3.7 Flash (Low)", 1_000_000, 64_000),
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.7-flash-tiered", "Gemini 3.7 Flash (Tiered)", 1_000_000, 64_000),
-
-    // Gemini 3.6 Flash
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.6-flash-high", "Gemini 3.6 Flash (High)", 1_000_000, 64_000),
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.6-flash-medium", "Gemini 3.6 Flash (Medium)", 1_000_000, 64_000),
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.6-flash-low", "Gemini 3.6 Flash (Low)", 1_000_000, 64_000),
-
-    // Gemini 3.1 Pro
-    io.legado.app.domain.model.AiAvailableModel("gemini-pro-agent", "Gemini 3.1 Pro (High)", 1_000_000, 64_000),
-    io.legado.app.domain.model.AiAvailableModel("gemini-3.1-pro-low", "Gemini 3.1 Pro (Low)", 1_000_000, 64_000),
-
     // Claude (via Antigravity backend)
-    io.legado.app.domain.model.AiAvailableModel("claude-opus-4-6-thinking", "Claude Opus 4.6 (Thinking)", 1_000_000, 64_000),
+    io.legado.app.domain.model.AiAvailableModel("claude-opus-4-7-thinking", "Claude Opus 4.7 (Thinking)", 1_000_000, 64_000),
     io.legado.app.domain.model.AiAvailableModel("claude-sonnet-4-6", "Claude Sonnet 4.6 (Thinking)", 1_000_000, 64_000),
 
     // GPT-OSS

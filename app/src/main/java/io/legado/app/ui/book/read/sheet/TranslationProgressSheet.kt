@@ -122,15 +122,6 @@ fun TranslationProgressSheet(
                     onSelected = { onIntent(ReadBookIntent.SelectTranslationTargetLanguage(it)) },
                 )
             }
-            if (state.provider == TranslationConstants.PROVIDER_QUICK_TRANSLATOR) {
-                TranslationSelector(
-                    title = stringResource(R.string.quick_translation_book_pronoun_mode),
-                    selectedValue = state.quickTranslationPronounMode,
-                    options = state.quickTranslationPronounModeOptions,
-                    enabled = state.status != TranslationUiStatus.TRANSLATING,
-                    onSelected = { onIntent(ReadBookIntent.SelectQuickTranslationPronounMode(it)) },
-                )
-            }
 
             HorizontalDivider()
             AppText(

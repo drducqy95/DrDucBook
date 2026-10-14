@@ -1,18 +1,23 @@
 package io.legado.app.ui.book.read
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drducbook.app.R
 import io.legado.app.data.repository.ReadPreferences
+import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.book.read.sheet.AiRewritePresetConfigSheet
 import io.legado.app.ui.book.read.sheet.AiTextCleanSheet
 import io.legado.app.ui.book.read.sheet.AiTextRewriteSheet
@@ -80,6 +85,36 @@ fun ReadBookScreen(
     val skipDialog = state.activeDialog as? ReadBookDialog.ConfirmSkipToChapter
     val payDialog = state.activeDialog as? ReadBookDialog.ConfirmChapterPay
     val addToBookshelfDialog = state.activeDialog as? ReadBookDialog.ConfirmAddToBookshelf
+    val editTitleDialog = state.activeDialog as? ReadBookDialog.EditChapterTitle
+
+    if (editTitleDialog != null) {
+        var editedTitle by remember(editTitleDialog) { mutableStateOf(editTitleDialog.currentTitle) }
+        AppAlertDialog(
+            show = true,
+            onDismissRequest = { onIntent(ReadBookIntent.DismissDialog) },
+            title = stringResource(R.string.edit_chapter_title),
+            content = {
+                AppTextField(
+                    value = editedTitle,
+                    onValueChange = { editedTitle = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    label = stringResource(R.string.edit_chapter_title_hint),
+                    singleLine = true,
+                )
+            },
+            confirmText = stringResource(R.string.ok),
+            onConfirm = {
+                if (editedTitle.isNotBlank()) {
+                    onIntent(ReadBookIntent.SaveUserChapterTitle(editTitleDialog.chapterIndex, editedTitle))
+                }
+                onIntent(ReadBookIntent.DismissDialog)
+            },
+            dismissText = stringResource(R.string.cancel),
+            onDismiss = { onIntent(ReadBookIntent.DismissDialog) },
+        )
+    }
 
     AppAlertDialog(
         show = restoreDialog != null,

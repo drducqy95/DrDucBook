@@ -172,18 +172,39 @@ class QuickDictionaryManagerViewModel(
                 QuickDictionaryBootstrapWorker.schedule(appCtx)
             }
             QuickDictionaryManagerIntent.RestoreOriginalPack -> restoreOriginalPack()
+            QuickDictionaryManagerIntent.RequestReplaceOriginalFile -> {
+                _effects.tryEmit(QuickDictionaryManagerEffect.OpenReplaceOriginalFile)
+            }
+            is QuickDictionaryManagerIntent.ReplaceOriginalFile -> replaceOriginalFile(intent.localPath)
+        }
+    }
+
+    private fun replaceOriginalFile(localPath: String) {
+        val file = File(localPath)
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                quickDictionaryPackStore.replaceOriginalBasePack(file)
+            }.onSuccess {
+                file.delete()
+                _effects.tryEmit(
+                    QuickDictionaryManagerEffect.ShowMessage(R.string.quick_dictionary_original_replaced)
+                )
+            }.onFailure {
+                file.delete()
+                _effects.tryEmit(
+                    QuickDictionaryManagerEffect.ShowMessage(R.string.quick_dictionary_original_replace_failed)
+                )
+            }
         }
     }
 
     private fun restoreOriginalPack() {
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { quickDictionaryPackStore.restoreOriginalPack() }
-                .onSuccess { restored ->
-                    if (restored != null) {
-                        _effects.tryEmit(
-                            QuickDictionaryManagerEffect.ShowMessage(R.string.quick_dictionary_original_restored)
-                        )
-                    }
+            runCatching { quickDictionaryPackStore.restoreDefaultBundledPack() }
+                .onSuccess {
+                    _effects.tryEmit(
+                        QuickDictionaryManagerEffect.ShowMessage(R.string.quick_dictionary_original_restored)
+                    )
                 }
                 .onFailure {
                     _effects.tryEmit(

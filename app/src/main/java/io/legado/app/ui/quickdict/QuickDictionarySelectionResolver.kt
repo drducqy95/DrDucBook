@@ -142,6 +142,7 @@ internal fun resolveQuickDictionarySelectionResult(
         null
     }
 
+    val sharedReadingCache = HashMap<String, List<String>>()
     if (translatedMatch == null) {
         translatedMatch = findTranslatedRange(
             sourceText = source,
@@ -149,6 +150,7 @@ internal fun resolveQuickDictionarySelectionResult(
             searchWindow = searchWindow,
             candidateTranslator = candidateTranslator,
             candidatePhoneticReader = candidatePhoneticReader,
+            readingCache = sharedReadingCache,
         )
     }
     if (translatedMatch == null && source.length <= MAX_GLOBAL_ALIGNMENT_SOURCE_CHARS) {
@@ -178,6 +180,7 @@ internal fun resolveQuickDictionarySelectionResult(
                 searchWindow = expandedWindow,
                 candidateTranslator = candidateTranslator,
                 candidatePhoneticReader = candidatePhoneticReader,
+                readingCache = sharedReadingCache,
             )
         }
     }
@@ -604,12 +607,13 @@ private fun findTranslatedRange(
     searchWindow: SourceSearchWindow,
     candidateTranslator: (String) -> String,
     candidatePhoneticReader: (String) -> String,
+    readingCache: MutableMap<String, List<String>> = HashMap(),
 ): ScoredRange? {
     val targetReading = normalizeReading(selectedText)
     if (targetReading.isBlank()) return null
     val targetWordCount = targetReading.split(' ').count(String::isNotBlank).coerceAtLeast(1)
     val minChars = (targetWordCount / 2).coerceAtLeast(1)
-    val maxChars = (targetWordCount + 2).coerceIn(minChars, 10)
+    val maxChars = (targetWordCount + 2).coerceIn(minChars, 6)
     val windowStart = searchWindow.start.coerceAtLeast(0)
     val windowEnd = searchWindow.endInclusive.coerceAtMost(sourceText.lastIndex)
     if (windowEnd < windowStart) return null
@@ -618,10 +622,9 @@ private fun findTranslatedRange(
     val starts = (windowStart..windowEnd)
         .filter { sourceText[it].isPhraseChar() }
         .sortedBy { abs(it - searchWindow.approximatePosition) }
-        .take(80)
+        .take(40)
 
     var best: ScoredRange? = null
-    val readingCache = HashMap<String, List<String>>()
 
     for (start in starts) {
         // If an exact match was already found and current start is farther away, break early
@@ -664,8 +667,8 @@ private fun findTranslatedRange(
                         score = score,
                         confidence = conf,
                     )
-                    // If exact match found at approximatePosition, return immediately
-                    if (conf >= 0.95f && abs(start - searchWindow.approximatePosition) <= 2) {
+                    // Since starts is sorted by distance to approximatePosition, return immediately on first exact match
+                    if (conf >= 0.95f) {
                         return best
                     }
                 }

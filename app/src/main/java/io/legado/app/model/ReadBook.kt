@@ -290,8 +290,11 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         dynamicChapterTitles["$bookUrl#$chapterIndex"] = title
     }
 
-    private fun dynamicChapterTitle(bookUrl: String, chapterIndex: Int): String? =
+    fun getDynamicChapterTitle(bookUrl: String, chapterIndex: Int): String? =
         dynamicChapterTitles["$bookUrl#$chapterIndex"]
+
+    private fun dynamicChapterTitle(bookUrl: String, chapterIndex: Int): String? =
+        getDynamicChapterTitle(bookUrl, chapterIndex)
 
     private fun clearTranslationObserverJobs() {
         translationObserverJobs.entries.filter { it.key !in durChapterIndex - 1..durChapterIndex + 1 }

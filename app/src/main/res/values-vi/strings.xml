@@ -2172,6 +2172,14 @@
     <string name="nmt_no_repeat_bigram">Chặn bigram lặp trong NMT</string>
     <string name="nmt_retry_missing_terms">Dịch lại khi thiếu thuật ngữ bắt buộc</string>
     <string name="nmt_retry_missing_terms_summary">Chỉ giải mã NMT nghiêm ngặt lại cho đoạn làm mất thuật ngữ theo scope.</string>
+    <string name="quick_translation_beam_width">Độ rộng Beam QT</string>
+    <string name="quick_translation_beam_width_greedy">1 (Greedy Longest-Match - nhanh nhất)</string>
+    <string name="quick_translation_beam_width_desc">%1$d (Beam search - tối ưu ngữ cảnh &amp; đa phân đoạn)</string>
+    <string name="nmt_beam_width">Độ rộng Beam NMT</string>
+    <string name="nmt_beam_width_greedy">1 (Greedy search - nhanh nhất)</string>
+    <string name="nmt_beam_width_desc">%1$d (Beam search - chất lượng cao &amp; giảm lặp từ)</string>
+    <string name="mlkit_decoding_fixed_notice_title">Thuật toán giải mã Google ML Kit</string>
+    <string name="mlkit_decoding_fixed_notice_summary">Google ML Kit chạy mô hình on-device thông qua Google Play Services với thuật toán giải mã tích hợp sẵn, không hỗ trợ điều chỉnh Beam width từ ứng dụng.</string>
     <string name="translation_app_ai_provider">Sử dụng giao diện AI của ứng dụng</string>
     <string name="translation_app_ai_provider_summary">Model, khóa API và giao thức được định cấu hình trong Cài đặt AI.</string>
 
@@ -3506,6 +3514,9 @@
     <string name="quick_dictionary_original_outdated">Gói QT cần cập nhật.</string>
     <string name="quick_dictionary_original_retry">Tải lại</string>
     <string name="quick_dictionary_original_restore">Khôi phục QT gốc</string>
+    <string name="quick_dictionary_original_replace">Thay thế từ điển gốc</string>
+    <string name="quick_dictionary_original_replaced">Đã thay thế từ điển gốc thành công.</string>
+    <string name="quick_dictionary_original_replace_failed">Không thể thay thế từ điển gốc.</string>
     <string name="quick_dictionary_deleted">Đã xóa mục từ.</string>
     <string name="quick_dictionary_scope_required">Hãy chọn Dự án hoặc Vũ trụ trước khi nhập.</string>
     <string name="quick_dictionary_select_scope">Chọn phạm vi áp dụng</string>
@@ -4266,4 +4277,6 @@
     <string name="chapter_context_status_user_edited">Đã sửa tay</string>
     <string name="chapter_context_status_stale">Bản thảo cũ</string>
     <string name="chapter_context_status_final">Đã chốt</string>
+    <string name="edit_chapter_title">Sửa tiêu đề chương</string>
+    <string name="edit_chapter_title_hint">Tiêu đề chương (lưu vĩnh viễn)</string>
 </resources>

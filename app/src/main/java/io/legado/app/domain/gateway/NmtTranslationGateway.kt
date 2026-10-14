@@ -72,6 +72,7 @@ data class NmtDecodeConfig(
     val modelId: String = "hachimi_onnx",
     val dictionaryRevision: String = "",
     val constraintFingerprint: String = "",
+    val beamWidth: Int = 1,
 )
 
 interface NmtTranslationGateway {

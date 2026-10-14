@@ -425,6 +425,8 @@ object PreferKey {
     const val nmtNoRepeatBigram = "nmtNoRepeatBigram"
     const val nmtRetryMissingTerms = "nmtRetryMissingTerms"
     const val nmtActiveModelId = "nmtActiveModelId"
+    const val nmtBeamWidth = "nmtBeamWidth"
+    const val quickTranslationBeamWidth = "quickTranslationBeamWidth"
     const val localAiModelPath = "localAiModelPath"
     const val localAiTemperature = "localAiTemperature"
     const val localAiTopP = "localAiTopP"

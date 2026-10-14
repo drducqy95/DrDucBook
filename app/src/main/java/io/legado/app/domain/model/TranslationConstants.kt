@@ -11,6 +11,7 @@ object TranslationConstants {
     const val PROVIDER_ML_KIT = "ml_kit"
     const val PROVIDER_HAN_VIET = "han_viet"
     const val PROVIDER_REWRITE = "rewrite"
+    const val PROVIDER_USER = "user"
     const val TARGET_VIETNAMESE = "vi"
     const val MIN_TEMPERATURE = 0f
     const val MAX_TEMPERATURE = 2f

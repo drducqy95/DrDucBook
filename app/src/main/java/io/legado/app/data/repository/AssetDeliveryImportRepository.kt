@@ -76,6 +76,7 @@ class AssetDeliveryImportRepository(
                 type = QuickDictionaryType.VIETPHRASE,
                 scope = QuickDictionaryScope.GLOBAL,
                 scopeKey = "",
+                skipBuiltInDedup = true,
             )
             result.pack?.let { quickDictionaryPackStore.registerOriginalPack(it, extracted) }
                 ?: error("Gói QT không có dữ liệu hợp lệ")

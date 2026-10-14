@@ -28,25 +28,37 @@ interface QuickTranslationGateway {
         projectTerms: List<DictPair>,
         customPhonetics: List<DictPair>,
         pronounMode: QuickTranslationPronounMode?,
+    ): String = translate(text, projectTerms, customPhonetics, pronounMode, null)
+
+    fun translate(
+        text: String,
+        projectTerms: List<DictPair>,
+        customPhonetics: List<DictPair>,
+        pronounMode: QuickTranslationPronounMode?,
+        beamWidth: Int?,
     ): String = translate(text, projectTerms, customPhonetics)
 
     fun translateMapped(
         text: String,
         projectTerms: List<DictPair> = emptyList(),
         customPhonetics: List<DictPair> = emptyList(),
-    ): MappedTranslation {
-        val translated = translate(text, projectTerms, customPhonetics)
-        val mapping = alignedParagraphMapping(text, translated, "quick_translator")
-        return MappedTranslation(translated, mapping.segments, mapping.engine)
-    }
+    ): MappedTranslation = translateMapped(text, projectTerms, customPhonetics, null)
 
     fun translateMapped(
         text: String,
         projectTerms: List<DictPair>,
         customPhonetics: List<DictPair>,
         pronounMode: QuickTranslationPronounMode?,
+    ): MappedTranslation = translateMapped(text, projectTerms, customPhonetics, pronounMode, null)
+
+    fun translateMapped(
+        text: String,
+        projectTerms: List<DictPair>,
+        customPhonetics: List<DictPair>,
+        pronounMode: QuickTranslationPronounMode?,
+        beamWidth: Int?,
     ): MappedTranslation {
-        val translated = translate(text, projectTerms, customPhonetics, pronounMode)
+        val translated = translate(text, projectTerms, customPhonetics, pronounMode, beamWidth)
         val mapping = alignedParagraphMapping(text, translated, "quick_translator")
         return MappedTranslation(translated, mapping.segments, mapping.engine)
     }
