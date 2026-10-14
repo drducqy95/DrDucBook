@@ -1,7 +1,7 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-14T16:20:00",
+    "last_updated": "2026-10-14T17:07:00",
     "overall_progress_percent": 99,
     "current_phase": "P77",
     "status": "IN_PROGRESS",
@@ -3017,13 +3017,13 @@
       "id": "P77",
       "name": "Khôi Phục QT Gốc, Sửa Lỗi Mojibake/i18n, Thu Gọn Download Blocks, Source Health Accuracy, Gemini Web 4 Models + TTS Fix",
       "status": "IN_PROGRESS",
-      "progress": 0,
+      "progress": 20,
       "plan_path": "plans/261014-1415-fix-qt-i18n-blocks-sourcehealth/plan.md",
       "tasks": [
         {
           "id": "T77.1",
           "desc": "Phase 01 — Khôi phục thuật toán QT Gốc (Linear FMM + LuatNhan + Từ điển đa tầng), loại bỏ beamTranslationPlan & 202 regex hậu xử lý, sửa MappedDisplayText 1:1 mapping",
-          "status": "PENDING"
+          "status": "DONE"
         },
         {
           "id": "T77.2",

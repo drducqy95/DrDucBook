@@ -9,7 +9,7 @@
     "feature": "Khôi Phục QT Gốc, Sửa Lỗi Mojibake/i18n, Thu Gọn Download Blocks, Source Health Accuracy, Gemini Web 4 Models + TTS Fix",
     "current_milestone": "P77",
     "current_plan_path": "plans/261014-1415-fix-qt-i18n-blocks-sourcehealth/plan.md",
-    "current_phase": "phase-01-qt-speed-and-mapping",
+    "current_phase": "phase-02-fix-vietnamese-mojibake",
     "total_phases": 5,
     "phases": [
       "01",
@@ -18,8 +18,10 @@
       "04",
       "05"
     ],
-    "completed_phases": [],
-    "status": "planning_complete"
+    "completed_phases": [
+      "01"
+    ],
+    "status": "in_progress"
   },
   "pending_tasks": [],
   "recent_changes": [

@@ -623,31 +623,15 @@ class QuickTranslationRepository(
         pronounMode: QuickTranslationPronounMode? = null,
         beamWidth: Int = 1,
     ): LocalMappedText {
-        val lexical = translateProtectedMapped(
+        return translateProtectedMapped(
             text = text,
             projectRuntime = projectRuntime,
             pack = pack,
             customPhonetics = customPhonetics,
             beamWidth = beamWidth,
         )
-        val processed = postProcessTranslatedText(
-            sourceText = text,
-            text = lexical.text,
-            pack = pack,
-            customPhonetics = customPhonetics,
-            pronounMode = pronounMode,
-        )
-        if (processed == lexical.text) return lexical
-        val remapped = remapProcessedSegments(
-            sourceText = text,
-            lexical = lexical,
-            processed = processed,
-            pack = pack,
-            customPhonetics = customPhonetics,
-            pronounMode = pronounMode,
-        )
-        return LocalMappedText(processed, remapped, text.length)
     }
+
 
     private fun translateProtectedMapped(
         text: String,
@@ -1128,6 +1112,13 @@ class QuickTranslationRepository(
         return penalty
     }
 
+    private val CORE_QT_FALLBACKS = mapOf(
+        "的" to "của",
+        "了" to "rồi",
+        "着" to "đang",
+        "得" to "được",
+    )
+
     private fun fallbackCandidate(
         text: String,
         offset: Int,
@@ -1181,7 +1172,7 @@ class QuickTranslationRepository(
                 kind = CandidateKind.LITERAL,
             )
         }
-        val reading = customPhonetics[source] ?: bundledPhonetics[source]
+        val reading = customPhonetics[source] ?: CORE_QT_FALLBACKS[source] ?: bundledPhonetics[source]
         val translation = if (reading != null && isCjk(codePoint)) reading else source
         return TranslationCandidate(
             endExclusive = offset + Character.charCount(codePoint),
@@ -4079,8 +4070,7 @@ class QuickTranslationRepository(
     companion object {
         private const val MAPPED_ENGINE = "quick_translator_exact"
         private const val PACK_VERSION = "qt-clean-4.2.27-v11"
-        private const val QT2025_PACK_VERSION =
-            "qt2025-302f9f8d+qt-clean-4.2.27-v11+runtime-3-entity-lock"
+        private const val QT2025_PACK_VERSION = "qt2025-fmm-classic-v1"
         private const val QT2020_PACK_VERSION = "qt2020-2025.09.01+qt-clean-4.2.27-v11"
         private val PROTECTED_CLEAN_TERMS = setOf(
             "第", "章", "节", "回", "卷", "篇", "零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
@@ -4676,7 +4666,6 @@ class QuickTranslationRepository(
             "年" to "{n} năm",
             "个月" to "{n} tháng",
             "月" to "{n} tháng",
-            "周" to "{n} tuần",
             "星期" to "{n} tuần",
             "天" to "{n} ngày",
             "日" to "{n} ngày",
@@ -4940,23 +4929,15 @@ internal fun cleanQuickDictionaryTarget(value: String): String {
     val trimmed = value.substringBefore('\t').substringBefore("//").trim()
     if (trimmed.isEmpty() || "://" in trimmed) return trimmed
     val candidates = quickDictionaryTargetCandidates(trimmed)
-        .asSequence()
         .map(String::trim)
         .filter(String::isNotEmpty)
-        .filterNot(::isDefinitionLikeQuickDictionaryTarget)
-        .mapIndexed { index, target ->
-            QuickDictionaryTargetCandidate(
-                value = target,
-                score = quickDictionaryTargetScore(target),
-                order = index,
-            )
-        }
-        .toList()
     if (candidates.isEmpty()) return ""
-    return candidates.sortedWith(
-        compareByDescending<QuickDictionaryTargetCandidate> { it.score }
-            .thenBy { it.order }
-    ).first().value
+    return candidates.firstOrNull { target ->
+        !isDefinitionLikeQuickDictionaryTarget(target) &&
+            !target.codePoints().anyMatch(::isQuickDictionaryCjk)
+    } ?: candidates.firstOrNull {
+        !isDefinitionLikeQuickDictionaryTarget(it)
+    } ?: candidates.first()
 }
 
 private fun quickDictionaryTargetCandidates(value: String): List<String> {
