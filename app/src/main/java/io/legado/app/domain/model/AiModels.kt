@@ -479,6 +479,8 @@ data class AiTaskRuntimeOptions(
     val routeProfileId: String = "",
     val geminiWebSkillName: String? = null,
     val geminiWebSkillCompactMode: Boolean = true,
+    /** BẬT MẶC ĐỊNH: Cho phép gửi các chương cùng truyện vào chung conversation Gemini Web */
+    val geminiWebMultiTurn: Boolean = true,
 ) {
     companion object {
         const val DEFAULT_TARGET_LANGUAGE = "zh"
@@ -524,6 +526,8 @@ data class AiGenerateRequest(
      * because Kotlin's copy() retains the original default when a caller changes taskType.
      */
     val outputContract: String = "",
+    /** Provider-specific metadata (e.g. Gemini Web multi-turn flags, conversation tokens). */
+    val providerMetadata: Map<String, String> = emptyMap(),
 )
 
 @Keep
@@ -537,7 +541,11 @@ data class AiToolContext(
 @Keep
 data class AiGenerateResponse(
     val text: String,
-    val rawBody: String? = null
+    val rawBody: String? = null,
+    /** Gemini Web conversation ID trích xuất từ response */
+    val conversationId: String? = null,
+    /** Gemini Web response choice ID trích xuất từ response */
+    val responseChoiceId: String? = null,
 )
 
 @Keep

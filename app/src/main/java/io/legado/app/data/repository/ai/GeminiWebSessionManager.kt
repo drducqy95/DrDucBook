@@ -2,7 +2,9 @@ package io.legado.app.data.repository.ai
 
 import android.webkit.CookieManager
 import com.google.gson.JsonObject
+import io.legado.app.constant.AppLog
 import io.legado.app.help.http.addHeaders
+import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.newCallStrResponse
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.utils.GSON
@@ -10,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.ConcurrentHashMap
 
 data class GeminiWebSession(
@@ -17,14 +21,71 @@ data class GeminiWebSession(
     val snlm0e: String,
     val cookieHeader: String,
     val buildLabel: String = "boq_gemini-web-uiserver_20261012.15_p0",
+    val authUser: String = "",
+    val sessionId: String = "",
+    val pushId: String = "feeds/mcudyrk2a4khkz",
     val fetchedAt: Long = System.currentTimeMillis(),
 )
+
+data class GeminiWebConversationMetadata(
+    val cid: String,
+    val rid: String = "",
+    val rcid: String = "",
+    val model: String = "",
+    val updatedAt: Long = System.currentTimeMillis(),
+    val turnCount: Int = 1,
+)
+
+object GeminiWebConversationStore {
+    private const val MAX_CONVERSATIONS = 50
+    private const val MAX_TURNS_PER_CONVERSATION = 30
+    private const val CONVERSATION_TTL_MS = 4 * 60 * 60 * 1000L // 4 hours
+
+    private val conversations = ConcurrentHashMap<String, GeminiWebConversationMetadata>()
+
+    fun get(sessionKey: String, currentModelId: String): GeminiWebConversationMetadata? {
+        val meta = conversations[sessionKey] ?: return null
+        val now = System.currentTimeMillis()
+
+        if (now - meta.updatedAt > CONVERSATION_TTL_MS) {
+            conversations.remove(sessionKey)
+            return null
+        }
+        if (meta.turnCount >= MAX_TURNS_PER_CONVERSATION) {
+            conversations.remove(sessionKey)
+            return null
+        }
+        if (meta.model.isNotBlank() && meta.model != currentModelId) {
+            conversations.remove(sessionKey)
+            return null
+        }
+        return meta
+    }
+
+    fun put(sessionKey: String, meta: GeminiWebConversationMetadata) {
+        if (conversations.size >= MAX_CONVERSATIONS && !conversations.containsKey(sessionKey)) {
+            val oldestKey = conversations.entries.minByOrNull { it.value.updatedAt }?.key
+            if (oldestKey != null) conversations.remove(oldestKey)
+        }
+        conversations[sessionKey] = meta
+    }
+
+    fun remove(sessionKey: String) {
+        conversations.remove(sessionKey)
+    }
+
+    fun clearAll() {
+        conversations.clear()
+    }
+}
 
 object GeminiWebSessionManager {
 
     private const val GEMINI_BASE_URL = "https://gemini.google.com"
     private const val GEMINI_APP_URL = "https://gemini.google.com/app"
     private const val DEFAULT_BUILD_LABEL = "boq_gemini-web-uiserver_20261012.15_p0"
+    private const val GOOGLE_ROTATE_COOKIES_URL = "https://accounts.google.com/RotateCookies"
+    private const val ROTATE_COOKIES_PAYLOAD = """[000,"-0000000000000000000"]"""
 
     private val SNLM0E_REGEXES = listOf(
         Regex(""""SNlM0e":"([^"]+)""""),
@@ -41,6 +102,15 @@ object GeminiWebSessionManager {
         Regex("""boq_gemini-web-uiserver_[0-9.]+_p\d+"""),
         Regex("""boq_assistant-bard-web-server_[0-9.]+_p\d+"""),
     )
+    private val SESSION_ID_REGEXES = listOf(
+        Regex(""""FdrFJe":"([^"]+)""""),
+        Regex("""'FdrFJe':\s*'([^']+)'"""),
+        Regex("""\["FdrFJe",\s*null,\s*"([^"]+)"\]"""),
+    )
+    private val PUSH_ID_REGEXES = listOf(
+        Regex(""""qKIAYe":"([^"]+)""""),
+        Regex("""'qKIAYe':\s*'([^']+)'"""),
+    )
 
     private const val MAX_CACHE_ENTRIES = 20
     private const val DEFAULT_KEY = "__default_webkit_cookie__"
@@ -51,9 +121,15 @@ object GeminiWebSessionManager {
     private val mutex = Mutex()
     private val sessionCache = ConcurrentHashMap<String, GeminiWebSession>()
 
+    fun getGeminiUrl(endpoint: String, authUser: String): String {
+        if (authUser.isBlank() || authUser == "0") return endpoint
+        return endpoint.replace("https://gemini.google.com/", "https://gemini.google.com/u/$authUser/")
+    }
+
     suspend fun getSession(explicitCredential: String? = null): GeminiWebSession =
         withContext(Dispatchers.IO) {
             val key = normalizeKey(explicitCredential)
+            val authUser = resolveAuthUser(explicitCredential)
             mutex.withLock {
                 val current = sessionCache[key]
                 val now = System.currentTimeMillis()
@@ -70,6 +146,10 @@ object GeminiWebSessionManager {
                         val jsonCookie = extractJsonField(parsed, "cookie", "cookies")
                         val jsonSnlm0e = extractJsonField(parsed, "snlm0e", "SNlM0e", "at", "token")
                         val jsonBl = extractJsonField(parsed, "bl", "cfb2h", "buildLabel", "build_label")
+                        val jsonAuthUser = extractJsonField(parsed, "authUser", "auth_user", "userIndex", "u").ifBlank { authUser }
+                        val jsonSessionId = extractJsonField(parsed, "sessionId", "session_id", "FdrFJe")
+                        val jsonPushId = extractJsonField(parsed, "pushId", "push_id", "qKIAYe").ifBlank { "feeds/mcudyrk2a4khkz" }
+
                         if (jsonCookie.isNotBlank() && jsonSnlm0e.isNotBlank()) {
                             val cookies = parseCookies(jsonCookie)
                             val session = GeminiWebSession(
@@ -77,6 +157,9 @@ object GeminiWebSessionManager {
                                 snlm0e = jsonSnlm0e,
                                 cookieHeader = jsonCookie,
                                 buildLabel = jsonBl.ifBlank { DEFAULT_BUILD_LABEL },
+                                authUser = jsonAuthUser,
+                                sessionId = jsonSessionId,
+                                pushId = jsonPushId,
                                 fetchedAt = now,
                             )
                             putSession(key, session)
@@ -85,19 +168,31 @@ object GeminiWebSessionManager {
                     }
                 }
 
-                val cookieHeader = resolveCookieHeader(explicitCredential)
-                val cookies = if (cookieHeader.isNotBlank()) parseCookies(cookieHeader) else emptyMap()
-                val (snlm0e, dynamicBl) = if (cookieHeader.isNotBlank()) {
-                    runCatching { fetchSessionData(cookieHeader) }.getOrDefault(Pair(null, null))
-                } else {
-                    Pair(null, null)
+                var cookieHeader = resolveCookieHeader(explicitCredential)
+                var cookies = if (cookieHeader.isNotBlank()) parseCookies(cookieHeader) else emptyMap()
+
+                // Auto-Rotate: If only __Secure-1PSID is provided, or if __Secure-1PSIDTS is missing, try rotation first
+                if (cookies.containsKey("__Secure-1PSID") && !cookies.containsKey("__Secure-1PSIDTS")) {
+                    AppLog.put("Gemini Web: Phát hiện thiếu __Secure-1PSIDTS, đang tự động gọi RotateCookies...")
+                    val (rotatedHeader, newPsidts) = rotateCookies(cookieHeader)
+                    if (!newPsidts.isNullOrBlank()) {
+                        cookieHeader = rotatedHeader
+                        cookies = parseCookies(cookieHeader)
+                        AppLog.put("Gemini Web: Tự động nhận __Secure-1PSIDTS thành công.")
+                    }
                 }
 
-                val resolvedSnlm0e = snlm0e
+                val sessionData = if (cookieHeader.isNotBlank()) {
+                    runCatching { fetchSessionData(cookieHeader, authUser) }.getOrDefault(SessionInitData())
+                } else {
+                    SessionInitData()
+                }
+
+                val resolvedSnlm0e = sessionData.snlm0e
                     ?: current?.snlm0e
                     ?: ""
 
-                val resolvedBl = dynamicBl
+                val resolvedBl = sessionData.buildLabel
                     ?: current?.buildLabel
                     ?: DEFAULT_BUILD_LABEL
 
@@ -106,10 +201,97 @@ object GeminiWebSessionManager {
                     snlm0e = resolvedSnlm0e,
                     cookieHeader = cookieHeader,
                     buildLabel = resolvedBl,
+                    authUser = authUser,
+                    sessionId = sessionData.sessionId ?: current?.sessionId ?: "",
+                    pushId = sessionData.pushId ?: current?.pushId ?: "feeds/mcudyrk2a4khkz",
                     fetchedAt = now,
                 )
                 putSession(key, session)
                 session
+            }
+        }
+
+    private data class SessionInitData(
+        val snlm0e: String? = null,
+        val buildLabel: String? = null,
+        val sessionId: String? = null,
+        val pushId: String? = null,
+    )
+
+    suspend fun rotateCookies(cookieHeader: String): Pair<String, String?> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val mediaType = "application/json;charset=utf-8".toMediaType()
+                val requestBody = ROTATE_COOKIES_PAYLOAD.toRequestBody(mediaType)
+                val response = aiOkHttpClient.newCallResponse {
+                    url(GOOGLE_ROTATE_COOKIES_URL)
+                    post(requestBody)
+                    addHeaders(
+                        mapOf(
+                            "Content-Type" to "application/json",
+                            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+                            "Cookie" to cookieHeader,
+                        )
+                    )
+                }
+
+                if (!response.isSuccessful) {
+                    AppLog.put("RotateCookies failed HTTP ${response.code}: ${response.message}")
+                    return@runCatching Pair(cookieHeader, null)
+                }
+
+                val setCookieHeaders = response.headers("Set-Cookie")
+                var newPsidts: String? = null
+                val updatedCookies = parseCookies(cookieHeader).toMutableMap()
+
+                for (header in setCookieHeaders) {
+                    val cookiePair = header.substringBefore(";").trim()
+                    val eqIndex = cookiePair.indexOf('=')
+                    if (eqIndex > 0) {
+                        val name = cookiePair.substring(0, eqIndex).trim()
+                        val value = cookiePair.substring(eqIndex + 1).trim()
+                        updatedCookies[name] = value
+                        if (name == "__Secure-1PSIDTS") {
+                            newPsidts = value
+                        }
+                    }
+                }
+
+                val mergedCookieHeader = updatedCookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                Pair(mergedCookieHeader, newPsidts)
+            }.getOrDefault(Pair(cookieHeader, null))
+        }
+
+    suspend fun rotateSession(explicitCredential: String? = null): GeminiWebSession? =
+        withContext(Dispatchers.IO) {
+            val key = normalizeKey(explicitCredential)
+            mutex.withLock {
+                val current = sessionCache[key]
+                val baseCookie = current?.cookieHeader ?: resolveCookieHeader(explicitCredential)
+                if (baseCookie.isBlank()) return@withLock null
+
+                val (newCookieHeader, newPsidts) = rotateCookies(baseCookie)
+                if (newPsidts.isNullOrBlank() && newCookieHeader == baseCookie) {
+                    return@withLock null
+                }
+
+                val cookies = parseCookies(newCookieHeader)
+                val authUser = resolveAuthUser(explicitCredential)
+                val sessionData = runCatching { fetchSessionData(newCookieHeader, authUser) }.getOrDefault(SessionInitData())
+
+                val newSession = GeminiWebSession(
+                    cookies = cookies,
+                    snlm0e = sessionData.snlm0e ?: current?.snlm0e ?: "",
+                    cookieHeader = newCookieHeader,
+                    buildLabel = sessionData.buildLabel ?: current?.buildLabel ?: DEFAULT_BUILD_LABEL,
+                    authUser = authUser,
+                    sessionId = sessionData.sessionId ?: current?.sessionId ?: "",
+                    pushId = sessionData.pushId ?: current?.pushId ?: "feeds/mcudyrk2a4khkz",
+                    fetchedAt = System.currentTimeMillis(),
+                )
+                putSession(key, newSession)
+                GeminiWebConversationStore.clearAll()
+                newSession
             }
         }
 
@@ -127,6 +309,23 @@ object GeminiWebSessionManager {
         } else {
             sessionCache.remove(normalizeKey(explicitCredential))
         }
+        GeminiWebConversationStore.clearAll()
+    }
+
+    internal fun resolveAuthUser(explicitCredential: String?): String {
+        val raw = explicitCredential?.trim().orEmpty()
+        if (raw.startsWith("{") && raw.endsWith("}")) {
+            val parsed = runCatching { GSON.fromJson(raw, JsonObject::class.java) }.getOrNull()
+            if (parsed != null) {
+                val user = extractJsonField(parsed, "authUser", "auth_user", "userIndex", "u")
+                if (user.isNotBlank()) return user
+            }
+        }
+        val urlMatch = Regex("""gemini\.google\.com/u/(\d+)""").find(raw)
+        if (urlMatch != null) {
+            return urlMatch.groupValues[1]
+        }
+        return ""
     }
 
     private fun extractJsonField(json: JsonObject, vararg keys: String): String {
@@ -137,7 +336,6 @@ object GeminiWebSessionManager {
                 if (str.isNotBlank()) return str
             }
         }
-        // Also fallback to case-insensitive match on all member names
         for (entry in json.entrySet()) {
             for (key in keys) {
                 if (entry.key.equals(key, ignoreCase = true)) {
@@ -210,9 +408,10 @@ object GeminiWebSessionManager {
             .toMap()
     }
 
-    private suspend fun fetchSessionData(cookieHeader: String): Pair<String?, String?> {
+    private suspend fun fetchSessionData(cookieHeader: String, authUser: String = ""): SessionInitData {
+        val appUrl = getGeminiUrl(GEMINI_APP_URL, authUser)
         val response = okHttpClient.newCallStrResponse {
-            url(GEMINI_APP_URL)
+            url(appUrl)
             addHeaders(
                 mapOf(
                     "Cookie" to cookieHeader,
@@ -231,7 +430,7 @@ object GeminiWebSessionManager {
             throw Exception("Không thể kết nối đến Gemini Web (HTTP $code: ${response.message()})")
         }
 
-        val body = response.body ?: return Pair(null, null)
+        val body = response.body ?: return SessionInitData()
 
         // Check if Google redirected to Google Accounts login page
         if (body.contains("accounts.google.com/ServiceLogin", ignoreCase = true) ||
@@ -263,6 +462,28 @@ object GeminiWebSessionManager {
                 break
             }
         }
-        return Pair(snlm0e, bl)
+        var sessionId: String? = null
+        for (regex in SESSION_ID_REGEXES) {
+            val found = regex.find(body)?.groupValues?.getOrNull(1)
+            if (!found.isNullOrBlank()) {
+                sessionId = found
+                break
+            }
+        }
+        var pushId: String? = null
+        for (regex in PUSH_ID_REGEXES) {
+            val found = regex.find(body)?.groupValues?.getOrNull(1)
+            if (!found.isNullOrBlank()) {
+                pushId = found
+                break
+            }
+        }
+
+        return SessionInitData(
+            snlm0e = snlm0e,
+            buildLabel = bl,
+            sessionId = sessionId,
+            pushId = pushId,
+        )
     }
 }

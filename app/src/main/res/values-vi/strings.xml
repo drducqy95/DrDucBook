@@ -4313,4 +4313,6 @@
     <string name="chapter_context_status_final">Đã chốt</string>
     <string name="edit_chapter_title">Sửa tiêu đề chương</string>
     <string name="edit_chapter_title_hint">Tiêu đề chương (lưu vĩnh viễn)</string>
+    <string name="gemini_web_multiturn_title">Duy trì hội thoại cùng truyện (Gemini Web)</string>
+    <string name="gemini_web_multiturn_summary">Tự động gửi các chương dịch của cùng một truyện vào chung đoạn chat Gemini Web để ghi nhớ nhân vật và thuật ngữ. Tắt nếu muốn mỗi chương dịch độc lập hoàn toàn.</string>
 </resources>

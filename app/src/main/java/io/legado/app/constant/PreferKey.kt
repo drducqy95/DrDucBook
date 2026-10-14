@@ -440,6 +440,7 @@ object PreferKey {
     const val aiChatBubblePortraitY = "aiChatBubblePortraitY"
     const val aiChatBubbleLandscapeX = "aiChatBubbleLandscapeX"
     const val aiChatBubbleLandscapeY = "aiChatBubbleLandscapeY"
+    const val geminiWebMultiTurnEnabled = "geminiWebMultiTurnEnabled"
 
     const val navIconHome = "navIconHome"
 

@@ -1,10 +1,10 @@
 {
   "meta": {
     "project_name": "legado-with-MD3-main",
-    "last_updated": "2026-10-14T18:35:00",
+    "last_updated": "2026-10-14T20:15:00",
     "overall_progress_percent": 100,
-    "current_phase": "P77",
-    "status": "COMPLETED",
+    "current_phase": "P78",
+    "status": "DONE",
     "database_version": 105,
     "debug_device": "HONOR LLY-LX2 (Android 14) / Huawei Nova HBN-LX9 / LDPlayer emulator-5554"
   },
@@ -3043,6 +3043,40 @@
         {
           "id": "T77.5",
           "desc": "Phase 05 — Gemini Web 4 model (3.5 Flash-Lite/3.8 Flash/3.1 Pro/4 Argon) + Cấp độ tư duy + Lồng Kỹ năng Gemini Web, Khóa chặt AI Model/Combo, Sửa lỗi TTS & Kiểm thử",
+          "status": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "P78",
+      "name": "Hoàn Thiện & Nâng Cấp Gemini Web Cho DrDucBook (Đối Chiếu & Kế Thừa gemini-web-to-api)",
+      "status": "DONE",
+      "progress": 100,
+      "plan_path": "plans/261014-1845-gemini-web-advanced-enhancements/plan.md",
+      "tasks": [
+        {
+          "id": "T78.1",
+          "desc": "Phase 01 — Cơ chế tự động làm mới Cookie (RotateCookies) & Hỗ trợ đa tài khoản Google (authUser /u/{n}/)",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.2",
+          "desc": "Phase 02 — Chuẩn hóa Browser Headers (x-goog-ext-*-jspb, f.sid, bl) & Tăng cường RPC Fidelity chống bot block",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.3",
+          "desc": "Phase 03 — Quản lý ngữ cảnh hội thoại nhiều lượt [cid, rid, rcid] cho AI Reader Chat (Book-scoped routing)",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.4",
+          "desc": "Phase 04 — Hạ tầng đính kèm ảnh/tài liệu (Resumable Upload) hỗ trợ dịch Manga/OCR (GeminiWebUploadService)",
+          "status": "DONE"
+        },
+        {
+          "id": "T78.5",
+          "desc": "Phase 05 — Kiểm thử toàn diện, phục hồi lỗi tự động & bàn giao",
           "status": "DONE"
         }
       ]

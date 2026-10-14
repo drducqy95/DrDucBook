@@ -826,6 +826,18 @@ fun TranslationConfigScreen(
                                 )
                             },
                         )
+                        var geminiWebMultiTurn by remember {
+                            mutableStateOf(TranslationConfig.geminiWebMultiTurnEnabled)
+                        }
+                        SwitchSettingItem(
+                            title = stringResource(R.string.gemini_web_multiturn_title),
+                            description = stringResource(R.string.gemini_web_multiturn_summary),
+                            checked = geminiWebMultiTurn,
+                            onCheckedChange = {
+                                geminiWebMultiTurn = it
+                                TranslationConfig.geminiWebMultiTurnEnabled = it
+                            },
+                        )
                     }
                 }
             }

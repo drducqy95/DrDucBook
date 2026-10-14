@@ -388,6 +388,11 @@ object TranslationConfig {
         "",
     )
 
+    var geminiWebMultiTurnEnabled by prefDelegate(
+        PreferKey.geminiWebMultiTurnEnabled,
+        true,
+    )
+
     // Delegate constants to domain layer
     const val PROVIDER_OPENAI = TranslationConstants.PROVIDER_OPENAI
     const val PROVIDER_APP_AI = TranslationConstants.PROVIDER_APP_AI

@@ -298,5 +298,140 @@ class WebSessionManagerTest {
         assertEquals(2, parsedInnerArgon[79].asInt)
         assertEquals(3, parsedInnerArgon[17].asJsonArray[0].asJsonArray[0].asInt)
     }
+
+    @Test
+    fun geminiWebHandlerBuilds81ElementPayloadWithMultiTurnAndJspb() {
+        val handler = GeminiWebHandler()
+
+        // 1. JSPB headers verification
+        val jspbHeaders = handler.buildJspbHeaders(modelNumber = 1, generationId = "GEN-UUID-TEST")
+        assertEquals("[0]", jspbHeaders["x-goog-ext-73010989-jspb"])
+        assertEquals("[0,0,0]", jspbHeaders["x-goog-ext-73010990-jspb"])
+        assertTrue("Must contain model JSPB header", jspbHeaders.containsKey("x-goog-ext-525001261-jspb"))
+        assertTrue("Must contain session JSPB header", jspbHeaders.containsKey("x-goog-ext-525005358-jspb"))
+        assertTrue("Model header must contain generation ID", jspbHeaders["x-goog-ext-525001261-jspb"]!!.contains("GEN-UUID-TEST"))
+
+        // 2. Multi-turn payload verification
+        val conversationMeta = GeminiWebConversationMetadata(
+            cid = "c_mock_conversation_id",
+            rid = "r_mock_response_id",
+            rcid = "rc_mock_candidate_id",
+            model = "gemini-web-3.8-flash",
+            turnCount = 3,
+        )
+        val payload = handler.buildFReqPayload(
+            prompt = "Dịch tiếp chương 2",
+            modelId = "gemini-web-3.8-flash",
+            conversationMeta = conversationMeta,
+        )
+
+        val outer = GSON.fromJson(payload, com.google.gson.JsonArray::class.java)
+        val inner = GSON.fromJson(outer[1].asString, com.google.gson.JsonArray::class.java)
+
+        // Must have exactly 81 elements (index 0 to 80)
+        assertEquals(81, inner.size())
+
+        // Index 2 must contain [cid, rid, rcid]
+        val contextArray = inner[2].asJsonArray
+        assertEquals("c_mock_conversation_id", contextArray[0].asString)
+        assertEquals("r_mock_response_id", contextArray[1].asString)
+        assertEquals("rc_mock_candidate_id", contextArray[2].asString)
+
+        // Index 45 must be 1 (isTemporary flag to avoid chat history clutter)
+        assertEquals(1, inner[45].asInt)
+
+        // Index 80 must be 1 (81st element)
+        assertEquals(1, inner[80].asInt)
+
+        // Index 6 and 41 must be [1]
+        assertEquals(1, inner[6].asJsonArray[0].asInt)
+        assertEquals(1, inner[41].asJsonArray[0].asInt)
+
+        // 3. File Attachment verification
+        val filePayload = handler.buildFReqPayload(
+            prompt = "OCR bức ảnh này",
+            modelId = "gemini-web-3.8-flash",
+            fileAttachment = Pair("w_test_file_id_123", "manga_p1.jpg")
+        )
+        val outerFile = GSON.fromJson(filePayload, com.google.gson.JsonArray::class.java)
+        val innerFile = GSON.fromJson(outerFile[1].asString, com.google.gson.JsonArray::class.java)
+        val fileArray = innerFile[0].asJsonArray[3].asJsonArray
+        val fileEntry = fileArray[0].asJsonArray
+        assertEquals("w_test_file_id_123", fileEntry[0].asJsonArray[0].asString)
+        assertEquals("manga_p1.jpg", fileEntry[1].asString)
+    }
+
+    @Test
+    fun geminiWebConversationStoreTracksPerBookMetadataAndEvicts() {
+        GeminiWebConversationStore.clearAll()
+
+        val bookKey = "https://example.com/novel/123"
+        val meta1 = GeminiWebConversationMetadata(
+            cid = "cid_book1",
+            rid = "rid_book1",
+            rcid = "rcid_book1",
+            model = "gemini-web-3.8-flash",
+            turnCount = 1,
+        )
+
+        GeminiWebConversationStore.put(bookKey, meta1)
+
+        // Same book, same model -> should retrieve conversation
+        val retrieved = GeminiWebConversationStore.get(bookKey, "gemini-web-3.8-flash")
+        assertNotNull(retrieved)
+        assertEquals("cid_book1", retrieved?.cid)
+        assertEquals(1, retrieved?.turnCount)
+
+        // Same book, different model -> should reset conversation for clean context
+        val modelMismatch = GeminiWebConversationStore.get(bookKey, "gemini-web-4-argon")
+        org.junit.Assert.assertNull("Model mismatch must reset conversation", modelMismatch)
+
+        // Turn limit enforcement: turnCount >= 30 should evict to prevent token overflow
+        val metaAtMaxTurns = GeminiWebConversationMetadata(
+            cid = "cid_max_turns",
+            rid = "rid_max_turns",
+            rcid = "rcid_max_turns",
+            model = "gemini-web-3.8-flash",
+            turnCount = 30,
+        )
+        GeminiWebConversationStore.put(bookKey, metaAtMaxTurns)
+        val maxTurnResult = GeminiWebConversationStore.get(bookKey, "gemini-web-3.8-flash")
+        org.junit.Assert.assertNull("Turns >= 30 must evict conversation", maxTurnResult)
+
+        // Removal
+        GeminiWebConversationStore.put(bookKey, meta1)
+        GeminiWebConversationStore.remove(bookKey)
+        org.junit.Assert.assertNull(GeminiWebConversationStore.get(bookKey, "gemini-web-3.8-flash"))
+    }
+
+    @Test
+    fun geminiWebSessionManagerResolvesAuthUserAndRewritesUrls() {
+        // Default authUser = ""
+        assertEquals("", GeminiWebSessionManager.resolveAuthUser(null))
+
+        // Explicit in JSON
+        val jsonCred = JsonObject().apply {
+            addProperty("cookie", "__Secure-1PSID=test")
+            addProperty("authUser", 2)
+        }.toString()
+        assertEquals("2", GeminiWebSessionManager.resolveAuthUser(jsonCred))
+
+        // From URL pattern in credential string
+        val urlCred = "__Secure-1PSID=test; https://gemini.google.com/u/1/app"
+        assertEquals("1", GeminiWebSessionManager.resolveAuthUser(urlCred))
+
+        // URL slot rewriting for non-zero authUser
+        val baseAppUrl = "https://gemini.google.com/app"
+        assertEquals("https://gemini.google.com/app", GeminiWebSessionManager.getGeminiUrl(baseAppUrl, ""))
+        assertEquals("https://gemini.google.com/app", GeminiWebSessionManager.getGeminiUrl(baseAppUrl, "0"))
+        assertEquals("https://gemini.google.com/u/1/app", GeminiWebSessionManager.getGeminiUrl(baseAppUrl, "1"))
+        assertEquals("https://gemini.google.com/u/2/app", GeminiWebSessionManager.getGeminiUrl(baseAppUrl, "2"))
+
+        val rpcUrl = "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate"
+        assertEquals(
+            "https://gemini.google.com/u/2/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate",
+            GeminiWebSessionManager.getGeminiUrl(rpcUrl, "2")
+        )
+    }
 }
 

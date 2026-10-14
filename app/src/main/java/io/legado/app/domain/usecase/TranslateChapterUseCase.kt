@@ -2527,6 +2527,7 @@ class TranslateChapterUseCase(
             },
             maxOutputTokens = outputTokenBudget,
         )
+        val multiTurn = preset.runtimeOptions.geminiWebMultiTurn && TranslationConfig.geminiWebMultiTurnEnabled
         val request = AiGenerateRequest(
             model = preset.model,
             messages = listOf(
@@ -2544,6 +2545,7 @@ class TranslateChapterUseCase(
             } else {
                 null
             },
+            providerMetadata = mapOf("multiTurn" to multiTurn.toString()),
         )
         val rawContent = AiTranslationStreamAccumulator()
         var lastPreviewLength = 0

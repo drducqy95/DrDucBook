@@ -4314,4 +4314,6 @@
     <string name="chapter_context_status_final">Final</string>
     <string name="edit_chapter_title">Edit chapter title</string>
     <string name="edit_chapter_title_hint">Chapter title (permanent)</string>
+    <string name="gemini_web_multiturn_title">Retain conversation context for same book (Gemini Web)</string>
+    <string name="gemini_web_multiturn_summary">Automatically route subsequent chapters of the same book into the existing Gemini Web conversation to remember characters and terms. Turn off for strict chapter isolation.</string>
 </resources>

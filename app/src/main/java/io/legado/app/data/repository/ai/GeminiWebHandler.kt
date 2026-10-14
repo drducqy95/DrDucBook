@@ -37,16 +37,30 @@ class GeminiWebHandler : AiProtocolHandler {
         withContext(Dispatchers.IO) {
             runCatching {
                 val fullText = StringBuilder()
-                streamInternal(request) { event ->
-                    if (event is AiStreamEvent.Content) {
-                        fullText.append(event.text)
+                var capturedCid: String? = null
+                var capturedRcid: String? = null
+                streamInternal(
+                    request = request,
+                    emitEvent = { event ->
+                        if (event is AiStreamEvent.Content) {
+                            fullText.append(event.text)
+                        }
+                    },
+                    onMetadataCaptured = { cid, rcid ->
+                        capturedCid = cid
+                        capturedRcid = rcid
                     }
-                }
+                )
                 val text = fullText.toString().trim()
                 if (text.isBlank()) {
                     throw Exception("Gemini Web returned empty response")
                 }
-                AiGenerateResponse(text = text, rawBody = text)
+                AiGenerateResponse(
+                    text = text,
+                    rawBody = text,
+                    conversationId = capturedCid,
+                    responseChoiceId = capturedRcid,
+                )
             }
         }
 
@@ -109,30 +123,118 @@ class GeminiWebHandler : AiProtocolHandler {
 
     private suspend fun streamInternal(
         request: AiGenerateRequest,
-        emitEvent: suspend (AiStreamEvent) -> Unit
+        emitEvent: suspend (AiStreamEvent) -> Unit,
+        onMetadataCaptured: ((String?, String?) -> Unit)? = null,
+    ) {
+        val apiKey = request.model.provider.apiKey
+        val sessionKey = request.routeSessionKey
+        val multiTurnEnabled = request.providerMetadata["multiTurn"] != "false" &&
+            !sessionKey.isNullOrBlank()
+
+        var retryCount = 0
+        val maxRetries = 1
+
+        while (true) {
+            try {
+                executeStreamRequest(
+                    request = request,
+                    sessionKey = sessionKey,
+                    multiTurnEnabled = multiTurnEnabled,
+                    emitEvent = emitEvent,
+                    onMetadataCaptured = onMetadataCaptured,
+                )
+                return
+            } catch (error: Throwable) {
+                val isAuthOrRpcError = error.message?.contains("RPC er", ignoreCase = true) == true ||
+                    error.message?.contains("401", ignoreCase = true) == true ||
+                    error.message?.contains("403", ignoreCase = true) == true ||
+                    error.message?.contains("BardErrorInfo", ignoreCase = true) == true ||
+                    error.message?.contains("hết hạn", ignoreCase = true) == true
+
+                if (isAuthOrRpcError && retryCount < maxRetries) {
+                    retryCount++
+                    AppLog.put("Gemini Web: Gặp lỗi phiên (${error.message}), đang kích hoạt RotateCookies tự động làm mới...")
+                    val rotatedSession = GeminiWebSessionManager.rotateSession(apiKey)
+                    if (rotatedSession != null) {
+                        AppLog.put("Gemini Web: Làm mới phiên thành công, tự động thử lại request...")
+                        continue
+                    }
+                }
+
+                // If error was related to an expired or invalid conversation ID, retry once stateless
+                if (multiTurnEnabled && retryCount < maxRetries && !sessionKey.isNullOrBlank()) {
+                    val isConversationError = error.message?.contains("conversation", ignoreCase = true) == true ||
+                        error.message?.contains("Không trích xuất được phản hồi", ignoreCase = true) == true
+                    if (isConversationError) {
+                        retryCount++
+                        AppLog.put("Gemini Web: Đặt lại conversation cho book $sessionKey và thử lại dạng stateless...")
+                        GeminiWebConversationStore.remove(sessionKey)
+                        continue
+                    }
+                }
+
+                throw error
+            }
+        }
+    }
+
+    private suspend fun executeStreamRequest(
+        request: AiGenerateRequest,
+        sessionKey: String?,
+        multiTurnEnabled: Boolean,
+        emitEvent: suspend (AiStreamEvent) -> Unit,
+        onMetadataCaptured: ((String?, String?) -> Unit)?,
     ) {
         val session = GeminiWebSessionManager.getSession(request.model.provider.apiKey)
         val prompt = buildFullPrompt(request)
         val reqId = (100000..999999).random()
 
-        val fReqPayload = buildFReqPayload(prompt, request.model.modelId)
+        val conversationMeta = if (multiTurnEnabled && !sessionKey.isNullOrBlank()) {
+            GeminiWebConversationStore.get(sessionKey, request.model.modelId)
+        } else null
+
+        val (geminiModelCode, _) = resolveGeminiWebModelSpec(request.model.modelId)
+        val fileId = request.providerMetadata["file_id"] ?: request.model.provider.runtimeMetadata["file_id"]
+        val fileName = request.providerMetadata["file_name"] ?: request.model.provider.runtimeMetadata["file_name"] ?: "input_file_0.jpg"
+        val fileAttachment: Pair<String, String>? = if (!fileId.isNullOrBlank()) Pair(fileId, fileName) else null
+        val fReqPayload = buildFReqPayload(prompt, request.model.modelId, conversationMeta, fileAttachment)
         val formBodyString = "f.req=" + URLEncoder.encode(fReqPayload, StandardCharsets.UTF_8.name()) +
             if (session.snlm0e.isNotBlank()) "&at=" + URLEncoder.encode(session.snlm0e, StandardCharsets.UTF_8.name()) else ""
 
         val requestBody = formBodyString.toRequestBody("application/x-www-form-urlencoded;charset=utf-8".toMediaType())
         val bl = session.buildLabel.ifBlank { "boq_gemini-web-uiserver_20261012.15_p0" }
         val encodedBl = URLEncoder.encode(bl, StandardCharsets.UTF_8.name())
-        val url = "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate" +
-            "?bl=$encodedBl&hl=vi&_reqid=$reqId&rt=c"
 
+        val baseUrl = GeminiWebSessionManager.getGeminiUrl(
+            "https://gemini.google.com/_/BardChatUi/data/assistant.lamda.BardFrontendService/StreamGenerate",
+            session.authUser
+        )
+        val url = buildString {
+            append(baseUrl)
+            append("?bl=").append(encodedBl)
+            append("&hl=vi")
+            append("&_reqid=").append(reqId)
+            append("&rt=c")
+            if (session.sessionId.isNotBlank()) {
+                append("&f.sid=").append(URLEncoder.encode(session.sessionId, StandardCharsets.UTF_8.name()))
+            }
+            append("&source-path=").append(URLEncoder.encode("/app", StandardCharsets.UTF_8.name()))
+        }
+
+        val refererUrl = GeminiWebSessionManager.getGeminiUrl("https://gemini.google.com/app", session.authUser)
         val headers = mutableMapOf(
             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
             "Accept" to "*/*",
             "Accept-Language" to "vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7",
             "X-Same-Domain" to "1",
             "Origin" to "https://gemini.google.com",
-            "Referer" to "https://gemini.google.com/app",
+            "Referer" to refererUrl,
         )
+
+        // Browser fidelity JSPB headers (G04)
+        val generationId = UUID.randomUUID().toString().uppercase()
+        headers.putAll(buildJspbHeaders(geminiModelCode, generationId))
+
         if (session.cookieHeader.isNotBlank()) {
             headers["Cookie"] = session.cookieHeader
         }
@@ -156,6 +258,8 @@ class GeminiWebHandler : AiProtocolHandler {
 
         val bodySource = response.body.source()
         val accumulator = GeminiStreamAccumulator(emitEvent)
+        var capturedCid: String? = null
+        var capturedRcid: String? = null
 
         try {
             while (!bodySource.exhausted()) {
@@ -166,10 +270,19 @@ class GeminiWebHandler : AiProtocolHandler {
                 checkRpcError(line, request.model.provider.apiKey)
 
                 // Lines in batchexecute response format:
-                // Length prefix line, followed by JSON payload containing [["wrb.fr", null, "JSON_STRING", ...]]
                 val extractedText = extractTextFromChunk(line)
                 if (!extractedText.isNullOrBlank()) {
                     accumulator.onTextUpdate(extractedText)
+                }
+
+                // Extract conversation metadata if not yet extracted
+                if (capturedCid == null) {
+                    val (cid, rcid) = extractConversationMetadataFromChunk(line)
+                    if (cid != null) {
+                        capturedCid = cid
+                        capturedRcid = rcid
+                        onMetadataCaptured?.invoke(cid, rcid)
+                    }
                 }
             }
         } finally {
@@ -183,6 +296,43 @@ class GeminiWebHandler : AiProtocolHandler {
                 "Vui lòng lấy lại Cookie từ Chrome/Edge đã đăng nhập."
             )
         }
+
+        // Save conversation metadata for subsequent chapter translation
+        if (multiTurnEnabled && !sessionKey.isNullOrBlank() && !capturedCid.isNullOrBlank()) {
+            val turnCount = (conversationMeta?.turnCount ?: 0) + 1
+            GeminiWebConversationStore.put(
+                sessionKey,
+                GeminiWebConversationMetadata(
+                    cid = capturedCid,
+                    rid = capturedRcid ?: "",
+                    rcid = capturedRcid ?: "",
+                    model = request.model.modelId,
+                    updatedAt = System.currentTimeMillis(),
+                    turnCount = turnCount,
+                )
+            )
+        }
+    }
+
+    internal fun buildJspbHeaders(
+        modelNumber: Int,
+        generationId: String
+    ): Map<String, String> {
+        val modelHeader = arrayOfNulls<Any?>(17)
+        modelHeader[0] = 1
+        modelHeader[7] = 0
+        modelHeader[8] = listOf(4, 5, 6, 8)
+        modelHeader[11] = 1
+        modelHeader[14] = modelNumber
+        modelHeader[15] = 1
+        modelHeader[16] = generationId
+
+        return mapOf(
+            "x-goog-ext-525001261-jspb" to COMPACT_GSON.toJson(modelHeader),
+            "x-goog-ext-525005358-jspb" to COMPACT_GSON.toJson(listOf(UUID.randomUUID().toString(), 1)),
+            "x-goog-ext-73010989-jspb" to "[0]",
+            "x-goog-ext-73010990-jspb" to "[0,0,0]",
+        )
     }
 
     internal fun checkRpcError(line: String, credentialKey: String? = null) {
@@ -297,30 +447,52 @@ Hãy sử dụng Kỹ năng "$skillName" đã được thiết lập của tôi 
         }
     }
 
-    internal fun buildFReqPayload(prompt: String, modelId: String = ""): String {
-        // Map model IDs to Google's MODE_CATEGORY and think_mode
-        // 1=FAST, 2=THINKING, 3=PRO, 4=AUTO, 5=FAST_DYNAMIC_THINKING, 6=FLASH_LITE
+    internal fun buildFReqPayload(
+        prompt: String,
+        modelId: String = "",
+        conversationMeta: GeminiWebConversationMetadata? = null,
+        fileAttachment: Pair<String, String>? = null,
+    ): String {
         val (geminiModelCode, thinkMode) = resolveGeminiWebModelSpec(modelId)
 
         val innerArray = JsonArray()
-        for (i in 0 until 80) {
+        for (i in 0 until 81) {
             innerArray.add(JsonNull.INSTANCE)
+        }
+
+        val fileAttachmentArray = if (fileAttachment != null && fileAttachment.first.isNotBlank()) {
+            JsonArray().apply {
+                add(JsonArray().apply {
+                    add(JsonArray().apply {
+                        add(fileAttachment.first)
+                    })
+                    add(fileAttachment.second.ifBlank { "input_file_0.jpg" })
+                })
+            }
+        } else {
+            JsonNull.INSTANCE
         }
 
         innerArray.set(0, JsonArray().apply {
             add(prompt)
             add(0)
             add(JsonNull.INSTANCE)
-            add(JsonNull.INSTANCE)
+            add(fileAttachmentArray)
             add(JsonNull.INSTANCE)
             add(JsonNull.INSTANCE)
             add(0)
         })
         innerArray.set(1, JsonArray().apply { add("vi") })
         innerArray.set(2, JsonArray().apply {
-            add("")
-            add("")
-            add("")
+            if (conversationMeta != null && conversationMeta.cid.isNotBlank()) {
+                add(conversationMeta.cid)
+                add(conversationMeta.rid)
+                add(conversationMeta.rcid)
+            } else {
+                add("")
+                add("")
+                add("")
+            }
             add(JsonNull.INSTANCE)
             add(JsonNull.INSTANCE)
             add(JsonNull.INSTANCE)
@@ -329,7 +501,7 @@ Hãy sử dụng Kỹ năng "$skillName" đã được thiết lập của tôi 
             add(JsonNull.INSTANCE)
             add("")
         })
-        innerArray.set(6, JsonArray().apply { add(0) })
+        innerArray.set(6, JsonArray().apply { add(1) })
         innerArray.set(7, JsonPrimitive(1))
         innerArray.set(10, JsonPrimitive(1))
         innerArray.set(11, JsonPrimitive(0))
@@ -339,12 +511,14 @@ Hãy sử dụng Kỹ năng "$skillName" đã được thiết lập của tôi 
         innerArray.set(18, JsonPrimitive(0))
         innerArray.set(27, JsonPrimitive(1))
         innerArray.set(30, JsonArray().apply { add(4) })
-        innerArray.set(41, JsonArray().apply { add(2) })
+        innerArray.set(41, JsonArray().apply { add(1) })
+        innerArray.set(45, JsonPrimitive(1)) // isTemporary flag
         innerArray.set(53, JsonPrimitive(0))
-        innerArray.set(59, JsonPrimitive(UUID.randomUUID().toString()))
+        innerArray.set(59, JsonPrimitive(UUID.randomUUID().toString().uppercase()))
         innerArray.set(61, JsonArray())
         innerArray.set(68, JsonPrimitive(1))
         innerArray.set(79, JsonPrimitive(geminiModelCode))
+        innerArray.set(80, JsonPrimitive(1)) // 81st element
 
         val outerArray = JsonArray().apply {
             add(JsonNull.INSTANCE)
@@ -382,6 +556,64 @@ Hãy sử dụng Kỹ năng "$skillName" đã được thiết lập của tôi 
         }.getOrNull()
     }
 
+    internal fun extractConversationMetadataFromChunk(line: String): Pair<String?, String?> {
+        val trimmed = line.trim()
+        if (!trimmed.startsWith("[")) return Pair(null, null)
+        return runCatching {
+            val root = COMPACT_GSON.fromJson(trimmed, JsonElement::class.java)
+            if (!root.isJsonArray) return@runCatching Pair(null, null)
+            val rootArray = root.asJsonArray
+
+            for (elem in rootArray) {
+                if (elem.isJsonArray) {
+                    val rpcItem = elem.asJsonArray
+                    if (rpcItem.size() > 2 &&
+                        rpcItem[0].isJsonPrimitive &&
+                        rpcItem[0].asString == "wrb.fr" &&
+                        rpcItem[2].isJsonPrimitive
+                    ) {
+                        val innerJson = rpcItem[2].asString
+                        val meta = parseConversationMetadataFromInnerJson(innerJson)
+                        if (meta.first != null) return@runCatching meta
+                    }
+                }
+            }
+            Pair(null, null)
+        }.getOrDefault(Pair(null, null))
+    }
+
+    internal fun parseConversationMetadataFromInnerJson(innerJson: String): Pair<String?, String?> {
+        val trimmed = innerJson.trim()
+        if (!trimmed.startsWith("[")) return Pair(null, null)
+        return runCatching {
+            val inner = COMPACT_GSON.fromJson(trimmed, JsonElement::class.java)
+            if (!inner.isJsonArray) return@runCatching Pair(null, null)
+            val arr = inner.asJsonArray
+
+            // 1. cid from arr[1]
+            val cid = when {
+                arr.size() > 1 && arr[1].isJsonPrimitive -> arr[1].asString.takeIf { it.isNotBlank() }
+                arr.size() > 1 && arr[1].isJsonArray && arr[1].asJsonArray.size() > 0 ->
+                    arr[1].asJsonArray[0].takeIf { it.isJsonPrimitive }?.asString?.takeIf { it.isNotBlank() }
+                else -> null
+            }
+
+            // 2. rcid from arr[4][0][0]
+            var rcid: String? = null
+            if (arr.size() > 4 && arr[4].isJsonArray) {
+                val candidates = arr[4].asJsonArray
+                if (candidates.size() > 0 && candidates[0].isJsonArray) {
+                    val cand0 = candidates[0].asJsonArray
+                    if (cand0.size() > 0 && cand0[0].isJsonPrimitive) {
+                        rcid = cand0[0].asString.takeIf { it.isNotBlank() }
+                    }
+                }
+            }
+
+            Pair(cid, rcid)
+        }.getOrDefault(Pair(null, null))
+    }
+
     internal fun parseInnerJson(innerJson: String): String? {
         val trimmed = innerJson.trim()
         if (!trimmed.startsWith("[")) return null
@@ -411,6 +643,16 @@ Hãy sử dụng Kỹ năng "$skillName" đã được thiết lập của tôi 
                         val text = textBuilder.toString()
                         if (text.isNotBlank()) return@runCatching text
                     }
+                }
+            }
+
+            // Newer StreamGenerate format: payload[2] is a map {"7": ["text"], "44": true}
+            if (innerArray.size() > 2 && innerArray[2].isJsonObject) {
+                val fields = innerArray[2].asJsonObject
+                val textField = fields.getAsJsonArray("7")
+                if (textField != null && textField.size() > 0 && textField[0].isJsonPrimitive) {
+                    val text = textField[0].asString
+                    if (text.isNotBlank()) return@runCatching text
                 }
             }
 
@@ -495,10 +737,12 @@ Hãy sử dụng Kỹ năng "$skillName" đã được thiết lập của tôi 
             if (cleaned.isEmpty()) return
             emittedAny = true
 
-            // Look for <thought> or ```thought
+            // Look for <thought>, ```thought, or Google native <ctrl94>thought / <ctrl95>
             val thoughtTag = when {
                 cleaned.contains("<thought>") -> "<thought>" to "</thought>"
                 cleaned.contains("```thought") -> "```thought" to "```"
+                cleaned.contains("<ctrl94>thought") -> "<ctrl94>thought" to "<ctrl95>"
+                cleaned.contains("<ctrl94>") -> "<ctrl94>" to "<ctrl95>"
                 else -> null
             }
 
