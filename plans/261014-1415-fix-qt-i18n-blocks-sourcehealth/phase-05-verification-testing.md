@@ -310,7 +310,7 @@ Khi người dùng đã tạo trước một **Kỹ năng (Skill)** trong mục 
 
 
 
-```
+
 
 
 
@@ -393,3 +393,4 @@ QUY TẮC BẮT BUỘC:
 2. Tái cấu trúc các câu văn dịch thô/convert bị ngược trật tự từ thành câu tiếng Việt tự nhiên, uyển chuyển, giàu hình ảnh.
 
 3. Bảo toàn số lượng đoạn văn và đối thoại; chỉ xuất trực tiếp nội dung chương đã biên tập hoàn chỉnh, không thêm lời bình luận ở đầu hoặc cuối.
+```
