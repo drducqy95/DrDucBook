@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,6 +22,8 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -247,7 +250,7 @@ private fun BookCacheManageScreen(
                     top = paddingValues.calculateTopPadding(),
                     bottom = paddingValues.calculateBottomPadding() + 24.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 cacheSection(
                     title = bookshelfSectionTitle,
@@ -419,6 +422,7 @@ private fun BookCacheBookCard(
         progressDescription,
         statusSummary
     )
+    val showProgress = item.hasActiveDownload || item.hasDownloadTask || item.cachedCount < item.totalCount
     NormalCard(
         modifier = modifier
             .fillMaxWidth()
@@ -433,8 +437,8 @@ private fun BookCacheBookCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -456,73 +460,75 @@ private fun BookCacheBookCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     AppText(
-                        text = item.author,
-                        style = LegadoTheme.typography.labelSmallEmphasized,
+                        text = "${item.author} • $statusSummary • ${item.cachedCount}/${item.totalCount}",
+                        style = LegadoTheme.typography.labelSmall,
                         color = LegadoTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                TextCard(
-                    text = "${item.cachedCount}/${item.totalCount}",
-                    backgroundColor = LegadoTheme.colorScheme.cardContainer,
-                )
-            }
-            AppLinearProgressIndicator(
-                progress = item.progress,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics {
-                        contentDescription = progressDescription
-                        progressBarRangeInfo = ProgressBarRangeInfo(item.progress, 0f..1f)
-                    }
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                AppText(
-                    text = statusSummary,
-                    modifier = Modifier.weight(1f),
-                    style = LegadoTheme.typography.labelMediumEmphasized,
-                    color = LegadoTheme.colorScheme.onSurfaceVariant
-                )
-                if (item.hasDownloadTask || item.cachedCount < item.totalCount) {
-                    SmallTonalButton(
-                        onClick = {
-                            if (item.hasActiveDownload) {
-                                onIntent(BookCacheManageIntent.StopBookDownload(item.bookUrl))
-                            } else {
-                                onIntent(BookCacheManageIntent.StartBookDownload(item.bookUrl))
-                            }
-                        },
-                        icon = if (item.hasActiveDownload) Icons.Default.Stop else Icons.Default.PlayArrow,
-                        contentDescription = when {
-                            item.hasActiveDownload -> stringResource(
-                                R.string.pause_book_download,
-                                item.name
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (item.hasDownloadTask || item.cachedCount < item.totalCount) {
+                        IconButton(
+                            onClick = {
+                                if (item.hasActiveDownload) {
+                                    onIntent(BookCacheManageIntent.StopBookDownload(item.bookUrl))
+                                } else {
+                                    onIntent(BookCacheManageIntent.StartBookDownload(item.bookUrl))
+                                }
+                            },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (item.hasActiveDownload) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                contentDescription = when {
+                                    item.hasActiveDownload -> stringResource(
+                                        R.string.pause_book_download,
+                                        item.name
+                                    )
+                                    item.isPaused -> stringResource(
+                                        R.string.resume_book_download,
+                                        item.name
+                                    )
+                                    else -> stringResource(R.string.start_book_download, item.name)
+                                },
+                                modifier = Modifier.size(18.dp),
                             )
-                            item.isPaused -> stringResource(
-                                R.string.resume_book_download,
-                                item.name
-                            )
-                            else -> stringResource(R.string.start_book_download, item.name)
                         }
-                    )
+                    }
+                    IconButton(
+                        onClick = { onDeleteBook(item) },
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete_book_cache, item.name),
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
                 }
-                SmallTonalButton(
-                    onClick = { onDeleteBook(item) },
-                    icon = Icons.Default.Delete,
-                    contentDescription = stringResource(R.string.delete_book_cache, item.name)
+            }
+            if (showProgress) {
+                AppLinearProgressIndicator(
+                    progress = item.progress,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .semantics {
+                            contentDescription = progressDescription
+                            progressBarRangeInfo = ProgressBarRangeInfo(item.progress, 0f..1f)
+                        }
                 )
             }
             item.failureMessage?.takeIf { it.isNotBlank() }?.let { message ->
                 AppText(
                     text = stringResource(R.string.cache_book_error_detail, message),
-                    style = LegadoTheme.typography.labelMedium,
+                    style = LegadoTheme.typography.labelSmall,
                     color = LegadoTheme.colorScheme.error,
-                    maxLines = 3,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -555,7 +561,7 @@ private fun BookCacheChapterRow(
             .fillMaxWidth()
             .padding(
                 horizontal = 12.dp,
-                vertical = 4.dp
+                vertical = 2.dp
             ),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -590,7 +596,8 @@ private fun BookCacheChapterRow(
                     progress = item.downloadProgress,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp)
+                        .height(3.dp)
+                        .padding(top = 2.dp)
                         .semantics {
                             contentDescription = downloadProgressDescription
                             progressBarRangeInfo = ProgressBarRangeInfo(
@@ -601,35 +608,55 @@ private fun BookCacheChapterRow(
                 )
             }
         }
-        if (item.isWaiting || item.isDownloading) {
-            SmallTonalButton(
-                onClick = onStop,
-                icon = Icons.Default.Stop,
-                contentDescription = stringResource(R.string.pause_chapter_download, item.title)
-            )
-        } else if (item.isPaused || !item.isCached) {
-            SmallTonalButton(
-                onClick = onDownload,
-                icon = Icons.Default.Download,
-                contentDescription = if (item.isPaused) {
-                    stringResource(R.string.resume_chapter_download, item.title)
-                } else {
-                    stringResource(R.string.download_chapter, item.title)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (item.isWaiting || item.isDownloading) {
+                IconButton(
+                    onClick = onStop,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Stop,
+                        contentDescription = stringResource(R.string.pause_chapter_download, item.title),
+                        modifier = Modifier.size(18.dp),
+                    )
                 }
-            )
+            } else if (item.isPaused || !item.isCached) {
+                IconButton(
+                    onClick = onDownload,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = if (item.isPaused) {
+                            stringResource(R.string.resume_chapter_download, item.title)
+                        } else {
+                            stringResource(R.string.download_chapter, item.title)
+                        },
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(32.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = stringResource(
+                        if (item.hasDownloadTask) {
+                            R.string.delete_chapter_task_and_cache
+                        } else {
+                            R.string.delete_chapter_cache
+                        },
+                        item.title,
+                    ),
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
-        SmallTonalButton(
-            onClick = onDelete,
-            icon = Icons.Default.Delete,
-            contentDescription = stringResource(
-                if (item.hasDownloadTask) {
-                    R.string.delete_chapter_task_and_cache
-                } else {
-                    R.string.delete_chapter_cache
-                },
-                item.title,
-            )
-        )
     }
 }
 

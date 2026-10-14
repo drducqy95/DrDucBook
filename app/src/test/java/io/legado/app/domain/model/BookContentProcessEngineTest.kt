@@ -49,6 +49,25 @@ class BookContentProcessEngineTest {
         assertTrue(result.effectiveProcesses.isNotEmpty())
     }
 
+    @Test
+    fun `collapses consecutive empty lines after deletion`() {
+        val process = process(
+            selectedText = "【quảng cáo rác】",
+            replacement = "",
+        )
+
+        val result = BookContentProcessEngine.apply(
+            content = "Đoạn 1.\n\n【quảng cáo rác】\n\n\n\nĐoạn 2.",
+            processes = listOf(process),
+        )
+
+        assertEquals(
+            "Đoạn 1.\n\nĐoạn 2.",
+            result.text,
+        )
+        assertTrue(result.effectiveProcesses.isNotEmpty())
+    }
+
     private fun process(
         selectedText: String,
         replacement: String,

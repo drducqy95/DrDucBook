@@ -378,7 +378,7 @@ private fun LocalTtsVoiceCatalogDialog(
         dismissText = stringResource(R.string.cancel),
         onDismiss = onDismissRequest,
         content = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 TinyClickableSettingItem(
                     title = stringResource(R.string.local_tts_voice_catalog_folder),
                     description = stringResource(R.string.local_tts_voice_catalog_folder_summary),
@@ -404,7 +404,7 @@ private fun LocalTtsVoiceCatalogItem(
     }
     TinyClickableSettingItem(
         title = asset.displayName,
-        description = "${asset.engine} - $supportLabel - ${formatAssetSize(asset.sizeBytes)}",
+        description = "${asset.engine} • $supportLabel • ${formatAssetSize(asset.sizeBytes)}",
         onClick = { onOpenUrl(asset.downloadUrl) },
     )
 }

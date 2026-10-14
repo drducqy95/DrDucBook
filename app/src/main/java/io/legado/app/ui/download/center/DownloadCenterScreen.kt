@@ -1,5 +1,6 @@
-﻿package io.legado.app.ui.download.center
+package io.legado.app.ui.download.center
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,19 +8,35 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.drducbook.app.R
@@ -27,6 +44,7 @@ import io.legado.app.domain.model.DownloadCenterItem
 import io.legado.app.domain.model.DownloadCenterAction
 import io.legado.app.domain.model.DownloadDisplayState
 import io.legado.app.domain.model.DownloadItemKind
+import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.text.AppText
 import org.koin.androidx.compose.koinViewModel
@@ -142,95 +160,129 @@ private fun DownloadCenterItemCard(
     onAction: (DownloadCenterAction) -> Unit,
 ) {
     NormalCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                AppText(
-                    text = item.title,
-                    style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-                )
-                AppText(text = item.state.label())
-            }
-            AppText(
-                text = buildString {
-                    append(
-                        if (item.kind == DownloadItemKind.BOOK) {
-                            stringResource(R.string.offline_cache)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(LegadoTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (item.kind == DownloadItemKind.BOOK) {
+                            Icons.Default.AutoStories
                         } else {
-                            stringResource(R.string.media_downloads_title)
-                        }
+                            Icons.Default.Language
+                        },
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = LegadoTheme.colorScheme.primary,
                     )
-                    item.subtitle?.takeIf(String::isNotBlank)?.let { append(" · $it") }
-                },
-            )
-            item.progress?.let { progress ->
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    AppText(
+                        text = item.title,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    AppText(
+                        text = buildString {
+                            append(item.state.label())
+                            if (item.downloadedBytes != null) {
+                                append(" • ")
+                                append(formatDownloadBytes(item.downloadedBytes))
+                                item.totalBytes?.takeIf { it > 0L }?.let {
+                                    append(" / ")
+                                    append(formatDownloadBytes(it))
+                                }
+                            }
+                            item.subtitle?.takeIf(String::isNotBlank)?.let { append(" • $it") }
+                        },
+                        style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                        color = LegadoTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (item.kind == DownloadItemKind.MEDIA) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        when (item.state) {
+                            DownloadDisplayState.WAITING,
+                            DownloadDisplayState.RUNNING -> IconButton(
+                                onClick = { onAction(DownloadCenterAction.PauseMedia(item.id.removePrefix("media:"))) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(Icons.Default.Pause, contentDescription = stringResource(R.string.pause), modifier = Modifier.size(18.dp))
+                            }
+                            DownloadDisplayState.PAUSED -> IconButton(
+                                onClick = { onAction(DownloadCenterAction.ResumeMedia(item.id.removePrefix("media:"))) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.resume), modifier = Modifier.size(18.dp))
+                            }
+                            DownloadDisplayState.FAILED -> IconButton(
+                                onClick = { onAction(DownloadCenterAction.RetryMedia(item.id.removePrefix("media:"))) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.retry), modifier = Modifier.size(18.dp))
+                            }
+                            DownloadDisplayState.COMPLETED,
+                            DownloadDisplayState.CANCELED -> IconButton(
+                                onClick = { onAction(DownloadCenterAction.DeleteMedia(item.id.removePrefix("media:"))) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        if (item.state == DownloadDisplayState.WAITING ||
+                            item.state == DownloadDisplayState.RUNNING ||
+                            item.state == DownloadDisplayState.PAUSED ||
+                            item.state == DownloadDisplayState.FAILED
+                        ) {
+                            IconButton(
+                                onClick = { onAction(DownloadCenterAction.CancelMedia(item.id.removePrefix("media:"))) },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+            if (item.progress != null && item.state != DownloadDisplayState.COMPLETED) {
                 LinearProgressIndicator(
-                    progress = { progress },
+                    progress = { item.progress },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 10.dp),
-                )
-            }
-            if (item.downloadedBytes != null) {
-                AppText(
-                    text = buildString {
-                        append(formatDownloadBytes(item.downloadedBytes))
-                        item.totalBytes?.takeIf { it > 0L }?.let {
-                            append(" / ")
-                            append(formatDownloadBytes(it))
-                        }
-                    },
-                    modifier = Modifier.padding(top = 6.dp),
+                        .height(3.dp),
                 )
             }
             item.errorMessage?.takeIf(String::isNotBlank)?.let { error ->
-                AppText(text = error, modifier = Modifier.padding(top = 6.dp))
-            }
-            if (item.kind == DownloadItemKind.MEDIA) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    when (item.state) {
-                        DownloadDisplayState.WAITING,
-                        DownloadDisplayState.RUNNING -> OutlinedButton(
-                            onClick = {
-                                onAction(DownloadCenterAction.PauseMedia(item.id.removePrefix("media:")))
-                            },
-                        ) { AppText(stringResource(R.string.pause)) }
-                        DownloadDisplayState.PAUSED -> Button(
-                            onClick = {
-                                onAction(DownloadCenterAction.ResumeMedia(item.id.removePrefix("media:")))
-                            },
-                        ) { AppText(stringResource(R.string.resume)) }
-                        DownloadDisplayState.FAILED -> Button(
-                            onClick = {
-                                onAction(DownloadCenterAction.RetryMedia(item.id.removePrefix("media:")))
-                            },
-                        ) { AppText(stringResource(R.string.retry)) }
-                        DownloadDisplayState.COMPLETED,
-                        DownloadDisplayState.CANCELED -> OutlinedButton(
-                            onClick = {
-                                onAction(DownloadCenterAction.DeleteMedia(item.id.removePrefix("media:")))
-                            },
-                        ) { AppText(stringResource(R.string.delete)) }
-                    }
-                    if (item.state == DownloadDisplayState.WAITING ||
-                        item.state == DownloadDisplayState.RUNNING ||
-                        item.state == DownloadDisplayState.PAUSED ||
-                        item.state == DownloadDisplayState.FAILED
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                onAction(DownloadCenterAction.CancelMedia(item.id.removePrefix("media:")))
-                            },
-                        ) { AppText(stringResource(R.string.cancel)) }
-                    }
-                }
+                AppText(
+                    text = error,
+                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                    color = LegadoTheme.colorScheme.error,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

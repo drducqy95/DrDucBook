@@ -67,7 +67,17 @@ object BookContentProcessEngine {
                     effectiveProcesses.add(process)
                 }
             }
+        if (effectiveProcesses.isNotEmpty()) {
+            output = collapseEmptyBlocks(output)
+        }
         return ApplyResult(output, effectiveProcesses)
+    }
+
+    private val CONSECUTIVE_EMPTY_LINES_REGEX = Regex("""\n(?:[ \t\u3000]*\n){2,}""")
+
+    fun collapseEmptyBlocks(text: String): String {
+        if (text.isEmpty()) return text
+        return text.replace(CONSECUTIVE_EMPTY_LINES_REGEX, "\n\n").trim()
     }
 
     fun normalizeProcessText(text: String): String {
